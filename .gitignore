@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+learnovo-backend/config.env
+learnovo-frontend/.env
+
+# Build outputs
+learnovo-frontend/dist/
+learnovo-frontend/build/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+learnovo-backend/uploads/*
+!learnovo-backend/uploads/.gitkeep
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# MongoDB
+*.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Misc
+*.pem
+*.key
+

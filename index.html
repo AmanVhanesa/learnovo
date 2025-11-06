@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learnovo - Smart Student Management Software</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <img src="learnovo.png" alt="Learnovo Logo" class="logo-img">
+                <span>Learnovo</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#dashboard">Dashboard</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+            <div class="nav-buttons">
+                <button class="btn-secondary">Login</button>
+                <button class="btn-primary">Get Started</button>
+            </div>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-content">
+                <h1 class="hero-title">Smart Student Management for Schools, Institutes, and Tuitions</h1>
+                <p class="hero-description">Streamline your educational institution with our comprehensive student management system. Track students, manage fees, assign homework, and generate reports all in one place.</p>
+                <div class="hero-buttons">
+                    <button class="btn-primary btn-large">Get Started</button>
+                    <button class="btn-outline btn-large">Request Demo</button>
+                </div>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-shapes">
+                    <div class="shape shape-1"></div>
+                    <div class="shape shape-2"></div>
+                    <div class="shape shape-3"></div>
+                </div>
+                <div class="hero-illustration">
+                    <i class="fas fa-users"></i>
+                    <i class="fas fa-book"></i>
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Core Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Core Features</h2>
+                <p>Everything you need to manage your educational institution efficiently</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h3>Add Students</h3>
+                    <p>Register and store comprehensive student details including name, class, roll number, contact information, and guardian details.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-edit"></i>
+                    </div>
+                    <h3>Manage Student Records</h3>
+                    <p>Edit, update, and remove student information anytime with our intuitive interface and secure data management.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-credit-card"></i>
+                    </div>
+                    <h3>Fees Management</h3>
+                    <p>Track fee payments, manage pending dues, generate invoices, and send automated fee reminders to parents.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-tasks"></i>
+                    </div>
+                    <h3>Homework Management</h3>
+                    <p>Assign homework, upload files, track student submissions, and provide feedback all in one centralized system.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-bullhorn"></i>
+                    </div>
+                    <h3>Notice & Updates</h3>
+                    <p>Create and broadcast important notices and announcements to students and parents instantly.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3>Reports & Analytics</h3>
+                    <p>Generate comprehensive reports on attendance, performance, and fees with detailed analytics and insights.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Preview Section -->
+    <section id="dashboard" class="dashboard-preview">
+        <div class="container">
+            <div class="section-header">
+                <h2>Dashboard Preview</h2>
+                <p>Experience the power of our intuitive dashboard</p>
+            </div>
+            <div class="dashboard-container">
+                <div class="dashboard-tabs">
+                    <button class="tab-btn active" data-tab="students">Students</button>
+                    <button class="tab-btn" data-tab="fees">Fees</button>
+                    <button class="tab-btn" data-tab="homework">Homework</button>
+                    <button class="tab-btn" data-tab="notices">Notices</button>
+                    <button class="tab-btn" data-tab="reports">Reports</button>
+                </div>
+                <div class="dashboard-content">
+                    <div class="tab-content active" id="students">
+                        <div class="dashboard-mockup">
+                            <div class="mockup-header">
+                                <h3>Student Management</h3>
+                                <button class="btn-primary">Add Student</button>
+                            </div>
+                            <div class="mockup-table">
+                                <div class="table-row header">
+                                    <div>Name</div>
+                                    <div>Class</div>
+                                    <div>Roll No.</div>
+                                    <div>Status</div>
+                                </div>
+                                <div class="table-row">
+                                    <div>John Doe</div>
+                                    <div>10th A</div>
+                                    <div>001</div>
+                                    <div><span class="status active">Active</span></div>
+                                </div>
+                                <div class="table-row">
+                                    <div>Jane Smith</div>
+                                    <div>10th B</div>
+                                    <div>002</div>
+                                    <div><span class="status active">Active</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="fees">
+                        <div class="dashboard-mockup">
+                            <div class="mockup-header">
+                                <h3>Fees Management</h3>
+                                <button class="btn-primary">Add Payment</button>
+                            </div>
+                            <div class="fees-summary">
+                                <div class="summary-card">
+                                    <h4>Total Collected</h4>
+                                    <span class="amount">$45,230</span>
+                                </div>
+                                <div class="summary-card">
+                                    <h4>Pending Dues</h4>
+                                    <span class="amount pending">$12,450</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="homework">
+                        <div class="dashboard-mockup">
+                            <div class="mockup-header">
+                                <h3>Homework Management</h3>
+                                <button class="btn-primary">Assign Homework</button>
+                            </div>
+                            <div class="homework-list">
+                                <div class="homework-item">
+                                    <h4>Math Assignment</h4>
+                                    <p>Due: Dec 15, 2024</p>
+                                    <span class="submissions">15/30 submitted</span>
+                                </div>
+                                <div class="homework-item">
+                                    <h4>Science Project</h4>
+                                    <p>Due: Dec 20, 2024</p>
+                                    <span class="submissions">8/30 submitted</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="notices">
+                        <div class="dashboard-mockup">
+                            <div class="mockup-header">
+                                <h3>Notices & Updates</h3>
+                                <button class="btn-primary">Create Notice</button>
+                            </div>
+                            <div class="notices-list">
+                                <div class="notice-item">
+                                    <h4>Holiday Notice</h4>
+                                    <p>School will be closed on Dec 25th for Christmas</p>
+                                    <span class="date">Dec 20, 2024</span>
+                                </div>
+                                <div class="notice-item">
+                                    <h4>Exam Schedule</h4>
+                                    <p>Final exams start from Jan 15th</p>
+                                    <span class="date">Dec 18, 2024</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="reports">
+                        <div class="dashboard-mockup">
+                            <div class="mockup-header">
+                                <h3>Reports & Analytics</h3>
+                                <button class="btn-primary">Generate Report</button>
+                            </div>
+                            <div class="reports-grid">
+                                <div class="report-card">
+                                    <h4>Attendance Report</h4>
+                                    <div class="chart-placeholder">📊</div>
+                                </div>
+                                <div class="report-card">
+                                    <h4>Performance Analysis</h4>
+                                    <div class="chart-placeholder">📈</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Why Learnovo Section -->
+    <section class="why-learnovo">
+        <div class="container">
+            <div class="section-header">
+                <h2>Why Choose Learnovo?</h2>
+                <p>Discover the advantages that make us the preferred choice for educational institutions</p>
+            </div>
+            <div class="benefits-grid">
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-mouse-pointer"></i>
+                    </div>
+                    <h3>Easy to Use</h3>
+                    <p>Intuitive interface designed for educators, no technical expertise required</p>
+                </div>
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3>Secure & Cloud-based</h3>
+                    <p>Your data is safe with enterprise-grade security and cloud backup</p>
+                </div>
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-university"></i>
+                    </div>
+                    <h3>Universal Access</h3>
+                    <p>Perfect for schools, tuition centers, and institutes of all sizes</p>
+                </div>
+                <div class="benefit-item">
+                    <div class="benefit-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>Saves Time</h3>
+                    <p>Automate routine tasks and focus on what matters most - teaching</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="testimonials">
+        <div class="container">
+            <div class="section-header">
+                <h2>What Our Users Say</h2>
+                <p>Hear from educational institutions that trust Learnovo</p>
+            </div>
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <div class="testimonial-content">
+                        <p>"Learnovo has revolutionized how we manage our students. The interface is so intuitive that our staff learned it in minutes."</p>
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-info">
+                            <h4>Sarah Johnson</h4>
+                            <span>Principal, Greenfield High School</span>
+                        </div>
+                        <div class="rating">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card">
+                    <div class="testimonial-content">
+                        <p>"The fees management feature has saved us countless hours. Parents love the automated reminders and online payment options."</p>
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-info">
+                            <h4>Michael Chen</h4>
+                            <span>Director, Bright Future Academy</span>
+                        </div>
+                        <div class="rating">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card">
+                    <div class="testimonial-content">
+                        <p>"As a tuition center owner, I needed something simple yet powerful. Learnovo delivers exactly that - perfect for our needs."</p>
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-info">
+                            <h4>Priya Sharma</h4>
+                            <span>Owner, Excel Tuition Center</span>
+                        </div>
+                        <div class="rating">
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                            <i class="fas fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Plans Section -->
+    <section id="pricing" class="pricing">
+        <div class="container">
+            <div class="section-header">
+                <h2>Choose Your Plan</h2>
+                <p>Flexible pricing options for institutions of all sizes</p>
+            </div>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <div class="plan-header">
+                        <h3>Free Trial</h3>
+                        <div class="price">
+                            <span class="currency">$</span>
+                            <span class="amount">0</span>
+                            <span class="period">/month</span>
+                        </div>
+                        <p>Perfect for small institutes</p>
+                    </div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> Up to 50 students</li>
+                        <li><i class="fas fa-check"></i> Basic student management</li>
+                        <li><i class="fas fa-check"></i> Simple fee tracking</li>
+                        <li><i class="fas fa-check"></i> Email support</li>
+                        <li><i class="fas fa-check"></i> 30-day trial</li>
+                    </ul>
+                    <button class="btn-outline">Start Free Trial</button>
+                </div>
+                <div class="pricing-card featured">
+                    <div class="popular-badge">Most Popular</div>
+                    <div class="plan-header">
+                        <h3>Standard</h3>
+                        <div class="price">
+                            <span class="currency">$</span>
+                            <span class="amount">29</span>
+                            <span class="period">/month</span>
+                        </div>
+                        <p>Ideal for schools</p>
+                    </div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> Up to 500 students</li>
+                        <li><i class="fas fa-check"></i> Complete student management</li>
+                        <li><i class="fas fa-check"></i> Advanced fee management</li>
+                        <li><i class="fas fa-check"></i> Homework & notices</li>
+                        <li><i class="fas fa-check"></i> Basic reports</li>
+                        <li><i class="fas fa-check"></i> Priority support</li>
+                    </ul>
+                    <button class="btn-primary">Get Started</button>
+                </div>
+                <div class="pricing-card">
+                    <div class="plan-header">
+                        <h3>Premium</h3>
+                        <div class="price">
+                            <span class="currency">$</span>
+                            <span class="amount">79</span>
+                            <span class="period">/month</span>
+                        </div>
+                        <p>For universities & large institutions</p>
+                    </div>
+                    <ul class="plan-features">
+                        <li><i class="fas fa-check"></i> Unlimited students</li>
+                        <li><i class="fas fa-check"></i> All features included</li>
+                        <li><i class="fas fa-check"></i> Advanced analytics</li>
+                        <li><i class="fas fa-check"></i> Custom integrations</li>
+                        <li><i class="fas fa-check"></i> API access</li>
+                        <li><i class="fas fa-check"></i> 24/7 support</li>
+                    </ul>
+                    <button class="btn-outline">Contact Sales</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact & Signup Section -->
+    <section id="contact" class="contact">
+        <div class="container">
+            <div class="contact-content">
+                <div class="contact-info">
+                    <h2>Get in Touch</h2>
+                    <p>Ready to transform your educational institution? Contact us today to learn more about Learnovo.</p>
+                    <div class="contact-details">
+                        <div class="contact-item">
+                            <i class="fas fa-envelope"></i>
+                            <span>info@learnovo.com</span>
+                        </div>
+                        <div class="contact-item">
+                            <i class="fas fa-phone"></i>
+                            <span>+1 (555) 123-4567</span>
+                        </div>
+                        <div class="contact-item">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span>123 Education Street, Learning City</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="contact-form">
+                    <form>
+                        <div class="form-group">
+                            <input type="text" placeholder="Your Name" required>
+                        </div>
+                        <div class="form-group">
+                            <input type="email" placeholder="Your Email" required>
+                        </div>
+                        <div class="form-group">
+                            <input type="tel" placeholder="Phone Number">
+                        </div>
+                        <div class="form-group">
+                            <textarea placeholder="Your Message" rows="5" required></textarea>
+                        </div>
+                        <button type="submit" class="btn-primary btn-full">Send Message</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                <div class="footer-logo">
+                    <img src="learnovo.png" alt="Learnovo Logo" class="logo-img">
+                    <span>Learnovo</span>
+                </div>
+                    <p>Smart student management for the modern educational institution.</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-facebook"></i></a>
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-linkedin"></i></a>
+                        <a href="#"><i class="fab fa-instagram"></i></a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#pricing">Pricing</a></li>
+                        <li><a href="#">API</a></li>
+                        <li><a href="#">Integrations</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Company</h4>
+                    <ul>
+                        <li><a href="#">About Us</a></li>
+                        <li><a href="#">Careers</a></li>
+                        <li><a href="#">Blog</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <ul>
+                        <li><a href="#">Help Center</a></li>
+                        <li><a href="#">Documentation</a></li>
+                        <li><a href="#">Status</a></li>
+                        <li><a href="#">Community</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Learnovo. All rights reserved.</p>
+                <div class="footer-links">
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">Cookie Policy</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
