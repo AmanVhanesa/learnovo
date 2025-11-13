@@ -72,16 +72,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static('uploads'));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/learnovo', {
+const mongoUri = process.env.MONGO_URI;
+
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
   .then(() => {
-    logger.info('MongoDB connected successfully');
+    console.log('MongoDB connected');
   })
   .catch(err => {
-    logger.error('MongoDB connection error', err);
-    process.exit(1);
+    console.error('MongoDB connection error:', err);
   });
 
 // Root/health endpoints
