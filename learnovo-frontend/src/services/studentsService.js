@@ -17,12 +17,9 @@ export const studentsService = {
     }
     
     const url = `/students${params.toString() ? `?${params.toString()}` : ''}`
-    console.log('🌐 Calling studentsService.list() with URL:', url)
-    console.log('🌐 Filters:', filters)
-    
+        
     try {
       const res = await api.get(url)
-      console.log('🌐 studentsService.list() response:', res.data)
       return res.data
     } catch (error) {
       console.error('🌐 studentsService.list() error:', error)
