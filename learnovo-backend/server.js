@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const { v4: uuidv4 } = require('uuid');
 const { requestIdMiddleware, errorHandler, notFoundHandler, logger } = require('./middleware/errorHandler');
 require('dotenv').config({ path: './config.env' });
 
