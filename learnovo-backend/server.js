@@ -73,17 +73,17 @@ app.use('/uploads', express.static('uploads'));
 
 // Database connection
 const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error('FATAL: MONGO_URI is not set');
+  process.exit(1);
+}
 
 mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-  .then(() => {
-    console.log('MongoDB connected');
-  })
-  .catch(err => {
-    console.error('MongoDB connection error:', err);
-  });
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Root/health endpoints
 app.get('/', (req, res) => {
