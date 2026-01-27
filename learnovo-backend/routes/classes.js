@@ -5,9 +5,10 @@ const { protect, authorize } = require('../middleware/auth');
 const Class = require('../models/Class');
 const User = require('../models/User');
 const Subject = require('../models/Subject');
+const Section = require('../models/Section');
 
 // Get all classes
-router.get('/', protect, async(req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const { academicYear, grade } = req.query;
     const filter = {};
@@ -20,29 +21,63 @@ router.get('/', protect, async(req, res) => {
     if (academicYear) filter.academicYear = academicYear;
     if (grade) filter.grade = grade;
 
-    const classes = await Class.find(filter)
-      .populate('classTeacher', 'name email')
-      .populate('subjects.subject', 'name subjectCode')
-      .populate('subjects.teacher', 'name email')
-      .sort({ grade: 1, name: 1 });
-
-    // Get student count for each class
-    const classesWithCounts = await Promise.all(
-      classes.map(async(classItem) => {
-        const studentCount = await User.countDocuments({
-          classId: classItem._id,
-          role: 'student'
-        });
-        return {
-          ...classItem.toObject(),
-          studentCount
-        };
-      })
-    );
+    // Use aggregation to fetch classes with their sections and student counts
+    const classes = await Class.aggregate([
+      { $match: filter },
+      // Lookup Sections
+      {
+        $lookup: {
+          from: 'sections',
+          localField: '_id',
+          foreignField: 'classId',
+          as: 'sections'
+        }
+      },
+      // Lookup Class Teacher
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'classTeacher',
+          foreignField: '_id',
+          as: 'classTeacher'
+        }
+      },
+      { $unwind: { path: '$classTeacher', preserveNullAndEmptyArrays: true } },
+      // Lookup Student Count (optimized)
+      {
+        $lookup: {
+          from: 'users',
+          let: { classId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$classId', '$$classId'] },
+                    { $eq: ['$role', 'student'] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: 'students'
+        }
+      },
+      {
+        $addFields: {
+          studentCount: { $size: '$students' },
+          sections: {
+            $sortArray: { input: '$sections', sortBy: { name: 1 } }
+          }
+        }
+      },
+      { $project: { students: 0 } }, // Remove heavy student array
+      { $sort: { grade: 1, name: 1 } }
+    ]);
 
     res.json({
       success: true,
-      data: classesWithCounts
+      data: classes
     });
   } catch (error) {
     console.error('Error fetching classes:', error);
@@ -54,7 +89,7 @@ router.get('/', protect, async(req, res) => {
 });
 
 // Get a specific class
-router.get('/:id', protect, async(req, res) => {
+router.get('/:id', protect, async (req, res) => {
   try {
     const classItem = await Class.findById(req.params.id)
       .populate('classTeacher', 'name email phone')
@@ -97,7 +132,7 @@ router.post('/', [
   body('grade').notEmpty().withMessage('Grade is required'),
   body('academicYear').notEmpty().withMessage('Academic year is required'),
   body('classTeacher').isMongoId().withMessage('Valid class teacher is required')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -137,13 +172,50 @@ router.post('/', [
 
     await newClass.save();
 
+    // Create Sections if provided
+    if (req.body.sections && Array.isArray(req.body.sections)) {
+      const sectionConfig = req.body.sections; // Expecting { type: 'STANDARD/CUSTOM', count: 3, names: [] } but frontend sends flattened struct usually? 
+      // Plan says: "sections" payload: { type: 'STANDARD', count: ... } OR { type: 'CUSTOM', names: [...] }
+      // Actually, let's keep it robust. If it's an array of strings, just create them. 
+      // If it's the config object, parse it.
+      // Let's assume the frontend sends the *final list of names* to be simple, 
+      // OR sends the config. 
+      // Implementation Plan said: "POST ... sections array".
+      // Let's support an array of objects or strings to be safe, but adhering to plan: 
+      // "sections payload: type... count... names..." implies it is an OBJECT, not an array of sections directly.
+      // But the previous lines say "sections (Array)".
+      // I will support req.body.sections as an ARRAY of strings for simplicity giving the frontend full control to generate the list.
+
+      const sectionsToCreate = req.body.sections.map(name => ({
+        tenantId: req.user.tenantId,
+        classId: newClass._id,
+        name: name.trim()
+      }));
+
+      if (sectionsToCreate.length > 0) {
+        await Section.insertMany(sectionsToCreate);
+      }
+    } else {
+      // Default "A" section if none provided? Plan said "Existing classes... default".
+      // But for NEW classes, we should enforce at least one via validation or default.
+      // Let's create 'A' if empty to be safe
+      await Section.create({
+        tenantId: req.user.tenantId,
+        classId: newClass._id,
+        name: 'A'
+      });
+    }
+
     const populatedClass = await Class.findById(newClass._id)
       .populate('classTeacher', 'name email');
+
+    // Fetch sections to return full object
+    const createdSections = await Section.find({ classId: newClass._id });
 
     res.status(201).json({
       success: true,
       message: 'Class created successfully',
-      data: populatedClass
+      data: { ...populatedClass.toObject(), sections: createdSections }
     });
   } catch (error) {
     console.error('Error creating class:', error);
@@ -171,7 +243,7 @@ router.put('/:id', [
   body('grade').optional().notEmpty().withMessage('Grade cannot be empty'),
   body('academicYear').optional().notEmpty().withMessage('Academic year cannot be empty'),
   body('classTeacher').optional().isMongoId().withMessage('Valid class teacher is required')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -202,16 +274,97 @@ router.put('/:id', [
     ).populate('classTeacher', 'name email');
 
     if (!updatedClass) {
-      return res.status(404).json({
-        success: false,
-        message: 'Class not found'
-      });
+      return res.status(404).json({ success: false, message: 'Class not found' });
     }
+
+    // --- Section Sync Logic with Safety Checks ---
+    if (req.body.sections && Array.isArray(req.body.sections)) {
+      const inputSections = req.body.sections;
+      const tenantId = req.user.tenantId;
+      const classId = req.params.id;
+
+      // Fetch existing sections
+      const existingSections = await Section.find({ classId });
+
+      // 1. Process Objects ({ id, name }) or Strings (name only)
+      // If string, we assume it's a desired state list.
+      // To safely support "Standard to Custom" switch, we treat input as the source of truth.
+      // But we MUST respect locks.
+
+      // We will execute operations in sequence to ensure safety.
+      // Strategy: 
+      // A. Identify IDs to UPDATE (if id provided)
+      // B. Identify Names to CREATE (if no id)
+      // C. Identify IDs to DELETE (if in DB but not in input IDs)
+
+      // If input contains ONLY strings, we can't map to IDs easily unless names match. 
+      // Fallback for strings: Map by Name.
+      // If object with ID: Map by ID.
+
+      const operations = []; // List of async tasks
+      const processedIds = new Set();
+      const processedNames = new Set();
+
+      for (const input of inputSections) {
+        let name, id;
+        if (typeof input === 'string') {
+          name = input.trim();
+        } else {
+          name = input.name.trim();
+          id = input._id || input.id;
+        }
+
+        if (!name) continue;
+        processedNames.add(name);
+
+        if (id) {
+          // Update specific section
+          processedIds.add(id.toString());
+          const section = existingSections.find(s => s._id.toString() === id.toString());
+          if (section && section.name !== name) {
+            // RENAME ATTEMPT
+            const studentCount = await User.countDocuments({ sectionId: id, role: 'student' });
+            if (studentCount > 0) {
+              return res.status(400).json({ success: false, message: `Cannot rename section '${section.name}' because it has active students.` });
+            }
+            operations.push(Section.findByIdAndUpdate(id, { name }));
+          }
+        } else {
+          // New Section (or matching existing by name if string-only input)
+          // Check if name already exists to prevent duplicate creation if ID wasn't sent
+          const exactMatch = existingSections.find(s => s.name === name);
+          if (exactMatch) {
+            processedIds.add(exactMatch._id.toString());
+            // No op, exists
+          } else {
+            // Create
+            operations.push(Section.create({ tenantId, classId, name }));
+          }
+        }
+      }
+
+      // Delete missing sections
+      for (const section of existingSections) {
+        if (!processedIds.has(section._id.toString())) {
+          // DELETE ATTEMPT
+          const studentCount = await User.countDocuments({ sectionId: section._id, role: 'student' });
+          if (studentCount > 0) {
+            return res.status(400).json({ success: false, message: `Cannot delete section '${section.name}' because it has active students.` });
+          }
+          operations.push(Section.findByIdAndDelete(section._id));
+        }
+      }
+
+      await Promise.all(operations);
+    }
+
+    // Re-fetch sections for response
+    const currentSections = await Section.find({ classId: req.params.id }).sort({ name: 1 });
 
     res.json({
       success: true,
       message: 'Class updated successfully',
-      data: updatedClass
+      data: { ...updatedClass.toObject(), sections: currentSections }
     });
   } catch (error) {
     console.error('Error updating class:', error);
@@ -223,7 +376,7 @@ router.put('/:id', [
 });
 
 // Delete a class
-router.delete('/:id', [protect, authorize('admin')], async(req, res) => {
+router.delete('/:id', [protect, authorize('admin')], async (req, res) => {
   try {
     // Check if class has students
     const studentCount = await User.countDocuments({
@@ -247,6 +400,9 @@ router.delete('/:id', [protect, authorize('admin')], async(req, res) => {
       });
     }
 
+    // Cascade delete sections
+    await Section.deleteMany({ classId: req.params.id });
+
     res.json({
       success: true,
       message: 'Class deleted successfully'
@@ -261,7 +417,7 @@ router.delete('/:id', [protect, authorize('admin')], async(req, res) => {
 });
 
 // Get students in a class
-router.get('/:id/students', protect, async(req, res) => {
+router.get('/:id/students', protect, async (req, res) => {
   try {
     const students = await User.find({
       classId: req.params.id,
@@ -287,7 +443,7 @@ router.post('/:id/students', [
   authorize('admin'),
   body('studentIds').isArray().withMessage('Student IDs must be an array'),
   body('studentIds.*').isMongoId().withMessage('Invalid student ID')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -331,7 +487,7 @@ router.post('/:id/students', [
 });
 
 // Get subjects and teachers for a class
-router.get('/:id/subjects', protect, async(req, res) => {
+router.get('/:id/subjects', protect, async (req, res) => {
   try {
     const classItem = await Class.findById(req.params.id)
       .populate('subjects.subject', 'name subjectCode')
@@ -363,7 +519,7 @@ router.post('/:id/subjects', [
   authorize('admin'),
   body('subjectId').isMongoId().withMessage('Valid subject ID is required'),
   body('teacherId').isMongoId().withMessage('Valid teacher ID is required')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -439,7 +595,7 @@ router.post('/:id/subjects', [
 });
 
 // Remove subject from class
-router.delete('/:id/subjects/:subjectId', [protect, authorize('admin')], async(req, res) => {
+router.delete('/:id/subjects/:subjectId', [protect, authorize('admin')], async (req, res) => {
   try {
     const { id, subjectId } = req.params;
 

@@ -29,26 +29,26 @@ const Layout = () => {
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
+
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         {/* Mobile Header */}
-        <MobileHeader 
+        <MobileHeader
           onMenuClick={toggleSidebar}
-          onSearchClick={() => {/* Handle search */}}
+          onSearchClick={() => {/* Handle search */ }}
         />
-        
+
         {/* Desktop Header */}
         <div className="hidden lg:block">
-          <Header 
+          <Header
             onToggleSidebar={toggleSidebar}
             sidebarOpen={sidebarOpen}
           />
         </div>
-        
+
         {/* Page content */}
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
-          <div className="container mx-auto px-4 lg:px-6 py-6 lg:py-8">
+          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
             <Outlet />
           </div>
         </main>

@@ -1,227 +1,216 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Search, Download, Eye, Edit, Trash2, X, AlertTriangle, Copy, Check } from 'lucide-react'
+import { Plus, Search, Eye, Power, PowerOff, Upload } from 'lucide-react'
 import { studentsService } from '../services/studentsService'
-import { exportCSV } from '../utils/exportHelpers'
 import { useAuth } from '../contexts/AuthContext'
-import ClassSelector from '../components/ClassSelector'
+import { useNavigate } from 'react-router-dom'
+import StudentForm from '../components/students/StudentForm'
+import ImportModal from '../components/ImportModal'
+import ExportButton from '../components/ExportButton'
 import toast from 'react-hot-toast'
 
 const Students = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
+
+  // Data state
   const [students, setStudents] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Filter state
   const [searchQuery, setSearchQuery] = useState('')
   const [classFilter, setClassFilter] = useState('')
-  const [selectedClass, setSelectedClass] = useState(null)
-  const [showModal, setShowModal] = useState(false)
-  const [showCredentialsModal, setShowCredentialsModal] = useState(false)
-  const [credentials, setCredentials] = useState(null)
-  const [copiedField, setCopiedField] = useState(null)
-  const [newStudentAdmissionNumber, setNewStudentAdmissionNumber] = useState(null)
-  const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    class: '',
-    rollNumber: '',
-    admissionDate: '',
-    guardianName: '',
-    guardianPhone: '',
-    address: '',
-    password: ''
-  })
+  const [sectionFilter, setSectionFilter] = useState('')
+  const [yearFilter, setYearFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('') // active/inactive
+  const [filterOptions, setFilterOptions] = useState({ classes: [], sections: [], academicYears: [] })
+
+  // UI state
+  const [showForm, setShowForm] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [editingStudent, setEditingStudent] = useState(null)
+  const [selectedStudents, setSelectedStudents] = useState([])
+  const [showBulkActions, setShowBulkActions] = useState(false)
 
   useEffect(() => {
     fetchStudents()
-  }, [selectedClass, searchQuery])
+    fetchFilterOptions()
+  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter])
+
+  const fetchFilterOptions = async () => {
+    try {
+      const response = await studentsService.getFilters()
+      if (response.success) {
+        setFilterOptions(response.data)
+      }
+    } catch (error) {
+      console.error('Error fetching filter options:', error)
+    }
+  }
 
   const fetchStudents = async () => {
     try {
       setIsLoading(true)
-      setError(null) // Clear previous errors
-      let filters = { search: searchQuery, limit: 100 }
-      
-      // For teachers, filter by selected class
-      if (user?.role === 'teacher' && selectedClass) {
-        filters.classId = selectedClass._id
-      } else if (classFilter) {
-        filters.className = classFilter
+      const filters = {
+        search: searchQuery,
+        class: classFilter,
+        section: sectionFilter,
+        academicYear: yearFilter,
+        status: statusFilter,
+        limit: 100
       }
-      
+
       const response = await studentsService.list(filters)
-      console.log('Students API response:', response)
-      
-      // Handle different response formats
-      const studentsData = response?.data || response?.students || response || []
+      const studentsData = response?.data || []
       setStudents(Array.isArray(studentsData) ? studentsData : [])
-      
-      if (!Array.isArray(studentsData)) {
-        console.warn('Unexpected students response format:', response)
-      }
-      
-      // Clear error if we got data (even if empty)
-      if (Array.isArray(studentsData)) {
-        setError(null) // No error if we got a valid array response
-      }
     } catch (error) {
       console.error('Error fetching students:', error)
-      setError(error.response?.data?.message || 'Failed to load students. Please check your connection and try again.')
-      setStudents([]) // Clear students on error
+      toast.error('Failed to load students')
+      setStudents([])
     } finally {
       setIsLoading(false)
     }
   }
 
-  const openAdd = () => {
-    setEditing(null)
-    setForm({ name: '', email: '', phone: '', class: '', rollNumber: '', admissionDate: '', guardianName: '', guardianPhone: '', address: '', password: '' })
-    setShowModal(true)
+  const handleAddStudent = () => {
+    setEditingStudent(null)
+    setShowForm(true)
   }
 
-  const openEdit = (student) => {
-    setEditing(student)
-    setForm({
-      name: student.name || '',
-      email: student.email || '',
-      phone: student.phone || '',
-      class: student.class || '',
-      rollNumber: student.rollNumber || '',
-      admissionDate: student.admissionDate ? student.admissionDate.substring(0,10) : '',
-      guardianName: student.guardianName || '',
-      guardianPhone: student.guardianPhone || '',
-      address: student.address || '',
-      password: ''
-    })
-    setShowModal(true)
+  const handleEditStudent = (student) => {
+    setEditingStudent(student)
+    setShowForm(true)
   }
 
-  const saveStudent = async (e) => {
-    e.preventDefault()
+  const handleViewStudent = (student) => {
+    navigate(`/app/students/${student._id}`)
+  }
+
+  const handleSaveStudent = async (formData) => {
     try {
-      if (editing) {
-        const { password, ...rest } = form
-        const payload = password ? { ...rest, password } : rest
-        await studentsService.update(editing._id || editing.id, payload)
+      setIsSaving(true)
+
+      if (editingStudent) {
+        await studentsService.update(editingStudent._id, formData)
+        toast.success('Student updated successfully')
       } else {
-        // For new students, provide a default password if none is given
-        const studentData = { ...form }
-        
-        // Ensure password is provided
-        if (!studentData.password || studentData.password.trim() === '') {
-          studentData.password = 'student123' // Default password for new students
-        }
-        
-        // Format phone number - remove spaces and ensure it starts with a valid digit
-        if (studentData.phone) {
-          studentData.phone = studentData.phone.trim().replace(/\s+/g, '')
-          // If phone doesn't start with + and starts with 0, remove leading 0 or add country code
-          if (studentData.phone.startsWith('0')) {
-            studentData.phone = studentData.phone.substring(1) // Remove leading 0
-          }
-        }
-        
-        // Format guardian phone similarly
-        if (studentData.guardianPhone) {
-          studentData.guardianPhone = studentData.guardianPhone.trim().replace(/\s+/g, '')
-          if (studentData.guardianPhone.startsWith('0')) {
-            studentData.guardianPhone = studentData.guardianPhone.substring(1)
-          }
-        }
-        
-        // Ensure admissionDate is in ISO format if provided
-        if (studentData.admissionDate) {
-          const date = new Date(studentData.admissionDate)
-          if (!isNaN(date.getTime())) {
-            studentData.admissionDate = date.toISOString()
-          }
-        }
-        
-        console.log('Creating student with data:', studentData)
-        const response = await studentsService.create(studentData)
-        
-        // Show credentials and admission number if returned
-        if (response?.data) {
-          if (response.data.credentials) {
-            setCredentials({
-              ...response.data.credentials,
-              admissionNumber: response.data.admissionNumber
-            })
-            setShowCredentialsModal(true)
-          }
-          if (response.data.admissionNumber) {
-            setNewStudentAdmissionNumber(response.data.admissionNumber)
-          }
-        } else {
-          toast.success('Student created successfully!')
+        const response = await studentsService.create(formData)
+        toast.success('Student added successfully')
+
+        // Show credentials if returned
+        if (response?.data?.credentials) {
+          toast.success(`Login: ${response.data.credentials.email} / ${response.data.credentials.password}`, {
+            duration: 10000
+          })
         }
       }
-      setShowModal(false)
-      await fetchStudents()
-    } catch (err) {
-      console.error('Save student error:', err)
-      console.error('Error response:', err.response?.data)
-      console.error('Error status:', err.response?.status)
-      console.error('Full error object:', JSON.stringify(err.response?.data || err, null, 2))
-      
-      // Show detailed error message
-      let errorMessage = 'Failed to save student'
-      if (err.response?.data) {
-        const errorData = err.response.data
-        console.error('Parsing error data:', errorData)
-        
-        // Check for validation errors array
-        if (errorData.errors && Array.isArray(errorData.errors)) {
-          const errorList = errorData.errors.map(e => {
-            if (typeof e === 'string') return e;
-            return `${e.field || e.path || 'Field'}: ${e.message || e.msg || 'Invalid value'}`;
-          }).join('\n');
-          errorMessage = `Validation errors:\n${errorList}`
-        } else if (errorData.message) {
-          errorMessage = errorData.message
-          // Include error details if available
-          if (errorData.error) {
-            errorMessage += `\n\nDetails: ${errorData.error}`
-          }
-          if (errorData.details) {
-            console.error('Error details:', errorData.details)
-            if (errorData.details.validationErrors) {
-              const validationErrors = Object.values(errorData.details.validationErrors).map(err => 
-                `${err.path}: ${err.message}`
-              ).join('\n');
-              errorMessage += `\n\nValidation errors:\n${validationErrors}`
-            }
-          }
-        } else if (errorData.error) {
-          errorMessage = errorData.error
-        }
-      } else if (err.message) {
-        errorMessage = err.message
-      }
-      
-      console.error('Final error message:', errorMessage)
-      alert(errorMessage)
+
+      setShowForm(false)
+      fetchStudents()
+    } catch (error) {
+      console.error('Save student error:', error)
+      toast.error(error.response?.data?.message || 'Failed to save student')
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const deleteStudent = async (student) => {
-    if (!window.confirm(`Delete ${student.name}?`)) return
+  const handleToggleStatus = async (student) => {
+    const action = student.isActive ? 'deactivate' : 'activate'
+    const reason = student.isActive ? prompt('Reason for deactivation:') : null
+
+    if (student.isActive && !reason) return
+
     try {
-      await studentsService.remove(student._id || student.id)
-      await fetchStudents()
-    } catch (err) {
-      console.error('Delete student error:', err)
-      alert(err?.response?.data?.message || 'Failed to delete student')
+      await studentsService.toggleStatus(student._id, { reason })
+      toast.success(`Student ${action}d successfully`)
+      fetchStudents()
+    } catch (error) {
+      console.error('Toggle status error:', error)
+      toast.error(`Failed to ${action} student`)
     }
   }
 
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (student.rollNumber && student.rollNumber.toLowerCase().includes(searchQuery.toLowerCase()))
-    const matchesClass = !classFilter || student.class === classFilter
-    return matchesSearch && matchesClass
-  })
+  const handleBulkActivate = async () => {
+    if (selectedStudents.length === 0) {
+      toast.error('Please select students first')
+      return
+    }
+
+    try {
+      await studentsService.bulkActivate(selectedStudents)
+      toast.success(`${selectedStudents.length} students activated`)
+      setSelectedStudents([])
+      fetchStudents()
+    } catch (error) {
+      console.error('Bulk activate error:', error)
+      toast.error('Failed to activate students')
+    }
+  }
+
+  const handleBulkDeactivate = async () => {
+    if (selectedStudents.length === 0) {
+      toast.error('Please select students first')
+      return
+    }
+
+    const reason = prompt('Reason for bulk deactivation:')
+    if (!reason) return
+
+    try {
+      await studentsService.bulkDeactivate(selectedStudents, reason)
+      toast.success(`${selectedStudents.length} students deactivated`)
+      setSelectedStudents([])
+      fetchStudents()
+    } catch (error) {
+      console.error('Bulk deactivate error:', error)
+      toast.error('Failed to deactivate students')
+    }
+  }
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedStudents(students.map(s => s._id))
+    } else {
+      setSelectedStudents([])
+    }
+  }
+
+  const handleSelectStudent = (studentId) => {
+    setSelectedStudents(prev =>
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    )
+  }
+
+  const handleExport = () => {
+    const rows = [
+      ['Admission No', 'Name', 'Roll No', 'Class', 'Section', 'Year', 'Guardian', 'Phone', 'Status']
+    ].concat(
+      students.map(s => [
+        s.admissionNumber || 'N/A',
+        s.name,
+        s.rollNumber || '',
+        s.class || '',
+        s.section || '',
+        s.academicYear || '',
+        s.guardians?.[0]?.name || '',
+        s.guardians?.[0]?.phone || '',
+        s.isActive ? 'Active' : 'Inactive'
+      ])
+    )
+    exportCSV('students.csv', rows)
+    toast.success('Students exported successfully')
+  }
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setClassFilter('')
+    setSectionFilter('')
+    setYearFilter('')
+    setStatusFilter('')
+  }
 
   if (isLoading) {
     return (
@@ -235,359 +224,269 @@ const Students = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Student Management</h1>
-        <button className="btn btn-primary" onClick={openAdd}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Student
-        </button>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-          <button
-            onClick={() => fetchStudents()}
-            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-          >
-            Try again
-          </button>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Students</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {students.length} student{students.length !== 1 ? 's' : ''} found
+          </p>
         </div>
-      )}
+        <div className="flex gap-2">
+          {user?.role === 'admin' && (
+            <>
+              <button
+                className="btn btn-outline"
+                onClick={() => setShowImportModal(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
+              </button>
+              <button className="btn btn-primary" onClick={handleAddStudent}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Student
+              </button>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm p-4">
         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+          {/* Search */}
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search students..."
+                placeholder="Search by name, admission number, roll number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="input pl-10"
               />
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
-            {user?.role === 'teacher' ? (
-              <div className="sm:w-64">
-                <ClassSelector
-                  selectedClass={selectedClass}
-                  onClassChange={setSelectedClass}
-                />
-              </div>
-            ) : (
-              <div className="sm:w-48">
-                <select
-                  value={classFilter}
-                  onChange={(e) => setClassFilter(e.target.value)}
-                  className="input"
-                >
-                  <option value="">All Classes</option>
-                  <option value="1st Grade">1st Grade</option>
-                  <option value="2nd Grade">2nd Grade</option>
-                  <option value="3rd Grade">3rd Grade</option>
-                  <option value="4th Grade">4th Grade</option>
-                  <option value="5th Grade">5th Grade</option>
-                  <option value="6th Grade">6th Grade</option>
-                  <option value="7th Grade">7th Grade</option>
-                  <option value="8th Grade">8th Grade</option>
-                  <option value="9th Grade">9th Grade</option>
-                  <option value="10th Grade">10th Grade</option>
-                  <option value="11th Grade">11th Grade</option>
-                  <option value="12th Grade">12th Grade</option>
-                </select>
-              </div>
+
+          {/* Filter Dropdowns */}
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={classFilter}
+              onChange={(e) => setClassFilter(e.target.value)}
+              className="input w-32"
+            >
+              <option value="">All Classes</option>
+              {filterOptions.classes.map(cls => (
+                <option key={cls} value={cls}>{cls}</option>
+              ))}
+            </select>
+
+            <select
+              value={sectionFilter}
+              onChange={(e) => setSectionFilter(e.target.value)}
+              className="input w-32"
+            >
+              <option value="">All Sections</option>
+              {filterOptions.sections.map(sec => (
+                <option key={sec} value={sec}>{sec}</option>
+              ))}
+            </select>
+
+            <select
+              value={yearFilter}
+              onChange={(e) => setYearFilter(e.target.value)}
+              className="input w-40"
+            >
+              <option value="">All Years</option>
+              {filterOptions.academicYears.map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="input w-32"
+            >
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+
+            {(searchQuery || classFilter || sectionFilter || yearFilter || statusFilter) && (
+              <button onClick={clearFilters} className="btn btn-ghost text-sm">
+                Clear
+              </button>
             )}
-            <button className="btn btn-outline flex-shrink-0" onClick={() => {
-              const rows = [["Admission No","Name","Roll No","Class","Guardian","Guardian Phone"]].concat(
-                filteredStudents.map(s => [s.admissionNumber || 'N/A', s.name, s.rollNumber, s.class, s.guardianName || '', s.guardianPhone || ''])
-              )
-              exportCSV('students.csv', rows)
-            }}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </button>
+
+            <ExportButton
+              module="students"
+              exportUrl="/api/students/export"
+              filters={{
+                class: classFilter,
+                section: sectionFilter,
+                academicYear: yearFilter,
+                status: statusFilter
+              }}
+            />
           </div>
         </div>
+
+        {/* Bulk Actions */}
+        {selectedStudents.length > 0 && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-900">
+              {selectedStudents.length} student{selectedStudents.length !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <button onClick={handleBulkActivate} className="btn btn-sm btn-outline">
+                <Power className="h-4 w-4 mr-1" />
+                Activate
+              </button>
+              <button onClick={handleBulkDeactivate} className="btn btn-sm btn-outline">
+                <PowerOff className="h-4 w-4 mr-1" />
+                Deactivate
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Students table */}
+      {/* Students Table */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table">
-          <thead>
-            <tr>
-              <th>Admission No.</th>
-              <th>Photo</th>
-              <th>Name</th>
-              <th>Roll No.</th>
-              <th>Class</th>
-              <th>Admission Date</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStudents.map((student) => (
-              <tr key={student._id || student.id}>
-                <td>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-semibold text-teal-600">
-                      {student.admissionNumber || 'N/A'}
-                    </span>
-                    {student.admissionNumber && (
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(student.admissionNumber)
-                          toast.success('Admission number copied!')
-                        }}
-                        className="text-gray-400 hover:text-teal-600 transition-colors"
-                        title="Copy admission number"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-gray-700">
-                      {student.name.charAt(0)}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">{student.name}</div>
-                    <div className="text-sm text-gray-500">{student.guardianName}</div>
-                  </div>
-                </td>
-                <td className="text-sm text-gray-900">{student.rollNumber}</td>
-                <td className="text-sm text-gray-900">{student.class}</td>
-                <td className="text-sm text-gray-900">
-                  {student.admissionDate ? new Date(student.admissionDate).toLocaleDateString() : 'N/A'}
-                </td>
-                <td>
-                  <span className={`status-badge status-${student.status}`}>
-                    {student.status}
-                  </span>
-                </td>
-                <td>
-                  <div className="flex space-x-2">
-                    <button className="p-1 text-gray-400 hover:text-blue-600">
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button className="p-1 text-gray-400 hover:text-green-600" onClick={() => openEdit(student)}>
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button className="p-1 text-gray-400 hover:text-red-600" onClick={() => deleteStudent(student)}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
+            <thead>
+              <tr>
+                <th className="w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectedStudents.length === students.length && students.length > 0}
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300"
+                  />
+                </th>
+                <th>Admission No.</th>
+                <th>Photo</th>
+                <th>Name</th>
+                <th>Roll No.</th>
+                <th>Class</th>
+                <th>Section</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {students.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="text-center py-12 text-gray-500">
+                    No students found
+                  </td>
+                </tr>
+              ) : (
+                students.map((student) => (
+                  <tr key={student._id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedStudents.includes(student._id)}
+                        onChange={() => handleSelectStudent(student._id)}
+                        className="rounded border-gray-300"
+                      />
+                    </td>
+                    <td>
+                      <span className="font-mono text-sm font-semibold text-teal-600">
+                        {student.admissionNumber || 'N/A'}
+                      </span>
+                    </td>
+                    <td>
+                      {student.photo ? (
+                        <img
+                          src={student.photo}
+                          alt={student.name}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-gray-700">
+                            {student.name?.charAt(0)}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{student.name}</div>
+                        <div className="text-sm text-gray-500">{student.guardians?.[0]?.name}</div>
+                      </div>
+                    </td>
+                    <td className="text-sm text-gray-900">{student.rollNumber || '-'}</td>
+                    <td className="text-sm text-gray-900">{student.class || '-'}</td>
+                    <td className="text-sm text-gray-900">{student.section || '-'}</td>
+                    <td>
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${student.isActive
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                          }`}
+                      >
+                        {student.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleViewStudent(student)}
+                          className="p-1 text-gray-400 hover:text-blue-600"
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        {user?.role === 'admin' && (
+                          <>
+                            <button
+                              onClick={() => handleToggleStatus(student)}
+                              className={`p-1 text-gray-400 hover:${student.isActive ? 'text-red-600' : 'text-green-600'}`}
+                              title={student.isActive ? 'Deactivate' : 'Activate'}
+                            >
+                              {student.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
-      {showModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-content p-4">
-            <div className="flex items-center justify-between border-b border-gray-200 p-4">
-              <h3 className="text-lg font-semibold text-gray-900">{editing ? 'Edit Student' : 'Add Student'}</h3>
-              <button className="p-2 rounded-md hover:bg-gray-100" onClick={() => setShowModal(false)}>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <form className="p-4 space-y-4" onSubmit={saveStudent}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Full name</label>
-                  <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                </div>
-                <div>
-                  <label className="label">Email</label>
-                  <input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required={!editing} />
-                </div>
-                {!editing && (
-                <div>
-                  <label className="label">Password (optional)</label>
-                  <input 
-                    type="password" 
-                    className="input" 
-                    value={form.password} 
-                    onChange={(e) => setForm({ ...form, password: e.target.value })} 
-                    placeholder="Leave empty for default password (student123)"
-                  />
-                </div>
-                )}
-                <div>
-                  <label className="label">Phone</label>
-                  <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="e.g., +919876543210" />
-                </div>
-                <div>
-                  <label className="label">Class</label>
-                  <input className="input" value={form.class} onChange={(e) => setForm({ ...form, class: e.target.value })} required />
-                </div>
-                <div>
-                  <label className="label">Roll Number</label>
-                  <input className="input" value={form.rollNumber} onChange={(e) => setForm({ ...form, rollNumber: e.target.value })} required />
-                </div>
-                <div>
-                  <label className="label">Admission Date</label>
-                  <input type="date" className="input" value={form.admissionDate} onChange={(e) => setForm({ ...form, admissionDate: e.target.value })} />
-                </div>
-                <div>
-                  <label className="label">Guardian Name</label>
-                  <input className="input" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} />
-                </div>
-                <div>
-                  <label className="label">Guardian Phone</label>
-                  <input className="input" value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="label">Address</label>
-                  <input className="input" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Student Form Modal */}
+      {showForm && (
+        <StudentForm
+          student={editingStudent}
+          onSave={handleSaveStudent}
+          onCancel={() => setShowForm(false)}
+          isLoading={isSaving}
+        />
       )}
 
-      {/* Credentials Modal */}
-      {showCredentialsModal && credentials && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-content p-6 max-w-md">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Student Credentials</h3>
-              <button className="p-2 rounded-md hover:bg-gray-100" onClick={() => {
-                setShowCredentialsModal(false)
-                setCredentials(null)
-              }}>
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600 mb-4">
-                Please save these credentials. You can share them with the student. This information will not be shown again.
-              </p>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                {credentials.admissionNumber && (
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Admission Number</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        readOnly
-                        value={credentials.admissionNumber}
-                        className="flex-1 input bg-white font-bold"
-                        onClick={(e) => e.target.select()}
-                      />
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(credentials.admissionNumber)
-                          setCopiedField('admissionNumber')
-                          toast.success('Admission Number copied!')
-                          setTimeout(() => setCopiedField(null), 2000)
-                        }}
-                        className="p-2 rounded hover:bg-blue-100"
-                      >
-                        {copiedField === 'admissionNumber' ? (
-                          <Check className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <Copy className="h-4 w-4 text-blue-600" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                <div>
-                  <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Email</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={credentials.email}
-                      className="flex-1 input bg-white"
-                      onClick={(e) => e.target.select()}
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(credentials.email)
-                        setCopiedField('email')
-                        toast.success('Email copied!')
-                        setTimeout(() => setCopiedField(null), 2000)
-                      }}
-                      className="p-2 rounded hover:bg-blue-100"
-                    >
-                      {copiedField === 'email' ? (
-                        <Check className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <Copy className="h-4 w-4 text-blue-600" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Password</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={credentials.password}
-                      className="flex-1 input bg-white font-mono"
-                      onClick={(e) => e.target.select()}
-                    />
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(credentials.password)
-                        setCopiedField('password')
-                        toast.success('Password copied!')
-                        setTimeout(() => setCopiedField(null), 2000)
-                      }}
-                      className="p-2 rounded hover:bg-blue-100"
-                    >
-                      {copiedField === 'password' ? (
-                        <Check className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <Copy className="h-4 w-4 text-blue-600" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-4">
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    setShowCredentialsModal(false)
-                    setCredentials(null)
-                  }}
-                >
-                  Got it
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Import Modal */}
+      {showImportModal && (
+        <ImportModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          module="students"
+          title="Import Students"
+          templateUrl="/api/students/import/template"
+          previewUrl="/api/students/import/preview"
+          executeUrl="/api/students/import/execute"
+          onSuccess={(result) => {
+            setShowImportModal(false)
+            fetchStudents()
+            toast.success(`Successfully imported ${result.created} students`)
+          }}
+        />
       )}
     </div>
   )

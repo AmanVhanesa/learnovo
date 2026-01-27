@@ -13,6 +13,12 @@ export const settingsService = {
     return response.data
   },
 
+  // Update admission settings
+  updateAdmissionSettings: async (admissionData) => {
+    const response = await api.put('/settings/admission', admissionData)
+    return response.data
+  },
+
   // Update currency settings
   updateCurrency: async (currencyData) => {
     const response = await api.put('/settings/currency', currencyData)

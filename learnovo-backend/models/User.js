@@ -10,11 +10,24 @@ const userSchema = new mongoose.Schema({
     index: true
   },
 
-  name: {
+  // Identity
+  firstName: {
     type: String,
-    required: [true, 'Name is required'],
-    trim: true,
-    maxlength: [50, 'Name cannot exceed 50 characters']
+    required: function () { return this.role === 'student'; },
+    trim: true
+  },
+  middleName: {
+    type: String,
+    trim: true
+  },
+  lastName: {
+    type: String,
+    required: function () { return this.role === 'student'; },
+    trim: true
+  },
+  name: { // Keeping for backward compatibility & display
+    type: String,
+    trim: true
   },
   email: {
     type: String,
@@ -37,7 +50,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
     validate: {
-      validator: function(v) {
+      validator: function (v) {
         // Only validate if phone is provided
         if (!v || v.trim() === '') return true;
         return /^[\+]?[1-9][\d]{5,15}$/.test(v);
@@ -54,9 +67,30 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // Status Management (for students)
+  inactiveReason: {
+    type: String,
+    trim: true
+  },
+  inactivatedAt: {
+    type: Date
+  },
+  inactivatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  // Login Management
   lastLogin: {
     type: Date,
     default: null
+  },
+  loginEnabled: {
+    type: Boolean,
+    default: true
+  },
+  forcePasswordChange: {
+    type: Boolean,
+    default: false
   },
   // For teachers
   subjects: [{
@@ -75,12 +109,61 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // For employees (teachers, admin, staff, accountant)
+  employeeId: {
+    type: String,
+    sparse: true,
+    index: true
+  },
+  salary: {
+    type: Number,
+    min: 0
+  },
+  dateOfJoining: {
+    type: Date
+  },
+  designation: {
+    type: String,
+    trim: true
+  },
+  department: {
+    type: String,
+    trim: true
+  },
+  fatherOrHusbandName: {
+    type: String,
+    trim: true
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other', ''],
+    default: ''
+  },
+  // dateOfBirth already exists for students
+  // religion already exists for students
+  // bloodGroup already exists for students
+  nationalId: {
+    type: String,
+    trim: true // Aadhaar, SSN, etc.
+  },
+  education: {
+    type: String,
+    trim: true
+  },
+  experience: {
+    type: Number, // years
+    min: 0
+  },
+  homeAddress: {
+    type: String,
+    trim: true
+  },
   // For parents
   children: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
-  // For students
+  // For students - Basic Info
   studentId: {
     type: String,
     sparse: true
@@ -106,13 +189,103 @@ const userSchema = new mongoose.Schema({
   admissionDate: {
     type: Date
   },
-  guardianName: {
+  // Personal Details
+  dateOfBirth: {
+    type: Date
+  },
+  bloodGroup: {
+    type: String,
+    enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', ''],
+    default: ''
+  },
+  religion: {
     type: String,
     trim: true
   },
-  guardianPhone: {
+  category: {
+    type: String,
+    enum: ['General', 'SC', 'ST', 'OBC', 'Other', ''],
+    default: ''
+  },
+  identificationMark: {
     type: String,
     trim: true
+  },
+  isOrphan: {
+    type: Boolean,
+    default: false
+  },
+  // Academic Background
+  previousSchool: {
+    type: String,
+    trim: true
+  },
+  previousBoard: {
+    type: String,
+    trim: true
+  },
+  previousRollNumber: {
+    type: String,
+    trim: true
+  },
+  transferNotes: {
+    type: String,
+    trim: true
+  },
+  // Medical Information
+  medicalConditions: {
+    type: String,
+    trim: true
+  },
+  allergies: {
+    type: String,
+    trim: true
+  },
+  // Additional Student Info
+  siblingCount: {
+    type: Number,
+    default: 0
+  },
+  familyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Family'
+  },
+  photo: {
+    type: String // URL to photo
+  },
+  notes: {
+    type: String,
+    trim: true
+  },
+  // Academic Details
+  academicYear: {
+    type: String, // e.g. "2025-2026"
+    required: function () { return this.role === 'student'; }
+  },
+  section: {
+    type: String, // e.g. "A", "B"
+    trim: true
+  },
+  sectionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Section',
+    index: true
+  },
+  board: {
+    type: String, // e.g. "CBSE"
+    trim: true
+  },
+  // Guardian Details
+  guardians: [{
+    relation: { type: String, enum: ['Father', 'Mother', 'Guardian'], required: true },
+    name: { type: String, required: true },
+    phone: String,
+    email: String,
+    isPrimary: { type: Boolean, default: false }
+  }],
+  credentialsSent: {
+    type: Boolean,
+    default: false
   },
   address: {
     type: String,
@@ -127,8 +300,46 @@ userSchema.index({ email: 1, tenantId: 1 }, { unique: true }); // Email unique p
 userSchema.index({ role: 1, tenantId: 1 });
 userSchema.index({ tenantId: 1 });
 
+// Unique Admission Number per Tenant
+userSchema.index(
+  { admissionNumber: 1, tenantId: 1 },
+  { unique: true, partialFilterExpression: { admissionNumber: { $exists: true } } }
+);
+
+// Unique Roll Number per Class + Section + Academic Year + Tenant
+userSchema.index(
+  { rollNumber: 1, class: 1, section: 1, academicYear: 1, tenantId: 1 },
+  { unique: true, partialFilterExpression: { rollNumber: { $exists: true }, role: 'student' } }
+);
+
+// Unique Employee ID per Tenant
+userSchema.index(
+  { employeeId: 1, tenantId: 1 },
+  { unique: true, partialFilterExpression: { employeeId: { $exists: true } } }
+);
+
+// Unique Phone per Tenant
+userSchema.index(
+  { phone: 1, tenantId: 1 },
+  { unique: true, partialFilterExpression: { phone: { $exists: true, $ne: '' } } }
+);
+
+// Auto-generate full name if missing but parts exist
+userSchema.pre('validate', function (next) {
+  if (this.firstName && this.lastName && !this.name) {
+    this.name = `${this.firstName} ${this.middleName ? this.middleName + ' ' : ''}${this.lastName}`;
+  }
+  // If name exists but parts missing (backward compat), try to split (naive)
+  if (this.name && !this.firstName) {
+    const parts = this.name.split(' ');
+    this.firstName = parts[0];
+    this.lastName = parts.length > 1 ? parts[parts.length - 1] : '';
+  }
+  next();
+});
+
 // Hash password before saving
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -143,12 +354,12 @@ userSchema.pre('save', async function(next) {
 // Note: Admission number and student ID generation moved to routes for proper async handling
 
 // Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Get user without sensitive data
-userSchema.methods.toJSON = function() {
+userSchema.methods.toJSON = function () {
   const user = this.toObject();
   delete user.password;
   return user;

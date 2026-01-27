@@ -8,13 +8,18 @@ const settingsSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  
+
   // Institution Information
   institution: {
     name: {
       type: String,
       required: [true, 'Institution name is required'],
       trim: true
+    },
+    tagline: {
+      type: String,
+      trim: true,
+      default: ''
     },
     address: {
       street: { type: String, trim: true },
@@ -97,6 +102,151 @@ const settingsSchema = new mongoose.Schema({
       code: { type: String, required: true },
       isActive: { type: Boolean, default: true }
     }]
+  },
+  // Admission Settings
+  admission: {
+    mode: {
+      type: String,
+      enum: ['AUTO', 'CUSTOM'],
+      default: 'AUTO'
+    },
+    prefix: {
+      type: String,
+      uppercase: true,
+      trim: true,
+      sparse: true
+    },
+    yearFormat: {
+      type: String,
+      enum: ['YY', 'YYYY'],
+      default: 'YYYY'
+    },
+    counterPadding: {
+      type: Number,
+      default: 4,
+      min: 3,
+      max: 6
+    },
+    startFrom: {
+      type: Number,
+      default: 1
+    },
+    resetEachYear: {
+      type: Boolean,
+      default: false
+    }
+  },
+  // Marks Grading Settings
+  grading: {
+    rules: [{
+      gradeName: {
+        type: String,
+        required: true,
+        trim: true
+      },
+      percentageFrom: {
+        type: Number,
+        required: true,
+        min: 0,
+        max: 100
+      },
+      percentageTo: {
+        type: Number,
+        required: true,
+        min: 0,
+        max: 100
+      },
+      status: {
+        type: String,
+        enum: ['PASS', 'FAIL'],
+        required: true
+      },
+      order: {
+        type: Number,
+        default: 0
+      }
+    }],
+    isActive: {
+      type: Boolean,
+      default: true
+    }
+  },
+  // Bank Account Details
+  bankAccounts: [{
+    bankName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    bankLogo: {
+      type: String,
+      default: null
+    },
+    accountNumber: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    branch: {
+      type: String,
+      trim: true
+    },
+    address: {
+      type: String,
+      trim: true
+    },
+    instructions: {
+      type: String,
+      trim: true
+    },
+    isDefault: {
+      type: Boolean,
+      default: false
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    }
+  }],
+  // Rules and Regulations
+  rulesAndRegulations: {
+    content: {
+      type: String,
+      default: ''
+    },
+    version: {
+      type: Number,
+      default: 1
+    },
+    lastUpdatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    lastUpdatedAt: {
+      type: Date,
+      default: Date.now
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    }
+  },
+  // Account Settings
+  account: {
+    timezone: {
+      type: String,
+      default: 'Asia/Kolkata'
+    },
+    dateFormat: {
+      type: String,
+      enum: ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'],
+      default: 'DD/MM/YYYY'
+    },
+    timeFormat: {
+      type: String,
+      enum: ['12h', '24h'],
+      default: '12h'
+    }
   },
   // Fee Settings
   fees: {
@@ -182,6 +332,11 @@ const settingsSchema = new mongoose.Schema({
   },
   // Theme Settings
   theme: {
+    mode: {
+      type: String,
+      enum: ['light', 'dark'],
+      default: 'light'
+    },
     primaryColor: {
       type: String,
       default: '#3EC4B1'
@@ -189,6 +344,10 @@ const settingsSchema = new mongoose.Schema({
     secondaryColor: {
       type: String,
       default: '#2355A6'
+    },
+    language: {
+      type: String,
+      default: 'en'
     },
     logo: {
       type: String,
@@ -221,17 +380,17 @@ const settingsSchema = new mongoose.Schema({
 });
 
 // Get or create settings for a tenant
-settingsSchema.statics.getSettings = async function(tenantId) {
+settingsSchema.statics.getSettings = async function (tenantId) {
   if (!tenantId) {
     throw new Error('Tenant ID is required');
   }
-  
+
   let settings = await this.findOne({ tenantId });
   if (!settings) {
     // Get tenant data to populate settings
     const Tenant = mongoose.model('Tenant');
     const tenant = await Tenant.findById(tenantId);
-    
+
     // Create default settings with required fields, populated from tenant if available
     settings = new this({
       tenantId,
@@ -258,10 +417,10 @@ settingsSchema.statics.getSettings = async function(tenantId) {
       },
       currency: {
         default: tenant?.settings?.currency || 'INR',
-        symbol: tenant?.settings?.currency === 'INR' ? '₹' : 
-                tenant?.settings?.currency === 'USD' ? '$' : 
-                tenant?.settings?.currency === 'EUR' ? '€' : 
-                tenant?.settings?.currency === 'GBP' ? '£' : '₹'
+        symbol: tenant?.settings?.currency === 'INR' ? '₹' :
+          tenant?.settings?.currency === 'USD' ? '$' :
+            tenant?.settings?.currency === 'EUR' ? '€' :
+              tenant?.settings?.currency === 'GBP' ? '£' : '₹'
       },
       academic: {
         currentYear: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1)
@@ -281,7 +440,7 @@ settingsSchema.statics.getSettings = async function(tenantId) {
 };
 
 // Method to update currency settings
-settingsSchema.methods.updateCurrency = function(currency, symbol, position = 'before') {
+settingsSchema.methods.updateCurrency = function (currency, symbol, position = 'before') {
   this.currency = {
     default: currency.toUpperCase(),
     symbol: symbol,
@@ -294,7 +453,7 @@ settingsSchema.methods.updateCurrency = function(currency, symbol, position = 'b
 };
 
 // Method to add new class
-settingsSchema.methods.addClass = function(name, level, maxStudents = 40) {
+settingsSchema.methods.addClass = function (name, level, maxStudents = 40) {
   this.academic.classes.push({
     name,
     level,
@@ -305,7 +464,7 @@ settingsSchema.methods.addClass = function(name, level, maxStudents = 40) {
 };
 
 // Method to add new subject
-settingsSchema.methods.addSubject = function(name, code) {
+settingsSchema.methods.addSubject = function (name, code) {
   this.academic.subjects.push({
     name,
     code,
@@ -315,7 +474,7 @@ settingsSchema.methods.addSubject = function(name, code) {
 };
 
 // Method to add fee structure
-settingsSchema.methods.addFeeStructure = function(class_, feeType, amount, term) {
+settingsSchema.methods.addFeeStructure = function (class_, feeType, amount, term) {
   this.fees.feeStructure.push({
     class: class_,
     feeType,

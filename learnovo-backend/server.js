@@ -14,7 +14,9 @@ const app = express();
 app.use(requestIdMiddleware);
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(compression());
 
 // Rate limiting (enabled only in production)
@@ -29,9 +31,9 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // CORS configuration
-const allowedOrigins = process.env.FRONTEND_URL 
+const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : (process.env.NODE_ENV === 'production' 
+  : (process.env.NODE_ENV === 'production'
     ? []
     : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173']);
 
@@ -41,7 +43,7 @@ app.use(cors({
     if (!origin) {
       return callback(null, true);
     }
-    
+
     // In development, be more permissive
     if (process.env.NODE_ENV !== 'production') {
       // Allow localhost on any port
@@ -49,7 +51,7 @@ app.use(cors({
         return callback(null, true);
       }
     }
-    
+
     // Check against allowed origins list
     if (allowedOrigins.length === 0 || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -68,13 +70,17 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files
-app.use('/uploads', express.static('uploads'));
+// Static files - serve uploads with CORS headers
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static('uploads'));
 
 // Database connection
-const mongoUri = process.env.MONGO_URI;
+const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 if (!mongoUri) {
-  console.error('FATAL: MONGO_URI is not set');
+  console.error('FATAL: MONGO_URI or MONGODB_URI is not set');
   process.exit(1);
 }
 
@@ -98,7 +104,7 @@ app.get('/', (req, res) => {
 });
 
 // Enhanced health check endpoint
-app.get('/health', async(req, res) => {
+app.get('/health', async (req, res) => {
   try {
     const healthCheck = {
       success: true,
@@ -156,10 +162,17 @@ app.use('/api/tenants', require('./routes/tenants'));
 app.use('/api/schools', require('./routes/schools'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/students', require('./routes/students'));
+app.use('/api/employees', require('./routes/employees'));
+app.use('/api/academic-sessions', require('./routes/academicSessions'));
 app.use('/api/teachers', require('./routes/teachers'));
 app.use('/api/classes', require('./routes/classes'));
 app.use('/api/subjects', require('./routes/subjects'));
+app.use('/api/class-subjects', require('./routes/classSubjects'));
+app.use('/api/teacher-assignments', require('./routes/teacherAssignments'));
 app.use('/api/fees', require('./routes/fees'));
+app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/fee-structures', require('./routes/feeStructures'));
+app.use('/api/fees', require('./routes/feesReports'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/assignments', require('./routes/assignments'));
 app.use('/api/admissions', require('./routes/admissions'));
@@ -167,6 +180,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/exams', require('./routes/exams'));
 
 // Error handling middleware
 app.use(errorHandler);

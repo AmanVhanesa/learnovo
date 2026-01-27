@@ -1,11 +1,11 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  School, 
-  Users, 
-  BookOpen, 
-  BarChart3, 
-  CheckCircle, 
+import {
+  School,
+  Users,
+  BookOpen,
+  BarChart3,
+  CheckCircle,
   Star,
   ArrowRight,
   Shield,
@@ -112,14 +112,14 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
-              <img 
-                src="/learnovo.png" 
-                alt="Learnovo Logo" 
+              <img
+                src="/learnovo.png"
+                alt="Learnovo Logo"
                 className="h-8 w-8 object-contain"
                 onError={(e) => {
                   e.target.style.display = 'none';
                   const icon = document.createElement('div');
-                  icon.className = 'h-8 w-8 text-blue-600';
+                  icon.className = 'h-8 w-8 text-primary-600';
                   icon.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /></svg>';
                   e.target.parentElement.insertBefore(icon, e.target);
                 }}
@@ -127,15 +127,15 @@ const Landing = () => {
               <span className="ml-2 text-2xl font-bold text-gray-900">Learnovo</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
                 Sign In
               </Link>
               <button
                 onClick={handleGetStarted}
-                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+                className="bg-primary-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary-700"
               >
                 Get Started
               </button>
@@ -145,21 +145,21 @@ const Landing = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
+      <section className="bg-gradient-to-br from-primary-50 to-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
               School Management
-              <span className="text-blue-600"> Made Simple</span>
+              <span className="text-primary-600"> Made Simple</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              The complete school management system that helps you manage students, teachers, 
+              The complete school management system that helps you manage students, teachers,
               classes, and more. Built for modern schools with modern needs.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={handleGetStarted}
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 flex items-center justify-center"
+                className="bg-primary-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-primary-700 flex items-center justify-center"
               >
                 Start Free Trial
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -183,16 +183,16 @@ const Landing = () => {
               Everything Your School Needs
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              From student enrollment to graduation, manage every aspect of your school 
+              From student enrollment to graduation, manage every aspect of your school
               with our comprehensive platform.
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
               <div key={index} className="text-center p-6 rounded-lg hover:shadow-lg transition-shadow">
-                <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <feature.icon className="h-8 w-8 text-blue-600" />
+                <div className="bg-primary-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <feature.icon className="h-8 w-8 text-primary-600" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   {feature.title}
@@ -217,23 +217,22 @@ const Landing = () => {
               Choose the plan that fits your school. No hidden fees, no surprises.
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {plans.map((plan, index) => (
-              <div 
-                key={index} 
-                className={`relative bg-white rounded-lg shadow-lg p-8 ${
-                  plan.popular ? 'ring-2 ring-blue-600 transform scale-105' : ''
-                }`}
+              <div
+                key={index}
+                className={`relative bg-white rounded-lg shadow-lg p-8 ${plan.popular ? 'ring-2 ring-primary-600 transform scale-105' : ''
+                  }`}
               >
                 {plan.popular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-medium">
+                    <span className="bg-primary-600 text-white px-4 py-1 rounded-full text-sm font-medium">
                       Most Popular
                     </span>
                   </div>
                 )}
-                
+
                 <div className="text-center mb-6">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">
                     {plan.name}
@@ -250,7 +249,7 @@ const Landing = () => {
                     {plan.description}
                   </p>
                 </div>
-                
+
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature, featureIndex) => (
                     <li key={featureIndex} className="flex items-center">
@@ -259,14 +258,13 @@ const Landing = () => {
                     </li>
                   ))}
                 </ul>
-                
+
                 <button
                   onClick={handleGetStarted}
-                  className={`w-full py-3 px-4 rounded-lg font-medium ${
-                    plan.popular
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  className={`w-full py-3 px-4 rounded-lg font-medium ${plan.popular
+                      ? 'bg-primary-600 text-white hover:bg-primary-700'
                       : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
                 </button>
@@ -287,7 +285,7 @@ const Landing = () => {
               Join thousands of schools already using Learnovo to manage their operations.
             </p>
           </div>
-          
+
           <div className="bg-gray-50 rounded-lg p-8">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-gray-900 mb-2">
@@ -297,11 +295,11 @@ const Landing = () => {
                 No credit card required. Set up your school in minutes.
               </p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="text-center">
-                <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Clock className="h-6 w-6 text-blue-600" />
+                <div className="bg-primary-50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Clock className="h-6 w-6 text-primary-600" />
                 </div>
                 <h4 className="font-semibold text-gray-900 mb-1">Quick Setup</h4>
                 <p className="text-sm text-gray-600">Get started in under 5 minutes</p>
@@ -321,11 +319,11 @@ const Landing = () => {
                 <p className="text-sm text-gray-600">Access all features during trial</p>
               </div>
             </div>
-            
+
             <div className="text-center">
               <Link
                 to="/register"
-                className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 inline-flex items-center"
+                className="bg-primary-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-primary-700 inline-flex items-center"
               >
                 Create Your School Account
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -341,7 +339,7 @@ const Landing = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <School className="h-8 w-8 text-blue-400" />
+                <School className="h-8 w-8 text-primary-400" />
                 <span className="ml-2 text-2xl font-bold">Learnovo</span>
               </div>
               <p className="text-gray-400">

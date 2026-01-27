@@ -20,7 +20,14 @@ const Classes = () => {
     name: '',
     grade: '',
     academicYear: '',
-    classTeacher: ''
+    classTeacher: '',
+    sections: [] // Array of strings
+  })
+  // UI State for Section Config
+  const [sectionConfig, setSectionConfig] = useState({
+    type: 'STANDARD', // STANDARD or CUSTOM
+    count: 1,
+    customNames: ['A'] // Array of strings or objects { id, name, studentCount }
   })
   const [teachers, setTeachers] = useState([])
 
@@ -60,8 +67,10 @@ const Classes = () => {
       name: '',
       grade: '',
       academicYear: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1),
-      classTeacher: ''
+      classTeacher: '',
+      sections: []
     })
+    setSectionConfig({ type: 'STANDARD', count: 1, customNames: ['A'] })
     setShowModal(true)
   }
 
@@ -71,28 +80,51 @@ const Classes = () => {
       name: classItem.name,
       grade: classItem.grade,
       academicYear: classItem.academicYear,
-      classTeacher: classItem.classTeacher._id
+      classTeacher: classItem.classTeacher?._id || ''
     })
+
+    // Load existing sections as CUSTOM config
+    // We treat them as custom to allow granular editing/locking
+    const existingSections = classItem.sections || [];
+    setSectionConfig({
+      type: 'CUSTOM', // Default to CUSTOM for editing to preserve structure
+      count: existingSections.length,
+      customNames: existingSections.length > 0 ? existingSections : [{ name: 'A' }]
+    })
+
     setShowModal(true)
+  }
+
+  const generateSectionNames = () => {
+    if (sectionConfig.type === 'STANDARD') {
+      return Array.from({ length: Math.min(sectionConfig.count, 26) }, (_, i) => String.fromCharCode(65 + i));
+    }
+    return sectionConfig.customNames.filter(n => n.trim() !== '');
   }
 
   const saveClass = async (e) => {
     e.preventDefault()
     try {
       setIsLoading(true)
-      
-      if (editing) {
-        await classesService.update(editing._id, form)
-      } else {
-        await classesService.create(form)
+
+      const payload = { ...form };
+      if (!editing) {
+        // Only send sections on create
+        payload.sections = generateSectionNames();
       }
-      
+
+      if (editing) {
+        await classesService.update(editing._id, payload)
+      } else {
+        await classesService.create(payload)
+      }
+
       setShowModal(false)
       setEditing(null)
       fetchClasses()
     } catch (error) {
       console.error('Error saving class:', error)
-      alert('Error saving class. Please try again.')
+      alert(error.response?.data?.message || 'Error saving class. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -100,7 +132,7 @@ const Classes = () => {
 
   const deleteClass = async (classItem) => {
     if (!window.confirm('Are you sure you want to delete this class?')) return
-    
+
     try {
       await classesService.delete(classItem._id)
       fetchClasses()
@@ -112,7 +144,7 @@ const Classes = () => {
 
   const filteredClasses = classes.filter(classItem => {
     const matchesSearch = classItem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         classItem.grade.toLowerCase().includes(searchQuery.toLowerCase())
+      classItem.grade.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesGrade = !gradeFilter || classItem.grade === gradeFilter
     const matchesYear = !academicYearFilter || classItem.academicYear === academicYearFilter
     return matchesSearch && matchesGrade && matchesYear
@@ -203,73 +235,87 @@ const Classes = () => {
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table">
-          <thead>
-            <tr>
-              <th>Class Name</th>
-              <th>Grade</th>
-              <th>Academic Year</th>
-              <th>Class Teacher</th>
-              <th>Students</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
+            <thead>
               <tr>
-                <td colSpan="6" className="text-center py-8">
-                  <div className="loading-spinner mx-auto"></div>
-                </td>
+                <th>Class Name</th>
+                <th>Grade</th>
+                <th>Sections</th>
+                <th>Academic Year</th>
+                <th>Class Teacher</th>
+                <th>Students</th>
+                <th>Actions</th>
               </tr>
-            ) : filteredClasses.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="text-center py-8 text-gray-500">
-                  No classes found
-                </td>
-              </tr>
-            ) : (
-              filteredClasses.map((classItem) => (
-                <tr key={classItem._id}>
-                  <td>
-                    <div className="text-sm font-medium text-gray-900">{classItem.name}</div>
-                  </td>
-                  <td className="text-sm text-gray-900">{classItem.grade}</td>
-                  <td className="text-sm text-gray-900">{classItem.academicYear}</td>
-                  <td className="text-sm text-gray-900">
-                    {classItem.classTeacher?.name || 'Not assigned'}
-                  </td>
-                  <td className="text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-1 text-gray-400" />
-                      {classItem.studentCount || 0}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex space-x-2">
-                      <button 
-                        className="p-1 text-gray-400 hover:text-blue-600"
-                        onClick={() => navigate(`/app/classes/${classItem._id}`)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button 
-                        className="p-1 text-gray-400 hover:text-green-600" 
-                        onClick={() => openEdit(classItem)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button 
-                        className="p-1 text-gray-400 hover:text-red-600" 
-                        onClick={() => deleteClass(classItem)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-8">
+                    <div className="loading-spinner mx-auto"></div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : filteredClasses.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-8 text-gray-500">
+                    No classes found
+                  </td>
+                </tr>
+              ) : (
+                filteredClasses.map((classItem) => (
+                  <tr key={classItem._id}>
+                    <td>
+                      <div className="text-sm font-medium text-gray-900">{classItem.name}</div>
+                    </td>
+                    <td className="text-sm text-gray-900">{classItem.grade}</td>
+                    <td className="text-sm text-gray-900">
+                      <div className="flex flex-wrap gap-1">
+                        {classItem.sections && classItem.sections.length > 0 ? (
+                          classItem.sections.map(sec => (
+                            <span key={sec._id} className="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                              {sec.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">None</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="text-sm text-gray-900">{classItem.academicYear}</td>
+                    <td className="text-sm text-gray-900">
+                      {classItem.classTeacher?.name || 'Not assigned'}
+                    </td>
+                    <td className="text-sm text-gray-900">
+                      <div className="flex items-center">
+                        <Users className="h-4 w-4 mr-1 text-gray-400" />
+                        {classItem.studentCount || 0}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex space-x-2">
+                        <button
+                          className="p-1 text-gray-400 hover:text-blue-600"
+                          onClick={() => navigate(`/app/classes/${classItem._id}`)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="p-1 text-gray-400 hover:text-green-600"
+                          onClick={() => openEdit(classItem)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="p-1 text-gray-400 hover:text-red-600"
+                          onClick={() => deleteClass(classItem)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -281,14 +327,14 @@ const Classes = () => {
               <h3 className="text-lg font-semibold text-gray-900">
                 {editing ? 'Edit Class' : 'Add Class'}
               </h3>
-              <button 
+              <button
                 className="p-2 rounded-md hover:bg-gray-100"
                 onClick={() => { setShowModal(false); setEditing(null); }}
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form className="space-y-4" onSubmit={saveClass}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -297,12 +343,12 @@ const Classes = () => {
                 <input
                   type="text"
                   value={form.name}
-                  onChange={(e) => setForm({...form, name: e.target.value})}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="input"
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Grade
@@ -310,13 +356,13 @@ const Classes = () => {
                 <input
                   type="text"
                   value={form.grade}
-                  onChange={(e) => setForm({...form, grade: e.target.value})}
+                  onChange={(e) => setForm({ ...form, grade: e.target.value })}
                   className="input"
                   placeholder="e.g., 9th Grade, 10th Grade"
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Academic Year
@@ -324,20 +370,20 @@ const Classes = () => {
                 <input
                   type="text"
                   value={form.academicYear}
-                  onChange={(e) => setForm({...form, academicYear: e.target.value})}
+                  onChange={(e) => setForm({ ...form, academicYear: e.target.value })}
                   className="input"
                   placeholder="e.g., 2024-2025"
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Class Teacher
                 </label>
                 <select
                   value={form.classTeacher}
-                  onChange={(e) => setForm({...form, classTeacher: e.target.value})}
+                  onChange={(e) => setForm({ ...form, classTeacher: e.target.value })}
                   className="input"
                   required
                 >
@@ -349,16 +395,97 @@ const Classes = () => {
                   ))}
                 </select>
               </div>
-              
+
+              {!editing && (
+                <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+                  <label className="block text-sm font-medium text-gray-900 mb-3">Section Configuration</label>
+
+                  <div className="flex gap-4 mb-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="sectionType"
+                        checked={sectionConfig.type === 'STANDARD'}
+                        onChange={() => setSectionConfig({ ...sectionConfig, type: 'STANDARD' })}
+                        className="text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className="text-sm text-gray-700">Standard (A, B, C...)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="sectionType"
+                        checked={sectionConfig.type === 'CUSTOM'}
+                        onChange={() => setSectionConfig({ ...sectionConfig, type: 'CUSTOM' })}
+                        className="text-teal-600 focus:ring-teal-500"
+                      />
+                      <span className="text-sm text-gray-700">Custom Names</span>
+                    </label>
+                  </div>
+
+                  {sectionConfig.type === 'STANDARD' ? (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Number of Sections</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="26"
+                        value={sectionConfig.count}
+                        onChange={(e) => setSectionConfig({ ...sectionConfig, count: parseInt(e.target.value) || 1 })}
+                        className="input w-32"
+                      />
+                      <div className="mt-2 text-sm text-gray-600">
+                        Preview: <span className="font-mono font-medium">{generateSectionNames().join(', ')}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Section Names</label>
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="text"
+                          className="input flex-1"
+                          placeholder="Type name and press Enter"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const val = e.target.value.trim();
+                              if (val && !sectionConfig.customNames.includes(val)) {
+                                setSectionConfig({
+                                  ...sectionConfig,
+                                  customNames: [...sectionConfig.customNames, val]
+                                });
+                                e.target.value = '';
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {sectionConfig.customNames.map((name, idx) => (
+                          <span key={idx} className="bg-white border border-gray-300 px-2 py-1 rounded-md text-sm flex items-center gap-1">
+                            {name}
+                            <button type="button" onClick={() => {
+                              const newNames = sectionConfig.customNames.filter((_, i) => i !== idx);
+                              setSectionConfig({ ...sectionConfig, customNames: newNames });
+                            }} className="text-gray-400 hover:text-red-500"><X className="h-3 w-3" /></button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3 pt-4">
-                <button 
+                <button
                   type="button"
                   className="btn btn-ghost"
                   onClick={() => { setShowModal(false); setEditing(null); }}
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="btn btn-primary"
                   disabled={isLoading}

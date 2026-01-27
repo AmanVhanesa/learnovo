@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 /**
  * Attendance Model
- * Tracks daily attendance for students by class, subject, and teacher
+ * Tracks daily attendance for students and employees
  */
 const attendanceSchema = new mongoose.Schema({
   // Multi-tenant support
@@ -12,41 +12,55 @@ const attendanceSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  
-  // Class reference
+
+  // Type of attendance: 'student' or 'employee'
+  attendanceType: {
+    type: String,
+    enum: ['student', 'employee'],
+    default: 'student',
+    required: true
+  },
+
+  // Class reference (only for student attendance)
   classId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Class',
-    required: [true, 'Class is required']
+    required: function () {
+      return this.attendanceType === 'student';
+    }
   },
-  
-  // Teacher who marked attendance
+
+  // Teacher who marked attendance (only for student attendance)
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Teacher is required']
+    required: function () {
+      return this.attendanceType === 'student';
+    }
   },
-  
-  // Subject for which attendance is marked
+
+  // Subject for which attendance is marked (only for student attendance)
   subject: {
     type: String,
-    required: [true, 'Subject is required'],
+    required: function () {
+      return this.attendanceType === 'student';
+    },
     trim: true
   },
-  
+
   // Date of attendance
   date: {
     type: Date,
     required: [true, 'Date is required']
   },
-  
+
   // Academic year
   academicYear: {
     type: String,
     default: '2025-2026'
   },
-  
-  // Individual student attendance records
+
+  // Individual student attendance records (for student attendance)
   attendanceRecords: [{
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -67,7 +81,35 @@ const attendanceSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  
+
+  // Individual employee attendance records (for employee attendance)
+  employeeRecords: [{
+    employeeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    employeeNumber: {
+      type: String,
+      trim: true
+    },
+    status: {
+      type: String,
+      enum: ['present', 'absent', 'late', 'on-leave'],
+      default: 'present'
+    },
+    checkInTime: {
+      type: Date
+    },
+    checkOutTime: {
+      type: Date
+    },
+    markedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+
   // Summary counts
   totalPresent: {
     type: Number,
@@ -86,10 +128,16 @@ const attendanceSchema = new mongoose.Schema({
 })
 
 // Calculate totals before saving
-attendanceSchema.pre('save', function(next) {
-  this.totalPresent = this.attendanceRecords.filter(r => r.status === 'present').length
-  this.totalAbsent = this.attendanceRecords.filter(r => r.status === 'absent').length
-  this.totalLate = this.attendanceRecords.filter(r => r.status === 'late').length
+attendanceSchema.pre('save', function (next) {
+  if (this.attendanceType === 'student') {
+    this.totalPresent = this.attendanceRecords.filter(r => r.status === 'present').length
+    this.totalAbsent = this.attendanceRecords.filter(r => r.status === 'absent').length
+    this.totalLate = this.attendanceRecords.filter(r => r.status === 'late').length
+  } else if (this.attendanceType === 'employee') {
+    this.totalPresent = this.employeeRecords.filter(r => r.status === 'present').length
+    this.totalAbsent = this.employeeRecords.filter(r => r.status === 'absent').length
+    this.totalLate = this.employeeRecords.filter(r => r.status === 'late').length
+  }
   next()
 })
 
@@ -101,14 +149,14 @@ attendanceSchema.index({ date: 1 })
 /**
  * Static method to get attendance for a class on a specific date
  */
-attendanceSchema.statics.getAttendanceByDate = function(classId, date, subject) {
+attendanceSchema.statics.getAttendanceByDate = function (classId, date, subject) {
   return this.findOne({ classId, date, subject }).populate('attendanceRecords.studentId', 'name email admissionNumber')
 }
 
 /**
  * Static method to get attendance statistics for a student
  */
-attendanceSchema.statics.getStudentAttendanceStats = function(studentId, academicYear) {
+attendanceSchema.statics.getStudentAttendanceStats = function (studentId, academicYear) {
   return this.aggregate([
     { $unwind: '$attendanceRecords' },
     { $match: { 'attendanceRecords.studentId': studentId, academicYear } },

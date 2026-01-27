@@ -18,6 +18,17 @@ export const reportsService = {
   getDashboardStats: async () => {
     const { data } = await api.get('/reports/dashboard')
     return data
+  },
+
+  getRecentActivities: async (limit = 10) => {
+    const { data } = await api.get(`/reports/activities?limit=${limit}`);
+    return data;
+  },
+
+  getDailyFeeDetails: async (date, filters = {}) => {
+    const params = { date, ...filters };
+    const { data } = await api.get('/fees/daily', { params });
+    return data;
   }
 }
 

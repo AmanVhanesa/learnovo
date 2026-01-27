@@ -16,13 +16,32 @@ const subjectSchema = new mongoose.Schema({
   },
   subjectCode: {
     type: String,
-    required: [true, 'Subject code is required'],
     trim: true,
-    uppercase: true
+    uppercase: true,
+    sparse: true // Optional, but unique if provided
+  },
+  type: {
+    type: String,
+    enum: ['Theory', 'Practical', 'Both'],
+    default: 'Theory'
+  },
+  maxMarks: {
+    type: Number,
+    min: 0,
+    default: 100
+  },
+  passingMarks: {
+    type: Number,
+    min: 0,
+    default: 33
   },
   description: {
     type: String,
     trim: true
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   isActive: {
     type: Boolean,

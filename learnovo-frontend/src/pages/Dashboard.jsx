@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
-import { 
-  Users, 
-  GraduationCap, 
-  CreditCard, 
-  AlertTriangle, 
+import {
+  Users,
+  GraduationCap,
+  CreditCard,
+  AlertTriangle,
   TrendingUp,
   Calendar,
   BookOpen,
-  Bell
+  Bell,
+  UserPlus
 } from 'lucide-react'
 import { Line, Doughnut } from 'react-chartjs-2'
 import KpiCard from '../components/KpiCard'
@@ -20,6 +21,7 @@ import Button from '../components/Button'
 import { CardSkeleton, ChartSkeleton } from '../components/LoadingSkeleton'
 import { exportCSV, exportPNGPlaceholder } from '../utils/exportHelpers'
 import { reportsService } from '../services/reportsService'
+import RecentActivities from '../components/RecentActivities'
 import toast from 'react-hot-toast'
 import {
   Chart as ChartJS,
@@ -56,7 +58,8 @@ const Dashboard = () => {
     teacher: { myStudents: 0, attendanceToday: 0, activeAssignments: 0, pendingSubmissions: 0 },
     student: { profileComplete: 'Incomplete', pendingFees: 0, assignments: 0, notifications: 0 },
     parent: { myChildren: 0, pendingFees: 0, notifications: 0, performance: 'Good' },
-    enrollmentTrend: { labels: [], data: [] }
+    enrollmentTrend: { labels: [], data: [] },
+    recentActivities: []
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -70,8 +73,14 @@ const Dashboard = () => {
       setIsLoading(true)
       setError(null)
       const res = await reportsService.getDashboardStats()
+      // Fetch recent activities in parallel or separately
+      const activitiesRes = await reportsService.getRecentActivities()
+
       if (res?.success && res?.data) {
-        setStats(res.data)
+        setStats({
+          ...res.data,
+          recentActivities: activitiesRes.success ? activitiesRes.data : []
+        })
       } else {
         setError(null)
       }
@@ -93,25 +102,32 @@ const Dashboard = () => {
       case 'admin':
         return [
           {
-            title: 'Total Students',
-            value: stats.students.total,
+            title: "Today's Collection",
+            value: formatCurrency(stats.fees.collectedToday || 0),
+            icon: CreditCard,
+            color: 'text-green-600',
+            bgColor: 'bg-green-100'
+          },
+          {
+            title: 'Students Present',
+            value: stats.attendance?.studentsPresentToday || 0,
             icon: Users,
             color: 'text-blue-600',
             bgColor: 'bg-blue-100'
           },
           {
-            title: 'Total Teachers',
-            value: stats.teachers.total,
-            icon: GraduationCap,
-            color: 'text-green-600',
-            bgColor: 'bg-green-100'
-          },
-          {
-            title: 'Fees Collected',
-            value: formatCurrency(stats.fees.paid),
-            icon: CreditCard,
+            title: 'Employees Present',
+            value: stats.attendance?.employeesPresentToday || 0,
+            icon: GraduationCap, // Or UserCheck
             color: 'text-purple-600',
             bgColor: 'bg-purple-100'
+          },
+          {
+            title: 'New Admissions',
+            value: stats.admissions.thisMonth || 0,
+            icon: UserPlus,
+            color: 'text-orange-600',
+            bgColor: 'bg-orange-100'
           },
           {
             title: 'Pending Fees',
@@ -220,8 +236,8 @@ const Dashboard = () => {
   }
 
   const enrollmentData = {
-    labels: stats.enrollmentTrend?.labels && stats.enrollmentTrend.labels.length > 0 
-      ? stats.enrollmentTrend.labels 
+    labels: stats.enrollmentTrend?.labels && stats.enrollmentTrend.labels.length > 0
+      ? stats.enrollmentTrend.labels
       : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
     datasets: [
       {
@@ -241,8 +257,8 @@ const Dashboard = () => {
     datasets: [
       {
         data: [
-          stats.fees.paid || 0, 
-          stats.fees.pending || 0, 
+          stats.fees.paid || 0,
+          stats.fees.pending || 0,
           stats.fees.overdue || 0
         ],
         backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
@@ -250,106 +266,7 @@ const Dashboard = () => {
     ]
   }
 
-  // Generate recent activities from actual data
-  const getRecentActivities = () => {
-    const activities = [];
-    
-    // Add recent student enrollments (if admin)
-    if (user?.role === 'admin' && stats.students) {
-      if (stats.students.total > 0) {
-        activities.push({
-          id: 'students',
-          type: 'student',
-          message: `${stats.students.total} total student${stats.students.total !== 1 ? 's' : ''} enrolled`,
-          time: 'Updated',
-          icon: Users
-        });
-      }
-    }
-    
-    // Add fee collection info
-    if (stats.fees && stats.fees.paid > 0) {
-      activities.push({
-        id: 'fees-paid',
-        type: 'fee',
-        message: `₹${stats.fees.paid.toLocaleString()} collected in fees`,
-        time: 'Current',
-        icon: CreditCard
-      });
-    }
-    
-    // Add pending fees warning
-    if (stats.fees && stats.fees.pending > 0) {
-      activities.push({
-        id: 'fees-pending',
-        type: 'fee',
-        message: `₹${stats.fees.pending.toLocaleString()} pending fees`,
-        time: 'Action needed',
-        icon: AlertTriangle
-      });
-    }
-    
-    // Add overdue fees warning
-    if (stats.fees && stats.fees.overdue > 0) {
-      activities.push({
-        id: 'fees-overdue',
-        type: 'fee',
-        message: `₹${stats.fees.overdue.toLocaleString()} overdue fees`,
-        time: 'Urgent',
-        icon: AlertTriangle
-      });
-    }
-    
-    // Add teacher-specific activities
-    if (user?.role === 'teacher' && stats.teacher) {
-      if (stats.teacher.myStudents > 0) {
-        activities.push({
-          id: 'my-students',
-          type: 'student',
-          message: `${stats.teacher.myStudents} student${stats.teacher.myStudents !== 1 ? 's' : ''} in your classes`,
-          time: 'Current',
-          icon: Users
-        });
-      }
-    }
-    
-    // Add student-specific activities
-    if (user?.role === 'student' && stats.student) {
-      if (stats.student.pendingFees > 0) {
-        activities.push({
-          id: 'student-fees',
-          type: 'fee',
-          message: `${stats.student.pendingFees} fee${stats.student.pendingFees !== 1 ? 's' : ''} pending`,
-          time: 'Action needed',
-          icon: CreditCard
-        });
-      }
-      if (stats.student.assignments > 0) {
-        activities.push({
-          id: 'student-assignments',
-          type: 'assignment',
-          message: `${stats.student.assignments} assignment${stats.student.assignments !== 1 ? 's' : ''} assigned`,
-          time: 'Current',
-          icon: BookOpen
-        });
-      }
-    }
-    
-    // If no activities, show default message
-    if (activities.length === 0) {
-      activities.push({
-        id: 'no-activities',
-        type: 'info',
-        message: 'No recent activities',
-        time: '',
-        icon: Bell
-      });
-    }
-    
-    return activities.slice(0, 5); // Limit to 5 most recent
-  }
-
-  const recentActivities = getRecentActivities()
+  /* Deprecated: Legacy Recent Activities logic removed */
 
   return (
     <div className="space-y-6">
@@ -368,10 +285,10 @@ const Dashboard = () => {
           </button>
         </div>
       )}
-      
+
       {/* Welcome message */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h1 className="text-2xl font-bold text-gray-900">
+      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Welcome back, {user?.name}!
         </h1>
         <div className="flex items-center gap-3 mt-2">
@@ -401,122 +318,152 @@ const Dashboard = () => {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-5 xl:gap-6">
         {isLoading ? (
           [...Array(4)].map((_, i) => <CardSkeleton key={i} />)
         ) : (
           getRoleBasedStats().map((stat, index) => {
-          // Map title to navigation route
-          const getRoute = (title) => {
-            if (title.toLowerCase().includes('student')) return '/app/students'
-            if (title.toLowerCase().includes('teacher')) return '/app/teachers'
-            if (title.toLowerCase().includes('fee')) return '/app/fees'
-            if (title.toLowerCase().includes('assignment')) return '/app/assignments'
-            if (title.toLowerCase().includes('notification')) return '/app/notifications'
-            return '/app/dashboard'
-          }
-          
-          // Handle export with more data
-          const handleExport = () => {
-            const exportData = [
-              ['Metric', 'Value'],
-              [stat.title, String(stat.value)]
-            ]
-            
-            // Add additional context based on stat type
-            if (stat.title.toLowerCase().includes('fee') && stats.fees) {
-              exportData.push(['Total Fees', stats.fees.total])
-              exportData.push(['Paid Fees', stats.fees.paid])
-              exportData.push(['Pending Fees', stats.fees.pending])
-              exportData.push(['Overdue Fees', stats.fees.overdue])
-            } else if (stat.title.toLowerCase().includes('student') && stats.students) {
-              exportData.push(['Total Students', stats.students.total])
-              exportData.push(['Active Students', stats.students.active])
-            } else if (stat.title.toLowerCase().includes('teacher') && stats.teachers) {
-              exportData.push(['Total Teachers', stats.teachers.total])
-              exportData.push(['Active Teachers', stats.teachers.active])
+            // Map title to navigation route
+            const getRoute = (title) => {
+              const lowerTitle = title.toLowerCase()
+              if (lowerTitle.includes('student')) return '/app/students'
+              if (lowerTitle.includes('teacher') || lowerTitle.includes('employee')) return '/app/teachers'
+              if (lowerTitle.includes('fee') || lowerTitle.includes('collection')) return '/app/fees'
+              if (lowerTitle.includes('admission')) return '/app/admissions'
+              if (lowerTitle.includes('assignment')) return '/app/assignments'
+              if (lowerTitle.includes('notification')) return '/app/notifications'
+              return '/app/dashboard'
             }
-            
-            exportCSV(`${stat.title}_${new Date().toISOString().split('T')[0]}.csv`, exportData)
-          }
-          
-          return (
-            <KpiCard
-              key={index}
-              title={stat.title}
-              value={stat.value}
-              Icon={stat.icon}
-              primaryLabel="View details"
-              onPrimary={() => navigate(getRoute(stat.title))}
-              secondaryLabel="Export"
-              onSecondary={handleExport}
-            />
-          )
-        })
+
+            // Handle export with more data
+            const handleExport = () => {
+              const exportData = [
+                ['Metric', 'Value'],
+                [stat.title, String(stat.value)]
+              ]
+
+              // Add additional context based on stat type
+              if (stat.title.toLowerCase().includes('fee') && stats.fees) {
+                exportData.push(['Total Fees', stats.fees.total])
+                exportData.push(['Paid Fees', stats.fees.paid])
+                exportData.push(['Pending Fees', stats.fees.pending])
+                exportData.push(['Overdue Fees', stats.fees.overdue])
+              } else if (stat.title.toLowerCase().includes('student') && stats.students) {
+                exportData.push(['Total Students', stats.students.total])
+                exportData.push(['Active Students', stats.students.active])
+              } else if (stat.title.toLowerCase().includes('teacher') && stats.teachers) {
+                exportData.push(['Total Teachers', stats.teachers.total])
+                exportData.push(['Active Teachers', stats.teachers.active])
+              }
+
+              exportCSV(`${stat.title}_${new Date().toISOString().split('T')[0]}.csv`, exportData)
+            }
+
+            return (
+              <KpiCard
+                key={index}
+                title={stat.title}
+                value={stat.value}
+                Icon={stat.icon}
+                primaryLabel="View details"
+                onPrimary={() => navigate(getRoute(stat.title))}
+                secondaryLabel="Export"
+                onSecondary={handleExport}
+              />
+            )
+          })
         )}
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
         {isLoading ? (
           <ChartSkeleton />
         ) : (
           <>
-        {user?.role === 'admin' ? (
-          <>
-            <ChartCard
-              title="Student Enrollment Trend"
-              onExport={() => exportChartAsPNG('Student Enrollment Trend', enrollmentData)}
-              filterOptions={{ classOptions: [], teacherOptions: [], sectionOptions: [] }}
-            >
-              {() => (
-                <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
-              )}
-            </ChartCard>
+            {user?.role === 'admin' ? (
+              <>
+                <ChartCard
+                  title="Student Enrollment Trend"
+                  onExport={() => exportChartAsPNG('Student Enrollment Trend', enrollmentData)}
+                  filterOptions={{ classOptions: [], teacherOptions: [], sectionOptions: [] }}
+                >
+                  {() => (
+                    <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
+                  )}
+                </ChartCard>
 
-            <ChartCard
-              title="Fee Collection Status"
-              onExport={() => exportChartAsPNG('Fee Collection Status', feesData)}
-            >
-              {() => (
-                <Doughnut data={feesData} options={{ responsive: true, maintainAspectRatio: false }} />
-              )}
-            </ChartCard>
-          </>
-        ) : user?.role === 'teacher' ? (
-          <>
-            <ChartCard
-              title="Weekly Attendance Trend"
-              onExport={() => exportChartAsPNG('Weekly Attendance Trend', enrollmentData)}
-            >
-              {() => (
-                <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
-              )}
-            </ChartCard>
+                <ChartCard
+                  title="Fee Collection Status"
+                  onExport={() => exportChartAsPNG('Fee Collection Status', feesData)}
+                >
+                  {() => (
+                    <Doughnut data={feesData} options={{ responsive: true, maintainAspectRatio: false }} />
+                  )}
+                </ChartCard>
+              </>
+            ) : user?.role === 'teacher' ? (
+              <>
+                <ChartCard
+                  title="Weekly Attendance Trend"
+                  onExport={() => exportChartAsPNG('Weekly Attendance Trend', enrollmentData)}
+                >
+                  {() => (
+                    <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
+                  )}
+                </ChartCard>
 
-            <ChartCard
-              title="Assignment Submission Status"
-              onExport={() => exportChartAsPNG('Assignment Submission Status', feesData)}
-            >
-              {() => (
-                <Doughnut data={feesData} options={{ responsive: true, maintainAspectRatio: false }} />
-              )}
-            </ChartCard>
-          </>
-        ) : (
-          <ChartCard
-            title="Student Enrollment Trend"
-            onExport={() => exportChartAsPNG('Student Enrollment Trend', enrollmentData)}
-            filterOptions={{ classOptions: [], teacherOptions: [], sectionOptions: [] }}
-          >
-            {() => (
-              <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
+                <ChartCard
+                  title="Assignment Submission Status"
+                  onExport={() => exportChartAsPNG('Assignment Submission Status', feesData)}
+                >
+                  {() => (
+                    <Doughnut data={feesData} options={{ responsive: true, maintainAspectRatio: false }} />
+                  )}
+                </ChartCard>
+              </>
+            ) : (
+              <ChartCard
+                title="Student Enrollment Trend"
+                onExport={() => exportChartAsPNG('Student Enrollment Trend', enrollmentData)}
+                filterOptions={{ classOptions: [], teacherOptions: [], sectionOptions: [] }}
+              >
+                {() => (
+                  <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
+                )}
+              </ChartCard>
             )}
-          </ChartCard>
-        )}
-        </>
+          </>
         )}
       </div>
+
+      {/* Admin specific widgets */}
+      {user?.role === 'admin' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Upcoming Exams & Deadlines</h3>
+            {stats.upcomingExams && stats.upcomingExams.length > 0 ? (
+              <div className="space-y-3">
+                {stats.upcomingExams.map((exam, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{exam.name || 'Exam'}</p>
+                      <p className="text-xs text-gray-500">{exam.subject?.name} • {exam.class?.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-indigo-600">
+                        {new Date(exam.date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 py-4 text-center">No upcoming exams found.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Teacher-specific widgets */}
       {user?.role === 'teacher' && (
@@ -598,24 +545,8 @@ const Dashboard = () => {
       )}
 
       {/* Recent activities */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activities</h3>
-        <div className="space-y-4">
-          {recentActivities.map((activity) => (
-            <div key={activity.id} className="flex items-center space-x-4">
-              <div className="flex-shrink-0">
-                <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
-                  <activity.icon className="h-4 w-4 text-gray-600" />
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-900">{activity.message}</p>
-                <p className="text-xs text-gray-500">{activity.time}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Recent activities */}
+      <RecentActivities activities={stats.recentActivities} isLoading={isLoading} />
     </div>
   )
 }

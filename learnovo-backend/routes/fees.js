@@ -8,8 +8,81 @@ const { protect, authorize, canAccessFee } = require('../middleware/auth');
 const { handleValidationErrors, validateFee } = require('../middleware/validation');
 const { formatCurrencyWithSettings } = require('../utils/currency');
 const { sendFeeReminder, sendOverdueFeeReminder } = require('../utils/email');
+const notificationService = require('../services/notificationService');
 
 const router = express.Router();
+
+// @desc    Get daily fee details (drill-down)
+// @route   GET /api/fees/daily
+// @access  Private (Admin, Accountant) - Restricted for now
+router.get('/daily', protect, [
+  query('date').isISO8601().withMessage('Valid date is required (YYYY-MM-DD)')
+], handleValidationErrors, async (req, res) => {
+  try {
+    // Ensure admin or strict permission check
+    if (req.user.role !== 'admin' && req.user.role !== 'teacher') { // Assuming teacher/accountant role
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    const { date } = req.query;
+    const tenantId = req.user.tenantId;
+
+    // Set time range for the entire day (00:00:00 to 23:59:59) in local time or UTC as stored
+    // Assuming date is passed as YYYY-MM-DD
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const filter = {
+      tenantId,
+      paidDate: { $gte: startOfDay, $lte: endOfDay },
+      status: 'paid'
+    };
+
+    // Additional filters
+    if (req.query.class) {
+      // Need to filter by student's class, so we need aggregation or two-step
+      // Simple approach: Fetch fees, populate student, filter in JS. 
+      // Better: Aggregation. Let's start with Populate & Filter for simplicity unless scale is huge.
+    }
+
+    if (req.query.paymentMethod) {
+      filter.paymentMethod = req.query.paymentMethod;
+    }
+
+    if (req.query.feeType) {
+      filter.feeType = req.query.feeType;
+    }
+
+    const fees = await Fee.find(filter)
+      .populate('student', 'name admissionNumber class section')
+      .sort({ paidDate: -1 });
+
+    // JS Filter for class if needed
+    let resultFees = fees;
+    if (req.query.class) {
+      resultFees = fees.filter(f => f.student?.class === req.query.class);
+    }
+
+    const totalCollected = resultFees.reduce((sum, f) => sum + f.amount, 0);
+
+    res.json({
+      success: true,
+      data: {
+        date: date,
+        totalCollected,
+        count: resultFees.length,
+        transactions: resultFees
+      }
+    });
+
+  } catch (error) {
+    console.error('Get daily fees error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 
 // @desc    Get all fees
 // @route   GET /api/fees
@@ -21,7 +94,7 @@ router.get('/', protect, [
   query('student').optional().isMongoId().withMessage('Invalid student ID'),
   query('class').optional().trim().notEmpty().withMessage('Class filter cannot be empty'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -39,7 +112,7 @@ router.get('/', protect, [
         filter.tenantId = req.user.tenantId;
       } else {
         // Legacy: filter through students
-        const studentsInTenant = await User.find({ 
+        const studentsInTenant = await User.find({
           tenantId: req.user.tenantId,
           role: 'student'
         }).select('_id');
@@ -102,7 +175,7 @@ router.get('/', protect, [
 
     // Format fees with currency
     const formattedFees = await Promise.all(
-      fees.map(async(fee) => ({
+      fees.map(async (fee) => ({
         ...fee.toJSON(),
         formattedAmount: await formatCurrencyWithSettings(fee.amount, fee.currency),
         student: fee.student
@@ -130,7 +203,7 @@ router.get('/', protect, [
 // @desc    Get single fee
 // @route   GET /api/fees/:id
 // @access  Private
-router.get('/:id', protect, canAccessFee, async(req, res) => {
+router.get('/:id', protect, canAccessFee, async (req, res) => {
   try {
     const fee = await Fee.findById(req.params.id)
       .populate('student', 'name email phone class studentId rollNumber');
@@ -162,7 +235,7 @@ router.get('/:id', protect, canAccessFee, async(req, res) => {
 // @desc    Create new fee
 // @route   POST /api/fees
 // @access  Private (Admin, Teacher)
-router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleValidationErrors, async(req, res) => {
+router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleValidationErrors, async (req, res) => {
   try {
     const {
       student,
@@ -209,16 +282,16 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
         academic: { currentYear: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1) }
       };
     }
-    
+
     // Handle case where settings might not have all required fields
     const feeCurrency = currency || (settings?.currency?.default || settings?.currency || 'INR');
     const currentYear = new Date().getFullYear();
     const nextYear = currentYear + 1;
-    const defaultAcademicYearStr = academicYear || 
-      settings?.academic?.currentYear || 
+    const defaultAcademicYearStr = academicYear ||
+      settings?.academic?.currentYear ||
       settings?.settings?.academicYear ||
       `${currentYear}-${nextYear}`;
-    
+
     const feeCurrencyFinal = typeof feeCurrency === 'string' ? feeCurrency : (feeCurrency?.default || 'INR');
     const defaultAcademicYear = defaultAcademicYearStr.toString();
 
@@ -229,31 +302,31 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
         message: 'Invalid student ID format'
       });
     }
-    
+
     // Validate feeType enum
     const validFeeTypes = ['tuition', 'transport', 'library', 'sports', 'exam', 'other'];
-    const finalFeeType = feeType && validFeeTypes.includes(feeType.toLowerCase()) 
-      ? feeType.toLowerCase() 
+    const finalFeeType = feeType && validFeeTypes.includes(feeType.toLowerCase())
+      ? feeType.toLowerCase()
       : 'tuition';
-    
+
     // Validate term enum
     const validTerms = ['1st_term', '2nd_term', '3rd_term', 'annual'];
     const finalTerm = term && validTerms.includes(term.toLowerCase())
       ? term.toLowerCase()
       : 'annual';
-    
+
     // Validate academic year format
     const academicYearPattern = /^\d{4}-\d{4}$/;
     const finalAcademicYear = academicYear && academicYearPattern.test(academicYear)
       ? academicYear
       : defaultAcademicYear.toString().trim();
-    
+
     // Validate status
     const validStatuses = ['pending', 'paid', 'overdue', 'cancelled'];
     const finalStatus = status && validStatuses.includes(status.toLowerCase())
       ? status.toLowerCase()
       : 'pending';
-    
+
     // If status is paid, set payment info
     const paymentInfo = {};
     if (finalStatus === 'paid') {
@@ -263,7 +336,7 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
         : 'cash';
       paymentInfo.paidDate = paidDate ? new Date(paidDate) : new Date();
     }
-    
+
     // Prepare fee data - mongoose will handle ObjectId conversion
     const feeDataToCreate = {
       tenantId: req.user.tenantId, // Ensure tenantId is included
@@ -279,7 +352,7 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
       ...paymentInfo,
       notes: (notes || '').trim()
     };
-    
+
     console.log('✅ Fee data validated and prepared:', {
       ...feeDataToCreate,
       dueDateType: typeof feeDataToCreate.dueDate,
@@ -327,7 +400,7 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
       console.error('❌ Error message:', createError.message);
       console.error('❌ Error code:', createError.code);
       console.error('❌ Full error object:', createError);
-      
+
       if (createError.errors) {
         console.error('❌ Validation errors object:', createError.errors);
         Object.keys(createError.errors).forEach(key => {
@@ -335,14 +408,14 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
           console.error(`  - ${key}: ${err.message} (kind: ${err.kind}, value: ${err.value})`);
         });
       }
-      
+
       if (createError.keyPattern) {
         console.error('❌ Duplicate key pattern:', createError.keyPattern);
         console.error('❌ Duplicate key value:', createError.keyValue);
       }
-      
+
       console.error('❌ Stack trace:', createError.stack);
-      
+
       // Re-throw to outer catch
       throw createError;
     }
@@ -386,6 +459,17 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
       };
     }
 
+    // Send notification about new fee invoice
+    try {
+      const tenantId = req.user.tenantId;
+      if (tenantId && fee.student) {
+        await notificationService.notifyFeeInvoiceGenerated(fee, studentExists, tenantId);
+      }
+    } catch (notifError) {
+      console.error('Error sending fee invoice notification:', notifError);
+      // Don't fail the request if notification fails
+    }
+
     res.status(201).json({
       success: true,
       message: 'Fee created successfully',
@@ -403,13 +487,13 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
     console.error('🚨 Full error object:', error);
     console.error('🚨 Error constructor:', error?.constructor?.name);
     console.error('🚨 Is Error instance?', error instanceof Error);
-    
+
     // Check if response was already sent
     if (res.headersSent) {
       console.error('🚨⚠️ Response already sent! Cannot send error response.');
       return;
     }
-    
+
     if (error?.errors) {
       console.error('🚨 Error.errors exists! Keys:', Object.keys(error.errors));
       Object.keys(error.errors).forEach(key => {
@@ -418,22 +502,22 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
     } else {
       console.error('🚨 No error.errors property');
     }
-    
+
     if (error?.keyPattern) {
       console.error('🚨 Duplicate key error detected!');
       console.error('🚨 Key pattern:', error.keyPattern);
       console.error('🚨 Key value:', error.keyValue);
     }
-    
+
     if (error?.stack) {
       console.error('🚨 Stack trace (first 15 lines):');
       console.error(error.stack.split('\n').slice(0, 15).join('\n'));
     }
-    
+
     // Handle specific error types
     let statusCode = 500;
     let errorMessage = 'Server error while creating fee';
-    
+
     if (error?.name === 'ValidationError') {
       statusCode = 400;
       errorMessage = 'Validation error';
@@ -464,7 +548,7 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
     } else if (error?.message) {
       errorMessage = error.message;
     }
-    
+
     // Build comprehensive error response - FORCE include details
     const errorResponse = {
       success: false,
@@ -476,7 +560,7 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
       // Include request info for debugging
       timestamp: new Date().toISOString()
     };
-    
+
     // Log what we're including
     console.error('🚨 Error object analysis:', {
       hasMessage: !!error?.message,
@@ -488,7 +572,7 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
       errorType: typeof error,
       errorString: String(error)
     });
-    
+
     // Include detailed validation errors if present
     if (error?.errors && typeof error.errors === 'object' && Object.keys(error.errors).length > 0) {
       errorResponse.validationErrors = Object.keys(error.errors).map(key => ({
@@ -499,7 +583,7 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
       }));
       console.error('🚨 Added', errorResponse.validationErrors.length, 'validation errors to response');
     }
-    
+
     // Include duplicate key info if present
     if (error?.keyPattern || error?.keyValue) {
       errorResponse.duplicateKey = {
@@ -508,17 +592,17 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
       };
       console.error('🚨 Added duplicate key info to response');
     }
-    
+
     // Always include stack in development
     if (error?.stack) {
       errorResponse.stack = error.stack.split('\n').slice(0, 15).join('\n');
     }
-    
+
     console.error('🚨🚨🚨 FINAL ERROR RESPONSE BEING SENT:');
     console.error(JSON.stringify(errorResponse, null, 2));
     console.error('🚨 Response status code:', statusCode);
     console.error('🚨 Response headers sent?', res.headersSent);
-    
+
     try {
       res.status(statusCode).json(errorResponse);
       console.error('🚨✅ Error response sent successfully');
@@ -544,7 +628,7 @@ router.put('/:id', protect, authorize('admin', 'teacher'), [
   body('description').optional().trim().isLength({ min: 5, max: 200 }).withMessage('Description must be between 5 and 200 characters'),
   body('dueDate').optional().isISO8601().withMessage('Please provide a valid due date'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const fee = await Fee.findById(req.params.id);
 
@@ -595,7 +679,7 @@ router.put('/:id/pay', protect, authorize('admin', 'teacher'), [
   body('paymentMethod').isIn(['cash', 'bank_transfer', 'online', 'cheque', 'other']).withMessage('Invalid payment method'),
   body('notes').optional().trim().isLength({ max: 500 }).withMessage('Notes must be less than 500 characters'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const { paymentMethod, notes } = req.body;
 
@@ -621,6 +705,16 @@ router.put('/:id/pay', protect, authorize('admin', 'teacher'), [
     // Populate student data
     await fee.populate('student', 'name email phone class studentId rollNumber');
 
+    // Send notification about payment received
+    try {
+      const tenantId = req.user.tenantId;
+      if (tenantId && fee.student) {
+        await notificationService.notifyFeePaymentReceived(fee, fee.student, tenantId);
+      }
+    } catch (notifError) {
+      console.error('Error sending payment notification:', notifError);
+    }
+
     res.json({
       success: true,
       message: 'Fee marked as paid successfully',
@@ -642,7 +736,7 @@ router.put('/:id/pay', protect, authorize('admin', 'teacher'), [
 // @desc    Send fee reminder
 // @route   POST /api/fees/:id/remind
 // @access  Private (Admin, Teacher)
-router.post('/:id/remind', protect, authorize('admin', 'teacher'), async(req, res) => {
+router.post('/:id/remind', protect, authorize('admin', 'teacher'), async (req, res) => {
   try {
     const fee = await Fee.findById(req.params.id)
       .populate('student', 'name email phone class studentId rollNumber');
@@ -689,7 +783,7 @@ router.post('/:id/remind', protect, authorize('admin', 'teacher'), async(req, re
 // @desc    Delete fee
 // @route   DELETE /api/fees/:id
 // @access  Private (Admin)
-router.delete('/:id', protect, authorize('admin'), async(req, res) => {
+router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   try {
     const fee = await Fee.findById(req.params.id);
 
@@ -727,7 +821,7 @@ router.delete('/:id', protect, authorize('admin'), async(req, res) => {
 // @desc    Get fee statistics
 // @route   GET /api/fees/statistics
 // @access  Private
-router.get('/statistics', protect, async(req, res) => {
+router.get('/statistics', protect, async (req, res) => {
   try {
     // Build filter based on user role
     const filter = {};
@@ -794,7 +888,7 @@ router.get('/statistics', protect, async(req, res) => {
 // @desc    Get overdue fees
 // @route   GET /api/fees/overdue
 // @access  Private
-router.get('/overdue', protect, async(req, res) => {
+router.get('/overdue', protect, async (req, res) => {
   try {
     // Build filter based on user role
     const filter = { status: 'overdue' };
@@ -817,7 +911,7 @@ router.get('/overdue', protect, async(req, res) => {
 
     // Format fees with currency
     const formattedFees = await Promise.all(
-      overdueFees.map(async(fee) => ({
+      overdueFees.map(async (fee) => ({
         ...fee.toJSON(),
         formattedAmount: await formatCurrencyWithSettings(fee.amount, fee.currency),
         student: fee.student

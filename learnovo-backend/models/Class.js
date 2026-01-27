@@ -24,21 +24,28 @@ const classSchema = new mongoose.Schema({
     required: [true, 'Academic year is required'],
     trim: true
   },
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
   classTeacher: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'Class teacher is required']
+    ref: 'User'
   },
-  subjects: [{
-    subject: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Subject'
-    },
-    teacher: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }
-  }],
+  tuitionFee: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   isActive: {
     type: Boolean,
     default: true

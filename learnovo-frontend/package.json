@@ -4,6 +4,7 @@
   "description": "Learnovo Student Management System Frontend",
   "private": true,
   "dependencies": {
+    "@headlessui/react": "^2.2.9",
     "axios": "^1.5.0",
     "chart.js": "^4.4.0",
     "clsx": "^2.0.0",

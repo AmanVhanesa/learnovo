@@ -1,13 +1,13 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, Bell, Search, User } from 'lucide-react'
+import { Menu, Search, User } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import NotificationBell from './NotificationBell'
 
 const Header = ({ onToggleSidebar, sidebarOpen }) => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
-  const [showNotifications, setShowNotifications] = useState(false)
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -27,7 +27,7 @@ const Header = ({ onToggleSidebar, sidebarOpen }) => {
           >
             <Menu className="h-6 w-6" />
           </button>
-          
+
           <div className="ml-4">
             <h1 className="text-xl font-semibold text-gray-900">
               {getPageTitle()}
@@ -54,47 +54,7 @@ const Header = ({ onToggleSidebar, sidebarOpen }) => {
           </form>
 
           {/* Notifications */}
-          <div className="relative">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <Bell className="h-6 w-6" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                3
-              </span>
-            </button>
-
-            {/* Notifications dropdown */}
-            {showNotifications && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
-                <div className="py-1">
-                  <div className="px-4 py-2 border-b border-gray-200">
-                    <h3 className="text-sm font-medium text-gray-900">Notifications</h3>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    <div className="px-4 py-3 hover:bg-gray-50">
-                      <p className="text-sm text-gray-900">Fee payment reminder for John Doe</p>
-                      <p className="text-xs text-gray-500">2 hours ago</p>
-                    </div>
-                    <div className="px-4 py-3 hover:bg-gray-50">
-                      <p className="text-sm text-gray-900">New admission application received</p>
-                      <p className="text-xs text-gray-500">4 hours ago</p>
-                    </div>
-                    <div className="px-4 py-3 hover:bg-gray-50">
-                      <p className="text-sm text-gray-900">Parent-teacher meeting scheduled</p>
-                      <p className="text-xs text-gray-500">1 day ago</p>
-                    </div>
-                  </div>
-                  <div className="px-4 py-2 border-t border-gray-200">
-                    <button className="text-sm text-primary-600 hover:text-primary-500">
-                      View all notifications
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <NotificationBell />
 
           {/* User menu */}
           <div className="flex items-center space-x-3">

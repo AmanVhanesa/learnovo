@@ -3,14 +3,25 @@ import { Settings as SettingsIcon, Save, Loader } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { settingsService } from '../services/settingsService'
 import toast from 'react-hot-toast'
+import { cn } from '../utils/cn'
+
+// Import section components
+import InstituteProfileSection from '../components/settings/InstituteProfileSection'
+import MarksGradingSection from '../components/settings/MarksGradingSection'
+import BankAccountsSection from '../components/settings/BankAccountsSection'
+import RulesRegulationsSection from '../components/settings/RulesRegulationsSection'
+import ThemeLanguageSection from '../components/settings/ThemeLanguageSection'
+import AccountSettingsSection from '../components/settings/AccountSettingsSection'
 
 const Settings = () => {
   const { tenant } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [activeTab, setActiveTab] = useState('institute')
   const [form, setForm] = useState({
     institution: {
       name: '',
+      tagline: '',
       address: {
         street: '',
         city: '',
@@ -22,68 +33,79 @@ const Settings = () => {
         phone: '',
         email: '',
         website: ''
-      }
+      },
+      logo: null
+    },
+    grading: {
+      rules: [],
+      isActive: true
+    },
+    bankAccounts: [],
+    rulesAndRegulations: {
+      content: '',
+      version: 1,
+      isActive: true
+    },
+    theme: {
+      mode: 'light',
+      primaryColor: '#3EC4B1',
+      secondaryColor: '#2355A6',
+      language: 'en'
+    },
+    account: {
+      timezone: 'Asia/Kolkata',
+      dateFormat: 'DD/MM/YYYY',
+      timeFormat: '12h'
     },
     currency: {
       default: 'INR',
       symbol: '₹',
       position: 'before'
+    },
+    admission: {
+      mode: 'AUTO',
+      prefix: '',
+      yearFormat: 'YYYY',
+      counterPadding: 4,
+      isLocked: false
     }
   })
 
+  const tabs = [
+    { id: 'institute', label: 'Institute Profile', icon: '🏫' },
+    { id: 'grading', label: 'Marks Grading', icon: '📊' },
+    { id: 'banks', label: 'Bank Accounts', icon: '🏦' },
+    { id: 'rules', label: 'Rules & Regulations', icon: '📜' },
+    { id: 'theme', label: 'Theme & Language', icon: '🎨' },
+    { id: 'account', label: 'Account Settings', icon: '⚙️' }
+  ]
+
   useEffect(() => {
     loadSettings()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadSettings = async () => {
     try {
       setIsLoading(true)
-      console.log('Loading settings for tenant:', tenant)
       const data = await settingsService.getSettings()
-      console.log('Settings loaded:', data)
-      
+
       if (data.success && data.data) {
-        setForm(data.data)
-        console.log('Form set with data:', data.data)
-      } else {
-        console.log('No settings data received, using tenant data')
-        // If no settings exist yet, initialize from tenant
-        if (tenant) {
-          setForm({
-            institution: {
-              name: tenant.schoolName || '',
-              address: {
-                street: tenant.address?.street || '',
-                city: tenant.address?.city || '',
-                state: tenant.address?.state || '',
-                pincode: tenant.address?.zipCode || '',
-                country: tenant.address?.country || 'India'
-              },
-              contact: {
-                phone: tenant.phone || '',
-                email: tenant.email || '',
-                website: ''
-              }
-            },
-            currency: {
-              default: tenant.settings?.currency || 'INR',
-              symbol: tenant.settings?.currency === 'INR' ? '₹' : 
-                      tenant.settings?.currency === 'USD' ? '$' : 
-                      tenant.settings?.currency === 'EUR' ? '€' : 
-                      tenant.settings?.currency === 'GBP' ? '£' : '₹',
-              position: 'before'
-            }
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error)
-      console.error('Error details:', error.response?.data)
-      // Set default values from tenant if available
-      if (tenant) {
-        setForm({
+        setForm(prevForm => ({
+          ...prevForm,
+          ...data.data,
+          // Ensure nested objects exist
+          institution: { ...prevForm.institution, ...data.data.institution },
+          grading: { ...prevForm.grading, ...data.data.grading },
+          theme: { ...prevForm.theme, ...data.data.theme },
+          account: { ...prevForm.account, ...data.data.account },
+          currency: { ...prevForm.currency, ...data.data.currency }
+        }))
+      } else if (tenant) {
+        // Initialize from tenant data
+        setForm(prevForm => ({
+          ...prevForm,
           institution: {
+            ...prevForm.institution,
             name: tenant.schoolName || '',
             address: {
               street: tenant.address?.street || '',
@@ -97,17 +119,12 @@ const Settings = () => {
               email: tenant.email || '',
               website: ''
             }
-          },
-          currency: {
-            default: tenant.settings?.currency || 'INR',
-            symbol: tenant.settings?.currency === 'INR' ? '₹' : 
-                    tenant.settings?.currency === 'USD' ? '$' : 
-                    tenant.settings?.currency === 'EUR' ? '€' : 
-                    tenant.settings?.currency === 'GBP' ? '£' : '₹',
-            position: 'before'
           }
-        })
+        }))
       }
+    } catch (error) {
+      console.error('Error loading settings:', error)
+      toast.error('Failed to load settings')
     } finally {
       setIsLoading(false)
     }
@@ -117,10 +134,31 @@ const Settings = () => {
     e.preventDefault()
     try {
       setIsSaving(true)
-      const data = await settingsService.updateSettings(form)
+
+      // Save admission settings separately if they exist
+      if (form.admission) {
+        const admissionPayload = {
+          mode: form.admission.mode,
+          prefix: form.admission.prefix,
+          counterPadding: form.admission.counterPadding
+        }
+        await settingsService.updateAdmissionSettings(admissionPayload)
+      }
+
+      // Save general settings
+      const generalForm = { ...form }
+      delete generalForm.admission
+
+      // Don't send logo if it's null (preserve existing logo in database)
+      if (generalForm.institution && generalForm.institution.logo === null) {
+        delete generalForm.institution.logo
+      }
+
+      const data = await settingsService.updateSettings(generalForm)
 
       if (data.success) {
         toast.success('Settings saved successfully!')
+        loadSettings()
       } else {
         toast.error(data.message || 'Failed to save settings')
       }
@@ -136,13 +174,45 @@ const Settings = () => {
     const keys = path.split('.')
     const newForm = { ...form }
     let current = newForm
-    
+
     for (let i = 0; i < keys.length - 1; i++) {
+      if (!current[keys[i]]) {
+        current[keys[i]] = {}
+      }
       current = current[keys[i]]
     }
-    
+
     current[keys[keys.length - 1]] = value
     setForm(newForm)
+  }
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    const formData = new FormData()
+    formData.append('logo', file)
+
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('http://localhost:5001/api/settings/upload-logo', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+      const data = await res.json()
+      if (data.success) {
+        updateField('institution.logo', data.data.url)
+        toast.success('Logo uploaded!')
+      } else {
+        toast.error('Upload failed')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Error uploading logo')
+    }
   }
 
   if (isLoading) {
@@ -155,152 +225,85 @@ const Settings = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">General Settings</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage your school's configuration and preferences</p>
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={isSaving}
+        >
           <Save className="h-4 w-4 mr-2" />
           {isSaving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
-      <form onSubmit={handleSave}>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Institution Information</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="label">Institution Name</label>
-                <input 
-                  type="text" 
-                  className="input" 
-                  value={form.institution?.name || ''} 
-                  onChange={(e) => updateField('institution.name', e.target.value)}
-                  required
-                />
-            </div>
-            <div>
-              <label className="label">Address</label>
-                <div className="space-y-2">
-                  <input 
-                    type="text" 
-                    className="input" 
-                    placeholder="Street" 
-                    value={form.institution?.address?.street || ''}
-                    onChange={(e) => updateField('institution.address.street', e.target.value)}
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input 
-                      type="text" 
-                      className="input" 
-                      placeholder="City" 
-                      value={form.institution?.address?.city || ''}
-                      onChange={(e) => updateField('institution.address.city', e.target.value)}
-                    />
-                    <input 
-                      type="text" 
-                      className="input" 
-                      placeholder="State" 
-                      value={form.institution?.address?.state || ''}
-                      onChange={(e) => updateField('institution.address.state', e.target.value)}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input 
-                      type="text" 
-                      className="input" 
-                      placeholder="Pincode" 
-                      value={form.institution?.address?.pincode || ''}
-                      onChange={(e) => updateField('institution.address.pincode', e.target.value)}
-                    />
-                    <input 
-                      type="text" 
-                      className="input" 
-                      placeholder="Country" 
-                      value={form.institution?.address?.country || ''}
-                      onChange={(e) => updateField('institution.address.country', e.target.value)}
-                    />
-                  </div>
-                </div>
-            </div>
-            <div>
-              <label className="label">Phone</label>
-                <input 
-                  type="tel" 
-                  className="input" 
-                  value={form.institution?.contact?.phone || ''} 
-                  onChange={(e) => updateField('institution.contact.phone', e.target.value)}
-                />
-            </div>
-            <div>
-              <label className="label">Email</label>
-                <input 
-                  type="email" 
-                  className="input" 
-                  value={form.institution?.contact?.email || ''} 
-                  onChange={(e) => updateField('institution.contact.email', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="label">Website</label>
-                <input 
-                  type="url" 
-                  className="input" 
-                  placeholder="https://example.com"
-                  value={form.institution?.contact?.website || ''} 
-                  onChange={(e) => updateField('institution.contact.website', e.target.value)}
-                />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Currency Settings</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="label">Default Currency</label>
-                <select 
-                  className="input"
-                  value={form.currency?.default || 'INR'}
-                  onChange={(e) => {
-                    const symbolMap = {
-                      'INR': '₹',
-                      'USD': '$',
-                      'EUR': '€',
-                      'GBP': '£'
-                    }
-                    updateField('currency.default', e.target.value)
-                    updateField('currency.symbol', symbolMap[e.target.value] || '₹')
-                  }}
-                >
-                <option value="INR">Indian Rupee (₹)</option>
-                <option value="USD">US Dollar ($)</option>
-                <option value="EUR">Euro (€)</option>
-                <option value="GBP">British Pound (£)</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Currency Symbol</label>
-                <input 
-                  type="text" 
-                  className="input" 
-                  value={form.currency?.symbol || '₹'} 
-                  onChange={(e) => updateField('currency.symbol', e.target.value)}
-                />
-            </div>
-            <div>
-              <label className="label">Symbol Position</label>
-                <select 
-                  className="input"
-                  value={form.currency?.position || 'before'}
-                  onChange={(e) => updateField('currency.position', e.target.value)}
-                >
-                <option value="before">Before Amount</option>
-                <option value="after">After Amount</option>
-              </select>
-            </div>
-          </div>
-        </div>
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                activeTab === tab.id
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              <span className="mr-2">{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </nav>
       </div>
+
+      {/* Tab Content */}
+      <form onSubmit={handleSave}>
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          {activeTab === 'institute' && (
+            <InstituteProfileSection
+              form={form}
+              updateField={updateField}
+              handleLogoUpload={handleLogoUpload}
+            />
+          )}
+          {activeTab === 'grading' && (
+            <MarksGradingSection
+              form={form}
+              updateField={updateField}
+            />
+          )}
+          {activeTab === 'banks' && (
+            <BankAccountsSection
+              form={form}
+              updateField={updateField}
+              settingsService={settingsService}
+            />
+          )}
+          {activeTab === 'rules' && (
+            <RulesRegulationsSection
+              form={form}
+              updateField={updateField}
+            />
+          )}
+          {activeTab === 'theme' && (
+            <ThemeLanguageSection
+              form={form}
+              updateField={updateField}
+            />
+          )}
+          {activeTab === 'account' && (
+            <AccountSettingsSection
+              form={form}
+              updateField={updateField}
+            />
+          )}
+        </div>
       </form>
     </div>
   )
