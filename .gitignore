@@ -47,3 +47,8 @@ temp/
 *.pem
 *.key
 
+
+# Scripts with potential secrets
+learnovo-backend/scripts/inspect-prod.js
+learnovo-backend/scripts/debug-login.js
+learnovo-backend/scripts/migrate-to-prod.js
