@@ -2,13 +2,16 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 // Protect routes - require authentication
-exports.protect = async(req, res, next) => {
+exports.protect = async (req, res, next) => {
   try {
     let token;
 
     // Get token from header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
+    } else if (req.query.token) {
+      // Check query params (for file downloads)
+      token = req.query.token;
     }
 
     // Check if token exists
@@ -71,7 +74,7 @@ exports.authorize = (...roles) => {
 };
 
 // Check if user can access student data
-exports.canAccessStudent = async(req, res, next) => {
+exports.canAccessStudent = async (req, res, next) => {
   try {
     const { studentId } = req.params;
     const user = req.user;
@@ -137,7 +140,7 @@ exports.canAccessStudent = async(req, res, next) => {
 };
 
 // Check if user can access fee data
-exports.canAccessFee = async(req, res, next) => {
+exports.canAccessFee = async (req, res, next) => {
   try {
     const { feeId } = req.params;
     const user = req.user;

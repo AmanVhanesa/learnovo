@@ -1,6 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const Settings = require('../models/Settings');
+const Tenant = require('../models/Tenant'); // Import Tenant model for sync
 const upload = require('../middleware/upload');
 const { protect, authorize } = require('../middleware/auth');
 const User = require('../models/User'); // Required for locking check
@@ -84,6 +85,29 @@ router.put('/', protect, authorize('admin'), async (req, res) => {
     });
 
     await settings.save();
+
+    // Sync Institution details to Tenant model
+    if (updateData.institution) {
+      const tenantUpdate = {};
+      const inst = settings.institution; // Use updated settings which has merged data
+
+      if (inst.name) tenantUpdate.schoolName = inst.name;
+      if (inst.contact?.email) tenantUpdate.email = inst.contact.email;
+      if (inst.contact?.phone) tenantUpdate.phone = inst.contact.phone;
+      if (inst.logo) tenantUpdate.logo = inst.logo;
+
+      if (inst.address) {
+        tenantUpdate.address = {
+          street: inst.address.street,
+          city: inst.address.city,
+          state: inst.address.state,
+          country: inst.address.country,
+          zipCode: inst.address.pincode // Remap pincode to zipCode
+        };
+      }
+
+      await Tenant.findByIdAndUpdate(tenantId, { $set: tenantUpdate });
+    }
 
     res.json({
       success: true,

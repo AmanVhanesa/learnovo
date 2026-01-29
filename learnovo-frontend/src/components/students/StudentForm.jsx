@@ -1,10 +1,15 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { X, Upload, User, Heart, GraduationCap, Users, FileText } from 'lucide-react'
+import api from '../../services/authService'
+import transportService from '../../services/transportService'
+import { STANDARD_CLASSES } from '../../constants/classes'
 
 const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     const [activeSection, setActiveSection] = useState(0)
     const [form, setForm] = useState({
         // Basic Info
+        fullName: student?.fullName || student?.name || '',
+        // Keep for backward compatibility but hidden from UI
         firstName: student?.firstName || '',
         middleName: student?.middleName || '',
         lastName: student?.lastName || '',
@@ -19,6 +24,11 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         rollNumber: student?.rollNumber || '',
         admissionDate: student?.admissionDate ? student.admissionDate.substring(0, 10) : '',
         admissionNumber: student?.admissionNumber || '',
+        penNumber: student?.penNumber || '',
+        admissionNumber: student?.admissionNumber || '',
+        penNumber: student?.penNumber || '',
+        subDepartment: student?.subDepartment?._id || student?.subDepartment || '',
+        driverId: student?.driverId?._id || student?.driverId || '',
 
         // Personal Details
         dateOfBirth: student?.dateOfBirth ? student.dateOfBirth.substring(0, 10) : '',
@@ -55,6 +65,36 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         password: '',
         createLogin: true
     })
+
+    const [subDepartmentOptions, setSubDepartmentOptions] = useState([])
+    const [driverOptions, setDriverOptions] = useState([])
+
+    useEffect(() => {
+        const fetchSubDepartments = async () => {
+            try {
+                const response = await api.get('/sub-departments?active=true')
+                if (response.data.success) {
+                    setSubDepartmentOptions(response.data.data)
+                }
+            } catch (error) {
+                console.error('Error fetching sub-departments', error)
+            }
+        }
+
+        const fetchDrivers = async () => {
+            try {
+                const response = await transportService.getDrivers({ limit: 100, status: 'active' })
+                if (response.success) {
+                    setDriverOptions(response.data)
+                }
+            } catch (error) {
+                console.error('Error fetching drivers', error)
+            }
+        }
+
+        fetchSubDepartments()
+        fetchDrivers()
+    }, [])
 
     const sections = [
         { id: 0, name: 'Student Info', icon: User },
@@ -125,8 +165,8 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     key={section.id}
                                     onClick={() => setActiveSection(section.id)}
                                     className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${activeSection === section.id
-                                            ? 'border-primary-500 text-primary-600'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        ? 'border-primary-500 text-primary-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                         }`}
                                 >
                                     <Icon className="h-4 w-4" />
@@ -173,34 +213,17 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     </div>
                                 </div>
 
-                                {/* Name Fields */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="label">First Name *</label>
-                                        <input
-                                            className="input"
-                                            value={form.firstName}
-                                            onChange={(e) => updateField('firstName', e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="label">Middle Name</label>
-                                        <input
-                                            className="input"
-                                            value={form.middleName}
-                                            onChange={(e) => updateField('middleName', e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="label">Last Name *</label>
-                                        <input
-                                            className="input"
-                                            value={form.lastName}
-                                            onChange={(e) => updateField('lastName', e.target.value)}
-                                            required
-                                        />
-                                    </div>
+                                {/* Name Field - Single Input */}
+                                <div>
+                                    <label className="label">Student Name *</label>
+                                    <input
+                                        className="input"
+                                        value={form.fullName}
+                                        onChange={(e) => updateField('fullName', e.target.value)}
+                                        required
+                                        placeholder="Enter full name"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Enter the complete name as it should appear on records</p>
                                 </div>
 
                                 {/* Contact & Login */}
@@ -268,13 +291,19 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                         </div>
                                         <div>
                                             <label className="label">Class *</label>
-                                            <input
+                                            <select
                                                 className="input"
                                                 value={form.class}
                                                 onChange={(e) => updateField('class', e.target.value)}
                                                 required
-                                                placeholder="10th"
-                                            />
+                                            >
+                                                <option value="">Select Class</option>
+                                                {STANDARD_CLASSES.map(cls => (
+                                                    <option key={cls.value} value={cls.value}>
+                                                        {cls.label}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="label">Section</label>
@@ -314,6 +343,53 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 />
                                             </div>
                                         )}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                                        <div>
+                                            <label className="label">Sub Department</label>
+                                            <select
+                                                className="input"
+                                                value={form.subDepartment}
+                                                onChange={(e) => updateField('subDepartment', e.target.value)}
+                                            >
+                                                <option value="">Select Sub Department</option>
+                                                {subDepartmentOptions.map(opt => (
+                                                    <option key={opt._id} value={opt._id}>{opt.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="label">Assigned Driver</label>
+                                            <select
+                                                className="input"
+                                                value={form.driverId}
+                                                onChange={(e) => updateField('driverId', e.target.value)}
+                                            >
+                                                <option value="">Select Driver</option>
+                                                {driverOptions.map(driver => (
+                                                    <option key={driver._id} value={driver._id}>{driver.name} ({driver.phone})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="label">PEN Number</label>
+                                            <input
+                                                className="input"
+                                                value={form.penNumber}
+                                                onChange={(e) => updateField('penNumber', e.target.value)}
+                                                placeholder="Permanent Education Number"
+                                                readOnly={!!student?.penNumber}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label">UDISE Code (School)</label>
+                                            <input
+                                                className="input bg-gray-50"
+                                                value={student?.udiseCode || 'Inherited'}
+                                                readOnly
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

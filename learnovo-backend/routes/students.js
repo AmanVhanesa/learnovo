@@ -6,9 +6,11 @@ const Counter = require('../models/Counter');
 const { protect, authorize, canAccessStudent } = require('../middleware/auth');
 const { handleValidationErrors, validateStudent } = require('../middleware/validation');
 const Settings = require('../models/Settings'); // Import Settings model
+const SubDepartment = require('../models/SubDepartment');
 const { formatCurrencyWithSettings } = require('../utils/currency');
 const upload = require('../middleware/upload');
 const { parseCSV } = require('../utils/csvHandler');
+const bcrypt = require('bcryptjs');
 const fs = require('fs');
 
 const router = express.Router();
@@ -65,15 +67,19 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     if (req.query.search) {
       filter.$or = [
         { name: { $regex: req.query.search, $options: 'i' } },
+        { fullName: { $regex: req.query.search, $options: 'i' } },
         { admissionNumber: { $regex: req.query.search, $options: 'i' } },
         { rollNumber: { $regex: req.query.search, $options: 'i' } },
-        { studentId: { $regex: req.query.search, $options: 'i' } }
+        { studentId: { $regex: req.query.search, $options: 'i' } },
+        { phone: { $regex: req.query.search, $options: 'i' } }
       ];
     }
 
     // Get students
     const students = await User.find(filter)
       .select('-password')
+      .populate('subDepartment', 'name')
+      .populate('driverId', 'name phone')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -120,44 +126,328 @@ router.get('/', protect, authorize('admin', 'teacher'), [
   }
 });
 
-// @desc    Bulk import students from CSV
-// @route   POST /api/students/import
+// @desc    Download student import CSV template
+// @route   GET /api/students/import/template
 // @access  Private (Admin)
-router.post('/import', protect, authorize('admin'), upload.single('file'), async (req, res) => {
+router.get('/import/template', protect, authorize('admin'), (req, res) => {
+  try {
+    const fields = [
+      'fullName', 'email', 'phone', 'dateOfBirth', 'gender',
+      'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear', 'admissionDate',
+      'bloodGroup', 'category', 'religion',
+      'fatherName', 'fatherPhone', 'fatherEmail',
+      'motherName', 'motherPhone', 'motherEmail',
+      'guardianName', 'guardianPhone',
+      'address',
+      'penNumber', 'subDepartment',
+      // Optional: firstName, middleName, lastName for backward compatibility
+      'firstName', 'middleName', 'lastName'
+    ];
+
+    // Create header row
+    const csvContent = fields.join(',') + '\n' +
+      // Add a sample row
+      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,,,';
+
+
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.csv');
+    res.status(200).send(csvContent);
+  } catch (error) {
+    console.error('Download template error:', error);
+    res.status(500).json({ success: false, message: 'Server error generating template' });
+  }
+});
+
+// @desc    Download student import Excel template
+// @route   GET /api/students/import/template/excel
+// @access  Private (Admin)
+router.get('/import/template/excel', protect, authorize('admin'), (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+
+    const fields = [
+      'fullName', 'email', 'phone', 'dateOfBirth', 'gender',
+      'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear', 'admissionDate',
+      'bloodGroup', 'category', 'religion',
+      'fatherName', 'fatherPhone', 'fatherEmail',
+      'motherName', 'motherPhone', 'motherEmail',
+      'guardianName', 'guardianPhone',
+      'address',
+      'penNumber', 'subDepartment',
+      'firstName', 'middleName', 'lastName'
+    ];
+
+    // Sample data row
+    const sampleData = {
+      'fullName': 'John David Doe',
+      'email': 'john.doe@example.com',
+      'phone': '1234567890',
+      'dateOfBirth': '2010-05-15',
+      'gender': 'male',
+      'admissionNumber': 'ADM001',
+      'rollNumber': '1',
+      'class': '10',
+      'section': 'A',
+      'academicYear': '2024-2025',
+      'admissionDate': '2024-04-01',
+      'bloodGroup': 'A+',
+      'category': 'General',
+      'religion': 'Hindu',
+      'fatherName': 'Father Name',
+      'fatherPhone': '9876543210',
+      'fatherEmail': 'father@example.com',
+      'motherName': 'Mother Name',
+      'motherPhone': '9876543211',
+      'motherEmail': 'mother@example.com',
+      'guardianName': '',
+      'guardianPhone': '',
+      'address': '123 Main St',
+      'penNumber': '12345678901',
+      'subDepartment': '27 LG SEC',
+      'firstName': '',
+      'middleName': '',
+      'lastName': ''
+    };
+
+    // Create worksheet with headers and sample data
+    const wsData = [fields, Object.values(sampleData)];
+    const worksheet = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Set column widths for better readability
+    const colWidths = fields.map(() => ({ wch: 15 }));
+    worksheet['!cols'] = colWidths;
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+
+    // Generate buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.xlsx');
+    res.status(200).send(excelBuffer);
+  } catch (error) {
+    console.error('Download Excel template error:', error);
+    res.status(500).json({ success: false, message: 'Server error generating Excel template' });
+  }
+});
+
+// @desc    Preview student import from CSV
+// @route   POST /api/students/import/preview
+// @access  Private (Admin)
+router.post('/import/preview', protect, authorize('admin'), upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Please upload a CSV file' });
     }
 
     const rows = await parseCSV(req.file.path);
-    const results = { success: 0, failed: 0, errors: [] };
+
+    // Clean up file immediately after parsing
+    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
 
     if (!rows || rows.length === 0) {
-      fs.unlinkSync(req.file.path);
       return res.status(400).json({ success: false, message: 'CSV file is empty' });
     }
 
+    // Normalize column names to handle different CSV formats
+    const normalizeRow = (row) => {
+      const normalized = {};
+
+      // Column name mappings (CSV column -> expected field name)
+      const columnMappings = {
+        'name': 'fullName',
+        'student_name': 'fullName',
+        'studentname': 'fullName',
+        'admno': 'admissionNumber',
+        'admission_no': 'admissionNumber',
+        'admission_number': 'admissionNumber',
+        'rollno': 'rollNumber',
+        'roll_no': 'rollNumber',
+        'roll_number': 'rollNumber',
+        'dob': 'dateOfBirth',
+        'date_of_birth': 'dateOfBirth',
+        'father_name': 'fatherName',
+        'father_phone': 'fatherPhone',
+        'father_email': 'fatherEmail',
+        'mother_name': 'motherName',
+        'mother_phone': 'motherPhone',
+        'mother_email': 'motherEmail',
+        'guardian_name': 'guardianName',
+        'guardian_phone': 'guardianPhone',
+        'blood_group': 'bloodGroup',
+        'sub_department': 'subDepartment',
+        'subdepartment': 'subDepartment',
+        'pen_number': 'penNumber',
+        'academic_year': 'academicYear',
+        'admission_date': 'admissionDate'
+      };
+
+      // Normalize each field
+      for (const [key, value] of Object.entries(row)) {
+        const lowerKey = key.toLowerCase().trim();
+        const mappedKey = columnMappings[lowerKey] || key;
+        normalized[mappedKey] = value;
+      }
+
+      return normalized;
+    };
+
+    // Normalize all rows
+    const normalizedRows = rows.map(normalizeRow);
+
+    const preview = [];
+    const errors = [];
+    const validData = [];
+    const tenantId = req.user.tenantId;
+
+    // Cache existing emails for duplicate checking
+    const existingEmails = new Set();
+    const students = await User.find({ tenantId, role: 'student' }).select('email');
+    students.forEach(s => {
+      if (s.email && s.email.trim()) {
+        existingEmails.add(s.email.toLowerCase());
+      }
+    });
+
+    // Also check duplicates within the file itself
+    const fileEmails = new Set();
+
     // Process each row
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowNum = i + 2;
+    for (let i = 0; i < normalizedRows.length; i++) {
+      const row = normalizedRows[i];
+      const rowNum = i + 2; // +1 for 0-index, +1 for header
+      const rowErrors = [];
+      const cleanRow = { ...row };
+
+      // 1. Basic Validation
+      if (!row.fullName && !row.firstName && !row.lastName) {
+        rowErrors.push('Student name is required (fullName or firstName/lastName)');
+      }
+
+      // Email is now optional - validate only if provided
+      if (row.email && row.email.trim()) {
+        const email = row.email.toLowerCase().trim();
+        cleanRow.email = email;
+
+        // Validate email format
+        const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+        if (!emailRegex.test(email)) {
+          rowErrors.push('Invalid email format');
+        } else {
+          // Check duplicate in DB
+          if (existingEmails.has(email)) {
+            rowErrors.push(`Email ${email} already exists in system`);
+          }
+
+          // Check duplicate in file
+          if (fileEmails.has(email)) {
+            rowErrors.push(`Duplicate email ${email} in file`);
+          } else {
+            fileEmails.add(email);
+          }
+        }
+      }
+
+      // Add row number for reference
+      cleanRow._rowNumber = rowNum;
+
+      if (rowErrors.length > 0) {
+        rowErrors.forEach(msg => {
+          errors.push({
+            row: rowNum,
+            field: 'Validation',
+            message: msg,
+            value: ''
+          });
+        });
+        // Still add to preview but mark invalid visual indication if we were returning per-row status
+        // For now, preview just shows first N rows usually
+      } else {
+        validData.push(cleanRow);
+      }
+
+      // Add to preview (limit to first 10 for display)
+      if (preview.length < 10) {
+        preview.push(cleanRow);
+      }
+    }
+
+    res.json({
+      success: true,
+      preview,
+      errors,
+      validData, // Send back valid data for the next step
+      summary: {
+        totalRows: normalizedRows.length,
+        validRows: validData.length,
+        invalidRows: normalizedRows.length - validData.length,
+        duplicatesInFile: 0 // Handled in errors logic effectively
+      }
+    });
+
+  } catch (error) {
+    console.error('Import preview error:', error);
+    console.error('Error stack:', error.stack);
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error during preview',
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// @desc    Execute student import
+// @route   POST /api/students/import/execute
+// @access  Private (Admin)
+router.post('/import/execute', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { validData, options } = req.body;
+
+    console.log('=== IMPORT EXECUTE CALLED ===');
+    console.log('validData length:', validData ? validData.length : 'undefined');
+    console.log('validData is array:', Array.isArray(validData));
+    console.log('================================');
+
+    if (!validData || !Array.isArray(validData) || validData.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid data to import' });
+    }
+
+    const tenantId = req.user.tenantId;
+
+    // Get settings for UDISE Code
+    const settings = await Settings.getSettings(tenantId);
+    const defaultUdiseCode = settings.institution?.udiseCode;
+
+    const results = { success: 0, failed: 0, errors: [] };
+
+    for (const row of validData) {
+      let studentData = null; // Declare safely for error logging scope
+      const rowNum = row._rowNumber || '?';
 
       try {
-        // 1. Basic Validation
-        if (!row.firstName || !row.lastName || !row.email) {
-          throw new Error('First Name, Last Name, and Email are required');
+        // Log the first row to see data structure
+        if (rowNum === 2 || rowNum === '?') {
+          console.log('=== FIRST ROW DATA ===');
+          console.log('Row keys:', Object.keys(row));
+          console.log('Row data:', JSON.stringify(row, null, 2));
+          console.log('======================');
         }
 
-        const email = row.email.toLowerCase().trim();
-        const tenantId = req.user.tenantId;
-
-        // 2. Check duplicates (DB)
-        const existingStudent = await User.findOne({ email, tenantId });
-        if (existingStudent) {
-          throw new Error(`Student with email ${email} already exists`);
+        // Double check duplicates (race condition protection) - only if email provided
+        if (row.email && row.email.trim()) {
+          const email = row.email.toLowerCase().trim();
+          const existingStudent = await User.findOne({ email, tenantId });
+          if (existingStudent) {
+            throw new Error(`Student with email ${email} already exists`);
+          }
         }
 
-        // 3. Generate Admission Number (only if not provided)
+        // Generate Admission Number (only if not provided)
         let admissionNumber = row.admissionNumber ? row.admissionNumber.toString().trim() : null;
 
         if (!admissionNumber) {
@@ -168,54 +458,188 @@ router.post('/import', protect, authorize('admin'), upload.single('file'), async
           const yearStr = yearFormat === 'YY' ? currentYear.substring(2) : currentYear;
           const effectivePrefix = mode === 'CUSTOM' ? (prefix || 'ADM') : 'ADM';
 
-          // Use tenant-specific counter
           const sequence = await Counter.getNextSequence('admission', currentYear, tenantId);
-          const finalSequence = sequence + (startFrom - 1); // Adjust for startFrom if needed (basic implementation uses raw sequence usually, but let's stick to sequence)
-
           admissionNumber = `${effectivePrefix}${yearStr}${String(sequence).padStart(counterPadding, '0')}`;
         }
 
-        // 4. Prepare Guardians
+        // Prepare Guardians
         const guardians = [];
         if (row.fatherName) guardians.push({ relation: 'Father', name: row.fatherName, phone: row.fatherPhone, email: row.fatherEmail, isPrimary: true });
         if (row.motherName) guardians.push({ relation: 'Mother', name: row.motherName, phone: row.motherPhone, email: row.motherEmail });
 
-        // Fallback for old CSV format
         if (guardians.length === 0 && row.guardianName) {
           guardians.push({ relation: 'Guardian', name: row.guardianName, phone: row.guardianPhone, isPrimary: true });
         }
 
-        // 5. Construct Data
-        const studentData = {
-          firstName: row.firstName.trim(),
-          middleName: row.middleName ? row.middleName.trim() : undefined,
-          lastName: row.lastName.trim(),
-          email: email,
-          password: row.password || 'student123',
+        // Handle Sub Department
+        let subDepartmentId = undefined;
+        if (row.subDepartment) {
+          const subDeptName = row.subDepartment.toString().trim().toUpperCase();
+          let subDept = await SubDepartment.findOne({ tenantId, name: subDeptName });
+          // Auto-create if missing
+          if (!subDept) {
+            subDept = await SubDepartment.create({ tenantId, name: subDeptName });
+          }
+          subDepartmentId = subDept._id;
+        }
+
+        // Helper to safely parse dates
+        const parseDate = (dateStr) => {
+          if (!dateStr) return undefined;
+          const d = new Date(dateStr);
+          return isNaN(d.getTime()) ? undefined : d;
+        };
+
+        // Construct Data - only include fields with actual values
+        const currentYear = new Date().getFullYear().toString();
+        studentData = {
           role: 'student',
           tenantId: tenantId,
           admissionNumber,
-          class: row.class ? row.class.trim() : undefined,
-          section: row.section ? row.section.trim() : undefined,
-          academicYear: row.academicYear || `${currentYear}-${parseInt(currentYear) + 1}`, // Default to current-next
-          rollNumber: row.rollNumber ? row.rollNumber.trim() : undefined,
-          phone: row.phone ? row.phone.trim() : undefined,
-          address: row.address ? row.address.trim() : undefined,
-          admissionDate: row.admissionDate ? new Date(row.admissionDate) : new Date(),
-          guardians
+          academicYear: row.academicYear || `${currentYear}-${parseInt(currentYear) + 1}`,
+          admissionDate: parseDate(row.admissionDate) || new Date(),
+          guardians,
+          udiseCode: defaultUdiseCode,
+          isActive: true
         };
 
-        await User.create(studentData);
+        // CRITICAL: Ensure fullName is ALWAYS set (required for students)
+        let fullNameValue = null;
+        if (row.fullName && row.fullName.trim()) {
+          fullNameValue = row.fullName.trim();
+        } else if (row.firstName || row.lastName) {
+          // Auto-generate from name parts
+          const parts = [row.firstName, row.middleName, row.lastName].filter(p => p && p.trim());
+          fullNameValue = parts.join(' ').trim();
+        }
+
+        // If still no fullName, use admission number as placeholder
+        if (!fullNameValue) {
+          fullNameValue = `Student ${admissionNumber}`;
+        }
+        studentData.fullName = fullNameValue;
+
+        // Add optional name fields only if they have values
+        if (row.firstName && row.firstName.trim()) {
+          studentData.firstName = row.firstName.trim();
+        }
+        if (row.middleName && row.middleName.trim()) {
+          studentData.middleName = row.middleName.trim();
+        }
+        if (row.lastName && row.lastName.trim()) {
+          studentData.lastName = row.lastName.trim();
+        }
+
+        // Add email and password only if email exists and is valid
+        if (row.email && row.email.trim()) {
+          const emailValue = row.email.trim().toLowerCase();
+          // Basic email validation - very lenient
+          if (emailValue.includes('@') && emailValue.includes('.')) {
+            studentData.email = emailValue;
+            studentData.password = row.password || 'student123';
+          }
+        }
+
+        // Add other optional fields only if they have values
+        // Normalize class value to handle variations like "Class 1", "class 1", "1"
+        if (row.class && row.class.trim()) {
+          let classValue = row.class.trim();
+          // Extract number from "Class X" format
+          const classMatch = classValue.match(/class\s*(\d+|nursery|lkg|ukg)/i);
+          if (classMatch) {
+            const extracted = classMatch[1].toLowerCase();
+            if (extracted === 'nursery' || extracted === 'lkg' || extracted === 'ukg') {
+              classValue = extracted.charAt(0).toUpperCase() + extracted.slice(1);
+            } else {
+              classValue = extracted;
+            }
+          }
+          studentData.class = classValue;
+        }
+        if (row.section && row.section.trim()) {
+          studentData.section = row.section.trim();
+        }
+        if (row.rollNumber && row.rollNumber.trim()) {
+          studentData.rollNumber = row.rollNumber.trim();
+        }
+
+        // Phone: sanitize to remove invalid characters, keep only digits and +
+        if (row.phone && row.phone.trim()) {
+          let phoneValue = row.phone.trim();
+          // Remove all non-digit and non-plus characters
+          phoneValue = phoneValue.replace(/[^\d+]/g, '');
+          // Only set if we have at least 6 digits
+          if (phoneValue.replace(/\+/g, '').length >= 6) {
+            studentData.phone = phoneValue;
+          }
+        }
+
+        if (row.address && row.address.trim()) {
+          // Truncate long addresses to 500 chars
+          studentData.address = row.address.trim().substring(0, 500);
+        }
+        if (row.dateOfBirth) {
+          const dob = parseDate(row.dateOfBirth);
+          if (dob) studentData.dateOfBirth = dob;
+        }
+        if (row.gender && row.gender.trim()) {
+          const genderValue = row.gender.trim().toLowerCase();
+          // Accept male/female/other or m/f/o
+          if (['male', 'female', 'other', 'm', 'f', 'o'].includes(genderValue)) {
+            studentData.gender = genderValue === 'm' ? 'male' : genderValue === 'f' ? 'female' : genderValue;
+          }
+        }
+        if (row.bloodGroup && row.bloodGroup.trim()) {
+          studentData.bloodGroup = row.bloodGroup.trim();
+        }
+        if (row.category && row.category.trim()) {
+          studentData.category = row.category.trim();
+        }
+        if (row.religion && row.religion.trim()) {
+          studentData.religion = row.religion.trim();
+        }
+        if (row.penNumber && row.penNumber.toString().trim()) {
+          studentData.penNumber = row.penNumber.toString().trim();
+        }
+        if (subDepartmentId) {
+          studentData.subDepartment = subDepartmentId;
+        }
+
+        // Add timestamps
+        studentData.createdAt = new Date();
+        studentData.updatedAt = new Date();
+
+        // Hash password if provided
+        if (studentData.password) {
+          const salt = await bcrypt.genSalt(10);
+          studentData.password = await bcrypt.hash(studentData.password, salt);
+        }
+
+        // Use insertOne to bypass Mongoose validation (more lenient)
+        await User.collection.insertOne(studentData);
         results.success++;
 
       } catch (error) {
-        // console.error(`Row ${rowNum} Error:`, error.message);
         results.failed++;
-        results.errors.push(`Row ${rowNum}: ${error.message}`);
+        console.error(`Import error for row ${rowNum}:`, error.message);
+
+        // Safely log data (prevent circular dependency/undefined errors)
+        try {
+          if (studentData) console.error('Student data payload:', JSON.stringify(studentData, null, 2));
+        } catch (logErr) { console.error('Failed to log payload:', logErr.message); }
+
+        // Capture validation errors if present
+        if (error.errors) {
+          const validationErrors = Object.keys(error.errors).map(key =>
+            `${key}: ${error.errors[key].message}`
+          ).join(', ');
+          results.errors.push(`Row ${rowNum}: ${validationErrors}`);
+        } else {
+          results.errors.push(`Row ${rowNum}: ${error.message}`);
+        }
       }
     }
 
-    fs.unlinkSync(req.file.path);
     res.json({
       success: true,
       message: `Import completed. Success: ${results.success}, Failed: ${results.failed}`,
@@ -223,9 +647,119 @@ router.post('/import', protect, authorize('admin'), upload.single('file'), async
     });
 
   } catch (error) {
-    console.error('Bulk import error:', error);
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ success: false, message: 'Server error during import' });
+    console.error('Import execute error:', error);
+    res.status(500).json({ success: false, message: 'Server error during import execution' });
+  }
+});
+
+// @desc    Get student filters
+// @route   GET /api/students/filters
+// @access  Private
+router.get('/filters', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    // Aggregation to get distinct values efficiently
+    const [classes, sections, academicYears] = await Promise.all([
+      User.distinct('class', { role: 'student', tenantId }),
+      User.distinct('section', { role: 'student', tenantId }),
+      User.distinct('academicYear', { role: 'student', tenantId })
+    ]);
+
+    // Sort values for better UI
+    const sortAlphaNum = (a, b) => {
+      return a.toString().localeCompare(b.toString(), undefined, { numeric: true, sensitivity: 'base' });
+    };
+
+    res.json({
+      success: true,
+      data: {
+        classes: classes.filter(Boolean).sort(sortAlphaNum),
+        sections: sections.filter(Boolean).sort(sortAlphaNum),
+        academicYears: academicYears.filter(Boolean).sort().reverse(), // Newest first
+        genders: ['Male', 'Female', 'Other']
+      }
+    });
+  } catch (error) {
+    console.error('Filter options error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @desc    Export students to CSV
+// @route   GET /api/students/export
+// @access  Private
+router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    // Build filter (same as list route)
+    const filter = { role: 'student', tenantId };
+
+    if (req.user.role === 'teacher' && req.user.assignedClasses) {
+      filter.class = { $in: req.user.assignedClasses };
+    }
+    if (req.query.class) filter.class = req.query.class;
+    if (req.query.section) filter.section = req.query.section;
+    if (req.query.academicYear) filter.academicYear = req.query.academicYear;
+    if (req.query.status) filter.isActive = req.query.status === 'active';
+    if (req.query.search) {
+      filter.$or = [
+        { fullName: { $regex: req.query.search, $options: 'i' } },
+        { admissionNumber: { $regex: req.query.search, $options: 'i' } },
+        { rollNumber: { $regex: req.query.search, $options: 'i' } }
+      ];
+    }
+
+    const students = await User.find(filter)
+      .sort({ class: 1, section: 1, rollNumber: 1, fullName: 1 })
+      .populate('subDepartment', 'name')
+      .populate('driverId', 'name phone');
+
+    // Generate CSV
+    const headers = [
+      'Admission No', 'Name', 'Class', 'Section', 'Roll No',
+      'Father Name', 'Mother Name', 'Mobile', 'Alt Mobile', 'Email',
+      'DOB', 'Gender', 'Address', 'Driver', 'Driver Phone', 'Sub Department', 'Status'
+    ];
+
+    const csvRows = [headers.join(',')];
+
+    students.forEach(student => {
+      const guardian = student.guardians?.[0] || {};
+      const mother = student.guardians?.find(g => g.relation === 'Mother') || {};
+
+      const row = [
+        student.admissionNumber || '',
+        `"${student.fullName}"`,
+        student.class || '',
+        student.section || '',
+        student.rollNumber || '',
+        `"${student.fatherOrHusbandName || guardian.name || ''}"`,
+        `"${mother.name || ''}"`,
+        student.phone || '',
+        guardian.phone || '', // Alt mobile
+        student.email || '',
+        student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '',
+        student.gender || '',
+        `"${(student.address || '').replace(/"/g, '""')}"`,
+        student.driverId?.name || '',
+        student.driverId?.phone || '',
+        student.subDepartment?.name || '',
+        student.isActive ? 'Active' : 'Inactive'
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const csvContent = csvRows.join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=students_export_${new Date().toISOString().split('T')[0]}.csv`);
+    res.status(200).send(csvContent);
+
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ success: false, message: 'Server error during export' });
   }
 });
 
@@ -234,7 +768,9 @@ router.post('/import', protect, authorize('admin'), upload.single('file'), async
 // @access  Private
 router.get('/:id', protect, canAccessStudent, async (req, res) => {
   try {
-    const student = await User.findById(req.params.id).select('-password');
+    const student = await User.findById(req.params.id)
+      .select('-password')
+      .populate('subDepartment', 'name');
 
     if (!student || student.role !== 'student') {
       return res.status(404).json({
@@ -292,16 +828,26 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
     }
 
     const {
-      firstName, middleName, lastName, email, phone, password,
+      fullName, firstName, middleName, lastName, email, phone, password,
       class: studentClass, section, academicYear, rollNumber, admissionDate,
-      guardians, address, avatar
+      guardians, address, avatar,
+      penNumber, subDepartment, udiseCode // Legacy fields
     } = req.body;
 
     const tenantId = req.user.tenantId;
 
-    // Check email uniqueness within tenant
-    if (await User.findOne({ email: email.toLowerCase().trim(), tenantId })) {
-      return res.status(400).json({ success: false, message: 'Student with this email already exists' });
+    // Check email uniqueness within tenant (only if email provided)
+    if (email && email.trim()) {
+      const existingEmail = await User.findOne({
+        email: email.toLowerCase().trim(),
+        tenantId
+      });
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Student with this email already exists'
+        });
+      }
     }
 
     // Check Roll Number uniqueness
@@ -335,12 +881,21 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
     }
 
     const studentData = {
-      firstName, middleName, lastName, email: email.toLowerCase().trim(),
-      password, role: 'student', tenantId,
+      fullName: fullName ? fullName.trim() : undefined,
+      firstName: firstName ? firstName.trim() : undefined,
+      middleName: middleName ? middleName.trim() : undefined,
+      lastName: lastName ? lastName.trim() : undefined,
+      email: email && email.trim() ? email.toLowerCase().trim() : undefined,
+      password: (email && email.trim()) ? (password || 'student123') : undefined,
+      role: 'student',
+      tenantId,
       admissionNumber,
       class: studentClass, section, academicYear, rollNumber,
       admissionDate: admissionDate || new Date(),
-      guardians, address, avatar
+      guardians, address, avatar,
+      penNumber: penNumber ? penNumber.trim() : undefined,
+      subDepartment,
+      udiseCode: udiseCode ? udiseCode.trim() : undefined
     };
 
     const student = await User.create(studentData);
@@ -423,6 +978,10 @@ router.put('/:id', protect, canAccessStudent, [
     });
   } catch (error) {
     console.error('Update student error:', error);
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(409).json({ success: false, message: `Duplicate entry detected for ${field}` });
+    }
     res.status(500).json({
       success: false,
       message: 'Server error while updating student'
@@ -560,25 +1119,38 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async (req, res) 
   try {
     const tenantId = req.user.tenantId;
 
-    // Get unique classes
-    const classes = await User.distinct('class', { role: 'student', tenantId, class: { $ne: null } });
+    // Get unique classes - filter out null, undefined, and empty strings
+    const classes = await User.distinct('class', {
+      role: 'student',
+      tenantId,
+      class: { $exists: true, $ne: null, $ne: '' }
+    });
 
-    // Get unique sections
-    const sections = await User.distinct('section', { role: 'student', tenantId, section: { $ne: null } });
+    // Get unique sections - filter out null, undefined, and empty strings
+    const sections = await User.distinct('section', {
+      role: 'student',
+      tenantId,
+      section: { $exists: true, $ne: null, $ne: '' }
+    });
 
-    // Get unique academic years
-    const academicYears = await User.distinct('academicYear', { role: 'student', tenantId, academicYear: { $ne: null } });
+    // Get unique academic years - filter out null, undefined, and empty strings
+    const academicYears = await User.distinct('academicYear', {
+      role: 'student',
+      tenantId,
+      academicYear: { $exists: true, $ne: null, $ne: '' }
+    });
 
     res.json({
       success: true,
       data: {
-        classes: classes.sort(),
-        sections: sections.sort(),
-        academicYears: academicYears.sort().reverse()
+        classes: classes.filter(Boolean).sort(),
+        sections: sections.filter(Boolean).sort(),
+        academicYears: academicYears.filter(Boolean).sort().reverse()
       }
     });
   } catch (error) {
     console.error('Get filters error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Server error while fetching filters'
@@ -973,14 +1545,29 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
       { key: 'createdAt', header: 'Created At', format: (val) => new Date(val).toISOString().split('T')[0] }
     ];
 
-    // Generate CSV
-    const csvBuffer = await ImportExportService.exportToCSV(students, columns);
+    // Get format from query parameter (default to csv)
+    const format = req.query.format || 'csv';
 
-    const filename = `students_export_${new Date().toISOString().split('T')[0]}.csv`;
+    // Generate export file
+    let buffer;
+    let contentType;
+    let fileExtension;
 
-    res.setHeader('Content-Type', 'text/csv');
+    if (format === 'xlsx' || format === 'excel') {
+      buffer = ImportExportService.exportToExcel(students, columns, 'Students');
+      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      fileExtension = 'xlsx';
+    } else {
+      buffer = await ImportExportService.exportToCSV(students, columns);
+      contentType = 'text/csv';
+      fileExtension = 'csv';
+    }
+
+    const filename = `students_export_${new Date().toISOString().split('T')[0]}.${fileExtension}`;
+
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-    res.send(csvBuffer);
+    res.send(buffer);
   } catch (error) {
     console.error('Export students error:', error);
     res.status(500).json({

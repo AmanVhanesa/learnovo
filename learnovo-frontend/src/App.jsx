@@ -30,6 +30,10 @@ import Communication from './pages/Communication'
 import Academics from './pages/Academics'
 import FeesFinance from './pages/FeesFinance'
 import Search from './pages/Search'
+import Transport from './pages/Transport'
+import CertificateManager from './pages/certificates/CertificateManager'
+import CertificateGeneration from './pages/certificates/CertificateGeneration'
+import TemplateSettings from './pages/certificates/TemplateSettings'
 
 function App() {
   return (
@@ -98,6 +102,14 @@ function App() {
                   {/* Communication Module */}
                   <Route path="communication" element={<Communication />} />
                   <Route path="notifications" element={<Notifications />} />
+
+                  {/* Transport Module */}
+                  <Route path="transport" element={<Transport />} />
+
+                  {/* Certificates Module */}
+                  <Route path="certificates" element={<CertificateManager />} />
+                  <Route path="certificates/generate" element={<CertificateGeneration />} />
+                  <Route path="certificates/templates" element={<TemplateSettings />} />
 
                   <Route path="search" element={<Search />} />
                   <Route path="settings" element={<Settings />} />

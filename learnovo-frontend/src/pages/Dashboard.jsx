@@ -328,8 +328,16 @@ const Dashboard = () => {
               const lowerTitle = title.toLowerCase()
               if (lowerTitle.includes('student')) return '/app/students'
               if (lowerTitle.includes('teacher') || lowerTitle.includes('employee')) return '/app/teachers'
+              // Redirect Admin to Advanced Fees & Finance dashboard
+              if (user?.role === 'admin' && (lowerTitle.includes('fee') || lowerTitle.includes('collection'))) {
+                return '/app/fees-finance'
+              }
               if (lowerTitle.includes('fee') || lowerTitle.includes('collection')) return '/app/fees'
+
+              // Specific redirect for Dashboard "New Admissions" stat (which counts Users) to Students page
+              if (lowerTitle === 'new admissions') return '/app/students'
               if (lowerTitle.includes('admission')) return '/app/admissions'
+
               if (lowerTitle.includes('assignment')) return '/app/assignments'
               if (lowerTitle.includes('notification')) return '/app/notifications'
               return '/app/dashboard'

@@ -43,18 +43,19 @@ router.get('/', protect, async (req, res) => {
         }
       },
       { $unwind: { path: '$classTeacher', preserveNullAndEmptyArrays: true } },
-      // Lookup Student Count (optimized)
+      // Lookup Student Count - Match by grade since students have 'class' field, not 'classId'
       {
         $lookup: {
           from: 'users',
-          let: { classId: '$_id' },
+          let: { classGrade: '$grade', classTenantId: '$tenantId' },
           pipeline: [
             {
               $match: {
                 $expr: {
                   $and: [
-                    { $eq: ['$classId', '$$classId'] },
-                    { $eq: ['$role', 'student'] }
+                    { $eq: ['$class', '$$classGrade'] },
+                    { $eq: ['$role', 'student'] },
+                    { $eq: ['$tenantId', '$$classTenantId'] }
                   ]
                 }
               }

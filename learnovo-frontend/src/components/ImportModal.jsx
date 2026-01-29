@@ -109,11 +109,9 @@ const ImportModal = ({
         formData.append('file', file);
 
         try {
-            const response = await api.post(previewUrl, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
+            // Don't set Content-Type header - let axios set it automatically for FormData
+            // This preserves the Authorization header from the interceptor
+            const response = await api.post(previewUrl, formData);
 
             if (response.data.success) {
                 setPreviewData(response.data);
@@ -246,8 +244,8 @@ const ImportModal = ({
                             {/* File Upload Area */}
                             <div
                                 className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${dragActive
-                                        ? 'border-primary-500 bg-primary-50'
-                                        : 'border-gray-300 hover:border-gray-400'
+                                    ? 'border-primary-500 bg-primary-50'
+                                    : 'border-gray-300 hover:border-gray-400'
                                     }`}
                                 onDragEnter={handleDrag}
                                 onDragLeave={handleDrag}

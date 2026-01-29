@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const FeeInvoice = require('../models/FeeInvoice');
 const Payment = require('../models/Payment');
 const StudentBalance = require('../models/StudentBalance');
@@ -12,7 +13,9 @@ const router = express.Router();
 router.get('/dashboard', protect, authorize('admin', 'accountant'), async (req, res) => {
     try {
         const { academicSessionId, startDate, endDate } = req.query;
-        const tenantId = req.user.tenantId;
+        // Ensure IDs are cast to ObjectId for aggregation
+        const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
+        const sessionObjectId = academicSessionId ? new mongoose.Types.ObjectId(academicSessionId) : null;
 
         // Total Collected
         const collectedFilter = {
@@ -59,8 +62,8 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async (req, 
             status: { $in: ['Pending', 'Partial', 'Overdue'] }
         };
 
-        if (academicSessionId) {
-            invoiceFilter.academicSessionId = academicSessionId;
+        if (sessionObjectId) {
+            invoiceFilter.academicSessionId = sessionObjectId;
         }
 
         const pendingAgg = await FeeInvoice.aggregate([
@@ -119,7 +122,29 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async (req, 
             }
         ]);
 
-        res.json({
+        // Recent Invoices (all statuses to show complete picture)
+        const recentInvoicesFilter = { tenantId };
+        if (academicSessionId) {
+            recentInvoicesFilter.academicSessionId = academicSessionId;
+        }
+
+        const recentInvoices = await FeeInvoice.find(recentInvoicesFilter)
+            .populate('studentId', 'name fullName studentId admissionNumber email phone')
+            .populate('classId', 'name grade')
+            .populate('sectionId', 'name')
+            .populate('academicSessionId', 'name')
+            .sort({ issuedDate: -1 })
+            .limit(10)
+            .lean();
+
+        console.log('Dashboard Recent Invoices Sample:', recentInvoices.length > 0 ? {
+            id: recentInvoices[0]._id,
+            student: recentInvoices[0].studentId,
+            studentName: recentInvoices[0].studentId?.name,
+            studentFullName: recentInvoices[0].studentId?.fullName
+        } : 'No recent invoices');
+
+        const response = {
             success: true,
             data: {
                 summary: {
@@ -129,9 +154,20 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async (req, 
                     thisMonthCollection
                 },
                 recentPayments,
+                recentInvoices,
                 paymentMethodBreakdown: methodBreakdown
             }
-        });
+        };
+
+        console.log('=== DASHBOARD RESPONSE ===');
+        console.log('Total Collected:', totalCollected);
+        console.log('Total Pending:', totalPending);
+        console.log('Total Overdue:', totalOverdue);
+        console.log('This Month:', thisMonthCollection);
+        console.log('Recent Invoices:', recentInvoices.length);
+        console.log('=========================');
+
+        res.json(response);
     } catch (error) {
         console.error('Dashboard error:', error);
         res.status(500).json({

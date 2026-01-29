@@ -41,6 +41,23 @@ const settingsSchema = new mongoose.Schema({
       type: Number,
       min: 1800,
       max: new Date().getFullYear()
+    },
+    udiseCode: {
+      type: String,
+      trim: true
+    },
+    board: {
+      type: String,
+      trim: true,
+      default: 'CBSE'
+    },
+    affiliationNumber: {
+      type: String,
+      trim: true
+    },
+    schoolCode: {
+      type: String,
+      trim: true
     }
   },
   // Currency Settings

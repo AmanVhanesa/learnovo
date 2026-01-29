@@ -159,6 +159,7 @@ app.get('/healthz', (req, res) => {
 
 // Routes
 app.use('/api/tenants', require('./routes/tenants'));
+// app.use('/api/schools', require('./routes/schools')); // Commented out to be safe if file missing, but usually tenant-based. Diff showed it existed. I'll include it.
 app.use('/api/schools', require('./routes/schools'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/students', require('./routes/students'));
@@ -169,18 +170,25 @@ app.use('/api/classes', require('./routes/classes'));
 app.use('/api/subjects', require('./routes/subjects'));
 app.use('/api/class-subjects', require('./routes/classSubjects'));
 app.use('/api/teacher-assignments', require('./routes/teacherAssignments'));
+app.use('/api/fees', require('./routes/feesReports')); // Must come before generic fees routes
 app.use('/api/fees', require('./routes/fees'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/fee-structures', require('./routes/feeStructures'));
-app.use('/api/fees', require('./routes/feesReports'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/assignments', require('./routes/assignments'));
 app.use('/api/admissions', require('./routes/admissions'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/sub-departments', require('./routes/subDepartments'));
+app.use('/api/certificates', require('./routes/certificates'));
+
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/exams', require('./routes/exams'));
+app.use('/api/drivers', require('./routes/drivers'));
+app.use('/api/vehicles', require('./routes/vehicles'));
+app.use('/api/transport/routes', require('./routes/transportRoutes'));
+app.use('/api/student-transport', require('./routes/studentTransport'));
 
 // Error handling middleware
 app.use(errorHandler);

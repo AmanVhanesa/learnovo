@@ -3,6 +3,8 @@ const { protect } = require('../middleware/auth');
 const Fee = require('../models/Fee');
 const User = require('../models/User');
 const Admission = require('../models/Admission');
+const FeeInvoice = require('../models/FeeInvoice');
+const Payment = require('../models/Payment');
 
 const router = express.Router();
 
@@ -85,6 +87,42 @@ router.get('/dashboard', protect, async (req, res) => {
     statistics.fees.pending = fees.filter(fee => fee.status === 'pending').reduce((sum, fee) => sum + (fee.amount || 0), 0);
     statistics.fees.overdue = fees.filter(fee => fee.status === 'overdue').reduce((sum, fee) => sum + (fee.amount || 0), 0);
 
+    // [ADMIN ONLY] Add statistics from Advanced Fee Module (FeeInvoice & Payment)
+    if (user.role === 'admin') {
+      try {
+        // Pending Dues (Invoice Balance)
+        const pendingAgg = await FeeInvoice.aggregate([
+          { $match: { tenantId: tenantId, status: { $in: ['Pending', 'Partial', 'Overdue'] } } },
+          { $group: { _id: null, total: { $sum: '$balanceAmount' } } }
+        ]);
+        const pendingAdvanced = pendingAgg.length > 0 ? pendingAgg[0].total : 0;
+        statistics.fees.pending += pendingAdvanced;
+
+        // Overdue Amount
+        const overdueAgg = await FeeInvoice.aggregate([
+          { $match: { tenantId: tenantId, status: 'Overdue' } },
+          { $group: { _id: null, total: { $sum: '$balanceAmount' } } }
+        ]);
+        const overdueAdvanced = overdueAgg.length > 0 ? overdueAgg[0].total : 0;
+        statistics.fees.overdue += overdueAdvanced;
+
+        // Paid Amount (Total Collected)
+        const paidAgg = await Payment.aggregate([
+          { $match: { tenantId: tenantId, isConfirmed: true, isReversed: false } },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+        const paidAdvanced = paidAgg.length > 0 ? paidAgg[0].total : 0;
+        statistics.fees.paid += paidAdvanced;
+
+        // Update Total (Collected + Pending balance)
+        statistics.fees.total += (paidAdvanced + pendingAdvanced);
+
+      } catch (advancedFeeError) {
+        console.error('Error fetching advanced fee stats:', advancedFeeError);
+        // Continue with legacy stats only
+      }
+    }
+
     // --- NEW DASHBOARD STATS ---
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -104,10 +142,36 @@ router.get('/dashboard', protect, async (req, res) => {
     });
     statistics.fees.collectedToday = feesToday.reduce((sum, fee) => sum + (fee.amount || 0), 0);
 
-    // 2. Admissions this month
-    statistics.admissions.thisMonth = await Admission.countDocuments({
+    // [ADMIN ONLY] Add today's collection from Advanced Payment Module
+    if (user.role === 'admin') {
+      try {
+        const paymentsToday = await Payment.aggregate([
+          {
+            $match: {
+              tenantId: tenantId,
+              isConfirmed: true,
+              isReversed: false,
+              paymentDate: { $gte: todayStart, $lte: todayEnd }
+            }
+          },
+          { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+        const collectedAdvanced = paymentsToday.length > 0 ? paymentsToday[0].total : 0;
+        statistics.fees.collectedToday += collectedAdvanced;
+      } catch (paymentError) {
+        console.error('Error fetching advanced payment stats:', paymentError);
+      }
+    }
+
+    // 2. Admissions this month (Count actual newly admitted students)
+    // We check both admissionDate and createdAt to cover manual entries and imports
+    statistics.admissions.thisMonth = await User.countDocuments({
+      role: 'student',
       tenantId: tenantId,
-      createdAt: { $gte: monthStart }
+      $or: [
+        { admissionDate: { $gte: monthStart } },
+        { createdAt: { $gte: monthStart } }
+      ]
     });
 
     // 3. Attendance Today (Global)
@@ -316,63 +380,100 @@ router.get('/activities', protect, async (req, res) => {
     const tenantId = user.tenantId;
     const limit = parseInt(req.query.limit) || 10;
 
-    // Only fetch for admin currently (can extend to other roles)
-    // if (user.role !== 'admin') return res.json({ success: true, count: 0, data: [] });
+    const activities = [];
 
-    // 1. Fetch recent fees
-    const fees = await Fee.find({ tenantId })
-      .sort({ updatedAt: -1 })
-      .limit(limit)
-      .populate('student', 'name class');
+    // 1. Fetch Recent Payments (Collections)
+    // Only for admin or if user has permission
+    if (user.role === 'admin' || user.role === 'accountant') {
+      try {
+        const Payment = require('../models/Payment');
+        const payments = await Payment.find({
+          tenantId,
+          isConfirmed: true,
+          isReversed: false
+        })
+          .sort({ paymentDate: -1, createdAt: -1 })
+          .limit(limit)
+          .populate('student', 'fullName admissionNumber class');
 
-    // 2. Fetch recent admissions (if needed)
-    // const admissions = await Admission.find({ tenantId }).sort({ updatedAt: -1 }).limit(limit);
-
-    const activities = items = [];
-
-    // Process fees
-    fees.forEach(fee => {
-      let type = 'fee';
-      let message = '';
-      let icon = 'CreditCard';
-      let status = 'info'; // info, warning, success, danger
-
-      if (fee.status === 'paid') {
-        const date = new Date(fee.paidDate || fee.updatedAt).toLocaleDateString();
-        message = `${fee.currency} ${fee.amount} collected from ${fee.student?.name || 'Student'}`;
-        status = 'success';
-      } else if (fee.status === 'pending') {
-        // Optimization: Don't show every pending fee creation as "activity" unless it's new
-        // Skip for now or show as "New invoice generated"
-        message = `Invoice generated for ${fee.student?.name}`;
-        icon = 'FileText';
-      } else if (fee.status === 'overdue') {
-        message = `Fee overdue for ${fee.student?.name}`;
-        status = 'danger';
-        icon = 'AlertTriangle';
-      }
-
-      if (message) {
-        activities.push({
-          id: fee._id,
-          type: type,
-          message: message,
-          date: fee.paidDate || fee.updatedAt,
-          amount: fee.amount,
-          studentName: fee.student?.name,
-          status: status,
-          data: fee // include full object for details
+        payments.forEach(payment => {
+          activities.push({
+            id: payment._id,
+            type: 'fee_collection',
+            message: `Received ${payment.currency || '₹'} ${payment.amount} from ${payment.student?.fullName || 'Student'}`,
+            date: payment.paymentDate || payment.createdAt,
+            amount: payment.amount,
+            studentName: payment.student?.fullName,
+            status: 'success', // Green
+            icon: 'CreditCard'
+          });
         });
+      } catch (err) {
+        console.warn('Payment model error:', err.message);
       }
-    });
+    }
 
-    // Sort combined activities by date
+    // 2. Fetch Recent Admissions (New Students)
+    if (user.role === 'admin' || user.role === 'teacher') {
+      try {
+        const students = await User.find({
+          tenantId,
+          role: 'student'
+        })
+          .sort({ createdAt: -1 })
+          .limit(limit)
+          .select('fullName admissionNumber class createdAt admissionDate');
+
+        students.forEach(student => {
+          activities.push({
+            id: student._id,
+            type: 'admission',
+            message: `New Admission: ${student.fullName} (${student.class || 'N/A'})`,
+            date: student.createdAt, // Or admissionDate
+            studentName: student.fullName,
+            status: 'primary', // Blue
+            icon: 'UserPlus'
+          });
+        });
+      } catch (err) {
+        console.warn('Student fetch error:', err.message);
+      }
+    }
+
+    // 3. Fetch Legacy Fees (Fallback or mixed usage)
+    if (user.role === 'admin') {
+      try {
+        const fees = await Fee.find({ tenantId, status: 'paid' })
+          .sort({ updatedAt: -1 })
+          .limit(limit)
+          .populate('student', 'fullName');
+
+        fees.forEach(fee => {
+          // Avoid duplicates if same payment is recorded in both systems (rare but possible during migration)
+          // For now, we trust they are distinct or we accept minor duplication in "Recent Activity"
+          activities.push({
+            id: fee._id,
+            type: 'fee',
+            message: `Collected ${fee.amount} from ${fee.student?.fullName || 'Student'}`,
+            date: fee.updatedAt,
+            amount: fee.amount,
+            status: 'success',
+            icon: 'CreditCard'
+          });
+        });
+      } catch (err) {
+        console.warn('Legacy Fee error:', err.message);
+      }
+    }
+
+    // 4. Sort and Limit
     activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const finalActivities = activities.slice(0, limit);
 
     res.json({
       success: true,
-      count: activities.length,
-      data: activities.slice(0, limit)
+      count: finalActivities.length,
+      data: finalActivities
     });
 
   } catch (error) {

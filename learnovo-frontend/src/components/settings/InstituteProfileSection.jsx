@@ -1,7 +1,17 @@
 import React from 'react'
 import { Building2 } from 'lucide-react'
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+const SERVER_URL = API_URL.replace(/\/api\/?$/, '')
+
 const InstituteProfileSection = ({ form, updateField, handleLogoUpload }) => {
+    // Helper to get safe logo URL
+    const getLogoUrl = (path) => {
+        if (!path) return null
+        if (path.startsWith('http')) return path
+        return encodeURI(`${SERVER_URL}${path}`)
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-3 mb-6">
@@ -35,6 +45,75 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload }) => {
                             value={form.institution?.tagline || ''}
                             onChange={(e) => updateField('institution.tagline', e.target.value)}
                             placeholder="e.g., Excellence in Education"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="label">UDISE Code</label>
+                        <input
+                            type="text"
+                            className="input"
+                            value={form.institution?.udiseCode || ''}
+                            onChange={(e) => updateField('institution.udiseCode', e.target.value)}
+                            placeholder="e.g. 27210100101"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="label">School Board</label>
+                        <div className="space-y-2">
+                            <select
+                                className="input"
+                                value={['CBSE', 'ICSE', 'IB', 'IGCSE'].includes(form.institution?.board) ? form.institution?.board : 'STATE'}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === 'STATE') {
+                                        // If switching to State/Custom, clear it or set default placeholder
+                                        updateField('institution.board', '');
+                                    } else {
+                                        updateField('institution.board', val);
+                                    }
+                                }}
+                            >
+                                <option value="CBSE">CBSE</option>
+                                <option value="ICSE">ICSE</option>
+                                <option value="IB">IB</option>
+                                <option value="IGCSE">IGCSE</option>
+                                <option value="STATE">State Board / Other</option>
+                            </select>
+
+                            {/* Show custom input if value is not one of the standard international boards */}
+                            {!['CBSE', 'ICSE', 'IB', 'IGCSE'].includes(form.institution?.board) && (
+                                <input
+                                    type="text"
+                                    className="input"
+                                    placeholder="Enter Board Name (e.g. PBSE, GSEB)"
+                                    value={form.institution?.board === 'STATE' ? '' : (form.institution?.board || '')}
+                                    onChange={(e) => updateField('institution.board', e.target.value)}
+                                />
+                            )}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="label">Affiliation Number</label>
+                        <input
+                            type="text"
+                            className="input"
+                            value={form.institution?.affiliationNumber || ''}
+                            onChange={(e) => updateField('institution.affiliationNumber', e.target.value)}
+                            placeholder="e.g. 430123"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="label">School Code</label>
+                        <input
+                            type="text"
+                            className="input"
+                            value={form.institution?.schoolCode || ''}
+                            onChange={(e) => updateField('institution.schoolCode', e.target.value)}
+                            placeholder="e.g. SCH-001"
                         />
                     </div>
 
@@ -125,7 +204,7 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload }) => {
                             <div className="h-24 w-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
                                 {form.institution?.logo ? (
                                     <img
-                                        src={`http://localhost:5001${form.institution.logo}`}
+                                        src={getLogoUrl(form.institution.logo)}
                                         alt="School Logo"
                                         className="h-full w-full object-contain"
                                         onError={(e) => e.target.style.display = 'none'}

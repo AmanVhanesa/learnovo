@@ -44,7 +44,7 @@ const Register = () => {
         [name]: value
       }))
     }
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -56,10 +56,10 @@ const Register = () => {
 
   const checkAvailability = async (field, value) => {
     if (!value || value.length < 3) return
-    
+
     try {
       const data = await tenantService.checkAvailability({ [field]: value })
-      
+
       if (data.success) {
         setAvailability(prev => ({
           ...prev,
@@ -73,42 +73,42 @@ const Register = () => {
 
   const validateForm = () => {
     const newErrors = {}
-    
+
     console.log('Validating form data:', formData)
-    
+
     if (!formData.schoolName.trim()) {
       newErrors.schoolName = 'School name is required'
     }
-    
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid'
     }
-    
+
     if (!formData.password) {
       newErrors.password = 'Password is required'
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters'
     }
-    
+
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match'
     }
-    
+
     if (!formData.schoolCode.trim()) {
       newErrors.schoolCode = 'School code is required'
     } else if (formData.schoolCode.length < 3) {
       newErrors.schoolCode = 'School code must be at least 3 characters'
     }
-    
+
     // Subdomain is optional - validate only if provided
     if (formData.subdomain.trim() && formData.subdomain.length < 3) {
       newErrors.subdomain = 'Subdomain must be at least 3 characters'
     } else if (formData.subdomain.trim() && !/^[a-z0-9-]+$/.test(formData.subdomain)) {
       newErrors.subdomain = 'Subdomain can only contain lowercase letters, numbers, and hyphens'
     }
-    
+
     console.log('Validation errors:', newErrors)
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -116,17 +116,17 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     console.log('Form submitted with data:', formData)
-    
+
     if (!validateForm()) {
       console.log('Form validation failed')
       return
     }
-    
+
     setIsLoading(true)
     setErrors({}) // Clear previous errors
-    
+
     try {
       // Only send required fields to backend
       // Note: subdomain is optional - backend will auto-generate from schoolCode if not provided
@@ -145,17 +145,17 @@ const Register = () => {
           zipCode: formData.address.zipCode
         } : undefined
       }
-      
+
       console.log('Submitting registration data:', registrationData)
       const data = await tenantService.register(registrationData)
       console.log('Registration response:', data)
-      
+
       if (data.success) {
         // Store token and user data
         localStorage.setItem('token', data.data.token)
         localStorage.setItem('user', JSON.stringify(data.data.user))
         localStorage.setItem('tenant', JSON.stringify(data.data.tenant))
-        
+
         // Redirect to dashboard
         navigate('/app/dashboard')
       } else {
@@ -166,9 +166,9 @@ const Register = () => {
       console.error('Error response:', error.response?.data)
       console.error('Error status:', error.response?.status)
       console.error('Error message:', error.message)
-      
+
       let errorMessage = 'Registration failed. Please try again.'
-      
+
       if (error.response?.data) {
         // Handle validation errors from backend
         if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
@@ -180,7 +180,7 @@ const Register = () => {
           setErrors(backendErrors)
           return // Don't set submit error if we have field errors
         }
-        
+
         // Single error message
         if (error.response.data.message) {
           errorMessage = error.response.data.message
@@ -190,9 +190,9 @@ const Register = () => {
       } else if (error.message) {
         errorMessage = error.message
       }
-      
+
       setErrors({ submit: errorMessage })
-      
+
       // Also show in console for debugging
       console.error('Final error message shown to user:', errorMessage)
     } finally {
@@ -204,7 +204,7 @@ const Register = () => {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <School className="h-12 w-12 text-blue-600" />
+          <School className="h-12 w-12 text-primary-600" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
           Create Your School Account
@@ -220,7 +220,7 @@ const Register = () => {
             {/* School Information */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900">School Information</h3>
-              
+
               <div>
                 <label htmlFor="schoolName" className="block text-sm font-medium text-gray-700">
                   School Name *
@@ -232,9 +232,8 @@ const Register = () => {
                   required
                   value={formData.schoolName}
                   onChange={handleInputChange}
-                  className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.schoolName ? 'border-red-300' : 'border-gray-300'
-                  }`}
+                  className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${errors.schoolName ? 'border-red-300' : 'border-gray-300'
+                    }`}
                   placeholder="Enter your school name"
                 />
                 {errors.schoolName && (
@@ -253,9 +252,8 @@ const Register = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.email ? 'border-red-300' : 'border-gray-300'
-                  }`}
+                  className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${errors.email ? 'border-red-300' : 'border-gray-300'
+                    }`}
                   placeholder="admin@yourschool.com"
                 />
                 {errors.email && (
@@ -273,7 +271,7 @@ const Register = () => {
                   type="tel"
                   value={formData.phone}
                   onChange={handleInputChange}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                   placeholder="+1 (555) 123-4567"
                 />
               </div>
@@ -282,7 +280,7 @@ const Register = () => {
             {/* School Access */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900">School Access</h3>
-              
+
               <div>
                 <label htmlFor="schoolCode" className="block text-sm font-medium text-gray-700">
                   School Code *
@@ -296,9 +294,8 @@ const Register = () => {
                     value={formData.schoolCode}
                     onChange={handleInputChange}
                     onBlur={() => checkAvailability('schoolCode', formData.schoolCode)}
-                    className={`flex-1 px-3 py-2 border rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.schoolCode ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`flex-1 px-3 py-2 border rounded-l-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${errors.schoolCode ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="myschool"
                   />
                   <div className="flex items-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50">
@@ -330,7 +327,7 @@ const Register = () => {
                     value={formData.subdomain}
                     onChange={handleInputChange}
                     placeholder="myschool"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                   />
                   <div className="flex items-center px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50">
                     <span className="text-sm text-gray-500">.learnovo.com</span>
@@ -345,7 +342,7 @@ const Register = () => {
             {/* Password */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900">Admin Password</h3>
-              
+
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Password *
@@ -358,9 +355,8 @@ const Register = () => {
                     required
                     value={formData.password}
                     onChange={handleInputChange}
-                    className={`block w-full px-3 py-2 pr-10 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.password ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`block w-full px-3 py-2 pr-10 border rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${errors.password ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="Enter password"
                   />
                   <button
@@ -392,9 +388,8 @@ const Register = () => {
                     required
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className={`block w-full px-3 py-2 pr-10 border rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`block w-full px-3 py-2 pr-10 border rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 ${errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                      }`}
                     placeholder="Confirm password"
                   />
                   <button
@@ -418,7 +413,7 @@ const Register = () => {
             {/* Address (Optional) */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium text-gray-900">School Address (Optional)</h3>
-              
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="address.street" className="block text-sm font-medium text-gray-700">
@@ -430,11 +425,11 @@ const Register = () => {
                     type="text"
                     value={formData.address.street}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     placeholder="123 Main St"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="address.city" className="block text-sm font-medium text-gray-700">
                     City
@@ -445,11 +440,11 @@ const Register = () => {
                     type="text"
                     value={formData.address.city}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     placeholder="New York"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="address.state" className="block text-sm font-medium text-gray-700">
                     State/Province
@@ -460,11 +455,11 @@ const Register = () => {
                     type="text"
                     value={formData.address.state}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     placeholder="NY"
                   />
                 </div>
-                
+
                 <div>
                   <label htmlFor="address.country" className="block text-sm font-medium text-gray-700">
                     Country
@@ -475,7 +470,7 @@ const Register = () => {
                     type="text"
                     value={formData.address.country}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                     placeholder="United States"
                   />
                 </div>
@@ -487,7 +482,7 @@ const Register = () => {
                 <p className="text-sm text-red-600">{errors.submit}</p>
               </div>
             )}
-            
+
             {Object.keys(errors).length > 0 && !errors.submit && (
               <div className="bg-red-50 border border-red-200 rounded-md p-4">
                 <p className="text-sm text-red-600 font-medium">Please fix the following errors:</p>
@@ -503,7 +498,7 @@ const Register = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
               >
                 {isLoading ? 'Creating Account...' : 'Create School Account'}
               </button>
@@ -512,7 +507,7 @@ const Register = () => {
             <div className="text-center">
               <p className="text-sm text-gray-600">
                 Already have an account?{' '}
-                <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+                <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
                   Sign in to your school
                 </Link>
               </p>

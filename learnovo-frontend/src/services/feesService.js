@@ -65,8 +65,18 @@ export const invoicesService = {
     return res.data
   },
 
+  update: async (id, data) => {
+    const res = await api.put(`/invoices/${id}`, data)
+    return res.data
+  },
+
   applyLateFee: async (id, amount) => {
     const res = await api.put(`/invoices/${id}/apply-late-fee`, { amount })
+    return res.data
+  },
+
+  delete: async (id) => {
+    const res = await api.delete(`/invoices/${id}`)
     return res.data
   }
 }
@@ -82,7 +92,7 @@ export const paymentsService = {
     if (filters.endDate) params.append('endDate', filters.endDate)
     if (filters.isConfirmed !== undefined) params.append('isConfirmed', filters.isConfirmed)
 
-    const url = `/payments${params.toString() ? `?${params.toString()}` : ''}`
+    const url = `/invoices/payments${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)
     return res.data
   },
@@ -93,7 +103,7 @@ export const paymentsService = {
   },
 
   collect: async (data) => {
-    const res = await api.post('/payments', data)
+    const res = await api.post('/invoices/collect-payment', data)
     return res.data
   },
 
@@ -108,7 +118,7 @@ export const paymentsService = {
   },
 
   getReceipt: async (id) => {
-    const res = await api.get(`/payments/receipt/${id}`)
+    const res = await api.get(`/invoices/payments/${id}/receipt`)
     return res.data
   }
 }

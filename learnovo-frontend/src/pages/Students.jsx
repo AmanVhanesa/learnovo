@@ -190,7 +190,7 @@ const Students = () => {
     ].concat(
       students.map(s => [
         s.admissionNumber || 'N/A',
-        s.name,
+        s.fullName || s.name,
         s.rollNumber || '',
         s.class || '',
         s.section || '',
@@ -212,13 +212,13 @@ const Students = () => {
     setStatusFilter('')
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="loading-spinner"></div>
-      </div>
-    )
-  }
+  // if (isLoading) {
+  //   return (
+  //     <div className="flex items-center justify-center h-64">
+  //       <div className="loading-spinner"></div>
+  //     </div>
+  //   )
+  // }
 
   return (
     <div className="space-y-6">
@@ -317,16 +317,23 @@ const Students = () => {
               </button>
             )}
 
-            <ExportButton
-              module="students"
-              exportUrl="/api/students/export"
-              filters={{
-                class: classFilter,
-                section: sectionFilter,
-                academicYear: yearFilter,
-                status: statusFilter
+            <button
+              onClick={() => {
+                const params = new URLSearchParams({
+                  class: classFilter,
+                  section: sectionFilter,
+                  academicYear: yearFilter,
+                  status: statusFilter,
+                  search: searchQuery
+                });
+                // Trigger backend download
+                window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/students/export?${params.toString()}&token=${localStorage.getItem('token')}`, '_blank');
               }}
-            />
+              className="btn btn-outline gap-2"
+            >
+              <Upload className="h-4 w-4 rotate-180" />
+              Export CSV
+            </button>
           </div>
         </div>
 
@@ -375,7 +382,15 @@ const Students = () => {
               </tr>
             </thead>
             <tbody>
-              {students.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan="9" className="text-center py-12">
+                    <div className="flex justify-center">
+                      <div className="loading-spinner"></div>
+                    </div>
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="text-center py-12 text-gray-500">
                     No students found
@@ -401,20 +416,20 @@ const Students = () => {
                       {student.photo ? (
                         <img
                           src={student.photo}
-                          alt={student.name}
+                          alt={student.fullName}
                           className="h-10 w-10 rounded-full object-cover"
                         />
                       ) : (
                         <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
                           <span className="text-sm font-medium text-gray-700">
-                            {student.name?.charAt(0)}
+                            {student.fullName?.charAt(0)}
                           </span>
                         </div>
                       )}
                     </td>
                     <td>
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{student.name}</div>
+                        <div className="text-sm font-medium text-gray-900">{student.fullName}</div>
                         <div className="text-sm text-gray-500">{student.guardians?.[0]?.name}</div>
                       </div>
                     </td>
@@ -478,9 +493,9 @@ const Students = () => {
           onClose={() => setShowImportModal(false)}
           module="students"
           title="Import Students"
-          templateUrl="/api/students/import/template"
-          previewUrl="/api/students/import/preview"
-          executeUrl="/api/students/import/execute"
+          templateUrl="/students/import/template"
+          previewUrl="/students/import/preview"
+          executeUrl="/students/import/execute"
           onSuccess={(result) => {
             setShowImportModal(false)
             fetchStudents()

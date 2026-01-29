@@ -7,6 +7,16 @@ export const settingsService = {
     return response.data
   },
 
+  // Upload school logo
+  uploadLogo: async (formData) => {
+    const response = await api.post('/settings/upload-logo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    return response.data
+  },
+
   // Update system settings
   updateSettings: async (settingsData) => {
     const response = await api.put('/settings', settingsData)

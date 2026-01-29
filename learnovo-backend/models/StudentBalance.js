@@ -79,9 +79,9 @@ studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId
     const invoiceAgg = await FeeInvoice.aggregate([
         {
             $match: {
-                tenantId: mongoose.Types.ObjectId(tenantId),
-                studentId: mongoose.Types.ObjectId(studentId),
-                academicSessionId: mongoose.Types.ObjectId(academicSessionId),
+                tenantId: new mongoose.Types.ObjectId(tenantId),
+                studentId: new mongoose.Types.ObjectId(studentId),
+                academicSessionId: new mongoose.Types.ObjectId(academicSessionId),
                 status: { $ne: 'Cancelled' }
             }
         },
@@ -99,8 +99,8 @@ studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId
     const paymentAgg = await Payment.aggregate([
         {
             $match: {
-                tenantId: mongoose.Types.ObjectId(tenantId),
-                studentId: mongoose.Types.ObjectId(studentId),
+                tenantId: new mongoose.Types.ObjectId(tenantId),
+                studentId: new mongoose.Types.ObjectId(studentId),
                 isConfirmed: true,
                 isReversed: false
             }
@@ -118,7 +118,7 @@ studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId
         },
         {
             $match: {
-                'invoice.academicSessionId': mongoose.Types.ObjectId(academicSessionId)
+                'invoice.academicSessionId': new mongoose.Types.ObjectId(academicSessionId)
             }
         },
         {
@@ -133,8 +133,8 @@ studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId
 
     // Get last payment
     const lastPayment = await Payment.findOne({
-        tenantId: mongoose.Types.ObjectId(tenantId),
-        studentId: mongoose.Types.ObjectId(studentId),
+        tenantId: new mongoose.Types.ObjectId(tenantId),
+        studentId: new mongoose.Types.ObjectId(studentId),
         isConfirmed: true,
         isReversed: false
     }).sort({ paymentDate: -1 });
@@ -160,8 +160,8 @@ studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId
 // Static method to get defaulters
 studentBalanceSchema.statics.getDefaulters = async function (tenantId, academicSessionId, options = {}) {
     const query = {
-        tenantId: mongoose.Types.ObjectId(tenantId),
-        academicSessionId: mongoose.Types.ObjectId(academicSessionId),
+        tenantId: new mongoose.Types.ObjectId(tenantId),
+        academicSessionId: new mongoose.Types.ObjectId(academicSessionId),
         totalBalance: { $gt: 0 }
     };
 
@@ -170,7 +170,7 @@ studentBalanceSchema.statics.getDefaulters = async function (tenantId, academicS
     }
 
     const defaulters = await this.find(query)
-        .populate('studentId', 'name studentId phone email classId sectionId')
+        .populate('studentId', 'name fullName studentId phone email classId sectionId')
         .populate('academicSessionId', 'name')
         .sort({ totalBalance: -1 })
         .limit(options.limit || 1000);

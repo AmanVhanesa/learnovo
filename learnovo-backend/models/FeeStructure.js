@@ -12,24 +12,30 @@ const feeStructureSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  
+
   // Class this fee structure applies to
-  class: {
-    type: String,
-    required: [true, 'Class is required'],
-    trim: true
+  classId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Class',
+    required: [true, 'Class is required']
   },
-  
-  // Academic year
-  academicYear: {
-    type: String,
-    required: [true, 'Academic year is required'],
-    trim: true,
-    match: [/^\d{4}-\d{4}$/, 'Academic year must be in format YYYY-YYYY']
+
+  // Section (optional - null means applies to all sections)
+  sectionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Section',
+    default: null
   },
-  
-  // Fee categories with amounts
-  categories: [{
+
+  // Academic session
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    required: [true, 'Academic session is required']
+  },
+
+  // Fee heads with amounts and payment schedules
+  feeHeads: [{
     name: {
       type: String,
       required: true,
@@ -40,45 +46,33 @@ const feeStructureSchema = new mongoose.Schema({
       required: true,
       min: 0
     },
-    currency: {
+    frequency: {
       type: String,
-      default: 'INR',
-      uppercase: true
+      enum: ['monthly', 'quarterly', 'annually', 'one-time'],
+      default: 'monthly'
+    },
+    isCompulsory: {
+      type: Boolean,
+      default: true
+    },
+    dueDay: {
+      type: Number,
+      min: 1,
+      max: 31,
+      default: 5
     },
     description: {
       type: String,
       trim: true
     }
   }],
-  
-  // Payment frequency
-  frequency: {
-    type: String,
-    enum: ['monthly', 'quarterly', 'half-yearly', 'yearly'],
-    required: [true, 'Payment frequency is required'],
-    default: 'monthly'
-  },
-  
-  // Due dates configuration
-  dueDates: [{
-    month: {
-      type: Number,
-      min: 1,
-      max: 12
-    },
-    day: {
-      type: Number,
-      min: 1,
-      max: 31
-    },
-    description: {
-      type: String,
-      trim: true
-    }
-  }],
-  
+
   // Late fee configuration
-  lateFee: {
+  lateFeeConfig: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
     type: {
       type: String,
       enum: ['fixed', 'percentage'],
@@ -88,15 +82,20 @@ const feeStructureSchema = new mongoose.Schema({
       type: Number,
       default: 0,
       min: 0
+    },
+    gracePeriodDays: {
+      type: Number,
+      default: 0,
+      min: 0
     }
   },
-  
+
   // Status
   isActive: {
     type: Boolean,
     default: true
   },
-  
+
   // Created by
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -104,12 +103,21 @@ const feeStructureSchema = new mongoose.Schema({
     required: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+})
+
+// Virtual field to calculate total amount
+feeStructureSchema.virtual('totalAmount').get(function () {
+  if (!this.feeHeads || this.feeHeads.length === 0) return 0
+  return this.feeHeads.reduce((total, head) => total + (head.amount || 0), 0)
 })
 
 // Indexes for efficient queries
-feeStructureSchema.index({ tenantId: 1, class: 1, academicYear: 1 })
+feeStructureSchema.index({ tenantId: 1, classId: 1, academicSessionId: 1 })
 feeStructureSchema.index({ tenantId: 1, isActive: 1 })
+feeStructureSchema.index({ tenantId: 1, classId: 1, sectionId: 1, academicSessionId: 1 })
 
 module.exports = mongoose.model('FeeStructure', feeStructureSchema)
 

@@ -19,6 +19,7 @@ const feeAuditLogSchema = new mongoose.Schema({
             'FEE_STRUCTURE_DEACTIVATED',
             'INVOICE_GENERATED',
             'INVOICE_BULK_GENERATED',
+            'INVOICE_UPDATED',
             'INVOICE_CANCELLED',
             'LATE_FEE_APPLIED',
             'PAYMENT_COLLECTED',
@@ -40,7 +41,7 @@ const feeAuditLogSchema = new mongoose.Schema({
 
     entityId: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true,
+        required: false,
         index: true
     },
 

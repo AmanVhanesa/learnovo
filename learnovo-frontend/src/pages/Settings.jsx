@@ -12,6 +12,7 @@ import BankAccountsSection from '../components/settings/BankAccountsSection'
 import RulesRegulationsSection from '../components/settings/RulesRegulationsSection'
 import ThemeLanguageSection from '../components/settings/ThemeLanguageSection'
 import AccountSettingsSection from '../components/settings/AccountSettingsSection'
+import SubDepartmentsSection from '../components/settings/SubDepartmentsSection'
 
 const Settings = () => {
   const { tenant } = useAuth()
@@ -73,6 +74,7 @@ const Settings = () => {
 
   const tabs = [
     { id: 'institute', label: 'Institute Profile', icon: '🏫' },
+    { id: 'subdepartments', label: 'Sub Departments', icon: '🏢' },
     { id: 'grading', label: 'Marks Grading', icon: '📊' },
     { id: 'banks', label: 'Bank Accounts', icon: '🏦' },
     { id: 'rules', label: 'Rules & Regulations', icon: '📜' },
@@ -194,18 +196,10 @@ const Settings = () => {
     formData.append('logo', file)
 
     try {
-      const token = localStorage.getItem('token')
-      const res = await fetch('http://localhost:5001/api/settings/upload-logo', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      })
-      const data = await res.json()
+      const data = await settingsService.uploadLogo(formData)
       if (data.success) {
         updateField('institution.logo', data.data.url)
-        toast.success('Logo uploaded!')
+        toast.success('Logo uploaded! Click Save to apply changes.')
       } else {
         toast.error('Upload failed')
       }
@@ -271,6 +265,9 @@ const Settings = () => {
               updateField={updateField}
               handleLogoUpload={handleLogoUpload}
             />
+          )}
+          {activeTab === 'subdepartments' && (
+            <SubDepartmentsSection />
           )}
           {activeTab === 'grading' && (
             <MarksGradingSection

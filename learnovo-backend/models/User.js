@@ -10,10 +10,15 @@ const userSchema = new mongoose.Schema({
     index: true
   },
 
-  // Identity
-  firstName: {
+  // Identity - Primary name field
+  fullName: {
     type: String,
     required: function () { return this.role === 'student'; },
+    trim: true
+  },
+  // Optional name parts for backward compatibility
+  firstName: {
+    type: String,
     trim: true
   },
   middleName: {
@@ -22,7 +27,6 @@ const userSchema = new mongoose.Schema({
   },
   lastName: {
     type: String,
-    required: function () { return this.role === 'student'; },
     trim: true
   },
   name: { // Keeping for backward compatibility & display
@@ -31,14 +35,38 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: function () {
+      // Email required only for admin and teacher roles
+      return ['admin', 'teacher'].includes(this.role);
+    },
     lowercase: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+    trim: true,
+    sparse: true,
+    validate: {
+      validator: function (v) {
+        // Skip validation if email is not provided
+        if (!v || v.trim() === '') return true;
+        // Validate email format only if provided
+        return /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(v);
+      },
+      message: 'Please enter a valid email'
+    }
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters'],
+    required: function () {
+      // Password required only if email exists and it's a new record
+      return this.email && this.isNew;
+    },
+    validate: {
+      validator: function (v) {
+        // Skip validation if password is not provided
+        if (!v) return true;
+        // Validate password length only if provided
+        return v.length >= 6;
+      },
+      message: 'Password must be at least 6 characters'
+    },
     select: false
   },
   role: {
@@ -80,6 +108,17 @@ const userSchema = new mongoose.Schema({
     ref: 'User'
   },
   // Login Management
+  hasLogin: {
+    type: Boolean,
+    default: false
+  },
+  loginCreatedAt: {
+    type: Date
+  },
+  loginCreatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   lastLogin: {
     type: Date,
     default: null
@@ -189,6 +228,28 @@ const userSchema = new mongoose.Schema({
   admissionDate: {
     type: Date
   },
+  // Legacy Fields
+  penNumber: {
+    type: String,
+    trim: true,
+    sparse: true,
+    index: true
+  },
+  subDepartment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SubDepartment',
+    sparse: true
+  },
+  driverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Driver',
+    sparse: true,
+    index: true
+  },
+  udiseCode: {
+    type: String,
+    trim: true
+  },
   // Personal Details
   dateOfBirth: {
     type: Date
@@ -296,7 +357,14 @@ const userSchema = new mongoose.Schema({
 });
 
 // Index for better performance
-userSchema.index({ email: 1, tenantId: 1 }, { unique: true }); // Email unique per tenant
+// Email unique per tenant (only when email exists)
+userSchema.index(
+  { email: 1, tenantId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { email: { $exists: true, $ne: null, $ne: '' } }
+  }
+);
 userSchema.index({ role: 1, tenantId: 1 });
 userSchema.index({ tenantId: 1 });
 
@@ -324,23 +392,65 @@ userSchema.index(
   { unique: true, partialFilterExpression: { phone: { $exists: true, $ne: '' } } }
 );
 
-// Auto-generate full name if missing but parts exist
+// Unique PEN Number per Tenant
+userSchema.index(
+  { penNumber: 1, tenantId: 1 },
+  { unique: true, partialFilterExpression: { penNumber: { $exists: true, $ne: '' } } }
+);
+
+// Auto-generate fullName and handle name parts
 userSchema.pre('validate', function (next) {
-  if (this.firstName && this.lastName && !this.name) {
+  // Priority 1: If fullName exists, use it as primary
+  // Priority 2: If name parts exist but no fullName, generate fullName
+  // Priority 3: If fullName exists but no parts, optionally split (for backward compat)
+
+  if (!this.fullName && (this.firstName || this.lastName || this.name)) {
+    // Generate fullName from available parts
+    if (this.firstName || this.lastName) {
+      const parts = [this.firstName, this.middleName, this.lastName].filter(Boolean);
+      this.fullName = parts.join(' ');
+    } else if (this.name) {
+      this.fullName = this.name;
+    }
+  }
+
+  // Auto-populate legacy 'name' field for backward compatibility
+  if (this.fullName && !this.name) {
+    this.name = this.fullName;
+  } else if (!this.name && this.firstName && this.lastName) {
     this.name = `${this.firstName} ${this.middleName ? this.middleName + ' ' : ''}${this.lastName}`;
   }
-  // If name exists but parts missing (backward compat), try to split (naive)
-  if (this.name && !this.firstName) {
-    const parts = this.name.split(' ');
-    this.firstName = parts[0];
-    this.lastName = parts.length > 1 ? parts[parts.length - 1] : '';
+
+  // Optional: Auto-split fullName into parts if parts are missing (best-effort)
+  if (this.fullName && !this.firstName && !this.lastName) {
+    const parts = this.fullName.trim().split(/\s+/);
+    if (parts.length === 1) {
+      this.firstName = parts[0];
+      this.lastName = '';
+    } else if (parts.length === 2) {
+      this.firstName = parts[0];
+      this.lastName = parts[1];
+    } else if (parts.length >= 3) {
+      this.firstName = parts[0];
+      this.lastName = parts[parts.length - 1];
+      this.middleName = parts.slice(1, -1).join(' ');
+    }
   }
+
   next();
 });
 
-// Hash password before saving
+// Hash password before saving and set hasLogin flag
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  // Auto-set hasLogin flag based on email and password
+  if (this.email && this.password) {
+    this.hasLogin = true;
+  } else if (!this.email || !this.password) {
+    this.hasLogin = false;
+  }
+
+  // Skip password hashing if no password or password not modified
+  if (!this.password || !this.isModified('password')) return next();
 
   try {
     const salt = await bcrypt.genSalt(12);
