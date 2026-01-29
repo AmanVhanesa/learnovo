@@ -18,7 +18,7 @@ router.post('/register', protect, getTenantFromRequest, [
   body('role').isIn(['admin', 'teacher', 'student', 'parent']).withMessage('Invalid role'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     // Only admins can register new users
     if (req.user.role !== 'admin') {
@@ -93,7 +93,7 @@ router.post('/register', protect, getTenantFromRequest, [
 // Helper function to ensure Demo Tenant exists
 async function ensureDemoTenant() {
   let demoTenant = await Tenant.findOne({ schoolCode: 'demo' });
-  
+
   if (!demoTenant) {
     try {
       demoTenant = await Tenant.create({
@@ -116,15 +116,15 @@ async function ensureDemoTenant() {
       if (!demoTenant) throw error;
     }
   }
-  
+
   // Create demo users if they don't exist (idempotent)
   const demoUsers = [
     { email: 'admin@learnovo.com', name: 'Demo Admin', password: 'admin123', role: 'admin' },
     { email: 'sarah.wilson@learnovo.com', name: 'Sarah Wilson', password: 'teacher123', role: 'teacher', phone: '+919876543211' },
-    { 
-      email: 'john.doe@learnovo.com', 
-      name: 'John Doe', 
-      password: 'student123', 
+    {
+      email: 'john.doe@learnovo.com',
+      name: 'John Doe',
+      password: 'student123',
       role: 'student',
       phone: '+919876543212',
       class: '10th Grade',
@@ -136,14 +136,14 @@ async function ensureDemoTenant() {
     },
     { email: 'parent@learnovo.com', name: 'Demo Parent', password: 'parent123', role: 'parent', phone: '+919876543214' }
   ];
-  
+
   for (const userData of demoUsers) {
     try {
-      const existingUser = await User.findOne({ 
-        email: userData.email.toLowerCase(), 
-        tenantId: demoTenant._id 
+      const existingUser = await User.findOne({
+        email: userData.email.toLowerCase(),
+        tenantId: demoTenant._id
       });
-      
+
       if (!existingUser) {
         await User.create({
           tenantId: demoTenant._id,
@@ -158,7 +158,7 @@ async function ensureDemoTenant() {
       console.log(`⚠️ Demo user ${userData.email} already exists or error:`, error.message);
     }
   }
-  
+
   return demoTenant;
 }
 
@@ -170,15 +170,15 @@ router.post('/login', [
   body('password').notEmpty().withMessage('Password is required'),
   body('schoolCode').optional().trim(),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const { email, password, schoolCode } = req.body;
     const emailLower = email.toLowerCase();
-    
+
     // Determine if this is a demo login
     const demoEmails = ['admin@learnovo.com', 'sarah.wilson@learnovo.com', 'john.doe@learnovo.com', 'parent@learnovo.com'];
     const isDemoLogin = demoEmails.includes(emailLower) || (schoolCode && schoolCode.toLowerCase() === 'demo');
-    
+
     // Get tenant
     let tenant = null;
     if (isDemoLogin) {
@@ -186,27 +186,38 @@ router.post('/login', [
         tenant = await ensureDemoTenant();
       } catch (error) {
         console.error('Error ensuring demo tenant:', error);
-        return res.status(500).json({ 
-          success: false, 
+        return res.status(500).json({
+          success: false,
           message: 'Failed to initialize demo environment',
           error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
       }
     } else if (schoolCode) {
-      tenant = await Tenant.findOne({ schoolCode: schoolCode.toLowerCase(), isActive: true });
+      console.log(`[LOGIN DEBUG] Searching for school: '${schoolCode}'`);
+
+      // Find tenant (don't filter by active yet to debug)
+      tenant = await Tenant.findOne({ schoolCode: schoolCode.toLowerCase().trim() });
+
       if (!tenant) {
-        return res.status(404).json({ success: false, message: 'School not found or inactive' });
+        console.log(`[LOGIN DEBUG] School '${schoolCode}' NOT FOUND in DB`);
+        return res.status(404).json({ success: false, message: 'School not found' });
+      }
+
+      console.log(`[LOGIN DEBUG] School found: ${tenant.schoolName}, Active: ${tenant.isActive}`);
+
+      if (!tenant.isActive) {
+        return res.status(404).json({ success: false, message: 'School is inactive. Please contact support.' });
       }
     }
-    
+
     // Find user
     let userQuery = { email: emailLower };
     if (tenant) {
       userQuery.tenantId = tenant._id;
     }
-    
+
     let user = await User.findOne(userQuery).select('+password').populate('tenantId');
-    
+
     // If not found and no tenant specified, try finding by email only
     if (!user && !tenant) {
       user = await User.findOne({ email: emailLower }).select('+password').populate('tenantId');
@@ -214,12 +225,12 @@ router.post('/login', [
         tenant = typeof user.tenantId === 'object' ? user.tenantId : await Tenant.findById(user.tenantId);
       }
     }
-    
+
     // User not found
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
-    
+
     // Verify tenant matches (for non-demo logins)
     if (!isDemoLogin && tenant && user.tenantId) {
       const userTenantId = typeof user.tenantId === 'object' ? user.tenantId._id.toString() : user.tenantId.toString();
@@ -227,41 +238,41 @@ router.post('/login', [
         return res.status(401).json({ success: false, message: 'Invalid credentials' });
       }
     }
-    
+
     // Check if active
     if (!user.isActive) {
       return res.status(401).json({ success: false, message: 'Account has been deactivated' });
     }
-    
+
     // Verify password
     if (!user.password) {
       console.error('User has no password field:', user.email);
-      return res.status(500).json({ 
-        success: false, 
+      return res.status(500).json({
+        success: false,
         message: 'User account error. Please contact support.',
         error: process.env.NODE_ENV === 'development' ? 'User password field is missing' : undefined
       });
     }
-    
+
     let isPasswordValid = false;
     try {
       isPasswordValid = await user.comparePassword(password);
     } catch (compareError) {
       console.error('Password comparison error:', compareError);
-      return res.status(500).json({ 
-        success: false, 
+      return res.status(500).json({
+        success: false,
         message: 'Authentication error',
         error: process.env.NODE_ENV === 'development' ? compareError.message : undefined
       });
     }
-    
+
     if (!isPasswordValid) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
-    
+
     // Update last login (non-blocking)
-    User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } }).catch(() => {});
-    
+    User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } }).catch(() => { });
+
     // Generate token
     let token;
     try {
@@ -271,16 +282,16 @@ router.post('/login', [
       token = generateToken(user._id);
     } catch (tokenError) {
       console.error('Token generation error:', tokenError);
-      return res.status(500).json({ 
-        success: false, 
+      return res.status(500).json({
+        success: false,
         message: 'Failed to generate authentication token',
         error: process.env.NODE_ENV === 'development' ? tokenError.message : undefined
       });
     }
-    
+
     // Prepare response data
     const tenantId = user.tenantId && (user.tenantId._id || user.tenantId);
-    
+
     res.json({
       success: true,
       message: 'Login successful',
@@ -320,7 +331,7 @@ router.post('/login', [
 // @desc    Get current user
 // @route   GET /api/auth/me
 // @access  Private
-router.get('/me', protect, async(req, res) => {
+router.get('/me', protect, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
 
@@ -353,7 +364,7 @@ router.put('/profile', protect, [
   body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const { name, phone } = req.body;
     const userId = req.user.id;
@@ -396,7 +407,7 @@ router.put('/password', protect, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters long'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
@@ -452,7 +463,7 @@ router.post('/logout', protect, (req, res) => {
 router.post('/forgot-password', [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -490,7 +501,7 @@ router.put('/reset-password', [
   body('token').notEmpty().withMessage('Reset token is required'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const { token, password } = req.body;
 

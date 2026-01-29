@@ -25,8 +25,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         admissionDate: student?.admissionDate ? student.admissionDate.substring(0, 10) : '',
         admissionNumber: student?.admissionNumber || '',
         penNumber: student?.penNumber || '',
-        admissionNumber: student?.admissionNumber || '',
-        penNumber: student?.penNumber || '',
+
         subDepartment: student?.subDepartment?._id || student?.subDepartment || '',
         driverId: student?.driverId?._id || student?.driverId || '',
 

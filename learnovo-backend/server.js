@@ -19,16 +19,16 @@ app.use(helmet({
 }));
 app.use(compression());
 
-// Rate limiting (enabled only in production)
-if (process.env.NODE_ENV === 'production') {
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 1000,
-    standardHeaders: true,
-    legacyHeaders: false
-  });
-  app.use(limiter);
-}
+// Rate limiting (DISABLED for troubleshooting)
+// if (process.env.NODE_ENV === 'production') {
+//   const limiter = rateLimit({
+//     windowMs: 15 * 60 * 1000,
+//     limit: 10000, // Increased
+//     standardHeaders: true,
+//     legacyHeaders: false
+//   });
+//   app.use(limiter);
+// }
 
 // CORS configuration
 const allowedOrigins = process.env.FRONTEND_URL
@@ -53,12 +53,16 @@ app.use(cors({
     }
 
     // Check against allowed origins list
+    // TEMPORARY FIX: Allow all for troubleshooting connection
+    callback(null, true);
+    /*
     if (allowedOrigins.length === 0 || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.warn(`CORS blocked origin: ${origin}. Allowed:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
+    */
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
