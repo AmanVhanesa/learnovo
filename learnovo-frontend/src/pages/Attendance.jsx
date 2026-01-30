@@ -11,6 +11,8 @@ const Attendance = () => {
   const [classes, setClasses] = useState([])
   const [attendance, setAttendance] = useState({})
   const [students, setStudents] = useState([])
+  const [filteredStudents, setFilteredStudents] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
@@ -26,11 +28,24 @@ const Attendance = () => {
     }
   }, [selectedClass, selectedDate])
 
+  // Filter students based on search term
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredStudents(students)
+    } else {
+      const filtered = students.filter(student =>
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (student.admissionNumber || student.admission_number || '').toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      setFilteredStudents(filtered)
+    }
+  }, [students, searchTerm])
+
   const fetchTeacherClasses = async () => {
     try {
       setIsLoading(true)
       const response = await attendanceService.getTeacherClasses()
-      
+
       if (response?.data && response.data.length > 0) {
         setClasses(response.data)
         setSelectedClass(response.data[0])
@@ -49,14 +64,14 @@ const Attendance = () => {
 
   const fetchStudents = async () => {
     if (!selectedClass?._id) return
-    
+
     try {
       setIsLoading(true)
       const response = await attendanceService.getStudentsByClass(selectedClass._id)
-      
+
       if (response?.data?.students && response.data.students.length > 0) {
         setStudents(response.data.students)
-        
+
         // Initialize attendance with all present by default
         const initialAttendance = {}
         response.data.students.forEach(student => {
@@ -107,6 +122,15 @@ const Attendance = () => {
     }))
   }
 
+  const markAllAs = (status) => {
+    const newAttendance = {}
+    students.forEach(student => {
+      newAttendance[student._id] = status
+    })
+    setAttendance(newAttendance)
+    toast.success(`Marked all students as ${status}`)
+  }
+
   const saveAttendance = async () => {
     if (!selectedClass || students.length === 0) {
       toast.error('Please select a class with students')
@@ -115,7 +139,7 @@ const Attendance = () => {
 
     try {
       setIsSaving(true)
-      
+
       const attendanceRecords = students.map(student => ({
         studentId: student._id,
         admissionNumber: student.admissionNumber || student.admission_number,
@@ -201,7 +225,7 @@ const Attendance = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Attendance Management</h1>
         <div className="flex space-x-3">
-          <button 
+          <button
             className="btn btn-outline"
             onClick={() => setShowReportModal(true)}
           >
@@ -268,85 +292,119 @@ const Attendance = () => {
             <p className="text-sm text-gray-500 mt-1">
               Click on the status buttons to mark attendance
             </p>
+
+            {/* Search and Bulk Actions */}
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search by name or admission number..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="input w-full"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => markAllAs('present')}
+                  className="btn btn-sm bg-green-100 text-green-700 hover:bg-green-200"
+                  title="Mark all as present"
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  All Present
+                </button>
+                <button
+                  onClick={() => markAllAs('absent')}
+                  className="btn btn-sm bg-red-100 text-red-700 hover:bg-red-200"
+                  title="Mark all as absent"
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  All Absent
+                </button>
+              </div>
+            </div>
           </div>
-          
+
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {students.map((student) => (
-                <div key={student._id} className="px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="flex-shrink-0">
-                      <div className="h-10 w-10 bg-gray-300 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-gray-700">
-                          {student.name.charAt(0)}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{student.name}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm text-gray-500">
-                          <span className="font-mono font-semibold text-teal-600">
-                            {student.admissionNumber || student.admission_number || 'N/A'}
-                          </span>
-                        </p>
-                        {student.admissionNumber && (
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(student.admissionNumber || student.admission_number)
-                              toast.success('Admission number copied!')
-                            }}
-                            className="text-gray-400 hover:text-teal-600 transition-colors"
-                            title="Copy admission number"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => updateAttendanceStatus(student._id, 'present')}
-                      className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${
-                        attendance[student._id] === 'present' 
-                          ? 'bg-green-100 text-green-800 border-2 border-green-300' 
-                          : 'bg-gray-100 text-gray-600 hover:bg-green-50'
-                      }`}
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      <span>Present</span>
-                    </button>
-                    <button
-                      onClick={() => updateAttendanceStatus(student._id, 'late')}
-                      className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${
-                        attendance[student._id] === 'late' 
-                          ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300' 
-                          : 'bg-gray-100 text-gray-600 hover:bg-yellow-50'
-                      }`}
-                    >
-                      <Clock className="h-4 w-4" />
-                      <span>Late</span>
-                    </button>
-                    <button
-                      onClick={() => updateAttendanceStatus(student._id, 'absent')}
-                      className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${
-                        attendance[student._id] === 'absent' 
-                          ? 'bg-red-100 text-red-800 border-2 border-red-300' 
-                          : 'bg-gray-100 text-gray-600 hover:bg-red-50'
-                      }`}
-                    >
-                      <XCircle className="h-4 w-4" />
-                      <span>Absent</span>
-                    </button>
-                  </div>
+              {filteredStudents.length === 0 ? (
+                <div className="px-6 py-8 text-center text-gray-500">
+                  No students found matching "{searchTerm}"
                 </div>
-              ))}
+              ) : (
+                filteredStudents.map((student) => (
+                  <div key={student._id} className="px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        <div className="h-10 w-10 bg-gray-300 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-gray-700">
+                            {student.name.charAt(0)}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{student.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-500">
+                            <span className="font-mono font-semibold text-teal-600">
+                              {student.admissionNumber || student.admission_number || 'N/A'}
+                            </span>
+                          </p>
+                          {student.admissionNumber && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(student.admissionNumber || student.admission_number)
+                                toast.success('Admission number copied!')
+                              }}
+                              className="text-gray-400 hover:text-teal-600 transition-colors"
+                              title="Copy admission number"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => updateAttendanceStatus(student._id, 'present')}
+                        className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${attendance[student._id] === 'present'
+                          ? 'bg-green-100 text-green-800 border-2 border-green-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-green-50'
+                          }`}
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Present</span>
+                      </button>
+                      <button
+                        onClick={() => updateAttendanceStatus(student._id, 'late')}
+                        className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${attendance[student._id] === 'late'
+                          ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-yellow-50'
+                          }`}
+                      >
+                        <Clock className="h-4 w-4" />
+                        <span>Late</span>
+                      </button>
+                      <button
+                        onClick={() => updateAttendanceStatus(student._id, 'absent')}
+                        className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${attendance[student._id] === 'absent'
+                          ? 'bg-red-100 text-red-800 border-2 border-red-300'
+                          : 'bg-gray-100 text-gray-600 hover:bg-red-50'
+                          }`}
+                      >
+                        <XCircle className="h-4 w-4" />
+                        <span>Absent</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -377,7 +435,7 @@ const Attendance = () => {
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
-                {students.length > 0 
+                {students.length > 0
                   ? ((students.filter(s => attendance[s._id] === 'present').length / students.length) * 100).toFixed(1)
                   : 0}%
               </div>
@@ -393,21 +451,21 @@ const Attendance = () => {
           <div className="modal-content p-6">
             <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Generate Attendance Report</h3>
-              <button 
+              <button
                 className="p-2 rounded-md hover:bg-gray-100"
                 onClick={() => setShowReportModal(false)}
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
                 Attendance report feature is coming soon. For now, you can view attendance history in the attendance table above.
               </p>
-              
+
               <div className="flex justify-end space-x-3 pt-4">
-                <button 
+                <button
                   className="btn btn-ghost"
                   onClick={() => setShowReportModal(false)}
                 >

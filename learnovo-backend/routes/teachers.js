@@ -15,7 +15,7 @@ router.get('/', protect, authorize('admin'), [
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -23,7 +23,7 @@ router.get('/', protect, authorize('admin'), [
 
     // Build filter
     const filter = { role: 'teacher' };
-    
+
     // Add tenant filtering
     if (req.user && req.user.tenantId) {
       filter.tenantId = req.user.tenantId;
@@ -78,7 +78,7 @@ router.post('/', protect, authorize('admin'), [
   body('qualifications').trim().notEmpty().withMessage('Qualifications are required'),
   body('assignedClasses').isArray().withMessage('Assigned classes must be an array'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const { name, email, password, subjects, qualifications, assignedClasses, phone } = req.body;
 
@@ -140,7 +140,7 @@ router.put('/:id', protect, authorize('admin'), [
   body('qualifications').optional().trim().notEmpty().withMessage('Qualifications are required'),
   body('assignedClasses').optional().isArray().withMessage('Assigned classes must be an array'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const teacher = await User.findById(req.params.id);
     if (!teacher || teacher.role !== 'teacher') {
@@ -163,7 +163,7 @@ router.put('/:id', protect, authorize('admin'), [
 // @desc    Delete teacher
 // @route   DELETE /api/teachers/:id
 // @access  Private (Admin)
-router.delete('/:id', protect, authorize('admin'), async(req, res) => {
+router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   try {
     const teacher = await User.findById(req.params.id);
     if (!teacher || teacher.role !== 'teacher') {
@@ -180,7 +180,7 @@ router.delete('/:id', protect, authorize('admin'), async(req, res) => {
 // @desc    Get teacher's assigned classes
 // @route   GET /api/teachers/my-classes
 // @access  Private (Teacher)
-router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
+router.get('/my-classes', protect, authorize('teacher', 'admin'), async (req, res) => {
   try {
     const teacherId = req.user._id;
 
@@ -203,8 +203,8 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
       const subjects = classDoc.subjects
         .filter(sub => sub.teacher && sub.teacher._id.toString() === teacherId.toString())
         .map(sub => ({
-          _id: sub.subject?._id || null,
-          name: sub.subject?.name || 'Not specified',
+          _id: sub._id,
+          name: sub.subject?.name || sub.name || 'General', // Handle both structures
           teacher: sub.teacher
         }));
 

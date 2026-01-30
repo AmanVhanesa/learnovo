@@ -52,3 +52,9 @@ temp/
 learnovo-backend/scripts/inspect-prod.js
 learnovo-backend/scripts/debug-login.js
 learnovo-backend/scripts/migrate-to-prod.js
+
+# Test files with credentials
+learnovo-backend/test-connection.js
+learnovo-backend/test-mongo-connection.js
+RENDER_FIX.md
+UPDATE_RENDER_PASSWORD.md

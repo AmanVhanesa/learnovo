@@ -61,7 +61,7 @@ router.get('/', protect, async (req, res) => {
  */
 router.post('/', [
   protect,
-  authorize('teacher'),
+  authorize('teacher', 'admin'),
   body('classId').notEmpty().withMessage('Class ID is required'),
   body('date').isISO8601().withMessage('Valid date is required'),
   body('subject').trim().notEmpty().withMessage('Subject is required'),
