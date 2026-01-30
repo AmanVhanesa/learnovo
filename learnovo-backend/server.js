@@ -186,6 +186,7 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/sub-departments', require('./routes/subDepartments'));
 app.use('/api/certificates', require('./routes/certificates'));
+app.use('/api/files', require('./routes/files')); // Cloudinary file operations
 
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/exams', require('./routes/exams'));

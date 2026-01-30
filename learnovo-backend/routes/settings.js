@@ -367,6 +367,8 @@ router.put('/system', protect, authorize('admin'), [
   }
 });
 
+const cloudinaryService = require('../services/cloudinaryService');
+
 // @desc    Upload school logo
 // @route   POST /api/settings/upload-logo
 // @access  Private (Admin)
@@ -379,19 +381,23 @@ router.post('/upload-logo', protect, authorize('admin'), upload.single('logo'), 
       });
     }
 
-    // Return the specific path that the frontend can use
-    // Assuming the server serves 'uploads' directory statically
-    const logoUrl = `/uploads/${req.file.filename}`;
+    const tenantId = req.user.tenantId;
 
-    // We don't save to DB here, frontend will send the URL in the update settings call
-    // or we can save it here if we prefer. Let's return it for preview first.
+    // Upload to Cloudinary
+    const result = await cloudinaryService.uploadSchoolLogo(req.file, tenantId.toString());
+
+    // Update settings with Cloudinary URL
+    const settings = await Settings.getSettings(tenantId);
+    settings.institution.logo = result.secure_url;
+    settings.institution.logoPublicId = result.public_id; // Store for deletion later
+    await settings.save();
 
     res.json({
       success: true,
       message: 'Logo uploaded successfully',
       data: {
-        url: logoUrl,
-        filename: req.file.filename
+        url: result.secure_url,
+        public_id: result.public_id
       }
     });
   } catch (error) {
