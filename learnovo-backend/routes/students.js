@@ -930,7 +930,16 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
 router.put('/:id', protect, canAccessStudent, [
   body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
   body('email').optional().trim().isEmail().withMessage('Please provide a valid email address'),
-  body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
+  body('phone').optional().custom((value) => {
+    // Allow empty string or null
+    if (!value || value.trim() === '') return true;
+    // Basic phone validation - just check if it's numeric and reasonable length
+    const cleaned = value.replace(/[\s\-\(\)]/g, '');
+    if (!/^\+?[0-9]{10,15}$/.test(cleaned)) {
+      throw new Error('Please provide a valid phone number (10-15 digits)');
+    }
+    return true;
+  }),
   body('class').optional().trim().notEmpty().withMessage('Class cannot be empty'),
   body('rollNumber').optional().trim().notEmpty().withMessage('Roll number cannot be empty'),
   handleValidationErrors
