@@ -605,6 +605,36 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           studentData.subDepartment = subDepartmentId;
         }
 
+        // Handle Inactive Student Fields
+        // Parse isActive (supports: true/false, yes/no, 1/0, active/inactive)
+        if (row.isActive !== undefined && row.isActive !== null && row.isActive !== '') {
+          const isActiveValue = row.isActive.toString().trim().toLowerCase();
+          if (['false', 'no', '0', 'inactive'].includes(isActiveValue)) {
+            studentData.isActive = false;
+
+            // If student is inactive, handle removal fields
+            if (row.removalDate) {
+              const removalDate = parseDate(row.removalDate);
+              if (removalDate) {
+                studentData.removalDate = removalDate;
+              }
+            }
+
+            // Normalize removal reason to match enum
+            if (row.removalReason && row.removalReason.trim()) {
+              const reasonValue = row.removalReason.trim();
+              const validReasons = ['Graduated', 'Transferred', 'Withdrawn', 'Expelled', 'Other'];
+              // Case-insensitive match
+              const matchedReason = validReasons.find(r => r.toLowerCase() === reasonValue.toLowerCase());
+              studentData.removalReason = matchedReason || 'Other';
+            }
+
+            if (row.removalNotes && row.removalNotes.trim()) {
+              studentData.removalNotes = row.removalNotes.trim();
+            }
+          }
+        }
+
         // Add timestamps
         studentData.createdAt = new Date();
         studentData.updatedAt = new Date();
@@ -1051,6 +1081,115 @@ router.put('/:id', protect, canAccessStudent, [
     res.status(500).json({
       success: false,
       message: 'Server error while updating student',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @desc    Deactivate student (mark as inactive with removal details)
+// @route   PUT /api/students/:id/deactivate
+// @access  Private (Admin)
+router.put('/:id/deactivate', protect, authorize('admin'), [
+  body('removalDate').optional().isISO8601().withMessage('Invalid removal date'),
+  body('removalReason').optional().isIn(['Graduated', 'Transferred', 'Withdrawn', 'Expelled', 'Other', '']).withMessage('Invalid removal reason'),
+  body('removalNotes').optional().trim(),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const student = await User.findById(req.params.id);
+
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+
+    // Check if already inactive
+    if (!student.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student is already inactive'
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      isActive: false,
+      removalDate: req.body.removalDate ? new Date(req.body.removalDate) : new Date(),
+      removalReason: req.body.removalReason || 'Other',
+      removalNotes: req.body.removalNotes || ''
+    };
+
+    // Update student
+    const updatedStudent = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Student deactivated successfully',
+      data: updatedStudent
+    });
+  } catch (error) {
+    console.error('Deactivate student error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deactivating student',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @desc    Reactivate student (mark as active, clear removal details)
+// @route   PUT /api/students/:id/reactivate
+// @access  Private (Admin)
+router.put('/:id/reactivate', protect, authorize('admin'), async (req, res) => {
+  try {
+    const student = await User.findById(req.params.id);
+
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+
+    // Check if already active
+    if (student.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student is already active'
+      });
+    }
+
+    // Prepare update data - clear removal fields
+    const updateData = {
+      isActive: true,
+      removalDate: null,
+      removalReason: '',
+      removalNotes: ''
+    };
+
+    // Update student
+    const updatedStudent = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Student reactivated successfully',
+      data: updatedStudent
+    });
+  } catch (error) {
+    console.error('Reactivate student error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while reactivating student',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

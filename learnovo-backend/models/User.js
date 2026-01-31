@@ -95,7 +95,22 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  // Status Management (for students)
+  // Student Removal/Exit Tracking
+  removalDate: {
+    type: Date,
+    default: null
+  },
+  removalReason: {
+    type: String,
+    enum: ['Graduated', 'Transferred', 'Withdrawn', 'Expelled', 'Other', ''],
+    default: ''
+  },
+  removalNotes: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  // Legacy fields (kept for backward compatibility)
   inactiveReason: {
     type: String,
     trim: true
