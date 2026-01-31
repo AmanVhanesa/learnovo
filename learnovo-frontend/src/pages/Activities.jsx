@@ -23,13 +23,21 @@ import toast from 'react-hot-toast'
 const Activities = () => {
     const [activities, setActivities] = useState([])
     const [isLoading, setIsLoading] = useState(true)
-    const [filters, setFilters] = useState({
-        search: '',
-        dateRange: 'last7days',
-        startDate: '',
-        endDate: '',
-        type: 'all'
-    })
+
+    // Initialize with proper date values for 'last7days'
+    const getInitialFilters = () => {
+        const today = new Date()
+        const sevenDaysAgo = subDays(today, 7)
+        return {
+            search: '',
+            dateRange: 'last7days',
+            startDate: format(sevenDaysAgo, 'yyyy-MM-dd'),
+            endDate: format(today, 'yyyy-MM-dd'),
+            type: 'all'
+        }
+    }
+
+    const [filters, setFilters] = useState(getInitialFilters())
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 20,
@@ -82,9 +90,14 @@ const Activities = () => {
                 startDate = format(subDays(today, 30), 'yyyy-MM-dd')
                 break
             case 'custom':
-                // User will set custom dates
+                // User will set custom dates - don't update dates yet
+                setFilters(prev => ({
+                    ...prev,
+                    dateRange: range
+                }))
                 return
             default:
+                // 'all' - clear date filters
                 startDate = ''
                 endDate = ''
         }
