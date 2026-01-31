@@ -45,6 +45,17 @@ const Activities = () => {
         totalPages: 0
     })
 
+    // Scroll to top when component mounts
+    useEffect(() => {
+        // Find the scrollable main container and scroll it to top
+        const mainContent = document.querySelector('main')
+        if (mainContent) {
+            mainContent.scrollTo({ top: 0, behavior: 'instant' })
+        }
+        // Also scroll window as fallback
+        window.scrollTo({ top: 0, behavior: 'instant' })
+    }, [])
+
     useEffect(() => {
         fetchActivities()
     }, [filters, pagination.page])

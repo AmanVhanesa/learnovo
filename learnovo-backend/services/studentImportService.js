@@ -137,6 +137,19 @@ class StudentImportService {
                     'string.pattern.base': 'Pincode must be 6 digits'
                 }),
 
+            admissionClass: Joi.string()
+                .allow('', null)
+                .trim()
+                .max(50),
+
+            admissionDate: Joi.date()
+                .max('now')
+                .allow('', null)
+                .messages({
+                    'date.base': 'Invalid admission date',
+                    'date.max': 'Admission date cannot be in the future'
+                }),
+
             guardianName: Joi.string()
                 .allow('', null)
                 .max(100),
@@ -369,6 +382,8 @@ class StudentImportService {
                     class: classData._id,
                     section: row.section,
                     rollNumber: row.rollNumber || undefined,
+                    admissionClass: row.admissionClass || undefined,
+                    admissionDate: row.admissionDate || undefined,
                     bloodGroup: row.bloodGroup || undefined,
                     address: row.address || undefined,
                     city: row.city || undefined,
@@ -426,6 +441,8 @@ class StudentImportService {
             { key: 'phone', header: 'phone' },
             { key: 'class', header: 'class' },
             { key: 'section', header: 'section' },
+            { key: 'admissionClass', header: 'admissionClass' },
+            { key: 'admissionDate', header: 'admissionDate' },
             { key: 'rollNumber', header: 'rollNumber' },
             { key: 'bloodGroup', header: 'bloodGroup' },
             { key: 'address', header: 'address' },
@@ -447,6 +464,8 @@ class StudentImportService {
             phone: '9876543210',
             class: '10',
             section: 'A',
+            admissionClass: '1st',
+            admissionDate: '2014-04-01',
             rollNumber: '1',
             bloodGroup: 'O+',
             address: '123 Main St',

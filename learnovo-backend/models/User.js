@@ -212,6 +212,20 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Bank Details (for employees)
+  bankName: {
+    type: String,
+    trim: true
+  },
+  accountNumber: {
+    type: String,
+    trim: true
+  },
+  ifscCode: {
+    type: String,
+    trim: true,
+    uppercase: true
+  },
   // For parents
   children: [{
     type: mongoose.Schema.Types.ObjectId,
@@ -242,6 +256,10 @@ const userSchema = new mongoose.Schema({
   },
   admissionDate: {
     type: Date
+  },
+  admissionClass: {
+    type: String,
+    trim: true
   },
   // Legacy Fields
   penNumber: {

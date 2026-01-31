@@ -25,6 +25,11 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         experience: employee?.experience || '',
         homeAddress: employee?.homeAddress || '',
 
+        // Bank Details
+        bankName: employee?.bankName || '',
+        accountNumber: employee?.accountNumber || '',
+        ifscCode: employee?.ifscCode || '',
+
         // Login (for new employees)
         password: '',
         createLogin: true
@@ -315,6 +320,43 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         value={form.homeAddress}
                                         onChange={(e) => updateField('homeAddress', e.target.value)}
                                         placeholder="Complete residential address"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Bank Details */}
+                        <div className="border-t border-gray-100 pt-4">
+                            <h4 className="text-sm font-semibold text-gray-900 mb-4">Bank Details</h4>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="label">Bank Name</label>
+                                    <input
+                                        className="input"
+                                        value={form.bankName}
+                                        onChange={(e) => updateField('bankName', e.target.value)}
+                                        placeholder="e.g., State Bank of India"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="label">Account Number</label>
+                                    <input
+                                        className="input"
+                                        value={form.accountNumber}
+                                        onChange={(e) => updateField('accountNumber', e.target.value)}
+                                        placeholder="e.g., 1234567890"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="label">IFSC Code</label>
+                                    <input
+                                        className="input"
+                                        value={form.ifscCode}
+                                        onChange={(e) => updateField('ifscCode', e.target.value.toUpperCase())}
+                                        placeholder="e.g., SBIN0001234"
                                     />
                                 </div>
                             </div>

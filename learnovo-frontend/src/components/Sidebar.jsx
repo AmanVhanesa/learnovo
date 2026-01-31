@@ -19,7 +19,8 @@ import {
   Menu,
   ClipboardList,
   Bus,
-  Award
+  Award,
+  Wallet
 } from 'lucide-react'
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -40,6 +41,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Employees', href: '/app/employees', icon: UserPlus, roles: ['admin'] },
       { name: 'Academics', href: '/app/academics', icon: School, roles: ['admin', 'teacher', 'student'] },
       { name: 'Fees & Finance', href: '/app/fees-finance', icon: CreditCard, roles: ['admin'] },
+      { name: 'Payroll', href: '/app/payroll', icon: Wallet, roles: ['admin'] },
       { name: 'Attendance', href: '/app/attendance', icon: Calendar, roles: ['admin', 'teacher', 'parent'] },
       { name: 'Exams & Results', href: '/app/exams', icon: ClipboardList, roles: ['admin', 'teacher', 'student', 'parent'] },
       { name: 'Transport', href: '/app/transport', icon: Bus, roles: ['admin'] },

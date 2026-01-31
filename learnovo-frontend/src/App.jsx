@@ -35,6 +35,7 @@ import CertificateManager from './pages/certificates/CertificateManager'
 import CertificateGeneration from './pages/certificates/CertificateGeneration'
 import TemplateSettings from './pages/certificates/TemplateSettings'
 import Activities from './pages/Activities'
+import Payroll from './pages/Payroll'
 
 function App() {
   return (
@@ -107,6 +108,9 @@ function App() {
 
                   {/* Transport Module */}
                   <Route path="transport" element={<Transport />} />
+
+                  {/* Payroll Module */}
+                  <Route path="payroll" element={<Payroll />} />
 
                   {/* Certificates Module */}
                   <Route path="certificates" element={<CertificateManager />} />

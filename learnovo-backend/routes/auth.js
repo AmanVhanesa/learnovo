@@ -359,7 +359,8 @@ router.get('/me', protect, async (req, res) => {
         avatar: user.avatar,
         phone: user.phone,
         lastLogin: user.lastLogin,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        tenantId: user.tenantId
       }
     });
   } catch (error) {
