@@ -929,6 +929,7 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
 // @access  Private
 router.put('/:id', protect, canAccessStudent, [
   body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
+  body('email').optional().trim().isEmail().withMessage('Please provide a valid email address'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
   body('class').optional().trim().notEmpty().withMessage('Class cannot be empty'),
   body('rollNumber').optional().trim().notEmpty().withMessage('Roll number cannot be empty'),
@@ -942,6 +943,21 @@ router.put('/:id', protect, canAccessStudent, [
         success: false,
         message: 'Student not found'
       });
+    }
+
+    // Check if email already exists (if being updated)
+    if (req.body.email) {
+      const existingEmail = await User.findOne({
+        email: req.body.email.trim().toLowerCase(),
+        _id: { $ne: req.params.id },
+        tenantId: req.user.tenantId
+      });
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email already exists for another user'
+        });
+      }
     }
 
     // Check if roll number already exists in the same class (if being updated)
