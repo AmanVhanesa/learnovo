@@ -12,6 +12,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [loginMode, setLoginMode] = useState('school') // 'school' or 'direct'
+  const [rememberMe, setRememberMe] = useState(false)
 
   const { login, isAuthenticated, isLoading: authLoading, error, clearError } = useAuth()
   const navigate = useNavigate()
@@ -25,6 +26,24 @@ const Login = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, authLoading, isLoading]) // Don't include navigate in deps
+
+  // Load saved credentials on mount
+  useEffect(() => {
+    const savedCredentials = localStorage.getItem('learnovo_remember_me')
+    if (savedCredentials) {
+      try {
+        const { email, schoolCode } = JSON.parse(savedCredentials)
+        setFormData(prev => ({
+          ...prev,
+          email: email || '',
+          schoolCode: schoolCode || ''
+        }))
+        setRememberMe(true)
+      } catch (error) {
+        console.error('Error loading saved credentials:', error)
+      }
+    }
+  }, [])
 
   // Clear errors when component mounts
   useEffect(() => {
@@ -43,6 +62,16 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
+
+    // Save credentials if remember me is checked
+    if (rememberMe) {
+      localStorage.setItem('learnovo_remember_me', JSON.stringify({
+        email: formData.email,
+        schoolCode: formData.schoolCode
+      }))
+    } else {
+      localStorage.removeItem('learnovo_remember_me')
+    }
 
     const loginData = {
       email: formData.email,
@@ -183,6 +212,23 @@ const Login = () => {
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
                   </button>
+                </div>
+              </div>
+
+              {/* Remember Me Checkbox */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer"
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 cursor-pointer">
+                    Remember my email and school code
+                  </label>
                 </div>
               </div>
 
