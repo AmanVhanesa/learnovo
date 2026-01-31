@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import StudentForm from '../components/students/StudentForm'
 import ImportModal from '../components/ImportModal'
 import ExportButton from '../components/ExportButton'
+import DeactivateStudentModal from '../components/students/DeactivateStudentModal'
 import toast from 'react-hot-toast'
 
 const Students = () => {
@@ -28,9 +29,12 @@ const Students = () => {
   // UI state
   const [showForm, setShowForm] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false)
   const [editingStudent, setEditingStudent] = useState(null)
+  const [studentToDeactivate, setStudentToDeactivate] = useState(null)
   const [selectedStudents, setSelectedStudents] = useState([])
   const [showBulkActions, setShowBulkActions] = useState(false)
+  const [isDeactivating, setIsDeactivating] = useState(false)
 
   useEffect(() => {
     fetchStudents()
@@ -116,18 +120,38 @@ const Students = () => {
   }
 
   const handleToggleStatus = async (student) => {
-    const action = student.isActive ? 'deactivate' : 'activate'
-    const reason = student.isActive ? prompt('Reason for deactivation:') : null
+    if (student.isActive) {
+      // Show deactivate modal
+      setStudentToDeactivate(student)
+      setShowDeactivateModal(true)
+    } else {
+      // Reactivate directly with confirmation
+      if (window.confirm(`Reactivate ${student.fullName || student.name}?`)) {
+        try {
+          await studentsService.reactivate(student._id)
+          toast.success('Student reactivated successfully')
+          fetchStudents()
+        } catch (error) {
+          console.error('Reactivate error:', error)
+          toast.error(error.response?.data?.message || 'Failed to reactivate student')
+        }
+      }
+    }
+  }
 
-    if (student.isActive && !reason) return
-
+  const handleDeactivateConfirm = async (formData) => {
     try {
-      await studentsService.toggleStatus(student._id, { reason })
-      toast.success(`Student ${action}d successfully`)
+      setIsDeactivating(true)
+      await studentsService.deactivate(studentToDeactivate._id, formData)
+      toast.success('Student deactivated successfully')
+      setShowDeactivateModal(false)
+      setStudentToDeactivate(null)
       fetchStudents()
     } catch (error) {
-      console.error('Toggle status error:', error)
-      toast.error(`Failed to ${action} student`)
+      console.error('Deactivate error:', error)
+      toast.error(error.response?.data?.message || 'Failed to deactivate student')
+    } finally {
+      setIsDeactivating(false)
     }
   }
 
@@ -501,6 +525,19 @@ const Students = () => {
             fetchStudents()
             toast.success(`Successfully imported ${result.created} students`)
           }}
+        />
+      )}
+
+      {/* Deactivate Student Modal */}
+      {showDeactivateModal && studentToDeactivate && (
+        <DeactivateStudentModal
+          student={studentToDeactivate}
+          onConfirm={handleDeactivateConfirm}
+          onCancel={() => {
+            setShowDeactivateModal(false)
+            setStudentToDeactivate(null)
+          }}
+          isLoading={isDeactivating}
         />
       )}
     </div>

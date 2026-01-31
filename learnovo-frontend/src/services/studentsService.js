@@ -75,6 +75,15 @@ export const studentsService = {
   promote: async (data) => {
     const res = await api.post('/students/promote', data)
     return res.data
+  },
+  // Inactive student management
+  deactivate: async (id, data) => {
+    const res = await api.put(`/students/${id}/deactivate`, data)
+    return res.data
+  },
+  reactivate: async (id) => {
+    const res = await api.put(`/students/${id}/reactivate`)
+    return res.data
   }
 }
 
