@@ -941,7 +941,15 @@ router.put('/:id', protect, canAccessStudent, [
     return true;
   }),
   body('class').optional().trim().notEmpty().withMessage('Class cannot be empty'),
-  body('rollNumber').optional().trim().notEmpty().withMessage('Roll number cannot be empty'),
+  body('rollNumber').optional().custom((value) => {
+    // Allow empty string or null
+    if (!value || value.trim() === '') return true;
+    // If provided, just check it's not too long
+    if (value.trim().length > 20) {
+      throw new Error('Roll number is too long');
+    }
+    return true;
+  }),
   handleValidationErrors
 ], async (req, res) => {
   try {

@@ -166,18 +166,24 @@ async function ensureDemoTenant() {
 // @route   POST /api/auth/login
 // @access  Public
 router.post('/login', [
-  body('email').isEmail().withMessage('Please provide a valid email'),
+  body('email').custom((value) => {
+    // Allow either email or admission number
+    if (!value || value.trim() === '') {
+      throw new Error('Email or Admission Number is required');
+    }
+    return true;
+  }),
   body('password').notEmpty().withMessage('Password is required'),
   body('schoolCode').optional().trim(),
   handleValidationErrors
 ], async (req, res) => {
   try {
     const { email, password, schoolCode } = req.body;
-    const emailLower = email.toLowerCase();
+    const identifier = email.toLowerCase().trim();
 
     // Determine if this is a demo login
     const demoEmails = ['admin@learnovo.com', 'sarah.wilson@learnovo.com', 'john.doe@learnovo.com', 'parent@learnovo.com'];
-    const isDemoLogin = demoEmails.includes(emailLower) || (schoolCode && schoolCode.toLowerCase() === 'demo');
+    const isDemoLogin = demoEmails.includes(identifier) || (schoolCode && schoolCode.toLowerCase() === 'demo');
 
     // Get tenant
     let tenant = null;
@@ -210,17 +216,25 @@ router.post('/login', [
       }
     }
 
-    // Find user
-    let userQuery = { email: emailLower };
+    // Find user - check if identifier is email or admission number
+    const isEmail = identifier.includes('@');
+    let userQuery = isEmail
+      ? { email: identifier }
+      : { admissionNumber: identifier, role: { $in: ['student', 'parent'] } }; // Only students/parents have admission numbers
+
     if (tenant) {
       userQuery.tenantId = tenant._id;
     }
 
     let user = await User.findOne(userQuery).select('+password').populate('tenantId');
 
-    // If not found and no tenant specified, try finding by email only
+    // If not found and no tenant specified, try finding by identifier only
     if (!user && !tenant) {
-      user = await User.findOne({ email: emailLower }).select('+password').populate('tenantId');
+      userQuery = isEmail
+        ? { email: identifier }
+        : { admissionNumber: identifier, role: { $in: ['student', 'parent'] } };
+
+      user = await User.findOne(userQuery).select('+password').populate('tenantId');
       if (user && user.tenantId) {
         tenant = typeof user.tenantId === 'object' ? user.tenantId : await Tenant.findById(user.tenantId);
       }

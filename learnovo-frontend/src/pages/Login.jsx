@@ -136,21 +136,24 @@ const Login = () => {
 
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email
+                  Email or Admission Number
                 </label>
                 <div className="mt-1">
                   <input
                     id="email"
                     name="email"
-                    type="email"
+                    type="text"
                     autoComplete="email"
                     required
                     value={formData.email}
                     onChange={handleChange}
                     className="input"
-                    placeholder="Enter your email"
+                    placeholder="Enter email or admission number"
                   />
                 </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Students can login with admission number if email is not available
+                </p>
               </div>
 
               <div>
