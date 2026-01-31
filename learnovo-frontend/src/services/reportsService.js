@@ -20,9 +20,22 @@ export const reportsService = {
     return data
   },
 
-  getRecentActivities: async (limit = 10) => {
-    const { data } = await api.get(`/reports/activities?limit=${limit}`);
-    return data;
+  getRecentActivities: async (filters = {}) => {
+    const params = new URLSearchParams()
+
+    // Add filters as query params
+    if (filters.limit) params.append('limit', filters.limit)
+    if (filters.search) params.append('search', filters.search)
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
+    if (filters.type && filters.type !== 'all') params.append('type', filters.type)
+    if (filters.page) params.append('page', filters.page)
+
+    const queryString = params.toString()
+    const url = `/reports/activities${queryString ? `?${queryString}` : ''}`
+
+    const { data } = await api.get(url)
+    return data
   },
 
   getDailyFeeDetails: async (date, filters = {}) => {

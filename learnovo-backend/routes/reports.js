@@ -378,34 +378,67 @@ router.get('/activities', protect, async (req, res) => {
   try {
     const user = req.user;
     const tenantId = user.tenantId;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page) || 1;
+    const skip = (page - 1) * limit;
+
+    // Get filter params
+    const { search, startDate, endDate, type } = req.query;
 
     const activities = [];
 
+    // Build date filter
+    let dateFilter = {};
+    if (startDate || endDate) {
+      dateFilter = {};
+      if (startDate) dateFilter.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // Include entire end date
+        dateFilter.$lte = end;
+      }
+    }
+
     // 1. Fetch Recent Payments (Collections)
-    // Only for admin or if user has permission
-    if (user.role === 'admin' || user.role === 'accountant') {
+    if ((user.role === 'admin' || user.role === 'accountant') && (!type || type === 'fee' || type === 'payment')) {
       try {
         const Payment = require('../models/Payment');
-        const payments = await Payment.find({
+
+        let paymentQuery = {
           tenantId,
           isConfirmed: true,
           isReversed: false
-        })
+        };
+
+        // Apply date filter
+        if (Object.keys(dateFilter).length > 0) {
+          paymentQuery.paymentDate = dateFilter;
+        }
+
+        const payments = await Payment.find(paymentQuery)
           .sort({ paymentDate: -1, createdAt: -1 })
-          .limit(limit)
+          .limit(limit * 2) // Fetch more to allow for filtering
           .populate('student', 'fullName admissionNumber class');
 
         payments.forEach(payment => {
+          const studentName = payment.student?.fullName || 'Student';
+          const message = `Received ${payment.currency || '₹'} ${payment.amount} from ${studentName}`;
+
+          // Apply search filter
+          if (search && !message.toLowerCase().includes(search.toLowerCase()) &&
+            !studentName.toLowerCase().includes(search.toLowerCase())) {
+            return; // Skip this activity
+          }
+
           activities.push({
             id: payment._id,
-            type: 'fee_collection',
-            message: `Received ${payment.currency || '₹'} ${payment.amount} from ${payment.student?.fullName || 'Student'}`,
+            type: 'fee',
+            message,
             date: payment.paymentDate || payment.createdAt,
             amount: payment.amount,
-            studentName: payment.student?.fullName,
-            status: 'success', // Green
-            icon: 'CreditCard'
+            studentName,
+            status: 'success',
+            icon: 'DollarSign'
           });
         });
       } catch (err) {
@@ -414,24 +447,40 @@ router.get('/activities', protect, async (req, res) => {
     }
 
     // 2. Fetch Recent Admissions (New Students)
-    if (user.role === 'admin' || user.role === 'teacher') {
+    if ((user.role === 'admin' || user.role === 'teacher') && (!type || type === 'admission' || type === 'student')) {
       try {
-        const students = await User.find({
+        let studentQuery = {
           tenantId,
           role: 'student'
-        })
+        };
+
+        // Apply date filter
+        if (Object.keys(dateFilter).length > 0) {
+          studentQuery.createdAt = dateFilter;
+        }
+
+        const students = await User.find(studentQuery)
           .sort({ createdAt: -1 })
-          .limit(limit)
+          .limit(limit * 2)
           .select('fullName admissionNumber class createdAt admissionDate');
 
         students.forEach(student => {
+          const studentName = student.fullName || 'Student';
+          const message = `New Admission: ${studentName} (${student.class || 'N/A'})`;
+
+          // Apply search filter
+          if (search && !message.toLowerCase().includes(search.toLowerCase()) &&
+            !studentName.toLowerCase().includes(search.toLowerCase())) {
+            return; // Skip this activity
+          }
+
           activities.push({
             id: student._id,
             type: 'admission',
-            message: `New Admission: ${student.fullName} (${student.class || 'N/A'})`,
-            date: student.createdAt, // Or admissionDate
-            studentName: student.fullName,
-            status: 'primary', // Blue
+            message,
+            date: student.createdAt,
+            studentName,
+            status: 'primary',
             icon: 'UserPlus'
           });
         });
@@ -441,24 +490,39 @@ router.get('/activities', protect, async (req, res) => {
     }
 
     // 3. Fetch Legacy Fees (Fallback or mixed usage)
-    if (user.role === 'admin') {
+    if (user.role === 'admin' && (!type || type === 'fee')) {
       try {
-        const fees = await Fee.find({ tenantId, status: 'paid' })
+        let feeQuery = { tenantId, status: 'paid' };
+
+        // Apply date filter
+        if (Object.keys(dateFilter).length > 0) {
+          feeQuery.updatedAt = dateFilter;
+        }
+
+        const fees = await Fee.find(feeQuery)
           .sort({ updatedAt: -1 })
           .limit(limit)
           .populate('student', 'fullName');
 
         fees.forEach(fee => {
-          // Avoid duplicates if same payment is recorded in both systems (rare but possible during migration)
-          // For now, we trust they are distinct or we accept minor duplication in "Recent Activity"
+          const studentName = fee.student?.fullName || 'Student';
+          const message = `Collected ${fee.amount} from ${studentName}`;
+
+          // Apply search filter
+          if (search && !message.toLowerCase().includes(search.toLowerCase()) &&
+            !studentName.toLowerCase().includes(search.toLowerCase())) {
+            return; // Skip this activity
+          }
+
           activities.push({
             id: fee._id,
             type: 'fee',
-            message: `Collected ${fee.amount} from ${fee.student?.fullName || 'Student'}`,
+            message,
             date: fee.updatedAt,
             amount: fee.amount,
+            studentName,
             status: 'success',
-            icon: 'CreditCard'
+            icon: 'DollarSign'
           });
         });
       } catch (err) {
@@ -466,14 +530,19 @@ router.get('/activities', protect, async (req, res) => {
       }
     }
 
-    // 4. Sort and Limit
+    // 4. Sort, Paginate, and Limit
     activities.sort((a, b) => new Date(b.date) - new Date(a.date));
-    const finalActivities = activities.slice(0, limit);
+
+    const total = activities.length;
+    const paginatedActivities = activities.slice(skip, skip + limit);
 
     res.json({
       success: true,
-      count: finalActivities.length,
-      data: finalActivities
+      count: paginatedActivities.length,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      data: paginatedActivities
     });
 
   } catch (error) {
@@ -483,3 +552,4 @@ router.get('/activities', protect, async (req, res) => {
 });
 
 module.exports = router;
+
