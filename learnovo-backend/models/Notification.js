@@ -42,8 +42,38 @@ const notificationSchema = new mongoose.Schema({
     // Categorization
     category: {
         type: String,
-        enum: ['admission', 'fee', 'academic', 'attendance', 'employee', 'exam', 'system'],
+        enum: [
+            // Admin-only categories
+            'fee_collection', 'payment_received', 'financial_report', 'salary_disbursed',
+            // Teacher categories
+            'assignment_submitted', 'attendance_marked', 'exam_scheduled', 'class_assigned',
+            // Student categories
+            'assignment_graded', 'fee_due', 'exam_result', 'attendance_alert',
+            // Parent categories
+            'report_card', 'parent_meeting', 'fee_reminder',
+            // General categories
+            'admission', 'admission_status', 'announcement', 'system', 'academic', 'employee', 'exam'
+        ],
         required: [true, 'Category is required']
+    },
+
+    // Role-based visibility
+    visibility: {
+        type: [String],
+        enum: ['admin', 'teacher', 'student', 'parent'],
+        default: function () {
+            // Auto-set visibility based on category
+            const adminOnly = ['fee_collection', 'payment_received', 'financial_report', 'salary_disbursed'];
+            const teacherCategories = ['assignment_submitted', 'attendance_marked', 'exam_scheduled', 'class_assigned'];
+            const studentCategories = ['assignment_graded', 'fee_due', 'exam_result', 'attendance_alert'];
+            const parentCategories = ['report_card', 'parent_meeting', 'fee_reminder', 'fee_due', 'attendance_alert', 'exam_result'];
+
+            if (adminOnly.includes(this.category)) return ['admin'];
+            if (teacherCategories.includes(this.category)) return ['admin', 'teacher'];
+            if (studentCategories.includes(this.category)) return ['admin', 'student'];
+            if (parentCategories.includes(this.category)) return ['admin', 'parent'];
+            return ['admin']; // Default to admin-only
+        }
     },
 
     // State management

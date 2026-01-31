@@ -123,6 +123,16 @@ async function getNotifications(userId, tenantId, options = {}) {
         isDeleted: false
     };
 
+    // Role-based visibility filtering
+    // Get user role from the User model
+    const user = await User.findById(userId).select('role');
+
+    if (user && user.role !== 'admin') {
+        // Non-admin users only see notifications where their role is in visibility array
+        query.visibility = user.role;
+    }
+    // Admin sees all notifications (no filter needed)
+
     if (isRead !== null && isRead !== 'all') {
         // Handle both string and boolean values
         if (isRead === 'true' || isRead === true) {
@@ -343,7 +353,7 @@ async function notifyFeeInvoiceGenerated(fee, student, tenantId) {
             title: 'New Fee Invoice Generated',
             message: `Fee invoice for ${fee.description} - ${fee.currency} ${fee.amount.toLocaleString()} has been generated. Due date: ${new Date(fee.dueDate).toLocaleDateString()}`,
             type: 'info',
-            category: 'fee',
+            category: 'fee_due',
             actionUrl: `/app/fees`,
             actionLabel: 'View Invoice',
             metadata: {
@@ -370,7 +380,7 @@ async function notifyFeeInvoiceGenerated(fee, student, tenantId) {
                     title: 'Fee Invoice for Your Child',
                     message: `Fee invoice for ${student.name} - ${fee.description}: ${fee.currency} ${fee.amount.toLocaleString()}. Due: ${new Date(fee.dueDate).toLocaleDateString()}`,
                     type: 'info',
-                    category: 'fee',
+                    category: 'fee_reminder',
                     actionUrl: `/app/students/${student._id}`,
                     actionLabel: 'View Details',
                     metadata: {
@@ -402,7 +412,7 @@ async function notifyFeePaymentReceived(payment, student, tenantId) {
             title: 'Payment Received ✓',
             message: `Payment of ${payment.currency} ${payment.amount.toLocaleString()} has been received for ${payment.description || 'fee payment'}.`,
             type: 'success',
-            category: 'fee',
+            category: 'payment_received',
             actionUrl: `/app/fees`,
             actionLabel: 'View Receipt',
             metadata: {
@@ -428,7 +438,7 @@ async function notifyFeePaymentReceived(payment, student, tenantId) {
                     title: 'Payment Received for Your Child',
                     message: `Payment of ${payment.currency} ${payment.amount.toLocaleString()} received for ${student.name}.`,
                     type: 'success',
-                    category: 'fee',
+                    category: 'payment_received',
                     actionUrl: `/app/students/${student._id}`,
                     actionLabel: 'View Receipt',
                     metadata: {
@@ -460,7 +470,7 @@ async function notifyFeeReminder(fee, student, tenantId) {
             title: 'Fee Payment Reminder',
             message: `Reminder: ${fee.description} payment of ${fee.currency} ${fee.amount.toLocaleString()} is due in ${daysUntilDue} days (${new Date(fee.dueDate).toLocaleDateString()}).`,
             type: 'warning',
-            category: 'fee',
+            category: 'fee_reminder',
             actionUrl: `/app/fees`,
             actionLabel: 'Pay Now',
             metadata: {
@@ -485,7 +495,7 @@ async function notifyFeeReminder(fee, student, tenantId) {
                     title: 'Fee Payment Reminder',
                     message: `Reminder: Fee payment for ${student.name} - ${fee.description} (${fee.currency} ${fee.amount.toLocaleString()}) due in ${daysUntilDue} days.`,
                     type: 'warning',
-                    category: 'fee',
+                    category: 'fee_reminder',
                     actionUrl: `/app/students/${student._id}`,
                     actionLabel: 'View Details',
                     metadata: {
@@ -516,7 +526,7 @@ async function notifyFeeDefaulter(student, tenantId, overdueAmount) {
             title: 'Overdue Fee Payment',
             message: `You have overdue fee payments totaling ${student.currency || 'INR'} ${overdueAmount.toLocaleString()}. Please clear your dues immediately.`,
             type: 'error',
-            category: 'fee',
+            category: 'attendance_alert',
             actionUrl: `/app/fees`,
             actionLabel: 'View Dues',
             metadata: {
@@ -541,7 +551,7 @@ async function notifyFeeDefaulter(student, tenantId, overdueAmount) {
                     title: 'Overdue Fee Payment',
                     message: `${student.name} has overdue fee payments totaling ${student.currency || 'INR'} ${overdueAmount.toLocaleString()}. Please clear the dues immediately.`,
                     type: 'error',
-                    category: 'fee',
+                    category: 'attendance_alert',
                     actionUrl: `/app/students/${student._id}`,
                     actionLabel: 'View Dues',
                     metadata: {
@@ -561,7 +571,7 @@ async function notifyFeeDefaulter(student, tenantId, overdueAmount) {
                 title: 'Fee Defaulter Alert',
                 message: `${student.name} (${student.admissionNumber}) has overdue fees: ${student.currency || 'INR'} ${overdueAmount.toLocaleString()}`,
                 type: 'warning',
-                category: 'fee',
+                category: 'fee_collection',
                 actionUrl: `/app/students/${student._id}`,
                 actionLabel: 'View Student',
                 metadata: {
