@@ -122,7 +122,22 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault()
-        onSave(form)
+
+        // Transform form data to match backend expectations
+        const submitData = { ...form }
+
+        // Backend expects 'name' not 'fullName'
+        if (submitData.fullName) {
+            submitData.name = submitData.fullName
+            delete submitData.fullName
+        }
+
+        // Remove firstName/lastName if they're empty (backend doesn't use them)
+        if (!submitData.firstName) delete submitData.firstName
+        if (!submitData.middleName) delete submitData.middleName
+        if (!submitData.lastName) delete submitData.lastName
+
+        onSave(submitData)
     }
 
     const handlePhotoUpload = async (e) => {

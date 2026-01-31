@@ -73,13 +73,24 @@ const StudentDetail = () => {
     const handleSaveStudent = async (formData) => {
         try {
             setIsSaving(true)
+            console.log('Sending student update:', formData) // Debug log
             await studentsService.update(id, formData)
             toast.success('Student updated successfully')
             setShowEditForm(false)
             fetchStudent()
         } catch (error) {
             console.error('Update student error:', error)
-            toast.error(error.response?.data?.message || 'Failed to update student')
+            console.error('Error response:', error.response?.data) // Debug log
+
+            // Handle validation errors array
+            if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+                console.error('Validation errors:', error.response.data.errors) // Debug log
+                const errorMessages = error.response.data.errors.map(err => err.msg || err.message).join(', ')
+                toast.error(errorMessages)
+            } else {
+                const errorMessage = error.response?.data?.message || error.response?.data?.error || 'Failed to update student'
+                toast.error(errorMessage)
+            }
         } finally {
             setIsSaving(false)
         }
@@ -196,8 +207,8 @@ const StudentDetail = () => {
                             </div>
                             <span
                                 className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${student.isActive
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-red-100 text-red-800'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
                                     }`}
                             >
                                 {student.isActive ? 'Active' : 'Inactive'}
@@ -230,8 +241,8 @@ const StudentDetail = () => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                                    ? 'border-primary-500 text-primary-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-primary-500 text-primary-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             {tab.label}
@@ -370,10 +381,10 @@ const StudentDetail = () => {
                                             <p className="text-sm font-semibold text-gray-900">{fee.formattedAmount}</p>
                                             <span
                                                 className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 ${fee.status === 'paid'
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : fee.status === 'overdue'
-                                                            ? 'bg-red-100 text-red-800'
-                                                            : 'bg-yellow-100 text-yellow-800'
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : fee.status === 'overdue'
+                                                        ? 'bg-red-100 text-red-800'
+                                                        : 'bg-yellow-100 text-yellow-800'
                                                     }`}
                                             >
                                                 {fee.status}
