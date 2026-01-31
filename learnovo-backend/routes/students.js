@@ -999,6 +999,15 @@ router.put('/:id', protect, canAccessStudent, [
       delete updatePayload.password;
     }
 
+    // Convert empty strings to null for ObjectId fields
+    // This prevents "Cast to ObjectId failed" errors
+    const objectIdFields = ['driverId', 'subDepartment'];
+    objectIdFields.forEach(field => {
+      if (updatePayload[field] === '' || updatePayload[field] === null) {
+        updatePayload[field] = null;
+      }
+    });
+
     // Debug logging
     console.log('Updating student:', req.params.id);
     console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
