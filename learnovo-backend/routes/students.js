@@ -998,6 +998,11 @@ router.put('/:id', protect, canAccessStudent, [
     if (updatePayload.password === '') {
       delete updatePayload.password;
     }
+
+    // Debug logging
+    console.log('Updating student:', req.params.id);
+    console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
+
     const updatedStudent = await User.findByIdAndUpdate(
       req.params.id,
       updatePayload,
@@ -1011,13 +1016,16 @@ router.put('/:id', protect, canAccessStudent, [
     });
   } catch (error) {
     console.error('Update student error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       return res.status(409).json({ success: false, message: `Duplicate entry detected for ${field}` });
     }
     res.status(500).json({
       success: false,
-      message: 'Server error while updating student'
+      message: 'Server error while updating student',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
