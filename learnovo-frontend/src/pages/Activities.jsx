@@ -111,9 +111,75 @@ const Activities = () => {
         setPagination(prev => ({ ...prev, page: 1 }))
     }
 
-    const handleExport = () => {
-        // TODO: Implement export functionality
-        toast.success('Export feature coming soon!')
+    const handleExport = async () => {
+        try {
+            toast.loading('Generating CSV...')
+
+            // Fetch all activities with current filters (no pagination limit)
+            const res = await reportsService.getRecentActivities({
+                ...filters,
+                limit: 10000, // Get all activities
+                page: 1
+            })
+
+            if (!res.success || !res.data || res.data.length === 0) {
+                toast.dismiss()
+                toast.error('No activities to export')
+                return
+            }
+
+            // Prepare CSV data
+            const csvData = res.data.map(activity => ({
+                'Date': format(new Date(activity.date), 'MMM d, yyyy'),
+                'Time': format(new Date(activity.date), 'h:mm a'),
+                'Type': activity.type.charAt(0).toUpperCase() + activity.type.slice(1),
+                'Activity': activity.message,
+                'Student': activity.studentName || 'N/A',
+                'Amount': activity.amount ? `₹${activity.amount}` : 'N/A'
+            }))
+
+            // Convert to CSV string
+            const headers = Object.keys(csvData[0])
+            const csvRows = [
+                headers.join(','), // Header row
+                ...csvData.map(row =>
+                    headers.map(header => {
+                        const value = row[header]
+                        // Escape quotes and wrap in quotes if contains comma
+                        const escaped = String(value).replace(/"/g, '""')
+                        return escaped.includes(',') ? `"${escaped}"` : escaped
+                    }).join(',')
+                )
+            ]
+            const csvString = csvRows.join('\n')
+
+            // Create blob and download
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' })
+            const link = document.createElement('a')
+            const url = URL.createObjectURL(blob)
+
+            // Generate filename with date range
+            const dateRangeText = filters.dateRange === 'all' ? 'all-time' :
+                filters.dateRange === 'today' ? 'today' :
+                    filters.dateRange === 'last7days' ? 'last-7-days' :
+                        filters.dateRange === 'last30days' ? 'last-30-days' :
+                            'custom'
+            const filename = `activities-${dateRangeText}-${format(new Date(), 'yyyy-MM-dd')}.csv`
+
+            link.setAttribute('href', url)
+            link.setAttribute('download', filename)
+            link.style.visibility = 'hidden'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+
+            toast.dismiss()
+            toast.success(`Exported ${res.data.length} activities to ${filename}`)
+        } catch (error) {
+            console.error('Export error:', error)
+            toast.dismiss()
+            toast.error('Failed to export activities')
+        }
     }
 
     const getIcon = (type) => {
