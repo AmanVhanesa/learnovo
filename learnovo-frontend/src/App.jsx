@@ -34,6 +34,7 @@ import Transport from './pages/Transport'
 import CertificateManager from './pages/certificates/CertificateManager'
 import CertificateGeneration from './pages/certificates/CertificateGeneration'
 import TemplateSettings from './pages/certificates/TemplateSettings'
+import Activities from './pages/Activities'
 
 function App() {
   return (
@@ -97,6 +98,7 @@ function App() {
                   <Route path="assignments" element={<Assignments />} />
                   <Route path="exams" element={<Exams />} />
                   <Route path="admissions" element={<Admissions />} />
+                  <Route path="activities" element={<Activities />} />
                   <Route path="reports" element={<Reports />} />
 
                   {/* Communication Module */}
