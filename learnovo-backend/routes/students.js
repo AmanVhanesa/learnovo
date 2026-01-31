@@ -1008,6 +1008,23 @@ router.put('/:id', protect, canAccessStudent, [
       }
     });
 
+    // Normalize category value to match enum (General, SC, ST, OBC, Other)
+    if (updatePayload.category) {
+      const categoryMap = {
+        'GENERAL': 'General',
+        'general': 'General',
+        'SC': 'SC',
+        'sc': 'SC',
+        'ST': 'ST',
+        'st': 'ST',
+        'OBC': 'OBC',
+        'obc': 'OBC',
+        'OTHER': 'Other',
+        'other': 'Other'
+      };
+      updatePayload.category = categoryMap[updatePayload.category] || updatePayload.category;
+    }
+
     // Debug logging
     console.log('Updating student:', req.params.id);
     console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
