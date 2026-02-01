@@ -8,8 +8,8 @@ const router = express.Router();
 
 // @desc    Get all academic sessions
 // @route   GET /api/academic-sessions
-// @access  Private (Admin)
-router.get('/', protect, authorize('admin'), async (req, res) => {
+// @access  Private (Admin, Teacher)
+router.get('/', protect, authorize('admin', 'teacher'), async (req, res) => {
     try {
         const sessions = await AcademicSession.find({ tenantId: req.user.tenantId })
             .sort({ startDate: -1 })
@@ -60,8 +60,8 @@ router.get('/active', protect, async (req, res) => {
 
 // @desc    Get single academic session
 // @route   GET /api/academic-sessions/:id
-// @access  Private (Admin)
-router.get('/:id', protect, authorize('admin'), async (req, res) => {
+// @access  Private (Admin, Teacher)
+router.get('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
     try {
         const session = await AcademicSession.findById(req.params.id)
             .populate('createdBy', 'name email');

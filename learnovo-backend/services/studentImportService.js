@@ -2,6 +2,7 @@ const Joi = require('joi');
 const ImportExportService = require('./importExportService');
 const User = require('../models/User');
 const Class = require('../models/Class');
+const Section = require('../models/Section');
 const mongoose = require('mongoose');
 
 /**
@@ -84,14 +85,14 @@ class StudentImportService {
                     'string.pattern.base': 'Phone number must be 10 digits'
                 }),
 
-            class: Joi.string()
+            currentClass: Joi.string()
                 .required()
                 .trim()
                 .messages({
                     'string.empty': 'Class is required'
                 }),
 
-            section: Joi.string()
+            currentSection: Joi.string()
                 .required()
                 .trim()
                 .uppercase()
@@ -141,6 +142,11 @@ class StudentImportService {
                 .allow('', null)
                 .trim()
                 .max(50),
+
+            admissionSection: Joi.string()
+                .allow('', null)
+                .trim()
+                .max(10),
 
             admissionDate: Joi.date()
                 .max('now')
@@ -258,10 +264,19 @@ class StudentImportService {
 
         // Get all classes for this tenant
         const classes = await Class.find({ tenantId, isActive: true }).lean();
-        const classMap = new Map();
+        const classMap = new Map(); // Name -> Class Doc
         classes.forEach(cls => {
-            const key = `${cls.name}-${cls.section}`.toLowerCase();
-            classMap.set(key, cls);
+            classMap.set(cls.name.toLowerCase(), cls);
+        });
+
+        // Get all sections for this tenant
+        // We need to fetch all active sections to validate the combinations
+        const sections = await Section.find({ tenantId, isActive: true }).populate('classId').lean();
+        const sectionMap = new Map(); // ClassId + SectionName -> Section Doc
+        sections.forEach(sec => {
+            // Key format: classID_sectionName
+            const key = `${sec.classId._id}_${sec.name}`.toLowerCase();
+            sectionMap.set(key, sec);
         });
 
         // Get existing admission numbers
@@ -291,15 +306,28 @@ class StudentImportService {
         rows.forEach((row, index) => {
             const rowNumber = row._rowNumber || index + 1;
 
-            // Check if class-section exists
-            const classKey = `${row.class}-${row.section}`.toLowerCase();
-            if (!classMap.has(classKey)) {
+            // 1. Resolve Class
+            const classDoc = classMap.get(row.currentClass.toLowerCase());
+            if (!classDoc) {
                 errors.push({
                     row: rowNumber,
                     rowIndex: index,
-                    field: 'class/section',
-                    message: `Class "${row.class}" Section "${row.section}" not found`,
-                    value: `${row.class}-${row.section}`
+                    field: 'currentClass',
+                    message: `Class "${row.currentClass}" not found`,
+                    value: row.currentClass
+                });
+                return; // Cannot validate section if class is missing
+            }
+
+            // 2. Resolve Section
+            const sectionKey = `${classDoc._id}_${row.currentSection}`.toLowerCase();
+            if (!sectionMap.has(sectionKey)) {
+                errors.push({
+                    row: rowNumber,
+                    rowIndex: index,
+                    field: 'currentSection',
+                    message: `Section "${row.currentSection}" not found in Class "${row.currentClass}"`,
+                    value: `${row.currentClass}-${row.currentSection}`
                 });
             }
 
@@ -344,29 +372,35 @@ class StudentImportService {
             failed: 0,
             errors: []
         };
-
         // Get class map for quick lookup
         const classes = await Class.find({ tenantId, isActive: true }).lean();
         const classMap = new Map();
         classes.forEach(cls => {
-            const key = `${cls.name}-${cls.section}`.toLowerCase();
-            classMap.set(key, cls);
+            classMap.set(cls.name.toLowerCase(), cls);
+        });
+
+        // Get section map
+        const sections = await Section.find({ tenantId, isActive: true }).lean();
+        const sectionMap = new Map();
+        sections.forEach(sec => {
+            const key = `${sec.classId}_${sec.name}`.toLowerCase();
+            sectionMap.set(key, sec);
         });
 
         // Process each student
         for (const row of validData) {
             try {
-                const classKey = `${row.class}-${row.section}`.toLowerCase();
-                const classData = classMap.get(classKey);
+                // Resolve Class
+                const classDoc = classMap.get(row.currentClass.toLowerCase());
+                if (!classDoc) {
+                    throw new Error(`Class "${row.currentClass}" not found`);
+                }
 
-                if (!classData) {
-                    results.failed++;
-                    results.errors.push({
-                        admissionNumber: row.admissionNumber,
-                        error: 'Class not found'
-                    });
-                    if (!skipErrors) break;
-                    continue;
+                // Resolve Section
+                const sectionKey = `${classDoc._id}_${row.currentSection}`.toLowerCase();
+                const sectionDoc = sectionMap.get(sectionKey);
+                if (!sectionDoc) {
+                    throw new Error(`Section "${row.currentSection}" not found in Class "${row.currentClass}"`);
                 }
 
                 // Prepare student data
@@ -379,10 +413,15 @@ class StudentImportService {
                     phone: row.phone || undefined,
                     dateOfBirth: row.dateOfBirth,
                     gender: row.gender,
-                    class: classData._id,
-                    section: row.section,
+
+                    // Linked Class & Section
+                    class: row.currentClass,          // Display string
+                    classId: classDoc._id,            // Reference
+                    section: row.currentSection,      // Display string
+                    sectionId: sectionDoc._id,        // Reference
                     rollNumber: row.rollNumber || undefined,
                     admissionClass: row.admissionClass || undefined,
+                    admissionSection: row.admissionSection || undefined,
                     admissionDate: row.admissionDate || undefined,
                     bloodGroup: row.bloodGroup || undefined,
                     address: row.address || undefined,
@@ -439,9 +478,10 @@ class StudentImportService {
             { key: 'gender', header: 'gender' },
             { key: 'email', header: 'email' },
             { key: 'phone', header: 'phone' },
-            { key: 'class', header: 'class' },
-            { key: 'section', header: 'section' },
+            { key: 'currentClass', header: 'currentClass' },
+            { key: 'currentSection', header: 'currentSection' },
             { key: 'admissionClass', header: 'admissionClass' },
+            { key: 'admissionSection', header: 'admissionSection' },
             { key: 'admissionDate', header: 'admissionDate' },
             { key: 'rollNumber', header: 'rollNumber' },
             { key: 'bloodGroup', header: 'bloodGroup' },
@@ -462,9 +502,10 @@ class StudentImportService {
             gender: 'male',
             email: 'john@example.com',
             phone: '9876543210',
-            class: '10',
-            section: 'A',
+            currentClass: '10',
+            currentSection: 'A',
             admissionClass: '1st',
+            admissionSection: 'A',
             admissionDate: '2014-04-01',
             rollNumber: '1',
             bloodGroup: 'O+',

@@ -12,6 +12,8 @@ const upload = require('../middleware/upload');
 const { parseCSV } = require('../utils/csvHandler');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
+const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
+const Class = require('../models/Class');
 
 const router = express.Router();
 
@@ -39,8 +41,58 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     }
 
     // Add class filter for teachers
-    if (req.user.role === 'teacher' && req.user.assignedClasses) {
-      filter.class = { $in: req.user.assignedClasses };
+    // Add class filter for teachers
+    if (req.user.role === 'teacher') {
+      try {
+        const legacyClasses = Array.isArray(req.user.assignedClasses) ? req.user.assignedClasses : [];
+        const assignmentQuery = { teacherId: req.user._id, tenantId: req.user.tenantId, isActive: true };
+
+        // 1. Fetch TeacherSubjectAssignment (New Relation)
+        const assignments = await TeacherSubjectAssignment.find(assignmentQuery);
+
+        // 2. Fetch Class Model Assignments (Embedded Teacher)
+        const classAssignments = await Class.find({
+          tenantId: req.user.tenantId,
+          $or: [
+            { classTeacher: req.user._id },
+            { 'subjects.teacher': req.user._id }
+          ]
+        }).select('name');
+
+        const criteria = [];
+
+        // Add legacy classes
+        if (legacyClasses.length > 0) {
+          criteria.push({ class: { $in: legacyClasses } });
+        }
+
+        // Add classes from Class model assignments
+        if (classAssignments.length > 0) {
+          const classNames = classAssignments.map(c => c.name);
+          criteria.push({ class: { $in: classNames } });
+          // Also try matching by ID if students have classId populated
+          criteria.push({ classId: { $in: classAssignments.map(c => c._id) } });
+        }
+
+        assignments.forEach(a => {
+          const clause = { classId: a.classId };
+          if (a.sectionId) clause.sectionId = a.sectionId;
+          criteria.push(clause);
+        });
+
+        if (criteria.length > 0) {
+          if (!filter.$and) filter.$and = [];
+          filter.$and.push({ $or: criteria });
+        } else {
+          // No assignments
+          if (!filter.$and) filter.$and = [];
+          filter.$and.push({ _id: null }); // Force empty
+        }
+      } catch (err) {
+        console.error('Teacher filter error:', err);
+        if (!filter.$and) filter.$and = [];
+        filter.$and.push({ _id: null });
+      }
     }
 
     // Add class filter from query
@@ -726,8 +778,33 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
     // Build filter (same as list route)
     const filter = { role: 'student', tenantId };
 
-    if (req.user.role === 'teacher' && req.user.assignedClasses) {
-      filter.class = { $in: req.user.assignedClasses };
+    if (req.user.role === 'teacher') {
+      try {
+        const legacyClasses = Array.isArray(req.user.assignedClasses) ? req.user.assignedClasses : [];
+        const assignmentQuery = { teacherId: req.user._id, tenantId: req.user.tenantId, isActive: true };
+        const assignments = await TeacherSubjectAssignment.find(assignmentQuery);
+
+        const criteria = [];
+        if (legacyClasses.length > 0) criteria.push({ class: { $in: legacyClasses } });
+
+        assignments.forEach(a => {
+          const clause = { classId: a.classId };
+          if (a.sectionId) clause.sectionId = a.sectionId;
+          criteria.push(clause);
+        });
+
+        if (criteria.length > 0) {
+          if (!filter.$and) filter.$and = [];
+          filter.$and.push({ $or: criteria });
+        } else {
+          if (!filter.$and) filter.$and = [];
+          filter.$and.push({ _id: null });
+        }
+      } catch (err) {
+        console.error('Teacher export filter error:', err);
+        if (!filter.$and) filter.$and = [];
+        filter.$and.push({ _id: null });
+      }
     }
     if (req.query.class) filter.class = req.query.class;
     if (req.query.section) filter.section = req.query.section;

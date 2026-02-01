@@ -21,6 +21,15 @@ router.get('/', protect, async (req, res) => {
     if (academicYear) filter.academicYear = academicYear;
     if (grade) filter.grade = grade;
 
+    // For teachers, only show classes they are assigned to
+    if (req.user.role === 'teacher') {
+      filter.$or = [
+        { classTeacher: req.user._id },
+        { 'subjects.teacher': req.user._id }
+      ];
+    }
+
+
     // Use aggregation to fetch classes with their sections and student counts
     const classes = await Class.aggregate([
       { $match: filter },

@@ -136,7 +136,11 @@ const Sidebar = ({ isOpen, onClose }) => {
 
         {/* User info and logout */}
         <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
-          <div className="flex items-center mb-4">
+          <div
+            className="flex items-center mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors duration-200"
+            onClick={() => navigate('/app/profile')}
+            title="Edit Profile"
+          >
             <div className="flex-shrink-0">
               <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
                 <span className="text-sm font-medium text-gray-700">
@@ -151,6 +155,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               )}
               <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
             </div>
+            <Settings className="ml-auto h-4 w-4 text-gray-400" />
           </div>
 
           <button

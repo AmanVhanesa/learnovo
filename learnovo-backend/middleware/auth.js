@@ -76,7 +76,7 @@ exports.authorize = (...roles) => {
 // Check if user can access student data
 exports.canAccessStudent = async (req, res, next) => {
   try {
-    const { studentId } = req.params;
+    const studentId = req.params.studentId || req.params.id;
     const user = req.user;
 
     // Admin can access all students
@@ -94,7 +94,80 @@ exports.canAccessStudent = async (req, res, next) => {
         });
       }
 
+      // Check legacy assignments
       if (user.assignedClasses && user.assignedClasses.includes(student.class)) {
+        return next();
+      }
+
+      const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
+      const Class = require('../models/Class');
+
+      // Check if teacher is assigned to this student's class via new system
+      // 1. Check via TeacherSubjectAssignment
+      // Note: student.class is a string, student.classId is the ObjectId reference
+
+      // Determine the Class ID if only name is available, or use classId if present.
+      let studentClassId = student.classId;
+
+      // If classId is missing but class name exists, assume we need to resolve it or rely on name matching
+      // However, TeacherSubjectAssignment uses classId (ObjectId).
+
+      // We will check if any assignment exists for this teacher with the student's classId (if exists)
+      // OR matching the student's class name if we can resolve it.
+
+      let isAssigned = false;
+
+      if (studentClassId) {
+        const hasAssignment = await TeacherSubjectAssignment.exists({
+          teacherId: user._id,
+          classId: studentClassId,
+          isActive: true
+        });
+
+        if (hasAssignment) isAssigned = true;
+
+        if (!isAssigned) {
+          const isClassTeacher = await Class.exists({
+            _id: studentClassId,
+            $or: [
+              { classTeacher: user._id },
+              { 'subjects.teacher': user._id }
+            ]
+          });
+          if (isClassTeacher) isAssigned = true;
+        }
+      }
+
+      // Fallback: If student has no classId but has class name (legacy data), try to find a Class with that name
+      // and check if teacher is assigned to it.
+      if (!isAssigned && student.class) {
+        const matchedClass = await Class.findOne({
+          name: student.class,
+          tenantId: user.tenantId
+        }).select('_id');
+
+        if (matchedClass) {
+          const hasAssignment = await TeacherSubjectAssignment.exists({
+            teacherId: user._id,
+            classId: matchedClass._id,
+            isActive: true
+          });
+          if (hasAssignment) isAssigned = true;
+
+          if (!isAssigned) {
+            const isClassTeacher = await Class.exists({
+              _id: matchedClass._id,
+              $or: [
+                { classTeacher: user._id },
+                { 'subjects.teacher': user._id }
+              ]
+            });
+            if (isClassTeacher) isAssigned = true;
+          }
+        }
+      }
+
+      if (isAssigned) {
         return next();
       }
 

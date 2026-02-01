@@ -261,6 +261,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  admissionSection: {
+    type: String,
+    trim: true
+  },
   // Legacy Fields
   penNumber: {
     type: String,

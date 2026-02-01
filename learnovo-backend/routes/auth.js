@@ -377,33 +377,89 @@ router.get('/me', protect, async (req, res) => {
 // @access  Private
 router.put('/profile', protect, [
   body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
+  body('address').optional().isString().withMessage('Address must be a string'),
+  body('dateOfBirth').optional().isISO8601().withMessage('Valid date of birth is required'),
+  body('gender').optional().isIn(['male', 'female', 'other']).withMessage('Invalid gender'),
   handleValidationErrors
 ], async (req, res) => {
   try {
-    const { name, phone } = req.body;
     const userId = req.user.id;
+    const user = await User.findById(userId);
 
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Define allowed fields based on role
+    const allowedFields = {
+      student: ['name', 'email', 'phone', 'address', 'dateOfBirth', 'gender', 'bloodGroup', 'religion'],
+      teacher: ['name', 'email', 'phone', 'address', 'dateOfBirth', 'gender', 'bloodGroup', 'religion', 'education', 'experience', 'homeAddress'],
+      admin: ['name', 'email', 'phone', 'address', 'dateOfBirth', 'gender'],
+      parent: ['name', 'email', 'phone', 'address'],
+      accountant: ['name', 'email', 'phone', 'address', 'dateOfBirth', 'gender'],
+      staff: ['name', 'email', 'phone', 'address', 'dateOfBirth', 'gender']
+    };
+
+    // Fields that are NEVER allowed to be updated via this endpoint
+    const protectedFields = ['salary', 'role', 'tenantId', 'isActive', 'loginEnabled', 'employeeId', 'admissionNumber'];
+
+    const roleAllowedFields = allowedFields[user.role] || [];
     const updateData = {};
-    if (name) updateData.name = name;
-    if (phone) updateData.phone = phone;
 
-    const user = await User.findByIdAndUpdate(
+    // Filter and validate update fields
+    for (const [key, value] of Object.entries(req.body)) {
+      // Skip protected fields
+      if (protectedFields.includes(key)) {
+        continue;
+      }
+
+      // Only allow fields that are permitted for this role
+      if (roleAllowedFields.includes(key)) {
+        updateData[key] = value;
+      }
+    }
+
+    // Check email uniqueness if being updated
+    if (updateData.email && updateData.email !== user.email) {
+      const existingUser = await User.findOne({
+        email: updateData.email.toLowerCase(),
+        tenantId: user.tenantId,
+        _id: { $ne: userId }
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email already in use'
+        });
+      }
+    }
+
+    // Update user
+    const updatedUser = await User.findByIdAndUpdate(
       userId,
       updateData,
       { new: true, runValidators: true }
-    );
+    ).select('-password');
 
     res.json({
       success: true,
       message: 'Profile updated successfully',
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-        phone: user.phone
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        avatar: updatedUser.avatar,
+        phone: updatedUser.phone,
+        address: updatedUser.address,
+        dateOfBirth: updatedUser.dateOfBirth,
+        gender: updatedUser.gender
       }
     });
   } catch (error) {

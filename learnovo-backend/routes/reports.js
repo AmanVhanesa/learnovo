@@ -21,25 +21,83 @@ router.get('/dashboard', protect, async (req, res) => {
     const feeFilter = {};
     const attendanceFilter = { tenantId: tenantId };
 
+    const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
+
+    // ...
+
     if (user.role === 'teacher') {
-      // Teacher visibility: students in classes where teacher is assigned
-      const teacherAssignedClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
-      if (teacherAssignedClasses.length > 0) {
-        // Find students by class name (since class field is string)
-        const studentsInClass = await User.find({
-          role: 'student',
-          class: { $in: teacherAssignedClasses },
-          tenantId: tenantId
-        }).select('_id');
-        const ids = studentsInClass.map(s => s._id);
-        if (ids.length > 0) {
-          studentFilter._id = { $in: ids };
-          feeFilter.student = { $in: ids };
-          attendanceFilter.student = { $in: ids };
+      try {
+        const Class = require('../models/Class');
+        // 1. Legacy Assignments (String Array)
+        const legacyClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
+
+        // 2. New Teacher Assignments (Relationship Model)
+        const assignments = await TeacherSubjectAssignment.find({
+          teacherId: user._id,
+          tenantId: tenantId,
+          isActive: true
+        });
+
+        // 3. Class Model Assignments (Embedded Teacher)
+        const classAssignments = await Class.find({
+          tenantId: tenantId,
+          $or: [
+            { classTeacher: user._id },
+            { 'subjects.teacher': user._id }
+          ]
+        }).select('name');
+
+        const criteria = [];
+
+        // Add legacy criteria
+        if (legacyClasses.length > 0) {
+          criteria.push({ class: { $in: legacyClasses } });
+        }
+
+        // Add class model criteria
+        if (classAssignments.length > 0) {
+          const classNames = classAssignments.map(c => c.name);
+          criteria.push({ class: { $in: classNames } });
+          criteria.push({ classId: { $in: classAssignments.map(c => c._id) } });
+        }
+
+        // Add new assignment criteria
+        if (assignments.length > 0) {
+          assignments.forEach(assign => {
+            const clause = { classId: assign.classId };
+            if (assign.sectionId) {
+              clause.sectionId = assign.sectionId;
+            }
+            criteria.push(clause);
+          });
+        }
+
+        // If we have any criteria, find students matching ANY of them
+        if (criteria.length > 0) {
+          const students = await User.find({
+            role: 'student',
+            tenantId: tenantId,
+            $or: criteria
+          }).select('_id');
+
+          const ids = students.map(s => s._id);
+
+          if (ids.length > 0) {
+            studentFilter._id = { $in: ids };
+            feeFilter.student = { $in: ids };
+            attendanceFilter.student = { $in: ids };
+          } else {
+            // Criteria exist but no students found
+            studentFilter._id = { $in: [] };
+          }
         } else {
-          // If no students found, return empty stats
+          // No assignments at all
           studentFilter._id = { $in: [] };
         }
+      } catch (err) {
+        console.error('Teacher stats assignment error:', err);
+        // Fallback to empty if error
+        studentFilter._id = { $in: [] };
       }
     } else if (user.role === 'student') {
       studentFilter._id = user._id;
