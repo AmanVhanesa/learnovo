@@ -479,75 +479,13 @@ const Dashboard = () => {
           {/* Upcoming Assignment Deadlines */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Upcoming Assignment Deadlines</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Math Homework</p>
-                  <p className="text-xs text-gray-500">Class 10A</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-yellow-600">Due Tomorrow</p>
-                  <p className="text-xs text-gray-500">Dec 11, 2024</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Science Project</p>
-                  <p className="text-xs text-gray-500">Class 9B</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-blue-600">Due in 3 days</p>
-                  <p className="text-xs text-gray-500">Dec 14, 2024</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">English Essay</p>
-                  <p className="text-xs text-gray-500">Class 11A</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-green-600">Due in 5 days</p>
-                  <p className="text-xs text-gray-500">Dec 16, 2024</p>
-                </div>
-              </div>
-            </div>
+            <p className="text-sm text-gray-500 py-4 text-center">No upcoming assignments found.</p>
           </div>
 
           {/* Today's Class Schedule */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Today's Class Schedule</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Mathematics</p>
-                  <p className="text-xs text-gray-500">Class 10A - 25 students</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-blue-600">9:00 AM</p>
-                  <p className="text-xs text-gray-500">45 min</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Physics</p>
-                  <p className="text-xs text-gray-500">Class 11B - 22 students</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-green-600">11:00 AM</p>
-                  <p className="text-xs text-gray-500">45 min</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Chemistry</p>
-                  <p className="text-xs text-gray-500">Class 12A - 20 students</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-purple-600">2:00 PM</p>
-                  <p className="text-xs text-gray-500">45 min</p>
-                </div>
-              </div>
-            </div>
+            <p className="text-sm text-gray-500 py-4 text-center">No classes scheduled for today.</p>
           </div>
         </div>
       )}
