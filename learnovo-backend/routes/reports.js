@@ -547,7 +547,100 @@ router.get('/activities', protect, async (req, res) => {
       }
     }
 
-    // 3. Fetch Legacy Fees (Fallback or mixed usage)
+    // 3. Fetch Employee Additions
+    if ((user.role === 'admin' || user.role === 'teacher') && (!type || type === 'employee')) {
+      try {
+        let employeeQuery = {
+          tenantId,
+          role: { $in: ['teacher', 'accountant', 'librarian', 'staff'] }
+        };
+
+        // Apply date filter
+        if (Object.keys(dateFilter).length > 0) {
+          employeeQuery.createdAt = dateFilter;
+        }
+
+        const employees = await User.find(employeeQuery)
+          .sort({ createdAt: -1 })
+          .limit(limit * 2)
+          .select('fullName role createdAt');
+
+        employees.forEach(employee => {
+          const employeeName = employee.fullName || 'Employee';
+          const roleLabel = employee.role.charAt(0).toUpperCase() + employee.role.slice(1);
+          const message = `New Employee Added: ${employeeName} (${roleLabel})`;
+
+          // Apply search filter
+          if (search && !message.toLowerCase().includes(search.toLowerCase()) &&
+            !employeeName.toLowerCase().includes(search.toLowerCase())) {
+            return; // Skip this activity
+          }
+
+          activities.push({
+            id: employee._id,
+            type: 'employee',
+            message,
+            date: employee.createdAt,
+            employeeName,
+            status: 'primary',
+            icon: 'UserPlus'
+          });
+        });
+      } catch (err) {
+        console.warn('Employee fetch error:', err.message);
+      }
+    }
+
+    // 4. Fetch Certificate Generations
+    if ((user.role === 'admin' || user.role === 'teacher') && (!type || type === 'certificate')) {
+      try {
+        const GeneratedCertificate = require('../models/GeneratedCertificate');
+
+        let certificateQuery = {
+          tenantId,
+          status: 'ACTIVE'
+        };
+
+        // Apply date filter
+        if (Object.keys(dateFilter).length > 0) {
+          certificateQuery.createdAt = dateFilter;
+        }
+
+        const certificates = await GeneratedCertificate.find(certificateQuery)
+          .sort({ createdAt: -1 })
+          .limit(limit * 2)
+          .populate('student', 'fullName admissionNumber')
+          .populate('issuedBy', 'fullName');
+
+        certificates.forEach(cert => {
+          const studentName = cert.student?.fullName || 'Student';
+          const certType = cert.type === 'TC' ? 'Transfer Certificate' : 'Bonafide Certificate';
+          const message = `${certType} generated for ${studentName} (${cert.certificateNumber})`;
+
+          // Apply search filter
+          if (search && !message.toLowerCase().includes(search.toLowerCase()) &&
+            !studentName.toLowerCase().includes(search.toLowerCase())) {
+            return; // Skip this activity
+          }
+
+          activities.push({
+            id: cert._id,
+            type: 'certificate',
+            message,
+            date: cert.createdAt,
+            studentName,
+            certificateType: cert.type,
+            certificateNumber: cert.certificateNumber,
+            status: 'success',
+            icon: 'FileText'
+          });
+        });
+      } catch (err) {
+        console.warn('Certificate fetch error:', err.message);
+      }
+    }
+
+    // 5. Fetch Legacy Fees (Fallback or mixed usage)
     if (user.role === 'admin' && (!type || type === 'fee')) {
       try {
         let feeQuery = { tenantId, status: 'paid' };

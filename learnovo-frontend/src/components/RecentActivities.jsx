@@ -42,9 +42,13 @@ const RecentActivities = ({ activities = [], isLoading = false, limit = 5, showV
             case 'student':
             case 'admission':
                 return <UserPlus className="h-4 w-4" />
+            case 'employee':
+                return <Users className="h-4 w-4" />
             case 'fee':
             case 'payment':
                 return <DollarSign className="h-4 w-4" />
+            case 'certificate':
+                return <FileText className="h-4 w-4" />
             case 'attendance':
                 return <CheckCircle className="h-4 w-4" />
             case 'exam':
@@ -73,15 +77,17 @@ const RecentActivities = ({ activities = [], isLoading = false, limit = 5, showV
         const colorMap = {
             student: { bg: 'bg-blue-100', text: 'text-blue-600', hover: 'hover:bg-blue-50' },
             admission: { bg: 'bg-blue-100', text: 'text-blue-600', hover: 'hover:bg-blue-50' },
+            employee: { bg: 'bg-purple-100', text: 'text-purple-600', hover: 'hover:bg-purple-50' },
             fee: { bg: 'bg-green-100', text: 'text-green-600', hover: 'hover:bg-green-50' },
             payment: { bg: 'bg-green-100', text: 'text-green-600', hover: 'hover:bg-green-50' },
+            certificate: { bg: 'bg-amber-100', text: 'text-amber-600', hover: 'hover:bg-amber-50' },
             attendance: { bg: 'bg-teal-100', text: 'text-teal-600', hover: 'hover:bg-teal-50' },
             exam: { bg: 'bg-orange-100', text: 'text-orange-600', hover: 'hover:bg-orange-50' },
             result: { bg: 'bg-orange-100', text: 'text-orange-600', hover: 'hover:bg-orange-50' },
             transport: { bg: 'bg-yellow-100', text: 'text-yellow-600', hover: 'hover:bg-yellow-50' },
             communication: { bg: 'bg-indigo-100', text: 'text-indigo-600', hover: 'hover:bg-indigo-50' },
             message: { bg: 'bg-indigo-100', text: 'text-indigo-600', hover: 'hover:bg-indigo-50' },
-            document: { bg: 'bg-purple-100', text: 'text-purple-600', hover: 'hover:bg-purple-50' },
+            document: { bg: 'bg-pink-100', text: 'text-pink-600', hover: 'hover:bg-pink-50' },
         }
 
         return colorMap[type] || { bg: 'bg-gray-100', text: 'text-gray-600', hover: 'hover:bg-gray-50' }
