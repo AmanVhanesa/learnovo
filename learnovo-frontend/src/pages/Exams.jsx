@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Calendar, FileText, CheckCircle, Trash2, X, ClipboardList } from 'lucide-react';
 import { examsService } from '../services/examsService';
+import { classesService } from '../services/classesService';
 import ExamResultsModal from '../components/ExamResultsModal';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +12,7 @@ const Exams = () => {
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedExam, setSelectedExam] = useState(null); // For results modal
+    const [availableClasses, setAvailableClasses] = useState([]);
     const [form, setForm] = useState({
         name: '',
         class: '',
@@ -22,6 +24,7 @@ const Exams = () => {
 
     useEffect(() => {
         fetchExams();
+        fetchClasses();
     }, []);
 
     const fetchExams = async () => {
@@ -34,6 +37,19 @@ const Exams = () => {
             toast.error('Failed to load exams');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchClasses = async () => {
+        try {
+            const res = await classesService.list();
+            // Backend already filters classes based on user role
+            // For teachers: only assigned classes
+            // For admins: all classes
+            setAvailableClasses(res.data || []);
+        } catch (error) {
+            console.error('Fetch classes error:', error);
+            toast.error('Failed to load classes');
         }
     };
 
@@ -152,7 +168,19 @@ const Exams = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="label">Class</label>
-                                    <input className="input" placeholder="e.g. 10th Grade" value={form.class} onChange={e => setForm({ ...form, class: e.target.value })} required />
+                                    <select
+                                        className="input"
+                                        value={form.class}
+                                        onChange={e => setForm({ ...form, class: e.target.value })}
+                                        required
+                                    >
+                                        <option value="">Select Class</option>
+                                        {availableClasses.map(cls => (
+                                            <option key={cls._id} value={cls.grade}>
+                                                {cls.name} ({cls.grade})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="label">Subject</label>

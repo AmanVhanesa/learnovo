@@ -68,6 +68,35 @@ router.post('/', protect, authorize('admin', 'teacher'), [
     handleValidationErrors
 ], async (req, res) => {
     try {
+        // For teachers, verify they can only schedule exams for their assigned classes
+        if (req.user.role === 'teacher') {
+            const Class = require('../models/Class');
+
+            // Find the class by grade to verify teacher assignment
+            const classDoc = await Class.findOne({
+                grade: req.body.class,
+                tenantId: req.user.tenantId
+            });
+
+            if (!classDoc) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Class not found'
+                });
+            }
+
+            // Check if teacher is assigned to this class
+            const isClassTeacher = classDoc.classTeacher && classDoc.classTeacher.toString() === req.user._id.toString();
+            const isAssignedToClass = req.user.assignedClasses && req.user.assignedClasses.includes(req.body.class);
+
+            if (!isClassTeacher && !isAssignedToClass) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You are not authorized to schedule exams for this class'
+                });
+            }
+        }
+
         const exam = await Exam.create({
             ...req.body,
             tenantId: req.user.tenantId
