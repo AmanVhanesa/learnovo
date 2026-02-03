@@ -17,6 +17,7 @@ const Employees = () => {
 
     // Filter state
     const [searchQuery, setSearchQuery] = useState('')
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
     const [roleFilter, setRoleFilter] = useState('')
     const [departmentFilter, setDepartmentFilter] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
@@ -27,10 +28,19 @@ const Employees = () => {
     const [editingEmployee, setEditingEmployee] = useState(null)
     const [isSaving, setIsSaving] = useState(false)
 
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery)
+        }, 500)
+
+        return () => clearTimeout(timer)
+    }, [searchQuery])
+
     useEffect(() => {
         fetchEmployees()
         fetchFilterOptions()
-    }, [searchQuery, roleFilter, departmentFilter, statusFilter])
+    }, [debouncedSearchQuery, roleFilter, departmentFilter, statusFilter])
 
     const fetchFilterOptions = async () => {
         try {
@@ -47,7 +57,7 @@ const Employees = () => {
         try {
             setIsLoading(true)
             const filters = {
-                search: searchQuery,
+                search: debouncedSearchQuery,
                 role: roleFilter,
                 department: departmentFilter,
                 status: statusFilter,
