@@ -36,6 +36,7 @@ import CertificateGeneration from './pages/certificates/CertificateGeneration'
 import TemplateSettings from './pages/certificates/TemplateSettings'
 import Activities from './pages/Activities'
 import Payroll from './pages/Payroll'
+import Homework from './pages/Homework'
 
 function App() {
   return (
@@ -97,6 +98,7 @@ function App() {
 
                   <Route path="attendance" element={<Attendance />} />
                   <Route path="assignments" element={<Assignments />} />
+                  <Route path="homework" element={<Homework />} />
                   <Route path="exams" element={<Exams />} />
                   <Route path="admissions" element={<Admissions />} />
                   <Route path="activities" element={<Activities />} />

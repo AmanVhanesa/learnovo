@@ -197,6 +197,7 @@ app.use('/api/transport/routes', require('./routes/transportRoutes'));
 app.use('/api/student-transport', require('./routes/studentTransport'));
 app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/advance-salary', require('./routes/advanceSalary'));
+app.use('/api/homework', require('./routes/homework'));
 
 // Error handling middleware
 app.use(errorHandler);
