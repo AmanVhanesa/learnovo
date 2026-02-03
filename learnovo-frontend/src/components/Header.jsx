@@ -23,7 +23,7 @@ const Header = ({ onToggleSidebar, sidebarOpen }) => {
         <div className="flex items-center">
           <button
             onClick={onToggleSidebar}
-            className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
+            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
           >
             <Menu className="h-6 w-6" />
           </button>
