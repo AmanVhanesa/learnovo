@@ -28,7 +28,7 @@ const payrollService = {
                 role: { $in: ['admin', 'teacher', 'accountant', 'staff'] },
                 isActive: true,
                 salary: { $exists: true, $ne: null, $gt: 0 }
-            }).select('_id name employeeId salary');
+            }).select('_id name employeeId salary leaveDeductionPerDay');
 
             console.log('Found employees:', employees.length);
             console.log('Employee details:', employees.map(e => ({ name: e.name, salary: e.salary, isActive: e.isActive })));
@@ -102,8 +102,13 @@ const payrollService = {
                     const bonuses = options.bonuses?.[employee._id.toString()] || 0;
                     const otherDeductions = options.deductions?.[employee._id.toString()] || 0;
 
-                    // Calculate net salary: base + bonuses - deductions - advances
-                    const netSalary = Math.max(0, baseSalary + bonuses - otherDeductions - totalAdvanceDeduction);
+                    // Calculate leave deductions
+                    const leaveDays = options.leaveDays?.[employee._id.toString()] || 0;
+                    const leaveDeductionPerDay = employee.leaveDeductionPerDay || 0;
+                    const leaveDeduction = leaveDays * leaveDeductionPerDay;
+
+                    // Calculate net salary: base + bonuses - deductions - advances - leave deductions
+                    const netSalary = Math.max(0, baseSalary + bonuses - otherDeductions - totalAdvanceDeduction - leaveDeduction);
 
                     const payrollData = {
                         tenantId,
@@ -115,6 +120,8 @@ const payrollService = {
                         otherDeductions,
                         advanceDeductions,
                         totalAdvanceDeduction,
+                        leaveDays,
+                        leaveDeduction,
                         netSalary,
                         generatedBy,
                         generatedAt: new Date()
@@ -246,6 +253,7 @@ const payrollService = {
                 totalBonuses: 0,
                 totalDeductions: 0,
                 totalAdvanceDeductions: 0,
+                totalLeaveDeductions: 0,
                 totalNetSalary: 0,
                 paidCount: 0,
                 pendingCount: 0
@@ -256,6 +264,7 @@ const payrollService = {
                 summary.totalBonuses += record.bonuses;
                 summary.totalDeductions += record.otherDeductions;
                 summary.totalAdvanceDeductions += record.totalAdvanceDeduction;
+                summary.totalLeaveDeductions += record.leaveDeduction || 0;
                 summary.totalNetSalary += record.netSalary;
 
                 if (record.paymentStatus === 'paid') {

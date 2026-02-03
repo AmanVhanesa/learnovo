@@ -122,6 +122,13 @@ const PayrollDetailsModal = ({ isOpen, onClose, payrollId }) => {
                                         </div>
                                     )}
 
+                                    {(payroll.leaveDays > 0 || payroll.leaveDeduction > 0) && (
+                                        <div className="flex justify-between text-red-600">
+                                            <span>Leave Deduction ({payroll.leaveDays || 0} days)</span>
+                                            <span className="font-semibold">-₹{payroll.leaveDeduction?.toLocaleString('en-IN')}</span>
+                                        </div>
+                                    )}
+
                                     {payroll.advanceDeductions && payroll.advanceDeductions.length > 0 && (
                                         <div className="border-t pt-2 mt-2">
                                             <p className="text-sm font-semibold text-gray-700 mb-2">Advance Salary Deductions:</p>
@@ -151,8 +158,8 @@ const PayrollDetailsModal = ({ isOpen, onClose, payrollId }) => {
                             <div>
                                 <p className="text-sm text-gray-600 mb-2">Payment Status</p>
                                 <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${payroll.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
-                                        payroll.paymentStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                            'bg-yellow-100 text-yellow-800'
+                                    payroll.paymentStatus === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                        'bg-yellow-100 text-yellow-800'
                                     }`}>
                                     {payroll.paymentStatus?.toUpperCase()}
                                 </span>

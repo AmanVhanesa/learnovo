@@ -70,6 +70,18 @@ const payrollSchema = new mongoose.Schema({
         min: 0
     },
 
+    // Leave deductions
+    leaveDays: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    leaveDeduction: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+
     // Net salary calculation
     netSalary: {
         type: Number,
@@ -152,8 +164,8 @@ payrollSchema.pre('save', function (next) {
         this.totalAdvanceDeduction = 0;
     }
 
-    // Calculate net salary: base + bonuses - deductions - advances
-    this.netSalary = this.baseSalary + this.bonuses - this.otherDeductions - this.totalAdvanceDeduction;
+    // Calculate net salary: base + bonuses - deductions - advances - leave deductions
+    this.netSalary = this.baseSalary + this.bonuses - this.otherDeductions - this.totalAdvanceDeduction - this.leaveDeduction;
 
     // Ensure net salary is not negative
     if (this.netSalary < 0) {

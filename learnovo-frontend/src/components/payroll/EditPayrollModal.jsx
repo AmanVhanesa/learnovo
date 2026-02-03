@@ -7,6 +7,7 @@ const EditPayrollModal = ({ isOpen, onClose, payrollData, onSuccess }) => {
         baseSalary: '',
         bonuses: '',
         otherDeductions: '',
+        leaveDays: '',
         notes: ''
     });
     const [loading, setLoading] = useState(false);
@@ -18,17 +19,25 @@ const EditPayrollModal = ({ isOpen, onClose, payrollData, onSuccess }) => {
                 baseSalary: payrollData.baseSalary || '',
                 bonuses: payrollData.bonuses || 0,
                 otherDeductions: payrollData.otherDeductions || 0,
+                leaveDays: payrollData.leaveDays || 0,
                 notes: payrollData.notes || ''
             });
         }
     }, [payrollData]);
+
+    const calculateLeaveDeduction = () => {
+        const leaveDays = parseFloat(formData.leaveDays) || 0;
+        const leaveRate = payrollData?.employeeId?.leaveDeductionPerDay || 0;
+        return leaveDays * leaveRate;
+    };
 
     const calculateNetSalary = () => {
         const base = parseFloat(formData.baseSalary) || 0;
         const bonus = parseFloat(formData.bonuses) || 0;
         const deductions = parseFloat(formData.otherDeductions) || 0;
         const advanceDeductions = payrollData?.totalAdvanceDeduction || 0;
-        return base + bonus - deductions - advanceDeductions;
+        const leaveDeduction = calculateLeaveDeduction();
+        return base + bonus - deductions - advanceDeductions - leaveDeduction;
     };
 
     const handleSubmit = async (e) => {
@@ -37,10 +46,15 @@ const EditPayrollModal = ({ isOpen, onClose, payrollData, onSuccess }) => {
 
         try {
             setLoading(true);
+            const leaveDays = parseFloat(formData.leaveDays) || 0;
+            const leaveDeduction = calculateLeaveDeduction();
+
             await payrollService.updatePayrollRecord(payrollData._id, {
                 baseSalary: parseFloat(formData.baseSalary),
                 bonuses: parseFloat(formData.bonuses) || 0,
                 otherDeductions: parseFloat(formData.otherDeductions) || 0,
+                leaveDays: leaveDays,
+                leaveDeduction: leaveDeduction,
                 notes: formData.notes
             });
             onSuccess('Payroll record updated successfully');
@@ -123,6 +137,37 @@ const EditPayrollModal = ({ isOpen, onClose, payrollData, onSuccess }) => {
                                 step="0.01"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
+                        </div>
+
+                        {/* Leave Days */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Leave Days
+                            </label>
+                            <input
+                                type="number"
+                                value={formData.leaveDays}
+                                onChange={(e) => setFormData({ ...formData, leaveDays: e.target.value })}
+                                min="0"
+                                step="1"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        {/* Leave Deduction (Read-only) */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Leave Deduction (Auto)
+                            </label>
+                            <input
+                                type="number"
+                                value={calculateLeaveDeduction()}
+                                disabled
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                {formData.leaveDays || 0} days × ₹{payrollData?.employeeId?.leaveDeductionPerDay || 0}/day
+                            </p>
                         </div>
 
                         {/* Advance Deductions (Read-only) */}

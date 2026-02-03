@@ -11,6 +11,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         designation: employee?.designation || '',
         department: employee?.department || '',
         salary: employee?.salary || '',
+        leaveDeductionPerDay: employee?.leaveDeductionPerDay || '',
         dateOfJoining: employee?.dateOfJoining ? employee.dateOfJoining.substring(0, 10) : '',
         photo: employee?.photo || '',
 
@@ -177,6 +178,20 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         min="0"
                                         placeholder="0"
                                     />
+                                </div>
+
+                                <div>
+                                    <label className="label">Leave Deduction Per Day</label>
+                                    <input
+                                        type="number"
+                                        className="input"
+                                        value={form.leaveDeductionPerDay}
+                                        onChange={(e) => updateField('leaveDeductionPerDay', e.target.value)}
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Amount to deduct per unpaid leave day</p>
                                 </div>
 
                                 <div>

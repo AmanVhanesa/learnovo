@@ -226,6 +226,12 @@ const userSchema = new mongoose.Schema({
     trim: true,
     uppercase: true
   },
+  // Leave deduction settings
+  leaveDeductionPerDay: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
   // For parents
   children: [{
     type: mongoose.Schema.Types.ObjectId,
