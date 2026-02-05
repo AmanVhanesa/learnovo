@@ -14,6 +14,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const Class = require('../models/Class');
+const Driver = require('../models/Driver');
 
 const router = express.Router();
 
@@ -191,7 +192,7 @@ router.get('/import/template', protect, authorize('admin'), (req, res) => {
       'motherName', 'motherPhone', 'motherEmail',
       'guardianName', 'guardianPhone',
       'address',
-      'penNumber', 'subDepartment',
+      'penNumber', 'subDepartment', 'driverName',
       // Optional: firstName, middleName, lastName for backward compatibility
       'firstName', 'middleName', 'lastName'
     ];
@@ -199,7 +200,7 @@ router.get('/import/template', protect, authorize('admin'), (req, res) => {
     // Create header row
     const csvContent = fields.join(',') + '\n' +
       // Add a sample row
-      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,,,';
+      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,,,';
 
 
 
@@ -227,7 +228,7 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
       'motherName', 'motherPhone', 'motherEmail',
       'guardianName', 'guardianPhone',
       'address',
-      'penNumber', 'subDepartment',
+      'penNumber', 'subDepartment', 'driverName',
       'firstName', 'middleName', 'lastName'
     ];
 
@@ -258,6 +259,7 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
       'address': '123 Main St',
       'penNumber': '12345678901',
       'subDepartment': '27 LG SEC',
+      'driverName': 'Raju Singh',
       'firstName': '',
       'middleName': '',
       'lastName': ''
@@ -335,7 +337,10 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
         'subdepartment': 'subDepartment',
         'pen_number': 'penNumber',
         'academic_year': 'academicYear',
-        'admission_date': 'admissionDate'
+        'admission_date': 'admissionDate',
+        'driver': 'driverName',
+        'driver_name': 'driverName',
+        'drivername': 'driverName'
       };
 
       // Normalize each field
@@ -606,6 +611,32 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           subDepartmentId = subDept._id;
         }
 
+        // Handle Driver Assignment
+        let driverId = undefined;
+        let transportMode = '';
+
+        if (row.driverName) {
+          const driverName = row.driverName.toString().trim();
+
+          if (driverName.toLowerCase() === 'self') {
+            transportMode = 'Self';
+          } else {
+            // Case insensitive search for driver
+            const driver = await Driver.findOne({
+              tenantId,
+              name: { $regex: new RegExp(`^${driverName}$`, 'i') },
+              isActive: true
+            });
+
+            if (driver) {
+              driverId = driver._id;
+              transportMode = 'School Transport';
+            } else {
+              console.warn(`Driver not found for import: ${driverName}`);
+            }
+          }
+        }
+
         // Helper to safely parse dates
         const parseDate = (dateStr) => {
           if (!dateStr) return undefined;
@@ -726,6 +757,12 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
         }
         if (subDepartmentId) {
           studentData.subDepartment = subDepartmentId;
+        }
+        if (driverId) {
+          studentData.driverId = driverId;
+        }
+        if (transportMode) {
+          studentData.transportMode = transportMode;
         }
 
         // Handle Inactive Student Fields
@@ -1009,8 +1046,20 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
       fullName, firstName, middleName, lastName, email, phone, password,
       class: studentClass, section, academicYear, rollNumber, admissionDate,
       guardians, address, avatar,
-      penNumber, subDepartment, udiseCode // Legacy fields
+      penNumber, subDepartment, udiseCode, // Legacy fields
+      transportMode, driverId
     } = req.body;
+
+    // Handle Transport Mode Logic
+    let finalDriverId = driverId;
+    let finalTransportMode = transportMode || '';
+
+    if (driverId === 'self') {
+      finalDriverId = null;
+      finalTransportMode = 'Self';
+    } else if (driverId && driverId.trim() !== '') {
+      finalTransportMode = 'School Transport';
+    }
 
     const tenantId = req.user.tenantId;
 
@@ -1073,7 +1122,9 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
       guardians, address, avatar,
       penNumber: penNumber ? penNumber.trim() : undefined,
       subDepartment,
-      udiseCode: udiseCode ? udiseCode.trim() : undefined
+      udiseCode: udiseCode ? udiseCode.trim() : undefined,
+      transportMode: finalTransportMode,
+      driverId: finalDriverId
     };
 
     const student = await User.create(studentData);
@@ -1175,6 +1226,14 @@ router.put('/:id', protect, canAccessStudent, [
     const updatePayload = { ...req.body };
     if (updatePayload.password === '') {
       delete updatePayload.password;
+    }
+
+    // Handle 'self' transport option
+    if (updatePayload.driverId === 'self') {
+      updatePayload.driverId = null;
+      updatePayload.transportMode = 'Self';
+    } else if (updatePayload.driverId && updatePayload.driverId !== '' && updatePayload.driverId !== null) {
+      updatePayload.transportMode = 'School Transport';
     }
 
     // Convert empty strings to null for ObjectId fields

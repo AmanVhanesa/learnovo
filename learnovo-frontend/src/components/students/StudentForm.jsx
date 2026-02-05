@@ -27,7 +27,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         penNumber: student?.penNumber || '',
 
         subDepartment: student?.subDepartment?._id || student?.subDepartment || '',
-        driverId: student?.driverId?._id || student?.driverId || '',
+        driverId: student?.transportMode === 'Self' ? 'self' : (student?.driverId?._id || student?.driverId || ''),
 
         // Personal Details
         dateOfBirth: student?.dateOfBirth ? student.dateOfBirth.substring(0, 10) : '',
@@ -381,6 +381,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 onChange={(e) => updateField('driverId', e.target.value)}
                                             >
                                                 <option value="">Select Driver</option>
+                                                <option value="self">Self (Own Transport)</option>
                                                 {driverOptions.map(driver => (
                                                     <option key={driver._id} value={driver._id}>{driver.name} ({driver.phone})</option>
                                                 ))}

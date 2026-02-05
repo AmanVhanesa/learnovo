@@ -289,6 +289,11 @@ const userSchema = new mongoose.Schema({
     sparse: true,
     index: true
   },
+  transportMode: {
+    type: String,
+    enum: ['School Transport', 'Self', 'Private', ''],
+    default: ''
+  },
   udiseCode: {
     type: String,
     trim: true
