@@ -7,15 +7,40 @@ const XLSX = require('xlsx');
  * @param {string} filePath - Path to the CSV/Excel file
  * @returns {Promise<Array>} - Array of data objects
  */
-const parseCSV = (filePath) => {
+const parseCSV = (fileSource) => {
   return new Promise((resolve, reject) => {
+    let filePath = null;
+    let buffer = null;
+    let originalName = '';
+
+    // Determine input type
+    if (typeof fileSource === 'string') {
+      filePath = fileSource;
+      originalName = fileSource;
+    } else if (fileSource && typeof fileSource === 'object') {
+      if (fileSource.path) filePath = fileSource.path;
+      if (fileSource.buffer) buffer = fileSource.buffer;
+      originalName = fileSource.originalname || '';
+    }
+
+    if (!filePath && !buffer) {
+      return reject(new Error('No file content found (missing path and buffer)'));
+    }
+
     // Check file extension
-    const ext = filePath.toLowerCase().split('.').pop();
+    const ext = originalName.toLowerCase().split('.').pop();
+    const stream = require('stream');
 
     if (ext === 'xlsx' || ext === 'xls') {
       // Parse Excel file
       try {
-        const workbook = XLSX.readFile(filePath);
+        let workbook;
+        if (filePath) {
+          workbook = XLSX.readFile(filePath);
+        } else {
+          workbook = XLSX.read(buffer, { type: 'buffer' });
+        }
+
         const sheetName = workbook.SheetNames[0]; // Get first sheet
         const worksheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(worksheet, {
@@ -29,7 +54,15 @@ const parseCSV = (filePath) => {
     } else {
       // Parse CSV file
       const results = [];
-      fs.createReadStream(filePath)
+      let input;
+
+      if (filePath) {
+        input = fs.createReadStream(filePath);
+      } else {
+        input = stream.Readable.from(buffer);
+      }
+
+      input
         .pipe(csv())
         .on('data', (data) => results.push(data))
         .on('end', () => resolve(results))

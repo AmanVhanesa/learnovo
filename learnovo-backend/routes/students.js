@@ -298,10 +298,12 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
       return res.status(400).json({ success: false, message: 'Please upload a CSV file' });
     }
 
-    const rows = await parseCSV(req.file.path);
+    const rows = await parseCSV(req.file);
 
-    // Clean up file immediately after parsing
-    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    // Clean up file immediately after parsing (only if file exists on disk)
+    if (req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
 
     if (!rows || rows.length === 0) {
       return res.status(400).json({ success: false, message: 'CSV file is empty' });
@@ -345,7 +347,7 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
 
       // Normalize each field
       for (const [key, value] of Object.entries(row)) {
-        const lowerKey = key.toLowerCase().trim();
+        const lowerKey = String(key || '').toLowerCase().trim();
         const mappedKey = columnMappings[lowerKey] || key;
         normalized[mappedKey] = value;
       }
@@ -418,7 +420,7 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
 
       // 3. Email validation - email is optional but must be unique if provided
       if (row.email && row.email.trim()) {
-        const email = row.email.toLowerCase().trim();
+        const email = String(row.email).toLowerCase().trim();
         cleanRow.email = email;
 
         // Validate email format
