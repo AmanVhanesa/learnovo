@@ -356,17 +356,23 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
     const validData = [];
     const tenantId = req.user.tenantId;
 
-    // Cache existing emails for duplicate checking
+    // Cache existing emails and admission numbers for duplicate checking
     const existingEmails = new Set();
-    const students = await User.find({ tenantId, role: 'student' }).select('email');
+    const existingAdmissionNumbers = new Set();
+    const students = await User.find({ tenantId, role: 'student' }).select('email admissionNumber');
     students.forEach(s => {
       if (s.email && s.email.trim()) {
         existingEmails.add(s.email.toLowerCase());
+      }
+      if (s.admissionNumber && s.admissionNumber.trim()) {
+        existingAdmissionNumbers.add(s.admissionNumber.toUpperCase());
       }
     });
 
     // Also check duplicates within the file itself
     const fileEmails = new Set();
+    const fileAdmissionNumbers = new Set();
+    const duplicates = []; // Track duplicate admission numbers separately
 
     // Process each row
     for (let i = 0; i < normalizedRows.length; i++) {
@@ -374,13 +380,38 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
       const rowNum = i + 2; // +1 for 0-index, +1 for header
       const rowErrors = [];
       const cleanRow = { ...row };
+      let isDuplicate = false;
 
       // 1. Basic Validation
       if (!row.fullName && !row.firstName && !row.lastName) {
         rowErrors.push('Student name is required (fullName or firstName/lastName)');
       }
 
-      // Email is now optional - validate only if provided
+      // 2. Check for duplicate admission number (track separately, not as error)
+      if (row.admissionNumber && row.admissionNumber.trim()) {
+        const admNo = row.admissionNumber.toString().trim().toUpperCase();
+        cleanRow.admissionNumber = admNo;
+
+        // Check if admission number already exists in database
+        if (existingAdmissionNumbers.has(admNo)) {
+          isDuplicate = true;
+          duplicates.push({
+            row: rowNum,
+            admissionNumber: admNo,
+            name: row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim(),
+            data: cleanRow
+          });
+        }
+
+        // Check duplicate admission number in file
+        if (fileAdmissionNumbers.has(admNo)) {
+          rowErrors.push(`Duplicate admission number ${admNo} in file`);
+        } else {
+          fileAdmissionNumbers.add(admNo);
+        }
+      }
+
+      // 3. Email validation - email is optional but must be unique if provided
       if (row.email && row.email.trim()) {
         const email = row.email.toLowerCase().trim();
         cleanRow.email = email;
@@ -407,7 +438,9 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
       // Add row number for reference
       cleanRow._rowNumber = rowNum;
 
+      // Categorize the row
       if (rowErrors.length > 0) {
+        // Has validation errors - add to errors
         rowErrors.forEach(msg => {
           errors.push({
             row: rowNum,
@@ -416,11 +449,11 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
             value: ''
           });
         });
-        // Still add to preview but mark invalid visual indication if we were returning per-row status
-        // For now, preview just shows first N rows usually
-      } else {
+      } else if (!isDuplicate) {
+        // Valid and not duplicate - add to valid data
         validData.push(cleanRow);
       }
+      // Note: duplicates are tracked separately in the duplicates array
 
       // Add to preview (limit to first 10 for display)
       if (preview.length < 10) {
@@ -432,12 +465,14 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
       success: true,
       preview,
       errors,
+      duplicates, // Students that already exist in the system
       validData, // Send back valid data for the next step
       summary: {
         totalRows: normalizedRows.length,
         validRows: validData.length,
-        invalidRows: normalizedRows.length - validData.length,
-        duplicatesInFile: 0 // Handled in errors logic effectively
+        invalidRows: errors.length > 0 ? normalizedRows.length - validData.length - duplicates.length : 0,
+        duplicatesInFile: 0, // Handled in errors logic effectively
+        duplicatesInDB: duplicates.length // New students that already exist
       }
     });
 
@@ -475,9 +510,45 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
     const settings = await Settings.getSettings(tenantId);
     const defaultUdiseCode = settings.institution?.udiseCode;
 
-    const results = { success: 0, failed: 0, errors: [] };
+    // Extract skipDuplicates option (default: false)
+    const skipDuplicates = options?.skipDuplicates || false;
 
-    for (const row of validData) {
+    // If skipDuplicates is enabled, filter out students with existing admission numbers
+    let dataToImport = validData;
+    let skippedCount = 0;
+
+    if (skipDuplicates) {
+      // Get existing admission numbers
+      const existingAdmissionNumbers = new Set();
+      const existingStudents = await User.find({
+        tenantId,
+        role: 'student'
+      }).select('admissionNumber');
+
+      existingStudents.forEach(s => {
+        if (s.admissionNumber && s.admissionNumber.trim()) {
+          existingAdmissionNumbers.add(s.admissionNumber.toUpperCase());
+        }
+      });
+
+      // Filter out duplicates
+      dataToImport = validData.filter(row => {
+        if (row.admissionNumber) {
+          const admNo = row.admissionNumber.toString().trim().toUpperCase();
+          if (existingAdmissionNumbers.has(admNo)) {
+            skippedCount++;
+            return false; // Skip this student
+          }
+        }
+        return true; // Import this student
+      });
+
+      console.log(`Skip duplicates enabled: ${skippedCount} students will be skipped`);
+    }
+
+    const results = { success: 0, failed: 0, skipped: skippedCount, errors: [] };
+
+    for (const row of dataToImport) {
       let studentData = null; // Declare safely for error logging scope
       const rowNum = row._rowNumber || '?';
 
@@ -724,7 +795,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
 
     res.json({
       success: true,
-      message: `Import completed. Success: ${results.success}, Failed: ${results.failed}`,
+      message: `Import completed. Success: ${results.success}, Skipped: ${results.skipped}, Failed: ${results.failed}`,
       data: results
     });
 

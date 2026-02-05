@@ -22,6 +22,7 @@ const ImportModal = ({
     const [step, setStep] = useState('upload'); // upload, preview, importing, complete
     const [previewData, setPreviewData] = useState(null);
     const [importing, setImporting] = useState(false);
+    const [skipDuplicates, setSkipDuplicates] = useState(false);
 
     if (!isOpen) return null;
 
@@ -147,11 +148,17 @@ const ImportModal = ({
             const response = await api.post(executeUrl, {
                 validData: previewData.validData,
                 options: {
-                    skipErrors: true
+                    skipErrors: true,
+                    skipDuplicates: skipDuplicates
                 }
             });
 
             if (response.data.success) {
+                // Store the response data for completion display
+                setPreviewData(prev => ({
+                    ...prev,
+                    data: response.data.data
+                }));
                 setStep('complete');
                 toast.success(response.data.message);
 
@@ -169,6 +176,14 @@ const ImportModal = ({
         } finally {
             setImporting(false);
         }
+    };
+
+    // Calculate records to import based on skipDuplicates setting
+    const getRecordsToImport = () => {
+        if (!previewData) return 0;
+        const validRows = previewData.summary.validRows || 0;
+        const duplicates = previewData.summary.duplicatesInDB || 0;
+        return skipDuplicates ? validRows : validRows + duplicates;
     };
 
     // Download error report
@@ -201,6 +216,7 @@ const ImportModal = ({
         setStep('upload');
         setPreviewData(null);
         setImporting(false);
+        setSkipDuplicates(false);
         onClose();
     };
 
@@ -297,12 +313,41 @@ const ImportModal = ({
                                     <p className="text-2xl font-semibold text-red-900">{previewData.summary.invalidRows}</p>
                                 </div>
                                 <div className="bg-yellow-50 rounded-lg p-4">
-                                    <p className="text-sm text-yellow-600">Duplicates</p>
+                                    <p className="text-sm text-yellow-600">Already Exist</p>
                                     <p className="text-2xl font-semibold text-yellow-900">
-                                        {previewData.summary.duplicatesInFile || 0}
+                                        {previewData.summary.duplicatesInDB || 0}
                                     </p>
                                 </div>
                             </div>
+
+                            {/* Duplicates Warning & Skip Option */}
+                            {previewData.summary.duplicatesInDB > 0 && (
+                                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                                    <div className="flex items-start">
+                                        <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                                        <div className="flex-1">
+                                            <h3 className="text-sm font-medium text-yellow-900 mb-2">
+                                                {previewData.summary.duplicatesInDB} student(s) already exist in the system
+                                            </h3>
+                                            <p className="text-sm text-yellow-700 mb-3">
+                                                These students have admission numbers that match existing records.
+                                                You can choose to skip them during import.
+                                            </p>
+                                            <label className="flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={skipDuplicates}
+                                                    onChange={(e) => setSkipDuplicates(e.target.checked)}
+                                                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                                />
+                                                <span className="ml-2 text-sm font-medium text-yellow-900">
+                                                    Skip students that already exist (based on admission number)
+                                                </span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Errors */}
                             {previewData.errors && previewData.errors.length > 0 && (
@@ -390,9 +435,23 @@ const ImportModal = ({
                         <div className="text-center py-12">
                             <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
                             <p className="text-lg font-medium text-gray-900">Import Completed Successfully!</p>
-                            <p className="text-sm text-gray-600 mt-2">
-                                All valid records have been imported to the system
-                            </p>
+                            {previewData && (
+                                <div className="mt-4 space-y-2">
+                                    <p className="text-sm text-gray-600">
+                                        <span className="font-semibold text-green-600">{previewData.data?.success || 0}</span> students imported successfully
+                                    </p>
+                                    {previewData.data?.skipped > 0 && (
+                                        <p className="text-sm text-gray-600">
+                                            <span className="font-semibold text-yellow-600">{previewData.data.skipped}</span> students skipped (already exist)
+                                        </p>
+                                    )}
+                                    {previewData.data?.failed > 0 && (
+                                        <p className="text-sm text-gray-600">
+                                            <span className="font-semibold text-red-600">{previewData.data.failed}</span> students failed to import
+                                        </p>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -427,10 +486,10 @@ const ImportModal = ({
                             </button>
                             <button
                                 onClick={handleExecuteImport}
-                                disabled={!previewData || previewData.summary.validRows === 0 || importing}
+                                disabled={!previewData || getRecordsToImport() === 0 || importing}
                                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Import {previewData?.summary.validRows || 0} Records
+                                Import {getRecordsToImport()} Record{getRecordsToImport() !== 1 ? 's' : ''}
                             </button>
                         </>
                     )}
