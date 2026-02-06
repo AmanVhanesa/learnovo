@@ -50,12 +50,12 @@ const Attendance = () => {
         setClasses(response.data)
         setSelectedClass(response.data[0])
       } else {
-        toast.error('No classes assigned to you. Please contact admin.')
+        // No classes found - could be empty database or no assignments
         setClasses([])
       }
     } catch (error) {
       console.error('Error fetching classes:', error)
-      toast.error('Failed to load classes')
+      // Don't show error toast, just set empty classes
       setClasses([])
     } finally {
       setIsLoading(false)
@@ -202,8 +202,20 @@ const Attendance = () => {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <AlertTriangle className="h-16 w-16 text-gray-400 mb-4" />
-        <p className="text-xl text-gray-600 mb-2">No Classes Assigned</p>
-        <p className="text-gray-500">Please contact the administrator to assign classes to you.</p>
+        <p className="text-xl text-gray-600 mb-2">No Classes Available</p>
+        <p className="text-gray-500 mb-4">
+          {user?.role === 'admin'
+            ? 'Please create classes first before marking attendance.'
+            : 'Please contact the administrator to create classes and assign you to them.'}
+        </p>
+        {user?.role === 'admin' && (
+          <a
+            href="/app/classes"
+            className="btn btn-primary"
+          >
+            Go to Classes & Sections
+          </a>
+        )}
       </div>
     )
   }

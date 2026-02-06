@@ -58,6 +58,14 @@ const settingsSchema = new mongoose.Schema({
     schoolCode: {
       type: String,
       trim: true
+    },
+    principalSignature: {
+      type: String,
+      default: null
+    },
+    signaturePublicId: {
+      type: String,
+      default: null
     }
   },
   // Currency Settings

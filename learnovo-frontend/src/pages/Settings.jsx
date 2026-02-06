@@ -209,6 +209,27 @@ const Settings = () => {
     }
   }
 
+  const handleSignatureUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+
+    const formData = new FormData()
+    formData.append('signature', file)
+
+    try {
+      const data = await settingsService.uploadSignature(formData)
+      if (data.success) {
+        updateField('institution.principalSignature', data.data.url)
+        toast.success('Signature uploaded! Click Save to apply changes.')
+      } else {
+        toast.error('Upload failed')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Error uploading signature')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -264,6 +285,7 @@ const Settings = () => {
               form={form}
               updateField={updateField}
               handleLogoUpload={handleLogoUpload}
+              handleSignatureUpload={handleSignatureUpload}
             />
           )}
           {activeTab === 'subdepartments' && (

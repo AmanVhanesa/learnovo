@@ -179,34 +179,65 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
 
 // @desc    Get teacher's assigned classes
 // @route   GET /api/teachers/my-classes
-// @access  Private (Teacher)
+// @access  Private (Teacher, Admin)
 router.get('/my-classes', protect, authorize('teacher', 'admin'), async (req, res) => {
   try {
     const teacherId = req.user._id;
+    const isAdmin = req.user.role === 'admin';
 
-    // Find all classes where this teacher is assigned
-    const classes = await Class.find({
+    let query = {
       tenantId: req.user.tenantId,
-      $or: [
+      isActive: true
+    };
+
+    // If not admin, filter by teacher assignment
+    if (!isAdmin) {
+      query.$or = [
         { classTeacher: teacherId },
         { 'subjects.teacher': teacherId }
-      ],
-      isActive: true
-    })
+      ];
+    }
+
+    // Find classes based on role
+    const classes = await Class.find(query)
       .populate('classTeacher', 'name email')
       .populate('subjects.teacher', 'name email')
       .select('name grade academicYear classTeacher subjects isActive')
       .sort({ name: 1 });
 
+    // If no classes found, return empty array
+    if (!classes || classes.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        count: 0
+      });
+    }
+
     // Transform to include subject information
     const classesWithSubjects = classes.map(classDoc => {
-      const subjects = classDoc.subjects
-        .filter(sub => sub.teacher && sub.teacher._id.toString() === teacherId.toString())
-        .map(sub => ({
+      let subjects = [];
+
+      // Ensure subjects array exists
+      const classSubjects = classDoc.subjects || [];
+
+      if (isAdmin) {
+        // For admin, return all subjects
+        subjects = classSubjects.map(sub => ({
           _id: sub._id,
-          name: sub.subject?.name || sub.name || 'General', // Handle both structures
+          name: sub.subject?.name || sub.name || 'General',
           teacher: sub.teacher
         }));
+      } else {
+        // For teachers, only return their subjects
+        subjects = classSubjects
+          .filter(sub => sub.teacher && sub.teacher._id.toString() === teacherId.toString())
+          .map(sub => ({
+            _id: sub._id,
+            name: sub.subject?.name || sub.name || 'General',
+            teacher: sub.teacher
+          }));
+      }
 
       return {
         _id: classDoc._id,
@@ -228,7 +259,8 @@ router.get('/my-classes', protect, authorize('teacher', 'admin'), async (req, re
     console.error('Get my classes error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while fetching classes'
+      message: 'Server error while fetching classes',
+      error: error.message
     });
   }
 });

@@ -4,7 +4,7 @@ import { Building2 } from 'lucide-react'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 const SERVER_URL = API_URL.replace(/\/api\/?$/, '')
 
-const InstituteProfileSection = ({ form, updateField, handleLogoUpload }) => {
+const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSignatureUpload }) => {
     // Helper to get safe logo URL
     const getLogoUrl = (path) => {
         if (!path) return null
@@ -228,6 +228,42 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload }) => {
                                     Change Logo
                                 </label>
                                 <p className="text-xs text-gray-500">Recommended: 200x200px PNG/JPG</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Principal Signature */}
+                    <div>
+                        <label className="label">Principal Signature</label>
+                        <div className="mt-2 flex items-center gap-4">
+                            <div className="h-24 w-48 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
+                                {form.institution?.principalSignature ? (
+                                    <img
+                                        src={getLogoUrl(form.institution.principalSignature)}
+                                        alt="Principal Signature"
+                                        className="h-full w-full object-contain p-2"
+                                        onError={(e) => e.target.style.display = 'none'}
+                                    />
+                                ) : (
+                                    <span className="text-gray-400 text-xs text-center px-2">No Signature</span>
+                                )}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <input
+                                    type="file"
+                                    id="signature-upload"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleSignatureUpload}
+                                />
+                                <label
+                                    htmlFor="signature-upload"
+                                    className="btn btn-outline cursor-pointer"
+                                >
+                                    Upload Signature
+                                </label>
+                                <p className="text-xs text-gray-500">Recommended: 300x100px PNG with transparent background</p>
+                                <p className="text-xs text-blue-600">Will appear on certificates and fee receipts</p>
                             </div>
                         </div>
                     </div>

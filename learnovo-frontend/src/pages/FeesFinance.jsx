@@ -219,6 +219,7 @@ const FeesFinance = () => {
                 return encodeURI(fullUrl)
             }
             const logoUrl = getLogoUrl(school.logo)
+            const signatureUrl = getLogoUrl(school.principalSignature)
 
             const html = `
                 <!DOCTYPE html>
@@ -259,6 +260,8 @@ const FeesFinance = () => {
                         .signatures { display: flex; justify-content: space-between; margin-top: 80px; padding: 0 40px; }
                         .sig-block { text-align: center; }
                         .sig-line { width: 200px; border-top: 1px solid #94a3b8; margin-bottom: 8px; }
+                        .sig-image { width: 200px; height: 60px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; }
+                        .sig-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
                         .sig-text { font-size: 12px; font-weight: 500; color: #64748b; }
 
                         .footer { margin-top: 60px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }
@@ -294,6 +297,7 @@ const FeesFinance = () => {
                                 <div class="info-row"><div class="label">Date</div><div class="value">${new Date(payment.paymentDate).toLocaleDateString()}</div></div>
                                 <div class="info-row"><div class="label">Mode</div><div class="value">${payment.paymentMethod}</div></div>
                                 ${payment.transactionDetails?.referenceNumber ? `<div class="info-row"><div class="label">Ref. No</div><div class="value">${payment.transactionDetails.referenceNumber}</div></div>` : ''}
+                                ${payment.invoiceId?.billingPeriod?.displayText ? `<div class="info-row"><div class="label">Period</div><div class="value" style="color: #2563eb; font-weight: 600;">${payment.invoiceId.billingPeriod.displayText}</div></div>` : ''}
                                 <div class="info-row"><div class="label">Status</div><div class="value" style="color: #16a34a">Paid</div></div>
                             </div>
                             <div class="info-column">
@@ -315,7 +319,10 @@ const FeesFinance = () => {
                                 <div class="sig-text">Depositor Signature</div>
                             </div>
                             <div class="sig-block">
-                                <div class="sig-line"></div>
+                                ${signatureUrl ?
+                    `<div class="sig-image"><img src="${signatureUrl}" alt="Principal Signature" /></div>` :
+                    '<div class="sig-line"></div>'
+                }
                                 <div class="sig-text">Authorized Signatory</div>
                             </div>
                         </div>
@@ -1300,9 +1307,18 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
     const [selectedStudent, setSelectedStudent] = useState(null)
     const [form, setForm] = useState({
         feeStructureId: '',
-        dueDate: ''
+        dueDate: '',
+        billingMonth: new Date().getMonth() + 1,
+        billingQuarter: Math.ceil((new Date().getMonth() + 1) / 3),
+        billingYear: new Date().getFullYear()
     })
     const [isSaving, setIsSaving] = useState(false)
+
+    // Get selected fee structure to determine frequency
+    const selectedFeeStructure = feeStructures.find(fs => fs._id === form.feeStructureId)
+    const rawFrequency = selectedFeeStructure?.feeHeads?.[0]?.frequency || 'One-time'
+    // Normalize frequency to title case for consistent comparison
+    const feeFrequency = rawFrequency.charAt(0).toUpperCase() + rawFrequency.slice(1).toLowerCase()
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -1320,11 +1336,41 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
         try {
             setIsSaving(true)
 
+            // Build billing period based on frequency
+            let billingPeriod = null
+            if (feeFrequency === 'Monthly') {
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December']
+                billingPeriod = {
+                    month: form.billingMonth,
+                    year: form.billingYear,
+                    displayText: `${monthNames[form.billingMonth - 1]} ${form.billingYear}`
+                }
+            } else if (feeFrequency === 'Quarterly') {
+                const quarterMonths = {
+                    1: 'Jan-Mar',
+                    2: 'Apr-Jun',
+                    3: 'Jul-Sep',
+                    4: 'Oct-Dec'
+                }
+                billingPeriod = {
+                    quarter: form.billingQuarter,
+                    year: form.billingYear,
+                    displayText: `Q${form.billingQuarter} ${form.billingYear} (${quarterMonths[form.billingQuarter]})`
+                }
+            } else if (feeFrequency === 'Annual') {
+                billingPeriod = {
+                    year: form.billingYear,
+                    displayText: `Academic Year ${form.billingYear}-${form.billingYear + 1}`
+                }
+            }
+
             await invoicesService.generate({
                 studentId: selectedStudent._id,
                 feeStructureId: form.feeStructureId,
                 dueDate: form.dueDate,
-                academicSessionId: activeSession._id
+                academicSessionId: activeSession._id,
+                billingPeriod
             })
 
             onSuccess()
@@ -1338,7 +1384,7 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-gray-200 p-6">
                     <h3 className="text-xl font-semibold text-gray-900">Generate Individual Invoice</h3>
                     <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
@@ -1380,6 +1426,102 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                             </select>
                         </div>
 
+                        {/* Billing Period Selection */}
+                        {form.feeStructureId && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                                <label className="block text-sm font-semibold text-blue-900">
+                                    Billing Period ({feeFrequency})
+                                </label>
+
+                                {feeFrequency === 'Monthly' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
+                                            <select
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                value={form.billingMonth}
+                                                onChange={(e) => setForm({ ...form, billingMonth: parseInt(e.target.value) })}
+                                            >
+                                                <option value="1">January</option>
+                                                <option value="2">February</option>
+                                                <option value="3">March</option>
+                                                <option value="4">April</option>
+                                                <option value="5">May</option>
+                                                <option value="6">June</option>
+                                                <option value="7">July</option>
+                                                <option value="8">August</option>
+                                                <option value="9">September</option>
+                                                <option value="10">October</option>
+                                                <option value="11">November</option>
+                                                <option value="12">December</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                                            <input
+                                                type="number"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                value={form.billingYear}
+                                                onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
+                                                min="2020"
+                                                max="2050"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {feeFrequency === 'Quarterly' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Quarter</label>
+                                            <select
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                value={form.billingQuarter}
+                                                onChange={(e) => setForm({ ...form, billingQuarter: parseInt(e.target.value) })}
+                                            >
+                                                <option value="1">Q1 (Jan-Mar)</option>
+                                                <option value="2">Q2 (Apr-Jun)</option>
+                                                <option value="3">Q3 (Jul-Sep)</option>
+                                                <option value="4">Q4 (Oct-Dec)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                                            <input
+                                                type="number"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                                value={form.billingYear}
+                                                onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
+                                                min="2020"
+                                                max="2050"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {feeFrequency === 'Annual' && (
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">Academic Year</label>
+                                        <input
+                                            type="number"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                            value={form.billingYear}
+                                            onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
+                                            min="2020"
+                                            max="2050"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Will show as: Academic Year {form.billingYear}-{form.billingYear + 1}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {feeFrequency === 'One-time' && (
+                                    <p className="text-sm text-gray-600">No billing period needed for one-time fees</p>
+                                )}
+                            </div>
+                        )}
+
                         {/* Due Date */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Due Date *</label>
@@ -1413,9 +1555,18 @@ const BulkInvoiceForm = ({ classes, feeStructures, activeSession, onSuccess }) =
     const [form, setForm] = useState({
         classId: '',
         feeStructureId: '',
-        dueDate: ''
+        dueDate: '',
+        billingMonth: new Date().getMonth() + 1, // 1-12
+        billingQuarter: Math.ceil((new Date().getMonth() + 1) / 3), // 1-4
+        billingYear: new Date().getFullYear()
     })
     const [isSaving, setIsSaving] = useState(false)
+
+    // Get selected fee structure to determine frequency
+    const selectedFeeStructure = feeStructures.find(fs => fs._id === form.feeStructureId)
+    const rawFrequency = selectedFeeStructure?.feeHeads?.[0]?.frequency || 'One-time'
+    // Normalize frequency to title case for consistent comparison
+    const feeFrequency = rawFrequency.charAt(0).toUpperCase() + rawFrequency.slice(1).toLowerCase()
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -1434,14 +1585,51 @@ const BulkInvoiceForm = ({ classes, feeStructures, activeSession, onSuccess }) =
         try {
             setIsSaving(true)
 
+            // Build billing period based on frequency
+            let billingPeriod = null
+            if (feeFrequency === 'Monthly') {
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December']
+                billingPeriod = {
+                    month: form.billingMonth,
+                    year: form.billingYear,
+                    displayText: `${monthNames[form.billingMonth - 1]} ${form.billingYear}`
+                }
+            } else if (feeFrequency === 'Quarterly') {
+                const quarterMonths = {
+                    1: 'Jan-Mar',
+                    2: 'Apr-Jun',
+                    3: 'Jul-Sep',
+                    4: 'Oct-Dec'
+                }
+                billingPeriod = {
+                    quarter: form.billingQuarter,
+                    year: form.billingYear,
+                    displayText: `Q${form.billingQuarter} ${form.billingYear} (${quarterMonths[form.billingQuarter]})`
+                }
+            } else if (feeFrequency === 'Annual') {
+                billingPeriod = {
+                    year: form.billingYear,
+                    displayText: `Academic Year ${form.billingYear}-${form.billingYear + 1}`
+                }
+            }
+
             await invoicesService.generateBulk({
                 classId: form.classId,
                 feeStructureId: form.feeStructureId,
                 dueDate: form.dueDate,
-                academicSessionId: activeSession._id
+                academicSessionId: activeSession._id,
+                billingPeriod
             })
 
-            setForm({ classId: '', feeStructureId: '', dueDate: '' })
+            setForm({
+                classId: '',
+                feeStructureId: '',
+                dueDate: '',
+                billingMonth: new Date().getMonth() + 1,
+                billingQuarter: Math.ceil((new Date().getMonth() + 1) / 3),
+                billingYear: new Date().getFullYear()
+            })
             onSuccess()
         } catch (error) {
             console.error('Bulk generate error:', error)
@@ -1484,6 +1672,102 @@ const BulkInvoiceForm = ({ classes, feeStructures, activeSession, onSuccess }) =
                     ))}
                 </select>
             </div>
+
+            {/* Billing Period Selection - Show based on frequency */}
+            {form.feeStructureId && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                    <label className="block text-sm font-semibold text-blue-900">
+                        Billing Period ({feeFrequency})
+                    </label>
+
+                    {feeFrequency === 'Monthly' && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    value={form.billingMonth}
+                                    onChange={(e) => setForm({ ...form, billingMonth: parseInt(e.target.value) })}
+                                >
+                                    <option value="1">January</option>
+                                    <option value="2">February</option>
+                                    <option value="3">March</option>
+                                    <option value="4">April</option>
+                                    <option value="5">May</option>
+                                    <option value="6">June</option>
+                                    <option value="7">July</option>
+                                    <option value="8">August</option>
+                                    <option value="9">September</option>
+                                    <option value="10">October</option>
+                                    <option value="11">November</option>
+                                    <option value="12">December</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                                <input
+                                    type="number"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    value={form.billingYear}
+                                    onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
+                                    min="2020"
+                                    max="2050"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {feeFrequency === 'Quarterly' && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Quarter</label>
+                                <select
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    value={form.billingQuarter}
+                                    onChange={(e) => setForm({ ...form, billingQuarter: parseInt(e.target.value) })}
+                                >
+                                    <option value="1">Q1 (Jan-Mar)</option>
+                                    <option value="2">Q2 (Apr-Jun)</option>
+                                    <option value="3">Q3 (Jul-Sep)</option>
+                                    <option value="4">Q4 (Oct-Dec)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                                <input
+                                    type="number"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    value={form.billingYear}
+                                    onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
+                                    min="2020"
+                                    max="2050"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {feeFrequency === 'Annual' && (
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Academic Year</label>
+                            <input
+                                type="number"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                value={form.billingYear}
+                                onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
+                                min="2020"
+                                max="2050"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                Will show as: Academic Year {form.billingYear}-{form.billingYear + 1}
+                            </p>
+                        </div>
+                    )}
+
+                    {feeFrequency === 'One-time' && (
+                        <p className="text-sm text-gray-600">No billing period needed for one-time fees</p>
+                    )}
+                </div>
+            )}
 
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>

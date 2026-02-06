@@ -409,6 +409,55 @@ router.post('/upload-logo', protect, authorize('admin'), upload.single('logo'), 
   }
 });
 
+// @desc    Upload principal signature
+// @route   POST /api/settings/upload-signature
+// @access  Private (Admin)
+router.post('/upload-signature', protect, authorize('admin'), upload.single('signature'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const tenantId = req.user.tenantId;
+
+    // Check if Cloudinary is configured
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error('Cloudinary not configured. Please set CLOUDINARY_* environment variables.');
+      return res.status(500).json({
+        success: false,
+        message: 'File upload service not configured. Please contact administrator.'
+      });
+    }
+
+    // Upload to Cloudinary
+    const result = await cloudinaryService.uploadSchoolLogo(req.file, tenantId.toString());
+
+    // Update settings with Cloudinary URL
+    const settings = await Settings.getSettings(tenantId);
+    settings.institution.principalSignature = result.secure_url;
+    settings.institution.signaturePublicId = result.public_id;
+    await settings.save();
+
+    res.json({
+      success: true,
+      message: 'Signature uploaded successfully',
+      data: {
+        url: result.secure_url,
+        public_id: result.public_id
+      }
+    });
+  } catch (error) {
+    console.error('Upload signature error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error while uploading signature'
+    });
+  }
+});
+
 // @desc    Update theme settings
 // @route   PUT /api/settings/theme
 // @access  Private (Admin)

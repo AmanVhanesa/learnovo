@@ -17,6 +17,16 @@ export const settingsService = {
     return response.data
   },
 
+  // Upload principal signature
+  uploadSignature: async (formData) => {
+    const response = await api.post('/settings/upload-signature', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    return response.data
+  },
+
   // Update system settings
   updateSettings: async (settingsData) => {
     const response = await api.put('/settings', settingsData)

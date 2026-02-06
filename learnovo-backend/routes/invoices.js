@@ -118,6 +118,14 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
             });
         }
 
+        // Use provided billing period or calculate it
+        let billingPeriod = req.body.billingPeriod;
+        if (!billingPeriod || !billingPeriod.displayText) {
+            // Fallback: Calculate period if not provided
+            const primaryFrequency = invoiceItems[0]?.frequency || 'One-time';
+            billingPeriod = FeeInvoice.calculateBillingPeriod(new Date(), primaryFrequency);
+        }
+
         // Create invoice
         const invoice = await FeeInvoice.create({
             tenantId: req.user.tenantId,
@@ -131,6 +139,7 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
             totalAmount,
             balanceAmount: totalAmount,
             dueDate,
+            billingPeriod,
             remarks,
             generatedBy: req.user._id
         });
@@ -320,6 +329,14 @@ router.post('/generate-bulk', protect, authorize('admin'), [
                     studentClassId = classId;
                 }
 
+                // Use provided billing period or calculate it
+                let billingPeriod = req.body.billingPeriod;
+                if (!billingPeriod || !billingPeriod.displayText) {
+                    // Fallback: Calculate period if not provided
+                    const primaryFrequency = invoiceItems[0]?.frequency || 'One-time';
+                    billingPeriod = FeeInvoice.calculateBillingPeriod(new Date(), primaryFrequency);
+                }
+
                 const invoice = await FeeInvoice.create({
                     tenantId: req.user.tenantId,
                     invoiceNumber,
@@ -332,6 +349,7 @@ router.post('/generate-bulk', protect, authorize('admin'), [
                     totalAmount,
                     balanceAmount: totalAmount,
                     dueDate,
+                    billingPeriod,
                     generatedBy: req.user._id
                 });
 
@@ -835,6 +853,16 @@ router.get('/payments/:id/receipt', protect, async (req, res) => {
         if (settings && settings.institution && settings.institution.contact) {
             if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
             if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
+        }
+
+        // Fallback: Calculate billing period for old invoices that don't have it
+        if (payment.invoiceId && !payment.invoiceId.billingPeriod?.displayText) {
+            // Get the primary fee frequency from invoice items
+            const primaryFrequency = payment.invoiceId.items?.[0]?.frequency || 'One-time';
+            // Calculate period based on payment date
+            const calculatedPeriod = FeeInvoice.calculateBillingPeriod(payment.paymentDate, primaryFrequency);
+            // Add it to the invoice object (not saved to DB, just for this response)
+            payment.invoiceId.billingPeriod = calculatedPeriod;
         }
 
         res.json({

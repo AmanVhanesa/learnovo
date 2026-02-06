@@ -116,6 +116,27 @@ const feeInvoiceSchema = new mongoose.Schema({
         type: Date
     },
 
+    // Billing Period (for receipt display)
+    billingPeriod: {
+        month: {
+            type: Number,
+            min: 1,
+            max: 12
+        },
+        quarter: {
+            type: Number,
+            min: 1,
+            max: 4
+        },
+        year: {
+            type: Number
+        },
+        displayText: {
+            type: String,
+            trim: true
+        }
+    },
+
     // Metadata
     remarks: {
         type: String,
@@ -160,6 +181,51 @@ feeInvoiceSchema.statics.generateInvoiceNumber = async function (tenantId) {
     const year = new Date().getFullYear();
     const counter = await Counter.getNextSequence(`invoice_${tenantId}_${year}`);
     return `INV-${year}-${String(counter).padStart(5, '0')}`;
+};
+
+// Static helper: Get month name
+feeInvoiceSchema.statics.getMonthName = function (month) {
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+    return monthNames[month - 1];
+};
+
+// Static helper: Calculate billing period
+feeInvoiceSchema.statics.calculateBillingPeriod = function (date, frequency) {
+    const d = new Date(date);
+    const month = d.getMonth() + 1; // 1-12
+    const year = d.getFullYear();
+
+    if (frequency === 'Monthly') {
+        return {
+            month,
+            year,
+            displayText: `${this.getMonthName(month)} ${year}`
+        };
+    } else if (frequency === 'Quarterly') {
+        const quarter = Math.ceil(month / 3);
+        const quarterMonths = {
+            1: 'Jan-Mar',
+            2: 'Apr-Jun',
+            3: 'Jul-Sep',
+            4: 'Oct-Dec'
+        };
+        return {
+            quarter,
+            year,
+            displayText: `Q${quarter} ${year} (${quarterMonths[quarter]})`
+        };
+    } else if (frequency === 'Annual') {
+        return {
+            year,
+            displayText: `Academic Year ${year}-${year + 1}`
+        };
+    }
+
+    // One-time fees don't need a specific period
+    return {
+        displayText: 'One-time Payment'
+    };
 };
 
 // Method to apply late fee

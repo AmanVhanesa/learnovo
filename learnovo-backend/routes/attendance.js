@@ -86,16 +86,18 @@ router.post('/', [
       })
     }
 
-    // Validate teacher is assigned to this class
-    const isAssigned = classDoc.subjects.some(
-      sub => sub.teacher && sub.teacher.toString() === req.user._id.toString()
-    )
+    // Validate teacher is assigned to this class (skip for admin)
+    if (req.user.role !== 'admin') {
+      const isAssigned = classDoc.subjects.some(
+        sub => sub.teacher && sub.teacher.toString() === req.user._id.toString()
+      )
 
-    if (!isAssigned && classDoc.classTeacher.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'You are not assigned to this class'
-      })
+      if (!isAssigned && classDoc.classTeacher.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not assigned to this class'
+        })
+      }
     }
 
     // Validate date is not in the future
