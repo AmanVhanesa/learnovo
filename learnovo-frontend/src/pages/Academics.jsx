@@ -85,7 +85,7 @@ const AcademicsManagement = () => {
 
     const fetchTeachers = async () => {
         try {
-            const res = await employeesService.list({ role: 'teacher' })
+            const res = await employeesService.list({ role: 'teacher', limit: 1000 })
             setTeachers(res.data || [])
         } catch (error) {
             console.error('Fetch teachers error:', error)

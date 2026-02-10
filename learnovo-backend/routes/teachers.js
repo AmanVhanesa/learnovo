@@ -12,7 +12,7 @@ const router = express.Router();
 // @access  Private (Admin)
 router.get('/', protect, authorize('admin'), [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('limit').optional().isInt({ min: 1, max: 2000 }).withMessage('Limit must be between 1 and 2000'),
   query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
   handleValidationErrors
 ], async (req, res) => {
