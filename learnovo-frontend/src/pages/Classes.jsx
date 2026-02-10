@@ -53,7 +53,7 @@ const Classes = () => {
 
   const fetchTeachers = async () => {
     try {
-      const { data } = await teachersService.list({ limit: 100 })
+      const { data } = await teachersService.list({ limit: 1000 })
       setTeachers(data || [])
     } catch (error) {
       console.error('Error fetching teachers:', error)
@@ -353,14 +353,29 @@ const Classes = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Grade
                 </label>
-                <input
-                  type="text"
+                <select
                   value={form.grade}
                   onChange={(e) => setForm({ ...form, grade: e.target.value })}
                   className="input"
-                  placeholder="e.g., 9th Grade, 10th Grade"
                   required
-                />
+                >
+                  <option value="">Select Grade</option>
+                  <option value="Nursery">Nursery</option>
+                  <option value="LKG">LKG</option>
+                  <option value="UKG">UKG</option>
+                  <option value="1">1st Grade</option>
+                  <option value="2">2nd Grade</option>
+                  <option value="3">3rd Grade</option>
+                  <option value="4">4th Grade</option>
+                  <option value="5">5th Grade</option>
+                  <option value="6">6th Grade</option>
+                  <option value="7">7th Grade</option>
+                  <option value="8">8th Grade</option>
+                  <option value="9">9th Grade</option>
+                  <option value="10">10th Grade</option>
+                  <option value="11">11th Grade</option>
+                  <option value="12">12th Grade</option>
+                </select>
               </div>
 
               <div>

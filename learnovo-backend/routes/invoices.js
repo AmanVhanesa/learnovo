@@ -850,9 +850,18 @@ router.get('/payments/:id/receipt', protect, async (req, res) => {
         const settings = await Settings.getSettings(tenantId);
 
         const schoolData = tenant.toObject();
-        if (settings && settings.institution && settings.institution.contact) {
-            if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
-            if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
+        if (settings && settings.institution) {
+            // Add contact information
+            if (settings.institution.contact) {
+                if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
+                if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
+            }
+            // Add school code, affiliation number, and UDISE code from Settings
+            if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
+            if (settings.institution.affiliationNumber) schoolData.affiliationNumber = settings.institution.affiliationNumber;
+            if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+            // Add principal signature
+            if (settings.institution.principalSignature) schoolData.principalSignature = settings.institution.principalSignature;
         }
 
         // Fallback: Calculate billing period for old invoices that don't have it

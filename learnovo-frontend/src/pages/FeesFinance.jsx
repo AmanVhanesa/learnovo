@@ -229,47 +229,47 @@ const FeesFinance = () => {
                     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
                     <style>
                         body { font-family: 'Inter', sans-serif; padding: 0; margin: 0; color: #1e293b; -webkit-print-color-adjust: exact; }
-                        .container { max-width: 800px; margin: 0 auto; padding: 40px; }
+                        .container { max-width: 420px; margin: 0 auto; padding: 15px; }
                         
-                        /* Header Section */
-                        .header { display: flex; align-items: center; gap: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 30px; margin-bottom: 30px; }
-                        .logo-container { width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 12px; }
+                        /* Header Section - Compact */
+                        .header { display: flex; align-items: center; gap: 10px; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px; }
+                        .logo-container { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 6px; flex-shrink: 0; }
                         .logo { max-width: 100%; max-height: 100%; object-fit: contain; }
-                        .school-info { flex: 1; }
-                        .school-name { font-size: 24px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 8px; letter-spacing: -0.5px; }
-                        .school-details { font-size: 13px; color: #64748b; line-height: 1.6; }
+                        .school-info { flex: 1; min-width: 0; }
+                        .school-name { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin-bottom: 3px; letter-spacing: -0.3px; line-height: 1.2; }
+                        .school-details { font-size: 8px; color: #64748b; line-height: 1.3; }
 
-                        /* Receipt Title & Meta */
-                        .receipt-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; background: #f1f5f9; padding: 15px 25px; border-radius: 8px; border-left: 4px solid #2563eb; }
-                        .receipt-title { font-size: 18px; font-weight: 700; color: #2563eb; text-transform: uppercase; }
-                        .receipt-number { font-size: 14px; font-weight: 600; color: #475569; }
+                        /* Receipt Title & Meta - Compact */
+                        .receipt-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #f1f5f9; padding: 6px 10px; border-radius: 4px; border-left: 2px solid #2563eb; }
+                        .receipt-title { font-size: 11px; font-weight: 700; color: #2563eb; text-transform: uppercase; }
+                        .receipt-number { font-size: 9px; font-weight: 600; color: #475569; }
 
-                        /* Info Grid */
-                        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
-                        .section-title { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
-                        .info-row { display: flex; margin-bottom: 12px; }
-                        .label { width: 120px; font-size: 13px; font-weight: 500; color: #64748b; }
-                        .value { flex: 1; font-size: 14px; font-weight: 600; color: #0f172a; }
+                        /* Info Grid - Compact */
+                        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+                        .section-title { font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
+                        .info-row { display: flex; margin-bottom: 4px; }
+                        .label { width: 70px; font-size: 8px; font-weight: 500; color: #64748b; }
+                        .value { flex: 1; font-size: 9px; font-weight: 600; color: #0f172a; }
 
-                        /* Amount Section */
-                        .amount-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 25px; text-align: center; margin-bottom: 40px; }
-                        .amount-label { font-size: 12px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
-                        .amount-value { font-size: 36px; font-weight: 800; color: #1e40af; }
+                        /* Amount Section - Compact */
+                        .amount-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px; text-align: center; margin-bottom: 15px; }
+                        .amount-label { font-size: 8px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+                        .amount-value { font-size: 20px; font-weight: 800; color: #1e40af; }
                         
-                        /* Footer */
-                        .signatures { display: flex; justify-content: space-between; margin-top: 80px; padding: 0 40px; }
+                        /* Footer - Compact */
+                        .signatures { display: flex; justify-content: space-between; margin-top: 15px; padding: 0 10px; }
                         .sig-block { text-align: center; }
-                        .sig-line { width: 200px; border-top: 1px solid #94a3b8; margin-bottom: 8px; }
-                        .sig-image { width: 200px; height: 60px; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; }
+                        .sig-line { width: 100px; border-top: 1px solid #94a3b8; margin-bottom: 4px; }
+                        .sig-image { width: 100px; height: 30px; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; }
                         .sig-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
-                        .sig-text { font-size: 12px; font-weight: 500; color: #64748b; }
+                        .sig-text { font-size: 8px; font-weight: 500; color: #64748b; }
 
-                        .footer { margin-top: 60px; text-align: center; font-size: 11px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+                        .footer { margin-top: 12px; text-align: center; font-size: 7px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
                         
                         @media print {
                             body { -webkit-print-color-adjust: exact; }
-                            @page { margin: 0; }
-                            .container { padding: 40px; }
+                            @page { size: A5; margin: 0; }
+                            .container { padding: 15px; max-width: 100%; }
                         }
                     </style>
                 </head>
@@ -282,7 +282,8 @@ const FeesFinance = () => {
                             <div class="school-info">
                                 <div class="school-name">${school.schoolName}</div>
                                 <div class="school-details">${school.fullAddress || school.address?.city || ''}</div>
-                                <div class="school-details">Phone: ${school.phone || '-'} | Email: ${school.email}</div>
+                                <div class="school-details">Ph: ${school.phone || '-'} | ${school.email}</div>
+                                <div class="school-details">School Code: ${school.schoolCode || '-'} | UDISE: ${school.udiseCode || '-'}</div>
                             </div>
                         </div>
 
@@ -303,8 +304,8 @@ const FeesFinance = () => {
                             <div class="info-column">
                                 <div class="section-title">Student</div>
                                 <div class="info-row"><div class="label">Name</div><div class="value">${payment.studentId.fullName || payment.studentId.name}</div></div>
-                                <div class="info-row"><div class="label">Admission No</div><div class="value">${payment.studentId.admissionNumber || payment.studentId.studentId}</div></div>
-                                <div class="info-row"><div class="label">Class</div><div class="value">${payment.studentId.class || '-'}</div></div>
+                                <div class="info-row"><div class="label">Adm. No</div><div class="value">${payment.studentId.admissionNumber || payment.studentId.studentId}</div></div>
+                                <div class="info-row"><div class="label">Class</div><div class="value">${payment.studentId.class || '-'}${payment.studentId.section ? ` (${payment.studentId.section})` : ''}</div></div>
                             </div>
                         </div>
 
@@ -316,20 +317,19 @@ const FeesFinance = () => {
                         <div class="signatures">
                             <div class="sig-block">
                                 <div class="sig-line"></div>
-                                <div class="sig-text">Depositor Signature</div>
+                                <div class="sig-text">Depositor</div>
                             </div>
                             <div class="sig-block">
                                 ${signatureUrl ?
                     `<div class="sig-image"><img src="${signatureUrl}" alt="Principal Signature" /></div>` :
                     '<div class="sig-line"></div>'
                 }
-                                <div class="sig-text">Authorized Signatory</div>
+                                <div class="sig-text">Authorized</div>
                             </div>
                         </div>
 
                         <div class="footer">
-                            <p>This is a computer-generated receipt and does not require a physical signature.</p>
-                            <p>Generated on ${new Date().toLocaleString()}</p>
+                            <p>Computer-generated receipt. No signature required.</p>
                         </div>
                     </div>
 

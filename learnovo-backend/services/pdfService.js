@@ -65,6 +65,57 @@ const pdfService = {
                     }
                 }
 
+                // Load principal signature if available
+                let signatureImage = null;
+                console.log('PDF Service - Principal Signature URL:', data.principalSignature);
+
+                if (data.principalSignature) {
+                    try {
+                        if (data.principalSignature.startsWith('http')) {
+                            // Remote URL (Cloudinary)
+                            console.log('Loading signature from URL:', data.principalSignature);
+                            const response = await axios.get(data.principalSignature, { responseType: 'arraybuffer' });
+                            signatureImage = response.data;
+                            console.log('Signature loaded successfully from URL');
+                        } else {
+                            // Local File Path
+                            let signaturePath = data.principalSignature;
+
+                            // If path starts with /, it's relative to project root
+                            if (signaturePath.startsWith('/')) {
+                                signaturePath = path.join(process.cwd(), signaturePath);
+                            }
+
+                            console.log('Trying signature path:', signaturePath);
+
+                            if (fs.existsSync(signaturePath)) {
+                                signatureImage = signaturePath;
+                                console.log('Signature file found at:', signaturePath);
+                            } else {
+                                // Try resolving relative to project root
+                                signaturePath = path.resolve(process.cwd(), data.principalSignature);
+                                if (fs.existsSync(signaturePath)) {
+                                    signatureImage = signaturePath;
+                                    console.log('Signature file found at:', signaturePath);
+                                } else {
+                                    // Try just the basename in uploads folder
+                                    signaturePath = path.join(process.cwd(), 'uploads', path.basename(data.principalSignature));
+                                    if (fs.existsSync(signaturePath)) {
+                                        signatureImage = signaturePath;
+                                        console.log('Signature file found at:', signaturePath);
+                                    } else {
+                                        console.warn(`Signature file not found at: ${data.principalSignature} or resolved paths`);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        console.warn('Failed to load signature:', err.message);
+                    }
+                } else {
+                    console.log('No principal signature provided in data');
+                }
+
                 // --- Layout Logic ---
 
                 // 1. Header (School Details)
@@ -145,13 +196,48 @@ const pdfService = {
                 }
 
                 // 4. Footer & Signatures
-                const bottomY = doc.page.height - 150;
+                // For bonafide, use current Y position + some spacing to avoid too much empty space
+                // For TC, use fixed bottom position since it has more content
+                let bottomY;
+                if (template.type === 'TC') {
+                    bottomY = doc.page.height - 150;
+                } else {
+                    // For bonafide, place footer very close to content to minimize gap
+                    bottomY = doc.y + 40; // Reduced from 80 to 40 for tighter spacing
+                }
 
                 doc.fontSize(10).text(`Place: ${data.place}`, 50, bottomY);
                 doc.text(`Date: ${data.issueDate}`, 50, bottomY + 15);
 
+                // Class Teacher signature (left)
                 doc.text('Class Teacher', 50, bottomY + 80, { align: 'left' });
-                doc.text('Principal', 450, bottomY + 80, { align: 'left' });
+
+                // Principal signature (right) - with image if available
+                const principalX = 420; // Adjusted for better alignment
+                console.log('Rendering signature section. Signature image available:', !!signatureImage);
+
+                if (signatureImage) {
+                    // Render signature image above the "Principal" text
+                    const signatureWidth = 120; // Slightly larger for better visibility
+                    const signatureHeight = 50;
+                    const signatureY = bottomY + 20; // Closer to the text
+
+                    console.log('Attempting to render signature at position:', { x: principalX, y: signatureY });
+
+                    try {
+                        doc.image(signatureImage, principalX, signatureY, {
+                            width: signatureWidth,
+                            height: signatureHeight,
+                            fit: [signatureWidth, signatureHeight]
+                        });
+                        console.log('Signature image rendered successfully');
+                    } catch (err) {
+                        console.error('Failed to render signature image:', err.message, err.stack);
+                    }
+                } else {
+                    console.log('No signature image available to render');
+                }
+                doc.text('Principal', principalX + 30, bottomY + 80, { align: 'left' }); // Centered under signature
 
                 doc.end();
                 resolve(doc);

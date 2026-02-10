@@ -236,8 +236,8 @@ const AcademicsManagement = () => {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === tab.id
-                                        ? 'border-primary-500 text-primary-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-primary-500 text-primary-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`}
                             >
                                 <Icon className="h-4 w-4" />
@@ -833,13 +833,29 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
 
                         <div>
                             <label className="label">Grade *</label>
-                            <input
+                            <select
                                 className="input"
                                 value={form.grade}
                                 onChange={(e) => setForm({ ...form, grade: e.target.value })}
-                                placeholder="e.g., 10"
                                 required
-                            />
+                            >
+                                <option value="">Select Grade</option>
+                                <option value="Nursery">Nursery</option>
+                                <option value="LKG">LKG</option>
+                                <option value="UKG">UKG</option>
+                                <option value="1">1st Grade</option>
+                                <option value="2">2nd Grade</option>
+                                <option value="3">3rd Grade</option>
+                                <option value="4">4th Grade</option>
+                                <option value="5">5th Grade</option>
+                                <option value="6">6th Grade</option>
+                                <option value="7">7th Grade</option>
+                                <option value="8">8th Grade</option>
+                                <option value="9">9th Grade</option>
+                                <option value="10">10th Grade</option>
+                                <option value="11">11th Grade</option>
+                                <option value="12">12th Grade</option>
+                            </select>
                         </div>
 
                         <div>
