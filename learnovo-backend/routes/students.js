@@ -592,10 +592,38 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           admissionNumber = `${effectivePrefix}${yearStr}${String(sequence).padStart(counterPadding, '0')}`;
         }
 
-        // Prepare Guardians
+        // Prepare Guardians with auto-added honorifics
         const guardians = [];
-        if (row.fatherName) guardians.push({ relation: 'Father', name: row.fatherName, phone: row.fatherPhone, email: row.fatherEmail, isPrimary: true });
-        if (row.motherName) guardians.push({ relation: 'Mother', name: row.motherName, phone: row.motherPhone, email: row.motherEmail });
+
+        // Helper function to add honorific if not present
+        const addHonorific = (name, prefix) => {
+          if (!name || !name.trim()) return name;
+          const trimmedName = name.trim();
+          // Check if name already has a prefix
+          if (/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Miss)\s+/i.test(trimmedName)) {
+            return trimmedName;
+          }
+          return `${prefix} ${trimmedName}`;
+        };
+
+        if (row.fatherName) {
+          guardians.push({
+            relation: 'Father',
+            name: addHonorific(row.fatherName, 'Mr.'),
+            phone: row.fatherPhone,
+            email: row.fatherEmail,
+            isPrimary: true
+          });
+        }
+
+        if (row.motherName) {
+          guardians.push({
+            relation: 'Mother',
+            name: addHonorific(row.motherName, 'Mrs.'),
+            phone: row.motherPhone,
+            email: row.motherEmail
+          });
+        }
 
         if (guardians.length === 0 && row.guardianName) {
           guardians.push({ relation: 'Guardian', name: row.guardianName, phone: row.guardianPhone, isPrimary: true });
@@ -916,10 +944,23 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
         filter.$and.push({ _id: null });
       }
     }
+
+    // Apply filters
     if (req.query.class) filter.class = req.query.class;
     if (req.query.section) filter.section = req.query.section;
     if (req.query.academicYear) filter.academicYear = req.query.academicYear;
     if (req.query.status) filter.isActive = req.query.status === 'active';
+
+    // NEW: Driver filter
+    if (req.query.driverId) {
+      filter.driverId = req.query.driverId;
+    }
+
+    // NEW: Transport mode filter
+    if (req.query.transportMode) {
+      filter.transportMode = req.query.transportMode;
+    }
+
     if (req.query.search) {
       filter.$or = [
         { fullName: { $regex: req.query.search, $options: 'i' } },
@@ -933,38 +974,101 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
       .populate('subDepartment', 'name')
       .populate('driverId', 'name phone');
 
-    // Generate CSV
-    const headers = [
-      'Admission No', 'Name', 'Class', 'Section', 'Roll No',
-      'Father Name', 'Mother Name', 'Mobile', 'Alt Mobile', 'Email',
-      'DOB', 'Gender', 'Address', 'Driver', 'Driver Phone', 'Sub Department', 'Status'
-    ];
+    // Define all available fields with their extractors
+    const fieldDefinitions = {
+      // Basic Info
+      admissionNumber: { label: 'Admission No', extract: (s) => s.admissionNumber || '' },
+      name: { label: 'Name', extract: (s) => `"${s.fullName}"` },
+      class: { label: 'Class', extract: (s) => s.class || '' },
+      section: { label: 'Section', extract: (s) => s.section || '' },
+      rollNumber: { label: 'Roll No', extract: (s) => s.rollNumber || '' },
+      status: { label: 'Status', extract: (s) => s.isActive ? 'Active' : 'Inactive' },
 
+      // Academic
+      academicYear: { label: 'Academic Year', extract: (s) => s.academicYear || '' },
+      admissionDate: { label: 'Admission Date', extract: (s) => s.admissionDate ? new Date(s.admissionDate).toLocaleDateString() : '' },
+      penNumber: { label: 'PEN Number', extract: (s) => s.penNumber || '' },
+      subDepartment: { label: 'Sub Department', extract: (s) => s.subDepartment?.name || '' },
+
+      // Contact
+      fatherName: {
+        label: 'Father Name', extract: (s) => {
+          const father = s.guardians?.find(g => g.relation === 'Father');
+          let name = s.fatherOrHusbandName || father?.name || '';
+
+          // Add "Mr." prefix if not already present
+          if (name && !/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Miss)\s+/i.test(name)) {
+            name = `Mr. ${name}`;
+          }
+
+          return `"${name}"`;
+        }
+      },
+      motherName: {
+        label: 'Mother Name', extract: (s) => {
+          const mother = s.guardians?.find(g => g.relation === 'Mother');
+          let name = mother?.name || '';
+
+          // Add "Mrs." prefix if not already present
+          if (name && !/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Miss)\s+/i.test(name)) {
+            name = `Mrs. ${name}`;
+          }
+
+          return `"${name}"`;
+        }
+      },
+      guardianName: {
+        label: 'Guardian Name', extract: (s) => {
+          const guardian = s.guardians?.[0];
+          return `"${guardian?.name || ''}"`;
+        }
+      },
+      mobile: { label: 'Mobile', extract: (s) => s.phone || '' },
+      altMobile: {
+        label: 'Alt Mobile', extract: (s) => {
+          const guardian = s.guardians?.[0];
+          return guardian?.phone || '';
+        }
+      },
+      email: { label: 'Email', extract: (s) => s.email || '' },
+      address: { label: 'Address', extract: (s) => `"${(s.address || '').replace(/"/g, '""')}"` },
+
+      // Personal
+      dob: { label: 'DOB', extract: (s) => s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString() : '' },
+      gender: { label: 'Gender', extract: (s) => s.gender || '' },
+      bloodGroup: { label: 'Blood Group', extract: (s) => s.bloodGroup || '' },
+      category: { label: 'Category', extract: (s) => s.category || '' },
+      religion: { label: 'Religion', extract: (s) => s.religion || '' },
+
+      // Transport
+      driverName: { label: 'Driver', extract: (s) => s.driverId?.name || '' },
+      driverPhone: { label: 'Driver Phone', extract: (s) => s.driverId?.phone || '' },
+      transportMode: { label: 'Transport Mode', extract: (s) => s.transportMode || '' }
+    };
+
+    // Parse selected fields from query parameter
+    let selectedFields = [];
+    if (req.query.fields) {
+      // Fields are comma-separated
+      selectedFields = req.query.fields.split(',').map(f => f.trim()).filter(f => fieldDefinitions[f]);
+    }
+
+    // If no fields specified, use all fields (default behavior)
+    if (selectedFields.length === 0) {
+      selectedFields = [
+        'admissionNumber', 'name', 'class', 'section', 'rollNumber',
+        'fatherName', 'motherName', 'mobile', 'altMobile', 'email',
+        'dob', 'gender', 'address', 'driverName', 'driverPhone', 'subDepartment', 'status'
+      ];
+    }
+
+    // Generate CSV headers based on selected fields
+    const headers = selectedFields.map(field => fieldDefinitions[field].label);
     const csvRows = [headers.join(',')];
 
+    // Generate CSV rows
     students.forEach(student => {
-      const guardian = student.guardians?.[0] || {};
-      const mother = student.guardians?.find(g => g.relation === 'Mother') || {};
-
-      const row = [
-        student.admissionNumber || '',
-        `"${student.fullName}"`,
-        student.class || '',
-        student.section || '',
-        student.rollNumber || '',
-        `"${student.fatherOrHusbandName || guardian.name || ''}"`,
-        `"${mother.name || ''}"`,
-        student.phone || '',
-        guardian.phone || '', // Alt mobile
-        student.email || '',
-        student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : '',
-        student.gender || '',
-        `"${(student.address || '').replace(/"/g, '""')}"`,
-        student.driverId?.name || '',
-        student.driverId?.phone || '',
-        student.subDepartment?.name || '',
-        student.isActive ? 'Active' : 'Inactive'
-      ];
+      const row = selectedFields.map(field => fieldDefinitions[field].extract(student));
       csvRows.push(row.join(','));
     });
 

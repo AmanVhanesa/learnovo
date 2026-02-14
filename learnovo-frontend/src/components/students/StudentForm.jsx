@@ -126,6 +126,30 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         // Transform form data to match backend expectations
         const submitData = { ...form }
 
+        // Auto-add honorifics to guardian names
+        if (submitData.guardians && Array.isArray(submitData.guardians)) {
+            submitData.guardians = submitData.guardians.map(guardian => {
+                if (guardian.name && guardian.name.trim()) {
+                    let name = guardian.name.trim();
+
+                    // Check if name already has a prefix (Mr., Mrs., Ms., Dr., etc.)
+                    const hasPrefix = /^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Miss)\s+/i.test(name);
+
+                    if (!hasPrefix) {
+                        // Add appropriate prefix based on relation
+                        if (guardian.relation === 'Father') {
+                            name = `Mr. ${name}`;
+                        } else if (guardian.relation === 'Mother') {
+                            name = `Mrs. ${name}`;
+                        }
+                    }
+
+                    return { ...guardian, name };
+                }
+                return guardian;
+            });
+        }
+
         // Backend expects 'name' not 'fullName'
         if (submitData.fullName) {
             submitData.name = submitData.fullName

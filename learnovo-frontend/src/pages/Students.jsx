@@ -275,91 +275,189 @@ const Students = () => {
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by name, admission number, roll number..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="input pl-10"
-              />
-            </div>
-          </div>
+        {/* Search Bar */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name, admission number, roll number..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="input pl-10"
+          />
+        </div>
 
-          {/* Filter Dropdowns */}
-          <div className="flex flex-wrap gap-3">
+        {/* Filter Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Filters:</span>
+
+          {/* Class Filter */}
+          <div className="relative">
             <select
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
-              className="input w-32"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
-              <option value="">All Classes</option>
+              <option value="">Class</option>
               {filterOptions.classes.map(cls => (
                 <option key={cls} value={cls}>{cls}</option>
               ))}
             </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
 
+          {/* Section Filter */}
+          <div className="relative">
             <select
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              className="input w-32"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
-              <option value="">All Sections</option>
+              <option value="">Section</option>
               {filterOptions.sections.map(sec => (
                 <option key={sec} value={sec}>{sec}</option>
               ))}
             </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
 
+          {/* Year Filter */}
+          <div className="relative">
             <select
               value={yearFilter}
               onChange={(e) => setYearFilter(e.target.value)}
-              className="input w-40"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
-              <option value="">All Years</option>
+              <option value="">Year</option>
               {filterOptions.academicYears.map(year => (
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
 
+          {/* Status Filter */}
+          <div className="relative">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="input w-32"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
-              <option value="">All Status</option>
+              <option value="">Status</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
-
-            {(searchQuery || classFilter || sectionFilter || yearFilter || statusFilter) && (
-              <button onClick={clearFilters} className="btn btn-ghost text-sm">
-                Clear
-              </button>
-            )}
-
-            <button
-              onClick={() => {
-                const params = new URLSearchParams({
-                  class: classFilter,
-                  section: sectionFilter,
-                  academicYear: yearFilter,
-                  status: statusFilter,
-                  search: searchQuery
-                });
-                // Trigger backend download
-                window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/students/export?${params.toString()}&token=${localStorage.getItem('token')}`, '_blank');
-              }}
-              className="btn btn-outline gap-2"
-            >
-              <Upload className="h-4 w-4 rotate-180" />
-              Export CSV
-            </button>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
           </div>
+
+          {/* Clear Filters Button */}
+          {(searchQuery || classFilter || sectionFilter || yearFilter || statusFilter) && (
+            <button
+              onClick={clearFilters}
+              className="h-8 px-3 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all"
+            >
+              Clear all
+            </button>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1"></div>
+
+          {/* Export Button */}
+          <button
+            onClick={() => {
+              const params = new URLSearchParams({
+                class: classFilter,
+                section: sectionFilter,
+                academicYear: yearFilter,
+                status: statusFilter,
+                search: searchQuery
+              });
+              window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/students/export?${params.toString()}&token=${localStorage.getItem('token')}`, '_blank');
+            }}
+            className="h-8 px-3 text-xs font-medium text-primary-600 border border-primary-600 hover:bg-primary-50 rounded-md transition-all inline-flex items-center gap-1.5"
+          >
+            <Upload className="h-3.5 w-3.5 rotate-180" />
+            <span>Export CSV</span>
+          </button>
         </div>
+
+        {/* Active Filters Display */}
+        {(classFilter || sectionFilter || yearFilter || statusFilter) && (
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-gray-500">Active filters:</span>
+              {classFilter && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
+                  Class: {classFilter}
+                  <button
+                    onClick={() => setClassFilter('')}
+                    className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              {sectionFilter && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
+                  Section: {sectionFilter}
+                  <button
+                    onClick={() => setSectionFilter('')}
+                    className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              {yearFilter && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
+                  Year: {yearFilter}
+                  <button
+                    onClick={() => setYearFilter('')}
+                    className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              {statusFilter && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
+                  Status: {statusFilter === 'active' ? 'Active' : 'Inactive'}
+                  <button
+                    onClick={() => setStatusFilter('')}
+                    className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Bulk Actions */}
         {selectedStudents.length > 0 && (

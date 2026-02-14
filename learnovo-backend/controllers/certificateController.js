@@ -13,6 +13,13 @@ const dateToWords = (dateStr) => {
     return dateStr; // Placeholder
 };
 
+// Helper to strip existing honorific prefixes from names
+const stripHonorific = (name) => {
+    if (!name || typeof name !== 'string') return name;
+    // Remove common honorifics: Mr., Mrs., Ms., Dr., Prof., Miss
+    return name.replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Miss)\s+/i, '').trim();
+};
+
 exports.getTemplates = async (req, res) => {
     try {
         // req.user.tenantId should be populated by auth middleware
@@ -88,10 +95,16 @@ exports.previewCertificate = async (req, res) => {
         const dobWords = student.dateOfBirth ? dateToWords(format(new Date(student.dateOfBirth), 'dd MMMM yyyy')) : '';
         const today = format(new Date(), 'dd/MM/yyyy');
 
+        // Get guardian names and strip existing honorifics (PDF service will add them)
+        const father = student.guardians?.find(g => g.relation === 'Father');
+        const mother = student.guardians?.find(g => g.relation === 'Mother');
+        const fatherName = stripHonorific(student.fatherOrHusbandName || father?.name || '-');
+        const motherName = stripHonorific(mother?.name || '-');
+
         const data = {
             studentName: student.fullName,
-            fatherName: student.fatherOrHusbandName || (student.guardians?.[0]?.name) || '-',
-            motherName: student.guardians?.find(g => g.relation === 'Mother')?.name || '-',
+            fatherName: fatherName,
+            motherName: motherName,
             admissionNumber: student.admissionNumber || '-',
             class: student.class || '-',
             section: student.section || '-',
