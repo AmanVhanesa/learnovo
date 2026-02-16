@@ -912,6 +912,8 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                                 {teachers.map((teacher) => (
                                     <option key={teacher._id} value={teacher._id}>
                                         {teacher.name}
+                                        {teacher.employeeId && ` (ID: ${teacher.employeeId})`}
+                                        {!teacher.employeeId && teacher.email && ` (${teacher.email})`}
                                     </option>
                                 ))}
                             </select>
@@ -1190,6 +1192,8 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
                                 {teachers.map((teacher) => (
                                     <option key={teacher._id} value={teacher._id}>
                                         {teacher.name}
+                                        {teacher.employeeId && ` (ID: ${teacher.employeeId})`}
+                                        {!teacher.employeeId && teacher.email && ` (${teacher.email})`}
                                     </option>
                                 ))}
                             </select>

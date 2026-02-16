@@ -103,7 +103,40 @@ router.get('/', protect, authorize('admin', 'teacher'), [
 
     // Add section filter
     if (req.query.section) {
-      filter.section = req.query.section;
+      // If section is provided, we need to find the section by name and classId
+      // Then filter by sectionId for accurate results
+      try {
+        const Section = require('../models/Section');
+        const sectionQuery = {
+          name: req.query.section,
+          tenantId: req.user.tenantId,
+          isActive: true
+        };
+
+        // If class filter is also provided, use it to narrow down section lookup
+        if (req.query.class) {
+          const Class = require('../models/Class');
+          const classDoc = await Class.findOne({
+            grade: req.query.class,
+            tenantId: req.user.tenantId
+          });
+          if (classDoc) {
+            sectionQuery.classId = classDoc._id;
+          }
+        }
+
+        const section = await Section.findOne(sectionQuery);
+        if (section) {
+          filter.sectionId = section._id;
+        } else {
+          // If section not found, also try string match as fallback for legacy data
+          filter.section = req.query.section;
+        }
+      } catch (err) {
+        console.error('Section filter error:', err);
+        // Fallback to string match
+        filter.section = req.query.section;
+      }
     }
 
     // Add academic year filter
@@ -1213,6 +1246,38 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
       admissionNumber = `${effectivePrefix}${yearStr}${String(sequence).padStart(counterPadding, '0')}`;
     }
 
+    // Look up sectionId if section name is provided
+    let sectionId = req.body.sectionId || null;
+    if (section && !sectionId) {
+      try {
+        const Section = require('../models/Section');
+        const Class = require('../models/Class');
+
+        // Find the class first
+        const classDoc = await Class.findOne({
+          grade: studentClass,
+          tenantId
+        });
+
+        if (classDoc) {
+          // Find the section within that class
+          const sectionDoc = await Section.findOne({
+            name: section.trim().toUpperCase(),
+            classId: classDoc._id,
+            tenantId,
+            isActive: true
+          });
+
+          if (sectionDoc) {
+            sectionId = sectionDoc._id;
+          }
+        }
+      } catch (err) {
+        console.error('Error looking up sectionId:', err);
+        // Continue without sectionId - will save section string only
+      }
+    }
+
     const studentData = {
       fullName: fullName ? fullName.trim() : undefined,
       firstName: firstName ? firstName.trim() : undefined,
@@ -1223,7 +1288,11 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
       role: 'student',
       tenantId,
       admissionNumber,
-      class: studentClass, section, academicYear, rollNumber,
+      class: studentClass,
+      section,
+      sectionId,  // Add sectionId
+      academicYear,
+      rollNumber,
       admissionDate: admissionDate || new Date(),
       guardians, address, avatar,
       penNumber: penNumber ? penNumber.trim() : undefined,
@@ -1371,6 +1440,38 @@ router.put('/:id', protect, canAccessStudent, [
     // Debug logging
     console.log('Updating student:', req.params.id);
     console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
+
+    // Look up sectionId if section is being updated
+    if (updatePayload.section && !updatePayload.sectionId) {
+      try {
+        const Section = require('../models/Section');
+        const Class = require('../models/Class');
+
+        // Find the class first (use updated class or existing)
+        const classGrade = updatePayload.class || student.class;
+        const classDoc = await Class.findOne({
+          grade: classGrade,
+          tenantId: req.user.tenantId
+        });
+
+        if (classDoc) {
+          // Find the section within that class
+          const sectionDoc = await Section.findOne({
+            name: updatePayload.section.trim().toUpperCase(),
+            classId: classDoc._id,
+            tenantId: req.user.tenantId,
+            isActive: true
+          });
+
+          if (sectionDoc) {
+            updatePayload.sectionId = sectionDoc._id;
+          }
+        }
+      } catch (err) {
+        console.error('Error looking up sectionId during update:', err);
+        // Continue without sectionId - will save section string only
+      }
+    }
 
     const updatedStudent = await User.findByIdAndUpdate(
       req.params.id,

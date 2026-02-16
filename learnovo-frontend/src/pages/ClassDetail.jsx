@@ -42,7 +42,7 @@ const ClassDetail = () => {
         classesService.getStudents(id),
         classesService.getSubjects(id)
       ])
-      
+
       setClassItem(classResponse.data)
       setStudents(studentsResponse.data)
       setSubjects(subjectsResponse.data)
@@ -111,7 +111,7 @@ const ClassDetail = () => {
 
   const handleRemoveSubject = async (subjectId) => {
     if (!window.confirm('Are you sure you want to remove this subject?')) return
-    
+
     try {
       await classesService.removeSubject(id, subjectId)
       fetchClassDetails()
@@ -142,7 +142,7 @@ const ClassDetail = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button 
+          <button
             onClick={() => navigate('/classes')}
             className="p-2 rounded-md hover:bg-gray-100"
           >
@@ -182,22 +182,20 @@ const ClassDetail = () => {
           <nav className="flex space-x-8 px-6">
             <button
               onClick={() => setActiveTab('students')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'students'
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'students'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+                }`}
             >
               <Users className="h-4 w-4 inline mr-2" />
               Students ({students.length})
             </button>
             <button
               onClick={() => setActiveTab('subjects')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'subjects'
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'subjects'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+                }`}
             >
               <BookOpen className="h-4 w-4 inline mr-2" />
               Subjects & Teachers ({subjects.length})
@@ -211,7 +209,7 @@ const ClassDetail = () => {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Enrolled Students</h3>
-                <button 
+                <button
                   className="btn btn-primary"
                   onClick={() => setShowEnrollModal(true)}
                 >
@@ -260,7 +258,7 @@ const ClassDetail = () => {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-900">Subjects & Teachers</h3>
-                <button 
+                <button
                   className="btn btn-primary"
                   onClick={() => setShowSubjectModal(true)}
                 >
@@ -291,7 +289,7 @@ const ClassDetail = () => {
                           <td className="text-sm text-gray-900">{subject.subject.subjectCode}</td>
                           <td className="text-sm text-gray-900">{subject.teacher?.name || 'Not assigned'}</td>
                           <td>
-                            <button 
+                            <button
                               className="p-1 text-gray-400 hover:text-red-600"
                               onClick={() => handleRemoveSubject(subject.subject._id)}
                             >
@@ -315,19 +313,19 @@ const ClassDetail = () => {
           <div className="modal-content p-6">
             <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Enroll Students</h3>
-              <button 
+              <button
                 className="p-2 rounded-md hover:bg-gray-100"
                 onClick={() => setShowEnrollModal(false)}
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <p className="text-sm text-gray-600">
                 Select students to enroll in this class:
               </p>
-              
+
               {allStudents.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">
                   All students are already enrolled in classes
@@ -356,15 +354,15 @@ const ClassDetail = () => {
                   ))}
                 </div>
               )}
-              
+
               <div className="flex justify-end space-x-3 pt-4">
-                <button 
+                <button
                   className="btn btn-ghost"
                   onClick={() => setShowEnrollModal(false)}
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   className="btn btn-primary"
                   onClick={handleEnrollStudents}
                   disabled={selectedStudents.length === 0}
@@ -383,14 +381,14 @@ const ClassDetail = () => {
           <div className="modal-content p-6">
             <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Assign Subject</h3>
-              <button 
+              <button
                 className="p-2 rounded-md hover:bg-gray-100"
                 onClick={() => setShowSubjectModal(false)}
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form className="space-y-4" onSubmit={handleAssignSubject}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -398,7 +396,7 @@ const ClassDetail = () => {
                 </label>
                 <select
                   value={subjectForm.subjectId}
-                  onChange={(e) => setSubjectForm({...subjectForm, subjectId: e.target.value})}
+                  onChange={(e) => setSubjectForm({ ...subjectForm, subjectId: e.target.value })}
                   className="input"
                   required
                 >
@@ -410,35 +408,37 @@ const ClassDetail = () => {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Teacher
                 </label>
                 <select
                   value={subjectForm.teacherId}
-                  onChange={(e) => setSubjectForm({...subjectForm, teacherId: e.target.value})}
+                  onChange={(e) => setSubjectForm({ ...subjectForm, teacherId: e.target.value })}
                   className="input"
                   required
                 >
                   <option value="">Select Teacher</option>
                   {teachers.map(teacher => (
                     <option key={teacher._id} value={teacher._id}>
-                      {teacher.name} ({teacher.email})
+                      {teacher.name}
+                      {teacher.employeeId && ` (ID: ${teacher.employeeId})`}
+                      {!teacher.employeeId && teacher.email && ` (${teacher.email})`}
                     </option>
                   ))}
                 </select>
               </div>
-              
+
               <div className="flex justify-end space-x-3 pt-4">
-                <button 
+                <button
                   type="button"
                   className="btn btn-ghost"
                   onClick={() => setShowSubjectModal(false)}
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="btn btn-primary"
                 >

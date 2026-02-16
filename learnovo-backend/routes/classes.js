@@ -635,4 +635,45 @@ router.delete('/:id/subjects/:subjectId', [protect, authorize('admin')], async (
   }
 });
 
+// Get sections for a specific class
+router.get('/:id/sections', protect, async (req, res) => {
+  try {
+    const classId = req.params.id;
+
+    // Verify class exists and user has access
+    const classItem = await Class.findById(classId);
+    if (!classItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Class not found'
+      });
+    }
+
+    // Verify tenant access
+    if (req.user && req.user.tenantId && classItem.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Fetch sections for this class
+    const sections = await Section.find({
+      classId,
+      isActive: true
+    }).sort({ name: 1 });
+
+    res.json({
+      success: true,
+      data: sections
+    });
+  } catch (error) {
+    console.error('Error fetching sections:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
 module.exports = router;

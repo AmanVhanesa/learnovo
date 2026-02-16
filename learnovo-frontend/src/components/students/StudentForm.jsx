@@ -67,6 +67,8 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
     const [subDepartmentOptions, setSubDepartmentOptions] = useState([])
     const [driverOptions, setDriverOptions] = useState([])
+    const [sectionOptions, setSectionOptions] = useState([])
+    const [loadingSections, setLoadingSections] = useState(false)
 
     useEffect(() => {
         const fetchSubDepartments = async () => {
@@ -94,6 +96,46 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         fetchSubDepartments()
         fetchDrivers()
     }, [])
+
+    // Fetch sections when class changes
+    useEffect(() => {
+        const fetchSections = async () => {
+            if (!form.class) {
+                setSectionOptions([])
+                return
+            }
+
+            try {
+                setLoadingSections(true)
+                // Find the class ID from STANDARD_CLASSES
+                const selectedClass = STANDARD_CLASSES.find(c => c.value === form.class)
+                if (!selectedClass) {
+                    setSectionOptions([])
+                    return
+                }
+
+                // Fetch classes to get the classId
+                const classesResponse = await api.get('/classes')
+                if (classesResponse.data.success) {
+                    const classDoc = classesResponse.data.data.find(c => c.grade === form.class)
+                    if (classDoc) {
+                        // Fetch sections for this class
+                        const sectionsResponse = await api.get(`/classes/${classDoc._id}/sections`)
+                        if (sectionsResponse.data.success) {
+                            setSectionOptions(sectionsResponse.data.data)
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching sections:', error)
+                setSectionOptions([])
+            } finally {
+                setLoadingSections(false)
+            }
+        }
+
+        fetchSections()
+    }, [form.class])
 
     const sections = [
         { id: 0, name: 'Student Info', icon: User },
@@ -345,12 +387,30 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                         </div>
                                         <div>
                                             <label className="label">Section</label>
-                                            <input
+                                            <select
                                                 className="input"
                                                 value={form.section}
-                                                onChange={(e) => updateField('section', e.target.value)}
-                                                placeholder="A"
-                                            />
+                                                onChange={(e) => {
+                                                    const selectedSection = sectionOptions.find(s => s.name === e.target.value)
+                                                    updateField('section', e.target.value)
+                                                    if (selectedSection) {
+                                                        updateField('sectionId', selectedSection._id)
+                                                    }
+                                                }}
+                                                disabled={!form.class || loadingSections}
+                                            >
+                                                <option value="">
+                                                    {loadingSections ? 'Loading sections...' : 'Select Section'}
+                                                </option>
+                                                {sectionOptions.map(section => (
+                                                    <option key={section._id} value={section.name}>
+                                                        {section.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {!form.class && (
+                                                <p className="text-xs text-gray-500 mt-1">Please select a class first</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="label">Roll Number</label>
