@@ -12,12 +12,12 @@ const Layout = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Close sidebar on mobile when route changes
+  // Close sidebar on mobile/tablet when route changes, open only on large desktops
   React.useEffect(() => {
-    if (window.innerWidth < 768) {
+    if (window.innerWidth < 1280) { // xl breakpoint (1280px)
       setSidebarOpen(false)
     } else {
-      setSidebarOpen(true) // Open on desktop
+      setSidebarOpen(true) // Open on large desktop
     }
   }, [location])
 
@@ -31,7 +31,7 @@ const Layout = () => {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+      <div className="flex-1 flex flex-col overflow-hidden xl:ml-64">
         {/* Mobile Header */}
         <MobileHeader
           onMenuClick={toggleSidebar}
@@ -39,7 +39,7 @@ const Layout = () => {
         />
 
         {/* Desktop Header */}
-        <div className="hidden lg:block">
+        <div className="hidden xl:block">
           <Header
             onToggleSidebar={toggleSidebar}
             sidebarOpen={sidebarOpen}

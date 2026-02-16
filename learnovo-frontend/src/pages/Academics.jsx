@@ -5,6 +5,33 @@ import { employeesService } from '../services/employeesService'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
+// Helper function to format dates consistently as DD/MM/YYYY
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+};
+
+// Helper function to sort classes by grade order
+const sortClassesByGrade = (classes) => {
+    const gradeOrder = {
+        'Nursery': 0,
+        'LKG': 1,
+        'UKG': 2,
+        '1': 3, '2': 4, '3': 5, '4': 6, '5': 7, '6': 8,
+        '7': 9, '8': 10, '9': 11, '10': 12, '11': 13, '12': 14
+    };
+
+    return [...classes].sort((a, b) => {
+        const gradeA = gradeOrder[a.grade] ?? 999;
+        const gradeB = gradeOrder[b.grade] ?? 999;
+        return gradeA - gradeB;
+    });
+};
+
 const AcademicsManagement = () => {
     const { user } = useAuth()
     const [activeTab, setActiveTab] = useState('sessions')
@@ -66,7 +93,9 @@ const AcademicsManagement = () => {
     const fetchClasses = async () => {
         try {
             const res = await classesService.list()
-            setClasses(res.data || [])
+            // Sort classes by grade order
+            const sortedClasses = sortClassesByGrade(res.data || [])
+            setClasses(sortedClasses)
         } catch (error) {
             console.error('Fetch classes error:', error)
             toast.error('Failed to load classes')
@@ -86,6 +115,8 @@ const AcademicsManagement = () => {
     const fetchTeachers = async () => {
         try {
             const res = await employeesService.list({ role: 'teacher', limit: 1000 })
+            console.log('Teachers API Response:', res)
+            console.log('Teachers data:', res.data)
             setTeachers(res.data || [])
         } catch (error) {
             console.error('Fetch teachers error:', error)
@@ -213,7 +244,7 @@ const AcademicsManagement = () => {
                         </div>
                         <div className="text-right">
                             <p className="text-xs text-primary-600">
-                                {new Date(activeSession.startDate).toLocaleDateString()} - {new Date(activeSession.endDate).toLocaleDateString()}
+                                {formatDate(activeSession.startDate)} - {formatDate(activeSession.endDate)}
                             </p>
                             {activeSession.isLocked && (
                                 <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
@@ -300,7 +331,7 @@ const AcademicsManagement = () => {
                                                     )}
                                                 </div>
                                                 <p className="text-sm text-gray-600 mt-1">
-                                                    {new Date(session.startDate).toLocaleDateString()} - {new Date(session.endDate).toLocaleDateString()}
+                                                    {formatDate(session.startDate)} - {formatDate(session.endDate)}
                                                 </p>
                                             </div>
 

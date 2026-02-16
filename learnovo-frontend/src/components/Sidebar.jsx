@@ -60,10 +60,10 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile/Tablet overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 md:hidden"
+          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 xl:hidden"
           onClick={onClose}
         />
       )}
@@ -72,7 +72,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       <div
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out flex flex-col',
-          'lg:translate-x-0',
+          'xl:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -99,7 +99,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           </div>
           <button
             onClick={onClose}
-            className="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+            className="xl:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
           >
             <X className="h-5 w-5" />
           </button>
@@ -119,7 +119,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                   }`
                 }
                 onClick={() => {
-                  if (window.innerWidth < 768) {
+                  if (window.innerWidth < 1280) { // xl breakpoint
                     onClose()
                   }
                 }}
