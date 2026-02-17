@@ -49,6 +49,11 @@ const notificationPreferenceSchema = new mongoose.Schema({
             email: { type: Boolean, default: false },
             whatsapp: { type: Boolean, default: false }
         },
+        announcement: {
+            inApp: { type: Boolean, default: true },
+            email: { type: Boolean, default: false },
+            whatsapp: { type: Boolean, default: false }
+        },
         system: {
             inApp: { type: Boolean, default: true },
             email: { type: Boolean, default: false },
