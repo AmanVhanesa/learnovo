@@ -183,6 +183,7 @@ app.use('/api/assignments', require('./routes/assignments'));
 app.use('/api/admissions', require('./routes/admissions'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/sub-departments', require('./routes/subDepartments'));
 app.use('/api/certificates', require('./routes/certificates'));

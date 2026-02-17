@@ -26,6 +26,8 @@ import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
+import NotificationPreferences from './pages/NotificationPreferences'
+import Announcements from './pages/Announcements'
 import Communication from './pages/Communication'
 import Academics from './pages/Academics'
 import FeesFinance from './pages/FeesFinance'
@@ -106,7 +108,9 @@ function App() {
 
                   {/* Communication Module */}
                   <Route path="communication" element={<Communication />} />
+                  <Route path="announcements" element={<Announcements />} />
                   <Route path="notifications" element={<Notifications />} />
+                  <Route path="notification-preferences" element={<NotificationPreferences />} />
 
                   {/* Transport Module */}
                   <Route path="transport" element={<Transport />} />

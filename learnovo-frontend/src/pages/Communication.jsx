@@ -22,10 +22,10 @@ const Communication = () => {
         },
         {
             title: 'Announcements',
-            description: 'Public announcements for notice board',
+            description: 'Broadcast messages to students, teachers, and parents',
             icon: Megaphone,
-            path: '/app/communication/announcements',
-            color: 'bg-orange-500'
+            path: '/app/announcements',
+            color: 'bg-purple-500'
         }
     ]
 

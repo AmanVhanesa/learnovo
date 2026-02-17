@@ -6,6 +6,7 @@ const Class = require('../models/Class')
 const User = require('../models/User')
 const { protect, authorize } = require('../middleware/auth')
 const { handleValidationErrors } = require('../middleware/validation')
+const notificationService = require('../services/notificationService')
 
 /**
  * @route   GET /api/attendance
@@ -142,6 +143,19 @@ router.post('/', [
     }
 
     await attendance.populate('attendanceRecords.studentId', 'name email admissionNumber photo')
+
+    // Send notifications for absent students
+    try {
+      const absentStudents = attendance.attendanceRecords.filter(record => record.status === 'absent')
+      for (const record of absentStudents) {
+        if (record.studentId) {
+          await notificationService.notifyStudentAbsent(attendance, record.studentId, req.user.tenantId)
+        }
+      }
+    } catch (notifError) {
+      console.error('Error sending absence notifications:', notifError)
+      // Don't fail the request if notification fails
+    }
 
     res.status(isNew ? 201 : 200).json({
       success: true,

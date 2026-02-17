@@ -5,6 +5,7 @@ const Counter = require('../models/Counter');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const Settings = require('../models/Settings');
+const notificationService = require('../services/notificationService');
 
 const router = express.Router();
 
@@ -221,6 +222,14 @@ router.post('/', protect, authorize('admin'), [
         };
 
         const employee = await User.create(employeeData);
+
+        // Send notification about new employee
+        try {
+            await notificationService.notifyNewEmployee(employee, tenantId);
+        } catch (notifError) {
+            console.error('Error sending employee notification:', notifError);
+            // Don't fail the request if notification fails
+        }
 
         res.status(201).json({
             success: true,
