@@ -8,6 +8,7 @@ const Announcements = () => {
     const { user } = useAuth();
     const [announcements, setAnnouncements] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
@@ -37,7 +38,10 @@ const Announcements = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        if (submitting) return; // Prevent double submission
+
         try {
+            setSubmitting(true);
             const response = await announcementsService.createAnnouncement(formData);
             toast.success(response.message || 'Announcement created successfully');
             setShowCreateModal(false);
@@ -48,10 +52,12 @@ const Announcements = () => {
                 priority: 'medium',
                 expiresAt: ''
             });
-            fetchAnnouncements();
+            await fetchAnnouncements(); // Refresh the list
         } catch (error) {
             console.error('Error creating announcement:', error);
             toast.error(error.response?.data?.message || 'Failed to create announcement');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -61,12 +67,24 @@ const Announcements = () => {
         }
 
         try {
+            // Optimistically update UI
+            setAnnouncements(prev => prev.map(a =>
+                a._id === id ? { ...a, _deleting: true } : a
+            ));
+
             await announcementsService.deleteAnnouncement(id);
             toast.success('Announcement deleted successfully');
-            fetchAnnouncements();
+
+            // Remove from list
+            setAnnouncements(prev => prev.filter(a => a._id !== id));
         } catch (error) {
             console.error('Error deleting announcement:', error);
-            toast.error('Failed to delete announcement');
+            toast.error(error.response?.data?.message || 'Failed to delete announcement');
+
+            // Revert optimistic update
+            setAnnouncements(prev => prev.map(a =>
+                a._id === id ? { ...a, _deleting: false } : a
+            ));
         }
     };
 
@@ -159,9 +177,15 @@ const Announcements = () => {
                                 {user?.role === 'admin' && (
                                     <button
                                         onClick={() => handleDelete(announcement._id)}
-                                        className="text-red-600 hover:text-red-700 p-2"
+                                        disabled={announcement._deleting}
+                                        className="text-red-600 hover:text-red-700 p-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Delete announcement"
                                     >
-                                        <Trash2 size={18} />
+                                        {announcement._deleting ? (
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                                        ) : (
+                                            <Trash2 size={18} />
+                                        )}
                                     </button>
                                 )}
                             </div>
@@ -290,9 +314,17 @@ const Announcements = () => {
                                 <div className="flex gap-3 pt-4">
                                     <button
                                         type="submit"
-                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                        disabled={submitting}
+                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
-                                        Create & Send
+                                        {submitting ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                                Creating...
+                                            </>
+                                        ) : (
+                                            'Create & Send'
+                                        )}
                                     </button>
                                     <button
                                         type="button"
