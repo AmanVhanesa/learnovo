@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Search as SearchIcon, Users, GraduationCap, CreditCard, BookOpen, User } from 'lucide-react'
+import { Search as SearchIcon, Users, GraduationCap, CreditCard, BookOpen, User, ArrowLeft } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { studentsService } from '../services/studentsService'
 import { teachersService } from '../services/teachersService'
@@ -75,6 +75,15 @@ const Search = () => {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
+      {/* Back Button */}
+      <button
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+      >
+        <ArrowLeft className="h-5 w-5" />
+        <span className="font-medium">Back</span>
+      </button>
+
       {/* Search Header */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         <div className="flex items-center gap-4">
@@ -215,11 +224,10 @@ const Search = () => {
                         <p className="text-sm font-semibold text-gray-900">
                           {fee.currency} {fee.amount?.toLocaleString() || 0}
                         </p>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          fee.status === 'paid' ? 'bg-green-100 text-green-800' :
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${fee.status === 'paid' ? 'bg-green-100 text-green-800' :
                           fee.status === 'overdue' ? 'bg-red-100 text-red-800' :
-                          'bg-yellow-100 text-yellow-800'
-                        }`}>
+                            'bg-yellow-100 text-yellow-800'
+                          }`}>
                           {fee.status}
                         </span>
                       </div>
@@ -253,11 +261,10 @@ const Search = () => {
                         <p className="text-xs text-gray-500">
                           Due: {new Date(assignment.dueDate).toLocaleDateString()}
                         </p>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          assignment.status === 'active' ? 'bg-green-100 text-green-800' :
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${assignment.status === 'active' ? 'bg-green-100 text-green-800' :
                           assignment.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                            'bg-gray-100 text-gray-800'
+                          }`}>
                           {assignment.status}
                         </span>
                       </div>
