@@ -274,8 +274,8 @@ const EmployeeDetail = () => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                                    ? 'border-primary-500 text-primary-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-primary-500 text-primary-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             {tab.label}
@@ -363,6 +363,27 @@ const EmployeeDetail = () => {
                             <div className="border-t border-gray-100 pt-6">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Address</h3>
                                 <p className="text-sm text-gray-700">{employee.homeAddress}</p>
+                            </div>
+                        )}
+
+                        {/* Bank Details — admin only */}
+                        {user?.role === 'admin' && (
+                            <div className="border-t border-gray-100 pt-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Bank Details</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <p className="text-xs text-gray-500 uppercase">Bank Name</p>
+                                        <p className="text-sm font-medium text-gray-900 mt-1">{employee.bankName || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 uppercase">Account Number</p>
+                                        <p className="text-sm font-medium text-gray-900 mt-1">{employee.accountNumber || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 uppercase">IFSC Code</p>
+                                        <p className="text-sm font-medium text-gray-900 mt-1">{employee.ifscCode || 'N/A'}</p>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
