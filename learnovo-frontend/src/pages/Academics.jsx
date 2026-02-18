@@ -841,6 +841,7 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
     const [sections, setSections] = useState(
         classData?.sections?.length > 0
             ? classData.sections.map(s => ({
+                _id: s._id || null,   // ← preserve ID so backend can delete removed sections
                 name: s.name,
                 // sectionTeacher may be: raw ObjectId string, populated object, or null
                 sectionTeacher: s.sectionTeacher?._id?.toString()
@@ -870,6 +871,7 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
             const data = {
                 ...form,
                 sections: validSections.map(s => ({
+                    ...(s._id && { _id: s._id }),   // include _id if exists (for update/delete matching)
                     name: s.name.trim(),
                     sectionTeacher: s.sectionTeacher || null
                 }))
