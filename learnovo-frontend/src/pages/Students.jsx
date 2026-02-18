@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Search, Eye, Power, PowerOff, Upload } from 'lucide-react'
+import { Plus, Search, Eye, Power, PowerOff, Upload, Trash2 } from 'lucide-react'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -135,6 +135,19 @@ const Students = () => {
           console.error('Reactivate error:', error)
           toast.error(error.response?.data?.message || 'Failed to reactivate student')
         }
+      }
+    }
+  }
+
+  const handleDeleteStudent = async (student) => {
+    if (window.confirm(`Are you sure you want to permanently delete ${student.fullName || student.name}? This action cannot be undone.`)) {
+      try {
+        await studentsService.remove(student._id)
+        toast.success('Student deleted successfully')
+        fetchStudents()
+      } catch (error) {
+        console.error('Delete error:', error)
+        toast.error(error.response?.data?.message || 'Failed to delete student')
       }
     }
   }
@@ -581,10 +594,17 @@ const Students = () => {
                           <>
                             <button
                               onClick={() => handleToggleStatus(student)}
-                              className={`p-1 text-gray-400 hover:${student.isActive ? 'text-red-600' : 'text-green-600'}`}
+                              className={`p-1 text-gray-400 hover:${student.isActive ? 'text-orange-500' : 'text-green-600'}`}
                               title={student.isActive ? 'Deactivate' : 'Activate'}
                             >
                               {student.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteStudent(student)}
+                              className="p-1 text-gray-400 hover:text-red-600"
+                              title="Delete Permanently"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </>
                         )}
