@@ -396,66 +396,83 @@ const AcademicsManagement = () => {
                                 <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                 <p className="text-gray-500">No classes found</p>
                             </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {classes.map((cls) => (
-                                    <div key={cls._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                                <h3 className="text-lg font-semibold text-gray-900">{cls.name}</h3>
-                                                <p className="text-sm text-gray-600">Grade: {cls.grade}</p>
-                                                <p className="text-xs text-gray-500">{cls.academicYear}</p>
-                                            </div>
-                                            {user?.role === 'admin' && (
-                                                <div className="flex gap-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingClass(cls)
-                                                            setShowClassForm(true)
-                                                        }}
-                                                        className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                                        title="Edit"
-                                                    >
-                                                        <Edit className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeleteClass(cls._id)}
-                                                        className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
+                        ) : (() => {
+                            // Group classes by grade
+                            const gradeOrder = { 'Nursery': 0, 'LKG': 1, 'UKG': 2, '1': 3, '2': 4, '3': 5, '4': 6, '5': 7, '6': 8, '7': 9, '8': 10, '9': 11, '10': 12, '11': 13, '12': 14 };
+                            const grouped = classes.reduce((acc, cls) => {
+                                const g = cls.grade || 'Unknown';
+                                if (!acc[g]) acc[g] = [];
+                                acc[g].push(cls);
+                                return acc;
+                            }, {});
+                            const sortedGrades = Object.keys(grouped).sort((a, b) => (gradeOrder[a] ?? 99) - (gradeOrder[b] ?? 99));
 
-                                        <div className="space-y-2 text-sm">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-600">Class Teacher:</span>
-                                                <span className="font-medium">{cls.classTeacher?.name || 'Not assigned'}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-600">Students:</span>
-                                                <span className="font-medium">{cls.studentCount || 0}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-gray-600">Sections:</span>
-                                                <span className="font-medium">{cls.sections?.length || 0}</span>
-                                            </div>
-                                            {cls.sections && cls.sections.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mt-2">
-                                                    {cls.sections.map((section) => (
-                                                        <span key={section._id} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                                                            {section.name}
-                                                        </span>
-                                                    ))}
+                            return (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {sortedGrades.map(grade => {
+                                        const gradeClasses = grouped[grade];
+                                        // Flatten all sections from all classes of this grade
+                                        const allSections = gradeClasses.flatMap(cls => cls.sections || []);
+                                        const totalStudents = gradeClasses.reduce((sum, cls) => sum + (cls.studentCount || 0), 0);
+                                        const academicYear = gradeClasses[0]?.academicYear || '';
+
+                                        return (
+                                            <div key={grade} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                {/* Grade Header */}
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-gray-900">{grade}</h3>
+                                                        <p className="text-xs text-gray-500">{academicYear}</p>
+                                                    </div>
+                                                    {user?.role === 'admin' && (
+                                                        <div className="flex gap-1">
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingClass(gradeClasses[0])
+                                                                    setShowClassForm(true)
+                                                                }}
+                                                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                                                title="Edit"
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteClass(gradeClasses[0]._id)}
+                                                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+
+                                                {/* Stats */}
+                                                <div className="flex gap-4 text-sm mb-3">
+                                                    <span className="text-gray-600">👥 <strong>{totalStudents}</strong> Students</span>
+                                                    <span className="text-gray-600">📚 <strong>{allSections.length}</strong> Sections</span>
+                                                </div>
+
+                                                {/* Sections List */}
+                                                {allSections.length > 0 && (
+                                                    <div className="space-y-1.5">
+                                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sections</p>
+                                                        {allSections.map(section => (
+                                                            <div key={section._id} className="flex items-center justify-between bg-gray-50 rounded px-2.5 py-1.5">
+                                                                <span className="text-sm font-medium text-gray-800">{section.name}</span>
+                                                                <span className="text-xs text-gray-500">
+                                                                    {section.sectionTeacherName || section.sectionTeacher?.name || '—'}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -805,20 +822,37 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
         name: classData?.name || '',
         grade: classData?.grade || '',
         academicYear: classData?.academicYear || new Date().getFullYear().toString(),
-        classTeacher: classData?.classTeacher?._id || '',
-        sections: classData?.sections?.map(s => s.name).join(', ') || 'A'
     })
+    // Each section: { name: string, sectionTeacher: string (teacher _id) }
+    const [sections, setSections] = useState(
+        classData?.sections?.length > 0
+            ? classData.sections.map(s => ({ name: s.name, sectionTeacher: s.sectionTeacher?._id || s.sectionTeacher || '' }))
+            : [{ name: '', sectionTeacher: '' }]
+    )
     const [isSaving, setIsSaving] = useState(false)
+
+    const addSection = () => setSections(prev => [...prev, { name: '', sectionTeacher: '' }])
+    const removeSection = (idx) => setSections(prev => prev.filter((_, i) => i !== idx))
+    const updateSection = (idx, field, value) => setSections(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s))
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+
+        const validSections = sections.filter(s => s.name.trim())
+        if (validSections.length === 0) {
+            toast.error('Please add at least one section')
+            return
+        }
 
         try {
             setIsSaving(true)
 
             const data = {
                 ...form,
-                sections: form.sections.split(',').map(s => s.trim()).filter(Boolean)
+                sections: validSections.map(s => ({
+                    name: s.name.trim(),
+                    sectionTeacher: s.sectionTeacher || null
+                }))
             }
 
             if (classData) {
@@ -839,7 +873,7 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
 
     return (
         <div className="modal-overlay">
-            <div className="modal-content max-w-md">
+            <div className="modal-content max-w-lg">
                 <div className="flex items-center justify-between border-b border-gray-200 p-6">
                     <h3 className="text-xl font-semibold text-gray-900">
                         {classData ? 'Edit Class' : 'Add Class'}
@@ -849,19 +883,9 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6">
+                <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[75vh]">
                     <div className="space-y-4">
-                        <div>
-                            <label className="label">Class Name *</label>
-                            <input
-                                className="input"
-                                value={form.name}
-                                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                                placeholder="e.g., Class 10"
-                                required
-                            />
-                        </div>
-
+                        {/* Grade */}
                         <div>
                             <label className="label">Grade *</label>
                             <select
@@ -889,46 +913,63 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                             </select>
                         </div>
 
+                        {/* Academic Year */}
                         <div>
                             <label className="label">Academic Year *</label>
                             <input
                                 className="input"
                                 value={form.academicYear}
                                 onChange={(e) => setForm({ ...form, academicYear: e.target.value })}
-                                placeholder="e.g., 2024"
+                                placeholder="e.g., 2025"
                                 required
                             />
                         </div>
 
+                        {/* Sections */}
                         <div>
-                            <label className="label">Class Teacher *</label>
-                            <select
-                                className="input"
-                                value={form.classTeacher}
-                                onChange={(e) => setForm({ ...form, classTeacher: e.target.value })}
-                                required
-                            >
-                                <option value="">Select Teacher</option>
-                                {teachers.map((teacher) => (
-                                    <option key={teacher._id} value={teacher._id}>
-                                        {teacher.name}
-                                        {teacher.employeeId && ` (ID: ${teacher.employeeId})`}
-                                        {!teacher.employeeId && teacher.email && ` (${teacher.email})`}
-                                    </option>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="label mb-0">Sections *</label>
+                                <button
+                                    type="button"
+                                    onClick={addSection}
+                                    className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+                                >
+                                    <Plus className="h-3.5 w-3.5" /> Add Section
+                                </button>
+                            </div>
+
+                            <div className="space-y-2">
+                                {sections.map((sec, idx) => (
+                                    <div key={idx} className="flex gap-2 items-center">
+                                        <input
+                                            className="input flex-1"
+                                            value={sec.name}
+                                            onChange={(e) => updateSection(idx, 'name', e.target.value)}
+                                            placeholder={`Section name (e.g., ${String.fromCharCode(65 + idx)})`}
+                                        />
+                                        <select
+                                            className="input flex-1"
+                                            value={sec.sectionTeacher}
+                                            onChange={(e) => updateSection(idx, 'sectionTeacher', e.target.value)}
+                                        >
+                                            <option value="">Class Teacher</option>
+                                            {teachers.map(t => (
+                                                <option key={t._id} value={t._id}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                        {sections.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removeSection(idx)}
+                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded flex-shrink-0"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                 ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="label">Sections *</label>
-                            <input
-                                className="input"
-                                value={form.sections}
-                                onChange={(e) => setForm({ ...form, sections: e.target.value })}
-                                placeholder="e.g., A, B, C"
-                                required
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Comma-separated section names</p>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">Each section can have its own class teacher</p>
                         </div>
                     </div>
 

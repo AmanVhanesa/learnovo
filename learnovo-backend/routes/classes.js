@@ -33,12 +33,31 @@ router.get('/', protect, async (req, res) => {
     // Use aggregation to fetch classes with their sections and student counts
     const classes = await Class.aggregate([
       { $match: filter },
-      // Lookup Sections
+      // Lookup Sections with their sectionTeacher names
       {
         $lookup: {
           from: 'sections',
-          localField: '_id',
-          foreignField: 'classId',
+          let: { classId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$classId', '$$classId'] } } },
+            // Populate sectionTeacher name
+            {
+              $lookup: {
+                from: 'users',
+                localField: 'sectionTeacher',
+                foreignField: '_id',
+                as: 'sectionTeacherData'
+              }
+            },
+            { $unwind: { path: '$sectionTeacherData', preserveNullAndEmptyArrays: true } },
+            {
+              $addFields: {
+                sectionTeacherName: '$sectionTeacherData.name'
+              }
+            },
+            { $project: { sectionTeacherData: 0 } },
+            { $sort: { name: 1 } }
+          ],
           as: 'sections'
         }
       },
@@ -75,10 +94,7 @@ router.get('/', protect, async (req, res) => {
       },
       {
         $addFields: {
-          studentCount: { $size: '$students' },
-          sections: {
-            $sortArray: { input: '$sections', sortBy: { name: 1 } }
-          }
+          studentCount: { $size: '$students' }
         }
       },
       { $project: { students: 0 } }, // Remove heavy student array
@@ -183,32 +199,24 @@ router.post('/', [
     await newClass.save();
 
     // Create Sections if provided
-    if (req.body.sections && Array.isArray(req.body.sections)) {
-      const sectionConfig = req.body.sections; // Expecting { type: 'STANDARD/CUSTOM', count: 3, names: [] } but frontend sends flattened struct usually? 
-      // Plan says: "sections" payload: { type: 'STANDARD', count: ... } OR { type: 'CUSTOM', names: [...] }
-      // Actually, let's keep it robust. If it's an array of strings, just create them. 
-      // If it's the config object, parse it.
-      // Let's assume the frontend sends the *final list of names* to be simple, 
-      // OR sends the config. 
-      // Implementation Plan said: "POST ... sections array".
-      // Let's support an array of objects or strings to be safe, but adhering to plan: 
-      // "sections payload: type... count... names..." implies it is an OBJECT, not an array of sections directly.
-      // But the previous lines say "sections (Array)".
-      // I will support req.body.sections as an ARRAY of strings for simplicity giving the frontend full control to generate the list.
-
-      const sectionsToCreate = req.body.sections.map(name => ({
-        tenantId: req.user.tenantId,
-        classId: newClass._id,
-        name: name.trim()
-      }));
+    if (req.body.sections && Array.isArray(req.body.sections) && req.body.sections.length > 0) {
+      const sectionsToCreate = req.body.sections.map(s => {
+        // Support both string names and { name, sectionTeacher } objects
+        const name = typeof s === 'string' ? s.trim() : s.name?.trim();
+        const sectionTeacher = typeof s === 'object' ? s.sectionTeacher || null : null;
+        return {
+          tenantId: req.user.tenantId,
+          classId: newClass._id,
+          name,
+          ...(sectionTeacher && { sectionTeacher })
+        };
+      }).filter(s => s.name);
 
       if (sectionsToCreate.length > 0) {
         await Section.insertMany(sectionsToCreate);
       }
     } else {
-      // Default "A" section if none provided? Plan said "Existing classes... default".
-      // But for NEW classes, we should enforce at least one via validation or default.
-      // Let's create 'A' if empty to be safe
+      // Default section 'A' if none provided
       await Section.create({
         tenantId: req.user.tenantId,
         classId: newClass._id,
@@ -331,13 +339,22 @@ router.put('/:id', [
           // Update specific section
           processedIds.add(id.toString());
           const section = existingSections.find(s => s._id.toString() === id.toString());
-          if (section && section.name !== name) {
-            // RENAME ATTEMPT
-            const studentCount = await User.countDocuments({ sectionId: id, role: 'student' });
-            if (studentCount > 0) {
-              return res.status(400).json({ success: false, message: `Cannot rename section '${section.name}' because it has active students.` });
+          if (section) {
+            const updates = {};
+            if (section.name !== name) {
+              // RENAME ATTEMPT
+              const studentCount = await User.countDocuments({ sectionId: id, role: 'student' });
+              if (studentCount > 0) {
+                return res.status(400).json({ success: false, message: `Cannot rename section '${section.name}' because it has active students.` });
+              }
+              updates.name = name;
             }
-            operations.push(Section.findByIdAndUpdate(id, { name }));
+            // Update sectionTeacher if provided
+            const sectionTeacher = typeof input === 'object' ? input.sectionTeacher || null : null;
+            if (sectionTeacher !== undefined) updates.sectionTeacher = sectionTeacher || null;
+            if (Object.keys(updates).length > 0) {
+              operations.push(Section.findByIdAndUpdate(id, updates));
+            }
           }
         } else {
           // New Section (or matching existing by name if string-only input)
