@@ -763,36 +763,43 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
         }
 
         // Add other optional fields only if they have values
-        // Normalize class value to handle variations like "Class 1", "class 1", "1"
         if (row.class && row.class.trim()) {
-          let classValue = row.class.trim();
-          // Extract number from "Class X" format
-          const classMatch = classValue.match(/class\s*(\d+|nursery|lkg|ukg)/i);
+          const rawClassValue = row.class.trim();
+
+          // Build list of values to try matching against DB (most specific first)
+          const classValuesToTry = [rawClassValue]; // e.g. "Class 8"
+
+          // Also try extracted number/keyword as fallback (e.g. "8", "LKG")
+          const classMatch = rawClassValue.match(/class\s*(\d+|nursery|lkg|ukg)/i);
           if (classMatch) {
             const extracted = classMatch[1].toLowerCase();
-            if (extracted === 'nursery' || extracted === 'lkg' || extracted === 'ukg') {
-              classValue = extracted.charAt(0).toUpperCase() + extracted.slice(1);
-            } else {
-              classValue = extracted;
-            }
+            const normalized = (extracted === 'nursery' || extracted === 'lkg' || extracted === 'ukg')
+              ? extracted.charAt(0).toUpperCase() + extracted.slice(1)
+              : extracted;
+            if (normalized !== rawClassValue) classValuesToTry.push(normalized);
           }
-          studentData.class = classValue;
 
           // Look up the Class document to get classId
+          let classDoc = null;
           try {
             const Class = require('../models/Class');
             const Section = require('../models/Section');
 
-            // Try matching by name (case-insensitive)
-            const classDoc = await Class.findOne({
-              tenantId,
-              $or: [
-                { name: { $regex: new RegExp(`^${classValue}$`, 'i') } },
-                { grade: { $regex: new RegExp(`^${classValue}$`, 'i') } }
-              ]
-            });
+            // Try each candidate value against name and grade fields
+            for (const candidate of classValuesToTry) {
+              classDoc = await Class.findOne({
+                tenantId,
+                $or: [
+                  { name: { $regex: new RegExp(`^${candidate}$`, 'i') } },
+                  { grade: { $regex: new RegExp(`^${candidate}$`, 'i') } }
+                ]
+              });
+              if (classDoc) break;
+            }
 
             if (classDoc) {
+              // Use the DB document's actual name for consistency
+              studentData.class = classDoc.name;
               studentData.classId = classDoc._id;
 
               // Now look up section within this class
@@ -805,14 +812,20 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
                 });
                 if (sectionDoc) {
                   studentData.sectionId = sectionDoc._id;
+                  studentData.section = sectionDoc.name;
                 }
               }
+            } else {
+              // No DB match — store the raw value so at least the string is saved
+              studentData.class = rawClassValue;
+              console.warn(`Import: Class not found in DB for value "${rawClassValue}"`);
             }
           } catch (lookupErr) {
             console.warn('Class/Section lookup error during import:', lookupErr.message);
+            studentData.class = rawClassValue;
           }
         }
-        if (row.section && row.section.trim()) {
+        if (row.section && row.section.trim() && !studentData.section) {
           studentData.section = row.section.trim();
         }
         if (row.rollNumber && row.rollNumber.trim()) {
