@@ -779,54 +779,62 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
             if (normalized !== rawClassValue) classValuesToTry.push(normalized);
           }
 
-          // Look up the Class document to get classId
+          // --- Class lookup (independent try/catch) ---
           let classDoc = null;
           try {
             const Class = require('../models/Class');
-            const Section = require('../models/Section');
-
-            // Try each candidate value against name and grade fields
             for (const candidate of classValuesToTry) {
+              // Escape special regex chars in candidate
+              const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               classDoc = await Class.findOne({
                 tenantId,
                 $or: [
-                  { name: { $regex: new RegExp(`^${candidate}$`, 'i') } },
-                  { grade: { $regex: new RegExp(`^${candidate}$`, 'i') } }
+                  { name: { $regex: new RegExp(`^${escaped}$`, 'i') } },
+                  { grade: { $regex: new RegExp(`^${escaped}$`, 'i') } }
                 ]
               });
               if (classDoc) break;
             }
 
             if (classDoc) {
-              // Use the DB document's actual name for consistency
               studentData.class = classDoc.name;
               studentData.classId = classDoc._id;
-
-              // Now look up section within this class
-              if (row.section && row.section.trim()) {
-                const sectionDoc = await Section.findOne({
-                  tenantId,
-                  classId: classDoc._id,
-                  name: { $regex: new RegExp(`^${row.section.trim()}$`, 'i') },
-                  isActive: true
-                });
-                if (sectionDoc) {
-                  studentData.sectionId = sectionDoc._id;
-                  studentData.section = sectionDoc.name;
-                }
-              }
             } else {
-              // No DB match — store the raw value so at least the string is saved
               studentData.class = rawClassValue;
               console.warn(`Import: Class not found in DB for value "${rawClassValue}"`);
             }
-          } catch (lookupErr) {
-            console.warn('Class/Section lookup error during import:', lookupErr.message);
+          } catch (classLookupErr) {
+            console.warn('Class lookup error during import:', classLookupErr.message);
             studentData.class = rawClassValue;
           }
+
+          // --- Section lookup (independent try/catch, only if class was found) ---
+          if (classDoc && row.section && row.section.trim()) {
+            try {
+              const Section = require('../models/Section');
+              const sectionName = row.section.trim().toUpperCase(); // sections stored uppercase
+              const escapedSection = sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const sectionDoc = await Section.findOne({
+                tenantId,
+                classId: classDoc._id,
+                name: { $regex: new RegExp(`^${escapedSection}$`, 'i') },
+                isActive: true
+              });
+              if (sectionDoc) {
+                studentData.sectionId = sectionDoc._id;
+                studentData.section = sectionDoc.name;
+              } else {
+                console.warn(`Import: Section "${sectionName}" not found in class "${classDoc.name}"`);
+              }
+            } catch (sectionLookupErr) {
+              console.warn('Section lookup error during import:', sectionLookupErr.message);
+            }
+          }
         }
+
+        // Fallback: set section string if not already set by lookup
         if (row.section && row.section.trim() && !studentData.section) {
-          studentData.section = row.section.trim();
+          studentData.section = row.section.trim().toUpperCase();
         }
         if (row.rollNumber && row.rollNumber.trim()) {
           studentData.rollNumber = row.rollNumber.trim();
