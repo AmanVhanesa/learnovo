@@ -331,7 +331,7 @@ const Employees = () => {
                                         </td>
                                         <td>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-900">{employee.name}</div>
+                                                <div className="text-sm font-medium text-gray-900 uppercase">{employee.name}</div>
                                                 <div className="text-sm text-gray-500">{employee.email || employee.phone}</div>
                                             </div>
                                         </td>

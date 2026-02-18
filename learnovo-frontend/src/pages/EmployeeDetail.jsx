@@ -222,7 +222,7 @@ const EmployeeDetail = () => {
                     <div className="flex-1">
                         <div className="flex items-start justify-between">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">{employee.name}</h2>
+                                <h2 className="text-2xl font-bold text-gray-900 uppercase">{employee.name}</h2>
                                 <p className="text-sm text-gray-500 mt-1">
                                     {employee.designation || employee.role} • {employee.department || 'No Department'}
                                 </p>
