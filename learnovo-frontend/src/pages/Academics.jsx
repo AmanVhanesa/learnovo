@@ -428,7 +428,11 @@ const AcademicsManagement = () => {
                                                         <div className="flex gap-1">
                                                             <button
                                                                 onClick={() => {
-                                                                    setEditingClass(gradeClasses[0])
+                                                                    // Build a synthetic edit object with ALL sections from this grade
+                                                                    setEditingClass({
+                                                                        ...gradeClasses[0],
+                                                                        sections: allSections
+                                                                    })
                                                                     setShowClassForm(true)
                                                                 }}
                                                                 className="p-1 text-blue-600 hover:bg-blue-50 rounded"
@@ -826,7 +830,13 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
     // Each section: { name: string, sectionTeacher: string (teacher _id) }
     const [sections, setSections] = useState(
         classData?.sections?.length > 0
-            ? classData.sections.map(s => ({ name: s.name, sectionTeacher: s.sectionTeacher?._id || s.sectionTeacher || '' }))
+            ? classData.sections.map(s => ({
+                name: s.name,
+                // sectionTeacher may be: raw ObjectId string, populated object, or null
+                sectionTeacher: s.sectionTeacher?._id?.toString()
+                    || (typeof s.sectionTeacher === 'string' ? s.sectionTeacher : '')
+                    || ''
+            }))
             : [{ name: '', sectionTeacher: '' }]
     )
     const [isSaving, setIsSaving] = useState(false)
