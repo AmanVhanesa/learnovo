@@ -783,9 +783,17 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           let classDoc = null;
           try {
             const Class = require('../models/Class');
+
+            // DEBUG: log what we're looking for and what's in DB
+            const allClasses = await Class.find({ tenantId }).select('name grade').lean();
+            console.log(`[Import DEBUG] Looking for class: "${rawClassValue}", candidates: ${JSON.stringify(classValuesToTry)}`);
+            console.log(`[Import DEBUG] Classes in DB:`, allClasses.map(c => `name="${c.name}" grade="${c.grade}"`));
+
             for (const candidate of classValuesToTry) {
               // Escape special regex chars in candidate
               const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+              // Try exact match first
               classDoc = await Class.findOne({
                 tenantId,
                 $or: [
@@ -793,7 +801,17 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
                   { grade: { $regex: new RegExp(`^${escaped}$`, 'i') } }
                 ]
               });
-              if (classDoc) break;
+              if (classDoc) { console.log(`[Import DEBUG] Found class by exact match: "${classDoc.name}"`); break; }
+
+              // Try contains match as fallback (e.g. "8" inside "Class 8")
+              classDoc = await Class.findOne({
+                tenantId,
+                $or: [
+                  { name: { $regex: new RegExp(escaped, 'i') } },
+                  { grade: { $regex: new RegExp(escaped, 'i') } }
+                ]
+              });
+              if (classDoc) { console.log(`[Import DEBUG] Found class by partial match: "${classDoc.name}"`); break; }
             }
 
             if (classDoc) {
@@ -801,12 +819,13 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
               studentData.classId = classDoc._id;
             } else {
               studentData.class = rawClassValue;
-              console.warn(`Import: Class not found in DB for value "${rawClassValue}"`);
+              console.warn(`[Import DEBUG] Class NOT found in DB for value "${rawClassValue}"`);
             }
           } catch (classLookupErr) {
             console.warn('Class lookup error during import:', classLookupErr.message);
             studentData.class = rawClassValue;
           }
+
 
           // --- Section lookup (independent try/catch, only if class was found) ---
           if (classDoc && row.section && row.section.trim()) {
