@@ -1609,6 +1609,69 @@ router.put('/:id/reactivate', protect, authorize('admin'), async (req, res) => {
   }
 });
 
+// @desc    Bulk delete students permanently
+// @route   DELETE /api/students/bulk-delete
+// @access  Private (Admin)
+router.delete('/bulk-delete', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { studentIds } = req.body;
+
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide student IDs'
+      });
+    }
+
+    // Verify all students belong to this tenant
+    const students = await User.find({
+      _id: { $in: studentIds },
+      role: 'student',
+      tenantId: req.user.tenantId
+    }).select('_id fullName');
+
+    if (students.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No valid students found'
+      });
+    }
+
+    const validIds = students.map(s => s._id);
+
+    // Check if any of these students have existing fees
+    const studentsWithFees = await Fee.distinct('student', {
+      student: { $in: validIds }
+    });
+
+    if (studentsWithFees.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `${studentsWithFees.length} student(s) have existing fee records and cannot be deleted. Please clear their fees first.`
+      });
+    }
+
+    // Delete all valid students
+    const result = await User.deleteMany({
+      _id: { $in: validIds },
+      role: 'student',
+      tenantId: req.user.tenantId
+    });
+
+    res.json({
+      success: true,
+      message: `${result.deletedCount} student(s) deleted permanently`,
+      data: { count: result.deletedCount }
+    });
+  } catch (error) {
+    console.error('Bulk delete students error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting students'
+    });
+  }
+});
+
 // @desc    Delete student
 // @route   DELETE /api/students/:id
 // @access  Private (Admin)
@@ -1944,68 +2007,6 @@ router.post('/bulk-deactivate', protect, authorize('admin'), async (req, res) =>
   }
 });
 
-// @desc    Bulk delete students permanently
-// @route   DELETE /api/students/bulk-delete
-// @access  Private (Admin)
-router.delete('/bulk-delete', protect, authorize('admin'), async (req, res) => {
-  try {
-    const { studentIds } = req.body;
-
-    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide student IDs'
-      });
-    }
-
-    // Verify all students belong to this tenant
-    const students = await User.find({
-      _id: { $in: studentIds },
-      role: 'student',
-      tenantId: req.user.tenantId
-    }).select('_id fullName');
-
-    if (students.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No valid students found'
-      });
-    }
-
-    const validIds = students.map(s => s._id);
-
-    // Check if any of these students have existing fees
-    const studentsWithFees = await Fee.distinct('student', {
-      student: { $in: validIds }
-    });
-
-    if (studentsWithFees.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `${studentsWithFees.length} student(s) have existing fee records and cannot be deleted. Please clear their fees first.`
-      });
-    }
-
-    // Delete all valid students
-    const result = await User.deleteMany({
-      _id: { $in: validIds },
-      role: 'student',
-      tenantId: req.user.tenantId
-    });
-
-    res.json({
-      success: true,
-      message: `${result.deletedCount} student(s) deleted permanently`,
-      data: { count: result.deletedCount }
-    });
-  } catch (error) {
-    console.error('Bulk delete students error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while deleting students'
-    });
-  }
-});
 
 // @desc    Promote students to next class
 // @route   POST /api/students/promote
