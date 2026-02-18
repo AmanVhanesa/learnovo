@@ -733,6 +733,26 @@ const FeesFinance = () => {
                                     }}
                                 />
                             </div>
+
+
+                            <div className="border border-red-200 bg-red-50 rounded-lg p-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-3 bg-red-100 rounded-full">
+                                        <Trash2 className="h-6 w-6 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-900">Bulk Delete</h4>
+                                        <p className="text-sm text-gray-600">Delete pending invoices for class</p>
+                                    </div>
+                                </div>
+                                <BulkDeleteInvoiceForm
+                                    classes={classes}
+                                    activeSession={activeSession}
+                                    onSuccess={() => {
+                                        if (activeTab === 'dashboard') fetchDashboard()
+                                    }}
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -961,72 +981,80 @@ const FeesFinance = () => {
             </div>
 
             {/* Fee Structure Modal */}
-            {showFeeStructureModal && (
-                <FeeStructureModal
-                    feeStructure={editingFeeStructure}
-                    classes={classes}
-                    activeSession={activeSession}
-                    onClose={() => {
-                        setShowFeeStructureModal(false)
-                        setEditingFeeStructure(null)
-                    }}
-                    onSuccess={() => {
-                        setShowFeeStructureModal(false)
-                        setEditingFeeStructure(null)
-                        fetchFeeStructures()
-                        toast.success(editingFeeStructure ? 'Fee structure updated' : 'Fee structure created')
-                    }}
-                />
-            )}
+            {
+                showFeeStructureModal && (
+                    <FeeStructureModal
+                        feeStructure={editingFeeStructure}
+                        classes={classes}
+                        activeSession={activeSession}
+                        onClose={() => {
+                            setShowFeeStructureModal(false)
+                            setEditingFeeStructure(null)
+                        }}
+                        onSuccess={() => {
+                            setShowFeeStructureModal(false)
+                            setEditingFeeStructure(null)
+                            fetchFeeStructures()
+                            toast.success(editingFeeStructure ? 'Fee structure updated' : 'Fee structure created')
+                        }}
+                    />
+                )
+            }
 
             {/* Individual Invoice Modal */}
-            {showInvoiceModal && (
-                <IndividualInvoiceModal
-                    feeStructures={feeStructures}
-                    activeSession={activeSession}
-                    onClose={() => setShowInvoiceModal(false)}
-                    onSuccess={() => {
-                        setShowInvoiceModal(false)
-                        toast.success('Invoice generated successfully')
-                    }}
-                />
-            )}
+            {
+                showInvoiceModal && (
+                    <IndividualInvoiceModal
+                        feeStructures={feeStructures}
+                        activeSession={activeSession}
+                        onClose={() => setShowInvoiceModal(false)}
+                        onSuccess={() => {
+                            setShowInvoiceModal(false)
+                            toast.success('Invoice generated successfully')
+                        }}
+                    />
+                )
+            }
 
             {/* Payment Modal */}
-            {showPaymentModal && (
-                <PaymentModal
-                    student={selectedStudent}
-                    invoices={studentInvoices}
-                    payments={studentPayments}
-                    onPrintReceipt={handlePrintReceipt}
-                    onClose={() => {
-                        setShowPaymentModal(false)
-                        setSelectedStudent(null)
-                        setStudentInvoices([])
-                        setStudentPayments([])
-                    }}
-                    onSuccess={() => {
-                        setShowPaymentModal(false)
-                        setSelectedStudent(null)
-                        setStudentInvoices([])
-                        if (activeTab === 'dashboard') fetchDashboard()
-                        toast.success('Payment collected successfully')
-                    }}
-                />
-            )}
+            {
+                showPaymentModal && (
+                    <PaymentModal
+                        student={selectedStudent}
+                        invoices={studentInvoices}
+                        payments={studentPayments}
+                        onPrintReceipt={handlePrintReceipt}
+                        onClose={() => {
+                            setShowPaymentModal(false)
+                            setSelectedStudent(null)
+                            setStudentInvoices([])
+                            setStudentPayments([])
+                        }}
+                        onSuccess={() => {
+                            setShowPaymentModal(false)
+                            setSelectedStudent(null)
+                            setStudentInvoices([])
+                            if (activeTab === 'dashboard') fetchDashboard()
+                            toast.success('Payment collected successfully')
+                        }}
+                    />
+                )
+            }
 
             {/* Edit Invoice Modal */}
-            {editingInvoice && (
-                <EditInvoiceModal
-                    invoice={editingInvoice}
-                    onClose={() => setEditingInvoice(null)}
-                    onSuccess={() => {
-                        setEditingInvoice(null)
-                        if (activeTab === 'dashboard') fetchDashboard()
-                    }}
-                />
-            )}
-        </div>
+            {
+                editingInvoice && (
+                    <EditInvoiceModal
+                        invoice={editingInvoice}
+                        onClose={() => setEditingInvoice(null)}
+                        onSuccess={() => {
+                            setEditingInvoice(null)
+                            if (activeTab === 'dashboard') fetchDashboard()
+                        }}
+                    />
+                )
+            }
+        </div >
     )
 }
 
@@ -2036,6 +2064,77 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onClos
                 )}
             </div>
         </div>
+    )
+}
+
+// Bulk Delete Invoice Form Component
+const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
+    const [form, setForm] = useState({
+        classId: '',
+        sectionId: ''
+    })
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+
+        if (!form.classId) {
+            toast.error('Please select a class')
+            return
+        }
+
+        if (!window.confirm('Are you sure you want to delete ALL pending invoices for this class? This cannot be undone.')) {
+            return
+        }
+
+        try {
+            setIsDeleting(true)
+            await invoicesService.deleteBulk({
+                classId: form.classId,
+                sectionId: form.sectionId || undefined,
+                academicSessionId: activeSession._id
+            })
+
+            toast.success('Pending invoices deleted successfully')
+            setForm({ classId: '', sectionId: '' })
+            onSuccess()
+        } catch (error) {
+            console.error('Bulk delete error:', error)
+            toast.error(error.response?.data?.message || 'Failed to delete invoices')
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
+                <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    value={form.classId}
+                    onChange={(e) => setForm({ ...form, classId: e.target.value })}
+                    required
+                >
+                    <option value="">Select Class</option>
+                    {classes.map((cls) => (
+                        <option key={cls._id} value={cls._id}>{cls.name}</option>
+                    ))}
+                </select>
+            </div>
+
+            <button
+                type="submit"
+                className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={isDeleting}
+            >
+                <Trash2 className="h-4 w-4" />
+                {isDeleting ? 'Deleting...' : 'Delete Pending Invoices'}
+            </button>
+            <p className="text-xs text-red-500 text-center">
+                * Only pending invoices with no payments will be deleted.
+            </p>
+        </form>
     )
 }
 

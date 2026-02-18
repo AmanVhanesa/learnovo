@@ -403,6 +403,104 @@ router.post('/generate-bulk', protect, authorize('admin'), [
     }
 });
 
+// @desc    Bulk delete invoices for class
+// @route   DELETE /api/invoices/bulk
+// @access  Private (Admin)
+router.delete('/bulk', protect, authorize('admin'), [
+    body('classId').notEmpty().withMessage('Class ID is required'),
+    body('academicSessionId').notEmpty().withMessage('Academic Session ID is required'),
+    handleValidationErrors
+], async (req, res) => {
+    try {
+        const { classId, sectionId, academicSessionId } = req.body;
+        console.log('Bulk delete request:', { classId, sectionId, academicSessionId });
+
+        const query = {
+            tenantId: req.user.tenantId,
+            academicSessionId,
+            status: 'Pending', // Only delete pending invoices
+            paidAmount: 0      // Double check no payments made
+        };
+
+        // Handle classId/class logic similar to generation
+        const classConditions = [{ classId: classId }];
+        try {
+            const Class = require('../models/Class');
+            const classDoc = await Class.findOne({ _id: classId, tenantId: req.user.tenantId });
+            if (classDoc && classDoc.name) {
+                // If invoices stored class name instead of ID (legacy support)
+                // But generally we should rely on classId. 
+                // However, let's keep it safe and just query by classId as that's what we store now.
+                // Actually created invoices have classId.
+            }
+        } catch (err) { }
+
+        query.classId = classId;
+
+        if (sectionId) {
+            query.sectionId = sectionId;
+        }
+
+        console.log('Bulk delete query:', query);
+
+        // Find invoices to be deleted to log them or get count
+        const invoicesToDelete = await FeeInvoice.find(query);
+        const count = invoicesToDelete.length;
+
+        if (count === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No pending invoices found to delete'
+            });
+        }
+
+        // Delete them
+        await FeeInvoice.deleteMany(query);
+
+        // Update balances for all affected students
+        // This might be heavy if many students. 
+        // We can do it in background or iterate.
+        // For distinct students:
+        const distinctStudentIds = [...new Set(invoicesToDelete.map(inv => inv.studentId.toString()))];
+
+        // Update balances asynchronously to avoid timeout
+        // Or just do it now if not too many
+        for (const studentId of distinctStudentIds) {
+            await StudentBalance.updateBalance(req.user.tenantId, studentId, academicSessionId);
+        }
+
+        // Log action
+        await FeeAuditLog.logAction({
+            tenantId: req.user.tenantId,
+            action: 'INVOICE_BULK_DELETED',
+            entityType: 'FeeInvoice',
+            entityId: null,
+            userId: req.user._id,
+            userName: req.user.name,
+            userRole: req.user.role,
+            details: {
+                classId,
+                sectionId,
+                count,
+                academicSessionId
+            },
+            ipAddress: req.ip
+        });
+
+        res.json({
+            success: true,
+            message: `Successfully deleted ${count} pending invoices`
+        });
+
+    } catch (error) {
+        console.error('Bulk delete error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while deleting invoices'
+        });
+    }
+});
+
 // @desc    Get all invoices
 // @route   GET /api/invoices
 // @access  Private (Admin, Accountant)
