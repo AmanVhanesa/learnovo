@@ -368,37 +368,54 @@ router.put('/:id', [
   }
 });
 
-// Delete a class
+// Delete a class (and all other class docs for the same grade)
 router.delete('/:id', [protect, authorize('admin')], async (req, res) => {
   try {
-    // Check if class has students
-    const studentCount = await User.countDocuments({
-      classId: req.params.id,
-      role: 'student'
-    });
+    const classId = req.params.id;
+    // 1. Find the target class to get grade & tenant
+    const targetClass = await Class.findById(classId);
 
-    if (studentCount > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete class with enrolled students'
-      });
-    }
-
-    const deletedClass = await Class.findByIdAndDelete(req.params.id);
-
-    if (!deletedClass) {
+    if (!targetClass) {
       return res.status(404).json({
         success: false,
         message: 'Class not found'
       });
     }
 
-    // Cascade delete sections
-    await Section.deleteMany({ classId: req.params.id });
+    // Verify tenant access
+    if (req.user.tenantId && targetClass.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    // 2. Find ALL class docs for this grade (handle legacy multiple docs)
+    const allGradeClasses = await Class.find({
+      grade: targetClass.grade,
+      tenantId: targetClass.tenantId
+    });
+    const allClassIds = allGradeClasses.map(c => c._id);
+
+    // 3. Check if ANY of these classes have students
+    const studentCount = await User.countDocuments({
+      classId: { $in: allClassIds },
+      role: 'student'
+    });
+
+    if (studentCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete grade '${targetClass.grade}' because it has ${studentCount} enrolled student(s).`
+      });
+    }
+
+    // 4. Delete ALL class docs for this grade
+    await Class.deleteMany({ _id: { $in: allClassIds } });
+
+    // 5. Delete ALL sections for these classes
+    await Section.deleteMany({ classId: { $in: allClassIds } });
 
     res.json({
       success: true,
-      message: 'Class deleted successfully'
+      message: `Grade '${targetClass.grade}' and all associated data deleted successfully`
     });
   } catch (error) {
     console.error('Error deleting class:', error);
