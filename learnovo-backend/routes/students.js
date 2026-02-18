@@ -346,47 +346,97 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
     const normalizeRow = (row) => {
       const normalized = {};
 
-      // Column name mappings (CSV column -> expected field name)
+      // Column name mappings (lowercase key -> camelCase field name).
+      // All keys must be lowercase. The fallback also uses lowerKey so
+      // uppercase headers like CLASS, SECTION, FULLNAME are handled correctly.
       const columnMappings = {
+        // Name variants
         'name': 'fullName',
+        'fullname': 'fullName',
         'student_name': 'fullName',
         'studentname': 'fullName',
+        'firstname': 'firstName',
+        'first_name': 'firstName',
+        'middlename': 'middleName',
+        'middle_name': 'middleName',
+        'lastname': 'lastName',
+        'last_name': 'lastName',
+        // Admission number
         'admno': 'admissionNumber',
         'admission_no': 'admissionNumber',
         'admission_number': 'admissionNumber',
+        'admissionnumber': 'admissionNumber',
+        // Roll number
         'rollno': 'rollNumber',
         'roll_no': 'rollNumber',
         'roll_number': 'rollNumber',
+        'rollnumber': 'rollNumber',
+        // Date of birth
         'dob': 'dateOfBirth',
         'date_of_birth': 'dateOfBirth',
+        'dateofbirth': 'dateOfBirth',
+        // Class & Section (all variants map to 'class' / 'section')
+        'class': 'class',
+        'currentclass': 'class',
+        'current_class': 'class',
+        'section': 'section',
+        'currentsection': 'section',
+        'current_section': 'section',
+        // Admission class/section
+        'admissionclass': 'admissionClass',
+        'admission_class': 'admissionClass',
+        'admissionsection': 'admissionSection',
+        'admission_section': 'admissionSection',
+        // Academic year & admission date
+        'academic_year': 'academicYear',
+        'academicyear': 'academicYear',
+        'admission_date': 'admissionDate',
+        'admissiondate': 'admissionDate',
+        // Guardian / parent fields
         'father_name': 'fatherName',
+        'fathername': 'fatherName',
         'father_phone': 'fatherPhone',
+        'fatherphone': 'fatherPhone',
         'father_email': 'fatherEmail',
+        'fatheremail': 'fatherEmail',
         'mother_name': 'motherName',
+        'mothername': 'motherName',
         'mother_phone': 'motherPhone',
+        'motherphone': 'motherPhone',
         'mother_email': 'motherEmail',
+        'motheremail': 'motherEmail',
         'guardian_name': 'guardianName',
+        'guardianname': 'guardianName',
         'guardian_phone': 'guardianPhone',
+        'guardianphone': 'guardianPhone',
+        // Other fields
         'blood_group': 'bloodGroup',
+        'bloodgroup': 'bloodGroup',
         'sub_department': 'subDepartment',
         'subdepartment': 'subDepartment',
         'pen_number': 'penNumber',
-        'academic_year': 'academicYear',
-        'admission_date': 'admissionDate',
+        'pennumber': 'penNumber',
         'driver': 'driverName',
         'driver_name': 'driverName',
         'drivername': 'driverName',
-        // currentClass / currentSection from the import template
-        'currentclass': 'class',
-        'current_class': 'class',
-        'currentsection': 'section',
-        'current_section': 'section'
+        'isactive': 'isActive',
+        'is_active': 'isActive',
+        'removaldate': 'removalDate',
+        'removal_date': 'removalDate',
+        'removalreason': 'removalReason',
+        'removal_reason': 'removalReason',
+        'removalnotes': 'removalNotes',
+        'removal_notes': 'removalNotes',
+        'udisecode': 'udiseCode',
+        'udise_code': 'udiseCode',
+        'dateofjoining': 'dateOfJoining',
+        'date_of_joining': 'dateOfJoining',
       };
 
       // Normalize each field
       for (const [key, value] of Object.entries(row)) {
         const lowerKey = String(key || '').toLowerCase().trim();
-        const mappedKey = columnMappings[lowerKey] || key;
+        const mappedKey = columnMappings[lowerKey] || lowerKey;
         normalized[mappedKey] = value;
       }
 
