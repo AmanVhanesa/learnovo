@@ -36,10 +36,20 @@ const Students = () => {
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [isDeactivating, setIsDeactivating] = useState(false)
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [perPage, setPerPage] = useState(100)
+  const [totalStudents, setTotalStudents] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
+  useEffect(() => {
+    setCurrentPage(1) // reset to page 1 on filter change
+  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter])
+
   useEffect(() => {
     fetchStudents()
     fetchFilterOptions()
-  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter])
+  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter, currentPage, perPage])
 
   const fetchFilterOptions = async () => {
     try {
@@ -61,12 +71,17 @@ const Students = () => {
         section: sectionFilter,
         academicYear: yearFilter,
         status: statusFilter,
-        limit: 100
+        page: currentPage,
+        limit: perPage
       }
 
       const response = await studentsService.list(filters)
       const studentsData = response?.data || []
       setStudents(Array.isArray(studentsData) ? studentsData : [])
+      if (response?.pagination) {
+        setTotalStudents(response.pagination.total || 0)
+        setTotalPages(response.pagination.pages || 1)
+      }
     } catch (error) {
       console.error('Error fetching students:', error)
       toast.error('Failed to load students')
@@ -647,6 +662,46 @@ const Students = () => {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-between px-1">
+          <div className="flex items-center gap-3 text-sm text-gray-600">
+            <span>
+              Showing {((currentPage - 1) * perPage) + 1}–{Math.min(currentPage * perPage, totalStudents)} of <strong>{totalStudents}</strong> students
+            </span>
+            <select
+              value={perPage}
+              onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1); }}
+              className="border border-gray-300 rounded px-2 py-1 text-sm"
+            >
+              <option value={50}>50 / page</option>
+              <option value={100}>100 / page</option>
+              <option value={200}>200 / page</option>
+              <option value={500}>500 / page</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ← Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Student Form Modal */}
       {showForm && (
