@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { X, Upload, User, Heart, GraduationCap, Users, FileText } from 'lucide-react'
 import api from '../../services/authService'
 import transportService from '../../services/transportService'
-import { STANDARD_CLASSES } from '../../constants/classes'
 
 const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     const [activeSection, setActiveSection] = useState(0)
@@ -18,6 +17,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         photo: student?.photo || '',
 
         // Academic
+        classId: student?.classId?._id || student?.classId || '',
         class: student?.class || '',
         section: student?.section || '',
         academicYear: student?.academicYear || '2025-2026',
@@ -67,6 +67,8 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
     const [subDepartmentOptions, setSubDepartmentOptions] = useState([])
     const [driverOptions, setDriverOptions] = useState([])
+    const [classOptions, setClassOptions] = useState([])
+    const [classesLoading, setClassesLoading] = useState(false)
     const [sectionOptions, setSectionOptions] = useState([])
     const [loadingSections, setLoadingSections] = useState(false)
 
@@ -93,38 +95,39 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             }
         }
 
+        const fetchClasses = async () => {
+            try {
+                setClassesLoading(true)
+                const response = await api.get('/classes')
+                if (response.data.success) {
+                    setClassOptions(response.data.data)
+                }
+            } catch (error) {
+                console.error('Error fetching classes', error)
+            } finally {
+                setClassesLoading(false)
+            }
+        }
+
         fetchSubDepartments()
         fetchDrivers()
+        fetchClasses()
     }, [])
 
     // Fetch sections when class changes
     useEffect(() => {
         const fetchSections = async () => {
-            if (!form.class) {
+            if (!form.classId) {
                 setSectionOptions([])
                 return
             }
 
             try {
                 setLoadingSections(true)
-                // Find the class ID from STANDARD_CLASSES
-                const selectedClass = STANDARD_CLASSES.find(c => c.value === form.class)
-                if (!selectedClass) {
-                    setSectionOptions([])
-                    return
-                }
-
-                // Fetch classes to get the classId
-                const classesResponse = await api.get('/classes')
-                if (classesResponse.data.success) {
-                    const classDoc = classesResponse.data.data.find(c => c.grade === form.class)
-                    if (classDoc) {
-                        // Fetch sections for this class
-                        const sectionsResponse = await api.get(`/classes/${classDoc._id}/sections`)
-                        if (sectionsResponse.data.success) {
-                            setSectionOptions(sectionsResponse.data.data)
-                        }
-                    }
+                // Use the classId directly (already an ObjectId from the API-fetched class list)
+                const sectionsResponse = await api.get(`/classes/${form.classId}/sections`)
+                if (sectionsResponse.data.success) {
+                    setSectionOptions(sectionsResponse.data.data)
                 }
             } catch (error) {
                 console.error('Error fetching sections:', error)
@@ -135,7 +138,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         }
 
         fetchSections()
-    }, [form.class])
+    }, [form.classId])
 
     const sections = [
         { id: 0, name: 'Student Info', icon: User },
@@ -373,14 +376,24 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             <label className="label">Class *</label>
                                             <select
                                                 className="input"
-                                                value={form.class}
-                                                onChange={(e) => updateField('class', e.target.value)}
+                                                value={form.classId || ''}
+                                                onChange={(e) => {
+                                                    const selectedCls = classOptions.find(c => c._id === e.target.value)
+                                                    updateField('classId', e.target.value)
+                                                    updateField('class', selectedCls?.grade || selectedCls?.name || '')
+                                                    // Reset section when class changes
+                                                    updateField('section', '')
+                                                    updateField('sectionId', '')
+                                                }}
                                                 required
+                                                disabled={classesLoading}
                                             >
-                                                <option value="">Select Class</option>
-                                                {STANDARD_CLASSES.map(cls => (
-                                                    <option key={cls.value} value={cls.value}>
-                                                        {cls.label}
+                                                <option value="">
+                                                    {classesLoading ? 'Loading classes...' : 'Select Class'}
+                                                </option>
+                                                {classOptions.map(cls => (
+                                                    <option key={cls._id} value={cls._id}>
+                                                        {cls.name}
                                                     </option>
                                                 ))}
                                             </select>

@@ -205,6 +205,27 @@ const Students = () => {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedStudents.length === 0) {
+      toast.error('Please select students first')
+      return
+    }
+
+    if (!window.confirm(`Are you sure you want to PERMANENTLY DELETE ${selectedStudents.length} student(s)? This cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const result = await studentsService.bulkDelete(selectedStudents)
+      toast.success(result.message || `${selectedStudents.length} students deleted`)
+      setSelectedStudents([])
+      fetchStudents()
+    } catch (error) {
+      console.error('Bulk delete error:', error)
+      toast.error(error.response?.data?.message || 'Failed to delete students')
+    }
+  }
+
   const handleSelectAll = (e) => {
     if (e.target.checked) {
       setSelectedStudents(students.map(s => s._id))
@@ -487,6 +508,15 @@ const Students = () => {
                 <PowerOff className="h-4 w-4 mr-1" />
                 Deactivate
               </button>
+              {user?.role === 'admin' && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="btn btn-sm bg-red-600 text-white hover:bg-red-700 border-red-600"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete Selected
+                </button>
+              )}
             </div>
           </div>
         )}

@@ -72,6 +72,10 @@ export const studentsService = {
     const res = await api.post('/students/bulk-deactivate', { studentIds, reason })
     return res.data
   },
+  bulkDelete: async (studentIds) => {
+    const res = await api.delete('/students/bulk-delete', { data: { studentIds } })
+    return res.data
+  },
   promote: async (data) => {
     const res = await api.post('/students/promote', data)
     return res.data

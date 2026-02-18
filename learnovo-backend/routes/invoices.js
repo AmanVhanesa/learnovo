@@ -509,11 +509,12 @@ router.delete('/bulk', protect, authorize('admin'), [
         // For distinct students:
         const distinctStudentIds = [...new Set(invoicesToDelete.map(inv => inv.studentId.toString()))];
 
-        // Update balances asynchronously to avoid timeout
-        // Or just do it now if not too many
-        for (const studentId of distinctStudentIds) {
-            await StudentBalance.updateBalance(req.user.tenantId, studentId, academicSessionId);
-        }
+        // Update balances for all affected students in parallel (much faster than sequential)
+        await Promise.all(
+            distinctStudentIds.map(studentId =>
+                StudentBalance.updateBalance(req.user.tenantId, studentId, academicSessionId)
+            )
+        );
 
         // Log action
         await FeeAuditLog.logAction({

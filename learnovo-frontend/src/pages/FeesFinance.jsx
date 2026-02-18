@@ -2074,6 +2074,37 @@ const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
         sectionId: ''
     })
     const [isDeleting, setIsDeleting] = useState(false)
+    const [isPreviewing, setIsPreviewing] = useState(false)
+    const [previewCount, setPreviewCount] = useState(null) // null = not previewed yet
+
+    // Reset preview when class changes
+    const handleClassChange = (e) => {
+        setForm({ ...form, classId: e.target.value, sectionId: '' })
+        setPreviewCount(null)
+    }
+
+    const handlePreview = async () => {
+        if (!form.classId) {
+            toast.error('Please select a class')
+            return
+        }
+
+        try {
+            setIsPreviewing(true)
+            const res = await invoicesService.list({
+                classId: form.classId,
+                academicSessionId: activeSession._id,
+                status: 'Pending'
+            })
+            const invoices = res.data || []
+            setPreviewCount(invoices.length)
+        } catch (error) {
+            console.error('Preview error:', error)
+            toast.error('Failed to fetch invoice count')
+        } finally {
+            setIsPreviewing(false)
+        }
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -2083,7 +2114,17 @@ const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
             return
         }
 
-        if (!window.confirm('Are you sure you want to delete ALL pending invoices for this class? This cannot be undone.')) {
+        if (previewCount === null) {
+            toast.error('Please preview first to see how many invoices will be deleted')
+            return
+        }
+
+        if (previewCount === 0) {
+            toast.error('No pending invoices found for this class')
+            return
+        }
+
+        if (!window.confirm(`Are you sure you want to delete ${previewCount} pending invoice(s) for this class? This cannot be undone.`)) {
             return
         }
 
@@ -2095,8 +2136,9 @@ const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
                 academicSessionId: activeSession._id
             })
 
-            toast.success('Pending invoices deleted successfully')
+            toast.success(`Successfully deleted ${previewCount} pending invoice(s)`)
             setForm({ classId: '', sectionId: '' })
+            setPreviewCount(null)
             onSuccess()
         } catch (error) {
             console.error('Bulk delete error:', error)
@@ -2113,7 +2155,7 @@ const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
                 <select
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     value={form.classId}
-                    onChange={(e) => setForm({ ...form, classId: e.target.value })}
+                    onChange={handleClassChange}
                     required
                 >
                     <option value="">Select Class</option>
@@ -2123,14 +2165,58 @@ const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
                 </select>
             </div>
 
-            <button
-                type="submit"
-                className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                disabled={isDeleting}
-            >
-                <Trash2 className="h-4 w-4" />
-                {isDeleting ? 'Deleting...' : 'Delete Pending Invoices'}
-            </button>
+            {/* Preview Button */}
+            {form.classId && previewCount === null && (
+                <button
+                    type="button"
+                    onClick={handlePreview}
+                    disabled={isPreviewing}
+                    className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center gap-2 border border-gray-300"
+                >
+                    {isPreviewing ? 'Checking...' : 'Preview Invoices to Delete'}
+                </button>
+            )}
+
+            {/* Preview Result */}
+            {previewCount !== null && (
+                <div className={`rounded-lg p-4 border ${previewCount > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                    {previewCount > 0 ? (
+                        <div className="flex items-center gap-2">
+                            <Trash2 className="h-5 w-5 text-red-500 flex-shrink-0" />
+                            <div>
+                                <p className="text-sm font-semibold text-red-800">
+                                    {previewCount} pending invoice(s) will be deleted
+                                </p>
+                                <p className="text-xs text-red-600 mt-0.5">Only invoices with no payments will be removed</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-sm font-medium text-green-800">
+                            ✓ No pending invoices found for this class
+                        </p>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setPreviewCount(null)}
+                        className="text-xs text-gray-500 underline mt-2 block"
+                    >
+                        Re-check
+                    </button>
+                </div>
+            )}
+
+            {/* Delete Button — only shown after preview with results */}
+            {previewCount !== null && previewCount > 0 && (
+                <button
+                    type="submit"
+                    className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    disabled={isDeleting}
+                >
+                    <Trash2 className="h-4 w-4" />
+                    {isDeleting ? 'Deleting...' : `Delete ${previewCount} Pending Invoice(s)`}
+                </button>
+            )}
+
             <p className="text-xs text-red-500 text-center">
                 * Only pending invoices with no payments will be deleted.
             </p>
