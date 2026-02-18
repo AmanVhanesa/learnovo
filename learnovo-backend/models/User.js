@@ -14,24 +14,29 @@ const userSchema = new mongoose.Schema({
   fullName: {
     type: String,
     required: function () { return this.role === 'student'; },
-    trim: true
+    trim: true,
+    uppercase: true
   },
   // Optional name parts for backward compatibility
   firstName: {
     type: String,
-    trim: true
+    trim: true,
+    uppercase: true
   },
   middleName: {
     type: String,
-    trim: true
+    trim: true,
+    uppercase: true
   },
   lastName: {
     type: String,
-    trim: true
+    trim: true,
+    uppercase: true
   },
   name: { // Keeping for backward compatibility & display
     type: String,
-    trim: true
+    trim: true,
+    uppercase: true
   },
   email: {
     type: String,
