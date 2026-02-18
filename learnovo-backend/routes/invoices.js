@@ -441,21 +441,67 @@ router.delete('/bulk', protect, authorize('admin'), [
             query.sectionId = sectionId;
         }
 
-        console.log('Bulk delete query:', query);
+        console.log('Initial bulk delete query:', query);
 
         // Find invoices to be deleted to log them or get count
-        const invoicesToDelete = await FeeInvoice.find(query);
+        let invoicesToDelete = await FeeInvoice.find(query);
+
+        // FALLBACK: If no invoices found by classId, try finding by students in that class
+        // This handles cases where invoices were generated without classId or with wrong classId
+        if (invoicesToDelete.length === 0) {
+            console.log('No invoices found by classId directly. Trying via Student lookup...');
+
+            const User = require('../models/User');
+            const studentQuery = {
+                tenantId: req.user.tenantId,
+                role: 'student',
+                classId: classId
+            };
+
+            if (sectionId) {
+                studentQuery.sectionId = sectionId;
+            }
+
+            const students = await User.find(studentQuery).select('_id');
+            const studentIds = students.map(s => s._id);
+
+            if (studentIds.length > 0) {
+                const fallbackQuery = {
+                    tenantId: req.user.tenantId,
+                    academicSessionId,
+                    status: 'Pending',
+                    paidAmount: 0,
+                    studentId: { $in: studentIds }
+                };
+
+                console.log('Fallback query:', fallbackQuery);
+                invoicesToDelete = await FeeInvoice.find(fallbackQuery);
+
+                // If we found invoices this way, update the query to use for deletion
+                if (invoicesToDelete.length > 0) {
+                    // We can't use the original query anymore for deleteMany
+                    // We must delete by ID or by the fallback query
+                    // Let's use ID for safety
+                    const invoiceIds = invoicesToDelete.map(inv => inv._id);
+                    await FeeInvoice.deleteMany({ _id: { $in: invoiceIds } });
+
+                    // Skip the standard deleteMany below since we just did it
+                    query._id = { $in: [] }; // Prevent double deletion attempt
+                }
+            }
+        } else {
+            // Standard deletion
+            await FeeInvoice.deleteMany(query);
+        }
+
         const count = invoicesToDelete.length;
 
         if (count === 0) {
             return res.status(404).json({
                 success: false,
-                message: 'No pending invoices found to delete'
+                message: 'No pending invoices found to delete for this class'
             });
         }
-
-        // Delete them
-        await FeeInvoice.deleteMany(query);
 
         // Update balances for all affected students
         // This might be heavy if many students. 
