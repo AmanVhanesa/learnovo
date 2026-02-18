@@ -292,6 +292,10 @@ router.put('/:id', [
       const targetClassId = req.params.id;
       const inputSections = req.body.sections;
 
+      console.log('[PUT /classes] targetClassId:', targetClassId);
+      console.log('[PUT /classes] grade:', updatedClass.grade);
+      console.log('[PUT /classes] inputSections:', JSON.stringify(inputSections));
+
       // Find ALL class documents for this grade+tenant (there may be multiple due to legacy data)
       const allGradeClasses = await Class.find({
         grade: updatedClass.grade,
@@ -299,9 +303,11 @@ router.put('/:id', [
         _id: { $ne: targetClassId } // other class docs for same grade
       });
       const allClassIds = [targetClassId, ...allGradeClasses.map(c => c._id.toString())];
+      console.log('[PUT /classes] allClassIds:', allClassIds);
 
       // Fetch ALL existing sections across all class docs for this grade
       const existingSections = await Section.find({ classId: { $in: allClassIds } });
+      console.log('[PUT /classes] existingSections:', existingSections.map(s => ({ id: s._id, name: s.name, classId: s.classId })));
 
       // Check if any section being removed has students
       const inputIds = new Set(

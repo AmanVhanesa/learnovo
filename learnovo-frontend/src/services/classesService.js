@@ -76,6 +76,16 @@ export const classesService = {
     }
   },
 
+  // Alias for delete (used in some components)
+  remove: async (id) => {
+    try {
+      const response = await api.delete(`/classes/${id}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
   // Get students in a class
   getStudents: async (id) => {
     try {
