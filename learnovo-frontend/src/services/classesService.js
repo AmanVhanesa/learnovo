@@ -124,6 +124,16 @@ export const classesService = {
     } catch (error) {
       throw error.response?.data || error
     }
+  },
+
+  // Get sections for a specific class
+  getSections: async (id) => {
+    try {
+      const response = await api.get(`/classes/${id}/sections`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
   }
 }
 
