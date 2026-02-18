@@ -23,7 +23,11 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     const [classes, setClasses] = useState([]);
     const [subjects, setSubjects] = useState([]);
     const [sections, setSections] = useState([]);
+    const [selectedGrade, setSelectedGrade] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // Derive unique grades from loaded classes
+    const uniqueGrades = [...new Set(classes.map(cls => cls.grade).filter(Boolean))].sort();
 
     useEffect(() => {
         fetchOptions();
@@ -38,18 +42,26 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                 dueDate: homework.dueDate ? new Date(homework.dueDate).toISOString().split('T')[0] : ''
             });
             setExistingAttachments(homework.attachments || []);
+            // Restore grade from existing homework class
+            if (homework.class?.grade) setSelectedGrade(homework.class.grade);
         }
     }, [homework]);
 
+    // When grade changes, collect all sections from all classes of that grade
     useEffect(() => {
-        if (formData.class) {
-            // Use sections already embedded in the class data
-            const selectedClass = classes.find(cls => cls._id?.toString() === formData.class?.toString());
-            setSections(selectedClass?.sections || []);
+        if (selectedGrade && classes.length > 0) {
+            const classesForGrade = classes.filter(cls => cls.grade === selectedGrade);
+            // Flatten all sections from all classes of this grade, attach classId to each
+            const allSections = classesForGrade.flatMap(cls =>
+                (cls.sections || []).map(sec => ({ ...sec, classId: cls._id }))
+            );
+            setSections(allSections);
+            // Reset class and section when grade changes
+            setFormData(prev => ({ ...prev, class: '', section: '' }));
         } else {
             setSections([]);
         }
-    }, [formData.class, classes]);
+    }, [selectedGrade, classes]);
 
     const fetchOptions = async () => {
         try {
@@ -98,7 +110,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!formData.title || !formData.description || !formData.subject || !formData.class || !formData.dueDate) {
+        if (!formData.title || !formData.description || !formData.subject || !selectedGrade || !formData.section || !formData.dueDate) {
             toast.error('Please fill in all required fields');
             return;
         }
@@ -186,7 +198,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                         />
                     </div>
 
-                    {/* Subject, Class, Section */}
+                    {/* Subject, Grade, Section */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -209,18 +221,18 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Class <span className="text-red-500">*</span>
+                                Grade <span className="text-red-500">*</span>
                             </label>
                             <select
-                                value={formData.class}
-                                onChange={(e) => setFormData({ ...formData, class: e.target.value, section: '' })}
+                                value={selectedGrade}
+                                onChange={(e) => setSelectedGrade(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                                 required
                             >
-                                <option value="">Select Class</option>
-                                {classes.map((cls) => (
-                                    <option key={cls._id} value={cls._id}>
-                                        {cls.name}
+                                <option value="">Select Grade</option>
+                                {uniqueGrades.map((grade) => (
+                                    <option key={grade} value={grade}>
+                                        {grade}
                                     </option>
                                 ))}
                             </select>
@@ -228,15 +240,25 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Section
+                                Section <span className="text-red-500">*</span>
                             </label>
                             <select
                                 value={formData.section}
-                                onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                                onChange={(e) => {
+                                    const sectionId = e.target.value;
+                                    // Find the section and its parent classId
+                                    const sec = sections.find(s => s._id?.toString() === sectionId);
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        section: sectionId,
+                                        class: sec?.classId?.toString() || prev.class
+                                    }));
+                                }}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                disabled={!formData.class}
+                                disabled={!selectedGrade}
+                                required
                             >
-                                <option value="">All Sections</option>
+                                <option value="">Select Section</option>
                                 {sections.map((section) => (
                                     <option key={section._id} value={section._id}>
                                         {section.name}
