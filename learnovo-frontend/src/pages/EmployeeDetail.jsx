@@ -212,7 +212,7 @@ const EmployeeDetail = () => {
                         ) : (
                             <div className="h-32 w-32 rounded-full bg-gray-200 flex items-center justify-center border-4 border-gray-200">
                                 <span className="text-4xl font-medium text-gray-700">
-                                    {employee.name?.charAt(0)}
+                                    {employee.name?.charAt(0).toUpperCase()}
                                 </span>
                             </div>
                         )}
@@ -222,7 +222,7 @@ const EmployeeDetail = () => {
                     <div className="flex-1">
                         <div className="flex items-start justify-between">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900 uppercase">{employee.name}</h2>
+                                <h2 className="text-2xl font-bold text-gray-900">{employee.name?.toUpperCase()}</h2>
                                 <p className="text-sm text-gray-500 mt-1">
                                     {employee.designation || employee.role} • {employee.department || 'No Department'}
                                 </p>

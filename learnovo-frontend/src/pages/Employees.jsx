@@ -324,14 +324,14 @@ const Employees = () => {
                                             ) : (
                                                 <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
                                                     <span className="text-sm font-medium text-gray-700">
-                                                        {employee.name?.charAt(0)}
+                                                        {employee.name?.charAt(0).toUpperCase()}
                                                     </span>
                                                 </div>
                                             )}
                                         </td>
                                         <td>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-900 uppercase">{employee.name}</div>
+                                                <div className="text-sm font-medium text-gray-900">{employee.name?.toUpperCase()}</div>
                                                 <div className="text-sm text-gray-500">{employee.email || employee.phone}</div>
                                             </div>
                                         </td>
