@@ -65,7 +65,7 @@ const NotificationPreferences = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
             </div>
         );
     }
@@ -134,8 +134,8 @@ const NotificationPreferences = () => {
                                     <button
                                         onClick={() => handleToggle(category.key, 'inApp')}
                                         className={`inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors ${preferences.preferences[category.key]?.inApp
-                                                ? 'bg-green-100 text-green-600 hover:bg-green-200'
-                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                            ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                             }`}
                                     >
                                         {preferences.preferences[category.key]?.inApp ? (
