@@ -286,95 +286,64 @@ router.put('/:id', [
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // --- Section Sync Logic with Safety Checks ---
+    // --- Section Sync Logic: Grade-level sync ---
     if (req.body.sections && Array.isArray(req.body.sections)) {
-      const inputSections = req.body.sections;
       const tenantId = req.user.tenantId;
-      const classId = req.params.id;
+      const targetClassId = req.params.id;
+      const inputSections = req.body.sections;
 
-      // Fetch existing sections
-      const existingSections = await Section.find({ classId });
+      // Find ALL class documents for this grade+tenant (there may be multiple due to legacy data)
+      const allGradeClasses = await Class.find({
+        grade: updatedClass.grade,
+        tenantId,
+        _id: { $ne: targetClassId } // other class docs for same grade
+      });
+      const allClassIds = [targetClassId, ...allGradeClasses.map(c => c._id.toString())];
 
-      // 1. Process Objects ({ id, name }) or Strings (name only)
-      // If string, we assume it's a desired state list.
-      // To safely support "Standard to Custom" switch, we treat input as the source of truth.
-      // But we MUST respect locks.
+      // Fetch ALL existing sections across all class docs for this grade
+      const existingSections = await Section.find({ classId: { $in: allClassIds } });
 
-      // We will execute operations in sequence to ensure safety.
-      // Strategy: 
-      // A. Identify IDs to UPDATE (if id provided)
-      // B. Identify Names to CREATE (if no id)
-      // C. Identify IDs to DELETE (if in DB but not in input IDs)
+      // Check if any section being removed has students
+      const inputIds = new Set(
+        inputSections
+          .filter(s => s._id)
+          .map(s => s._id.toString())
+      );
+      const inputNames = new Set(
+        inputSections.map(s => (typeof s === 'string' ? s.trim() : s.name?.trim()))
+      );
 
-      // If input contains ONLY strings, we can't map to IDs easily unless names match. 
-      // Fallback for strings: Map by Name.
-      // If object with ID: Map by ID.
-
-      const operations = []; // List of async tasks
-      const processedIds = new Set();
-      const processedNames = new Set();
-
-      for (const input of inputSections) {
-        let name, id;
-        if (typeof input === 'string') {
-          name = input.trim();
-        } else {
-          name = input.name.trim();
-          id = input._id || input.id;
-        }
-
-        if (!name) continue;
-        processedNames.add(name);
-
-        if (id) {
-          // Update specific section
-          processedIds.add(id.toString());
-          const section = existingSections.find(s => s._id.toString() === id.toString());
-          if (section) {
-            const updates = {};
-            if (section.name !== name) {
-              // RENAME ATTEMPT
-              const studentCount = await User.countDocuments({ sectionId: id, role: 'student' });
-              if (studentCount > 0) {
-                return res.status(400).json({ success: false, message: `Cannot rename section '${section.name}' because it has active students.` });
-              }
-              updates.name = name;
-            }
-            // Update sectionTeacher if provided
-            const sectionTeacher = typeof input === 'object' ? input.sectionTeacher || null : null;
-            if (sectionTeacher !== undefined) updates.sectionTeacher = sectionTeacher || null;
-            if (Object.keys(updates).length > 0) {
-              operations.push(Section.findByIdAndUpdate(id, updates));
-            }
-          }
-        } else {
-          // New Section (or matching existing by name if string-only input)
-          // Check if name already exists to prevent duplicate creation if ID wasn't sent
-          const exactMatch = existingSections.find(s => s.name === name);
-          if (exactMatch) {
-            processedIds.add(exactMatch._id.toString());
-            // No op, exists
-          } else {
-            // Create
-            operations.push(Section.create({ tenantId, classId, name }));
-          }
-        }
-      }
-
-      // Delete missing sections
       for (const section of existingSections) {
-        if (!processedIds.has(section._id.toString())) {
-          // DELETE ATTEMPT
+        const keptById = inputIds.has(section._id.toString());
+        const keptByName = !inputIds.size && inputNames.has(section.name);
+        if (!keptById && !keptByName) {
           const studentCount = await User.countDocuments({ sectionId: section._id, role: 'student' });
           if (studentCount > 0) {
-            return res.status(400).json({ success: false, message: `Cannot delete section '${section.name}' because it has active students.` });
+            return res.status(400).json({
+              success: false,
+              message: `Cannot delete section '${section.name}' because it has ${studentCount} active student(s).`
+            });
           }
-          operations.push(Section.findByIdAndDelete(section._id));
         }
       }
 
-      await Promise.all(operations);
+      // Delete ALL existing sections across all class docs for this grade
+      await Section.deleteMany({ classId: { $in: allClassIds } });
+
+      // Recreate only the submitted sections on the target class
+      const sectionsToCreate = inputSections
+        .map(s => {
+          const name = typeof s === 'string' ? s.trim() : s.name?.trim();
+          const sectionTeacher = typeof s === 'object' ? (s.sectionTeacher || null) : null;
+          return { tenantId, classId: targetClassId, name, sectionTeacher };
+        })
+        .filter(s => s.name);
+
+      if (sectionsToCreate.length > 0) {
+        await Section.insertMany(sectionsToCreate);
+      }
     }
+
 
     // Re-fetch sections for response
     const currentSections = await Section.find({ classId: req.params.id }).sort({ name: 1 });
