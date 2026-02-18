@@ -154,10 +154,8 @@ router.get('/:id', protect, async (req, res) => {
 router.post('/', [
   protect,
   authorize('admin'),
-  body('name').notEmpty().withMessage('Class name is required'),
   body('grade').notEmpty().withMessage('Grade is required'),
-  body('academicYear').notEmpty().withMessage('Academic year is required'),
-  body('classTeacher').isMongoId().withMessage('Valid class teacher is required')
+  body('academicYear').notEmpty().withMessage('Academic year is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -169,7 +167,9 @@ router.post('/', [
       });
     }
 
-    const { name, grade, academicYear, classTeacher } = req.body;
+    const { grade, academicYear, classTeacher } = req.body;
+    // Auto-generate name from grade if not provided
+    const name = req.body.name || grade;
 
     // Ensure tenantId is available
     if (!req.user || !req.user.tenantId) {
@@ -179,21 +179,12 @@ router.post('/', [
       });
     }
 
-    // Check if class teacher exists and is a teacher
-    const teacher = await User.findById(classTeacher);
-    if (!teacher || teacher.role !== 'teacher') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid class teacher'
-      });
-    }
-
     const newClass = new Class({
       tenantId: req.user.tenantId,
       name,
       grade,
       academicYear,
-      classTeacher
+      ...(classTeacher && { classTeacher })
     });
 
     await newClass.save();

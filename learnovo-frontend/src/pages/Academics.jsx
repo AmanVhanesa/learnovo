@@ -114,7 +114,7 @@ const AcademicsManagement = () => {
 
     const fetchTeachers = async () => {
         try {
-            const res = await employeesService.list({ role: 'teacher', limit: 1000 })
+            const res = await employeesService.list({ limit: 1000 })
             console.log('Teachers API Response:', res)
             console.log('Teachers data:', res.data)
             setTeachers(res.data || [])
@@ -962,9 +962,11 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                                             value={sec.sectionTeacher}
                                             onChange={(e) => updateSection(idx, 'sectionTeacher', e.target.value)}
                                         >
-                                            <option value="">Class Teacher</option>
+                                            <option value="">— No Teacher —</option>
                                             {teachers.map(t => (
-                                                <option key={t._id} value={t._id}>{t.name}</option>
+                                                <option key={t._id} value={t._id}>
+                                                    {t.name}{t.employeeId ? ` (${t.employeeId})` : ''}
+                                                </option>
                                             ))}
                                         </select>
                                         {sections.length > 1 && (
