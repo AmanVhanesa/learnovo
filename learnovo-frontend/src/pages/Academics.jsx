@@ -32,6 +32,16 @@ const sortClassesByGrade = (classes) => {
     });
 };
 
+// Format grade for display: 1 → 1st, 2 → 2nd, 3 → 3rd, etc.
+const formatGrade = (grade) => {
+    const n = parseInt(grade);
+    if (isNaN(n)) return grade; // Nursery, LKG, UKG — unchanged
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    const suffix = suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0];
+    return `${n}${suffix}`;
+};
+
 const AcademicsManagement = () => {
     const { user } = useAuth()
     const [activeTab, setActiveTab] = useState('sessions')
@@ -421,7 +431,7 @@ const AcademicsManagement = () => {
                                                 {/* Grade Header */}
                                                 <div className="flex items-start justify-between mb-3">
                                                     <div>
-                                                        <h3 className="text-lg font-bold text-gray-900">{grade}</h3>
+                                                        <h3 className="text-lg font-bold text-gray-900">{formatGrade(grade)}</h3>
                                                         <p className="text-xs text-gray-500">{academicYear}</p>
                                                     </div>
                                                     {user?.role === 'admin' && (
