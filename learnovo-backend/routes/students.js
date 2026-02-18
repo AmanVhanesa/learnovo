@@ -375,7 +375,12 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
         'admission_date': 'admissionDate',
         'driver': 'driverName',
         'driver_name': 'driverName',
-        'drivername': 'driverName'
+        'drivername': 'driverName',
+        // currentClass / currentSection from the import template
+        'currentclass': 'class',
+        'current_class': 'class',
+        'currentsection': 'section',
+        'current_section': 'section'
       };
 
       // Normalize each field
@@ -772,6 +777,40 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
             }
           }
           studentData.class = classValue;
+
+          // Look up the Class document to get classId
+          try {
+            const Class = require('../models/Class');
+            const Section = require('../models/Section');
+
+            // Try matching by name (case-insensitive)
+            const classDoc = await Class.findOne({
+              tenantId,
+              $or: [
+                { name: { $regex: new RegExp(`^${classValue}$`, 'i') } },
+                { grade: { $regex: new RegExp(`^${classValue}$`, 'i') } }
+              ]
+            });
+
+            if (classDoc) {
+              studentData.classId = classDoc._id;
+
+              // Now look up section within this class
+              if (row.section && row.section.trim()) {
+                const sectionDoc = await Section.findOne({
+                  tenantId,
+                  classId: classDoc._id,
+                  name: { $regex: new RegExp(`^${row.section.trim()}$`, 'i') },
+                  isActive: true
+                });
+                if (sectionDoc) {
+                  studentData.sectionId = sectionDoc._id;
+                }
+              }
+            }
+          } catch (lookupErr) {
+            console.warn('Class/Section lookup error during import:', lookupErr.message);
+          }
         }
         if (row.section && row.section.trim()) {
           studentData.section = row.section.trim();
