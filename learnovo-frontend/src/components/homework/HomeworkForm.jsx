@@ -43,9 +43,13 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
     useEffect(() => {
         if (formData.class) {
-            fetchSections(formData.class);
+            // Use sections already embedded in the class data
+            const selectedClass = classes.find(cls => cls._id?.toString() === formData.class?.toString());
+            setSections(selectedClass?.sections || []);
+        } else {
+            setSections([]);
         }
-    }, [formData.class]);
+    }, [formData.class, classes]);
 
     const fetchOptions = async () => {
         try {
@@ -58,18 +62,6 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
             if (subjectsRes.success) setSubjects(subjectsRes.data || []);
         } catch (error) {
             console.error('Error fetching options:', error);
-        }
-    };
-
-    const fetchSections = async (classId) => {
-        try {
-            const response = await classesService.getSections(classId);
-            if (response.success) {
-                setSections(response.data || []);
-            }
-        } catch (error) {
-            console.error('Error fetching sections:', error);
-            setSections([]);
         }
     };
 
