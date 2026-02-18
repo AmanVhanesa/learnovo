@@ -473,8 +473,8 @@ const AcademicsManagement = () => {
                                                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sections</p>
                                                         {allSections.map(section => (
                                                             <div key={section._id} className="flex items-center justify-between bg-gray-50 rounded px-2.5 py-1.5">
-                                                                <span className="text-sm font-medium text-gray-800">{section.name}</span>
-                                                                <span className="text-xs text-gray-500">
+                                                                <span className="text-sm font-medium text-gray-800 uppercase">{section.name}</span>
+                                                                <span className="text-xs text-gray-500 uppercase">
                                                                     {section.sectionTeacherName || section.sectionTeacher?.name || '—'}
                                                                 </span>
                                                             </div>
