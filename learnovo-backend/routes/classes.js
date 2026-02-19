@@ -39,7 +39,17 @@ router.get('/', protect, async (req, res) => {
           from: 'sections',
           let: { classId: '$_id', classGrade: '$grade', classTenantId: '$tenantId' },
           pipeline: [
-            { $match: { $expr: { $eq: ['$classId', '$$classId'] } } },
+            {
+              $match: {
+                $expr: {
+                  $or: [
+                    { $eq: ['$classId', '$$classId'] },
+                    // Allow string match for classId to handle potential type mismatches
+                    { $eq: [{ $toString: '$classId' }, { $toString: '$$classId' }] }
+                  ]
+                }
+              }
+            },
             // Populate sectionTeacher name
             {
               $lookup: {
@@ -57,32 +67,29 @@ router.get('/', protect, async (req, res) => {
                 let: { secId: '$_id', secName: '$name', clsGrade: '$$classGrade', clsTenantId: '$$classTenantId', clsId: '$$classId' },
                 pipeline: [
                   {
-                    $match: {
-                      $expr: {
-                        $and: [
-                          { $eq: ['$role', 'student'] },
-                          { $ne: ['$isActive', false] },
-                          { $eq: ['$tenantId', '$$clsTenantId'] },
+                    $and: [
+                      { $eq: ['$role', 'student'] },
+                      { $ne: ['$isActive', false] },
+                      { $eq: ['$tenantId', '$$clsTenantId'] },
+                      {
+                        $or: [
+                          { $eq: ['$sectionId', '$$secId'] },
                           {
-                            $or: [
-                              { $eq: ['$sectionId', '$$secId'] },
+                            $and: [
+                              // Removed strict check: { $eq: [{ $ifNull: ['$sectionId', null] }, null] }
+                              // This allows matching by name if sectionId is present but maybe invalid/mismatch
+                              { $eq: [{ $toLower: '$section' }, { $toLower: '$$secName' }] },
                               {
-                                $and: [
-                                  { $eq: [{ $ifNull: ['$sectionId', null] }, null] },
-                                  { $eq: [{ $toLower: '$section' }, { $toLower: '$$secName' }] },
-                                  {
-                                    $or: [
-                                      { $eq: ['$class', '$$clsGrade'] },
-                                      { $eq: ['$classId', '$$clsId'] }
-                                    ]
-                                  }
+                                $or: [
+                                  { $eq: ['$class', '$$clsGrade'] },
+                                  { $eq: ['$classId', '$$clsId'] }
                                 ]
                               }
                             ]
                           }
                         ]
                       }
-                    }
+                    ]
                   },
                   { $count: 'total' }
                 ],
