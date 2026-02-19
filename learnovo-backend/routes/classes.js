@@ -33,7 +33,7 @@ router.get('/', protect, async (req, res) => {
     // Use aggregation to fetch classes with their sections and student counts
     const classes = await Class.aggregate([
       { $match: filter },
-      // Lookup Sections with their sectionTeacher names
+      // Lookup Sections with their sectionTeacher names and per-section student counts
       {
         $lookup: {
           from: 'sections',
@@ -50,12 +50,35 @@ router.get('/', protect, async (req, res) => {
               }
             },
             { $unwind: { path: '$sectionTeacherData', preserveNullAndEmptyArrays: true } },
+            // Count students assigned to this section via sectionId
             {
-              $addFields: {
-                sectionTeacherName: '$sectionTeacherData.name'
+              $lookup: {
+                from: 'users',
+                let: { secId: '$_id' },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $and: [
+                          { $eq: ['$sectionId', '$$secId'] },
+                          { $eq: ['$role', 'student'] },
+                          { $ne: ['$isActive', false] }
+                        ]
+                      }
+                    }
+                  },
+                  { $count: 'total' }
+                ],
+                as: 'studentCounts'
               }
             },
-            { $project: { sectionTeacherData: 0 } },
+            {
+              $addFields: {
+                sectionTeacherName: '$sectionTeacherData.name',
+                studentCount: { $ifNull: [{ $arrayElemAt: ['$studentCounts.total', 0] }, 0] }
+              }
+            },
+            { $project: { sectionTeacherData: 0, studentCounts: 0 } },
             { $sort: { name: 1 } }
           ],
           as: 'sections'
