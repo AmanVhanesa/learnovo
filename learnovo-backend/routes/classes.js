@@ -50,6 +50,18 @@ router.get('/', protect, async (req, res) => {
                 }
               }
             },
+            // Deduplicate sections that matched both arms of the $or above
+            {
+              $group: {
+                _id: '$_id',
+                name: { $first: '$name' },
+                classId: { $first: '$classId' },
+                tenantId: { $first: '$tenantId' },
+                sectionTeacher: { $first: '$sectionTeacher' },
+                createdAt: { $first: '$createdAt' },
+                updatedAt: { $first: '$updatedAt' }
+              }
+            },
             // Populate sectionTeacher name
             {
               $lookup: {
@@ -352,26 +364,64 @@ router.put('/:id', [
       const targetClassId = req.params.id;
       const inputSections = req.body.sections;
 
-      // Fetch ONLY the sections belonging to this specific class document
-      const existingSections = await Section.find({ classId: targetClassId });
+      // Import mongoose to use Types.ObjectId
+      const mongoose = require('mongoose');
+      let targetClassObjectId;
+      try {
+        targetClassObjectId = new mongoose.Types.ObjectId(targetClassId);
+      } catch (e) {
+        targetClassObjectId = targetClassId;
+      }
 
-      // Build lookup maps for existing sections
-      const existingById = new Map(existingSections.map(s => [s._id.toString(), s]));
-      const existingByName = new Map(existingSections.map(s => [s.name.toUpperCase(), s]));
+      // Fetch ALL sections relevant to this class, whether classId is String or ObjectId
+      const existingSections = await Section.find({
+        $or: [
+          { classId: targetClassObjectId },
+          { classId: targetClassId }
+        ]
+      });
 
-      // Track which existing section _ids are still present in the input
+      // Dedup existing sections by Name. 
+      const existingByName = new Map();
+      const duplicateIdsToDelete = [];
+
+      existingSections.forEach(s => {
+        const upperName = (s.name || '').toUpperCase();
+        if (existingByName.has(upperName)) {
+          const kept = existingByName.get(upperName);
+          const sHasObjectId = (s.classId instanceof mongoose.Types.ObjectId);
+          const keptHasObjectId = (kept.classId instanceof mongoose.Types.ObjectId);
+
+          if (sHasObjectId && !keptHasObjectId) {
+            duplicateIdsToDelete.push(kept._id);
+            existingByName.set(upperName, s);
+          } else {
+            duplicateIdsToDelete.push(s._id);
+          }
+        } else {
+          existingByName.set(upperName, s);
+        }
+      });
+
+      const existingById = new Map();
+      existingByName.forEach(s => existingById.set(s._id.toString(), s));
+
       const keptIds = new Set();
       const bulkOps = [];
 
-      // Import mongoose to use Types.ObjectId
-      const mongoose = require('mongoose');
+      if (duplicateIdsToDelete.length > 0) {
+        bulkOps.push({
+          deleteMany: {
+            filter: { _id: { $in: duplicateIdsToDelete } }
+          }
+        });
+      }
 
       for (const s of inputSections) {
         const rawName = (typeof s === 'string' ? s.trim() : s.name?.trim());
         if (!rawName) continue;
         const upperName = rawName.toUpperCase();
 
-        // Ensure sectionTeacher is converted to ObjectId if present
         let sectionTeacher = (typeof s === 'object' && s.sectionTeacher) ? s.sectionTeacher : null;
         if (sectionTeacher && mongoose.Types.ObjectId.isValid(sectionTeacher)) {
           sectionTeacher = new mongoose.Types.ObjectId(sectionTeacher);
@@ -381,27 +431,29 @@ router.put('/:id', [
 
         const inputId = s._id ? s._id.toString() : null;
 
-        // Resolve the existing section — prefer _id match, fall back to name
         const existing = (inputId && existingById.get(inputId))
           || existingByName.get(upperName)
           || null;
 
         if (existing) {
           keptIds.add(existing._id.toString());
-          // UPDATE in-place — preserves _id so student sectionId references stay valid
           bulkOps.push({
             updateOne: {
               filter: { _id: existing._id },
-              update: { $set: { sectionTeacher: sectionTeacher } }
+              update: {
+                $set: {
+                  sectionTeacher: sectionTeacher,
+                  classId: targetClassObjectId
+                }
+              }
             }
           });
         } else {
-          // Brand-new section — insert
           bulkOps.push({
             insertOne: {
               document: {
                 tenantId: new mongoose.Types.ObjectId(tenantId),
-                classId: new mongoose.Types.ObjectId(targetClassId),
+                classId: targetClassObjectId,
                 name: upperName,
                 sectionTeacher: sectionTeacher
               }
@@ -410,19 +462,15 @@ router.put('/:id', [
         }
       }
 
-      // Only delete sections that the frontend explicitly sent (had an _id) but then removed.
-      // Sections that were never in the form are left untouched.
       const inputIdsFromForm = new Set(
         inputSections.filter(s => s._id).map(s => s._id.toString())
       );
-      const hadIds = inputIdsFromForm.size > 0; // were any _ids submitted?
+      const hadIds = inputIdsFromForm.size > 0;
 
-      for (const sec of existingSections) {
-        if (keptIds.has(sec._id.toString())) continue; // still in the list
+      for (const sec of existingByName.values()) {
+        if (keptIds.has(sec._id.toString())) continue;
 
-        // Only delete if the form originally contained section _ids (meaning removals are intentional)
         if (hadIds && inputIdsFromForm.size > 0) {
-          // Check the section has no students before deleting
           const studentCount = await User.countDocuments({
             $or: [
               { sectionId: sec._id, role: 'student' },
@@ -437,7 +485,6 @@ router.put('/:id', [
           }
           bulkOps.push({ deleteOne: { filter: { _id: sec._id } } });
         }
-        // If no _ids were submitted (old form format), don't delete anything
       }
 
       if (bulkOps.length > 0) {
