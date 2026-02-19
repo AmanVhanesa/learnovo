@@ -37,7 +37,7 @@ router.get('/', protect, async (req, res) => {
       {
         $lookup: {
           from: 'sections',
-          let: { classId: '$_id' },
+          let: { classId: '$_id', classGrade: '$grade', classTenantId: '$tenantId' },
           pipeline: [
             { $match: { $expr: { $eq: ['$classId', '$$classId'] } } },
             // Populate sectionTeacher name
@@ -50,11 +50,11 @@ router.get('/', protect, async (req, res) => {
               }
             },
             { $unwind: { path: '$sectionTeacherData', preserveNullAndEmptyArrays: true } },
-            // Count students assigned to this section — match by sectionId OR by section name string
+            // Count students assigned to this section — match by sectionId OR by section name + grade string
             {
               $lookup: {
                 from: 'users',
-                let: { secId: '$_id', secName: '$name', clsGrade: { $literal: null } },
+                let: { secId: '$_id', secName: '$name', clsGrade: '$$classGrade', clsTenantId: '$$classTenantId' },
                 pipeline: [
                   {
                     $match: {
@@ -62,13 +62,15 @@ router.get('/', protect, async (req, res) => {
                         $and: [
                           { $eq: ['$role', 'student'] },
                           { $ne: ['$isActive', false] },
+                          { $eq: ['$tenantId', '$$clsTenantId'] },
                           {
                             $or: [
                               { $eq: ['$sectionId', '$$secId'] },
                               {
                                 $and: [
                                   { $eq: [{ $ifNull: ['$sectionId', null] }, null] },
-                                  { $eq: [{ $toLower: '$section' }, { $toLower: '$$secName' }] }
+                                  { $eq: [{ $toLower: '$section' }, { $toLower: '$$secName' }] },
+                                  { $eq: ['$class', '$$clsGrade'] }
                                 ]
                               }
                             ]
