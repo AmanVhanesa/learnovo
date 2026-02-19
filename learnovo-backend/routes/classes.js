@@ -356,20 +356,53 @@ router.put('/:id', [
         }
       }
 
-      // Delete ALL existing sections across all class docs for this grade
-      await Section.deleteMany({ classId: { $in: allClassIds } });
+      // --- Smart upsert: preserve existing section _id values so student
+      //     sectionId references remain valid ---
 
-      // Recreate only the submitted sections on the target class
-      const sectionsToCreate = inputSections
-        .map(s => {
-          const name = typeof s === 'string' ? s.trim() : s.name?.trim();
-          const sectionTeacher = typeof s === 'object' ? (s.sectionTeacher || null) : null;
-          return { tenantId, classId: targetClassId, name, sectionTeacher };
-        })
-        .filter(s => s.name);
+      // Build a name → existing section map
+      const existingByName = new Map(
+        existingSections.map(s => [s.name.toUpperCase(), s])
+      );
 
-      if (sectionsToCreate.length > 0) {
-        await Section.insertMany(sectionsToCreate);
+      const bulkOps = [];
+      const handledNames = new Set();
+
+      for (const s of inputSections) {
+        const rawName = (typeof s === 'string' ? s.trim() : s.name?.trim());
+        if (!rawName) continue;
+        const upperName = rawName.toUpperCase();
+        const sectionTeacher = (typeof s === 'object' && s.sectionTeacher) ? s.sectionTeacher : null;
+
+        const existing = existingByName.get(upperName);
+        if (existing) {
+          // UPDATE in-place — preserves _id so student sectionId links stay valid
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: existing._id },
+              update: { $set: { sectionTeacher: sectionTeacher || null, classId: targetClassId } }
+            }
+          });
+        } else {
+          // INSERT brand-new section
+          bulkOps.push({
+            insertOne: {
+              document: { tenantId, classId: targetClassId, name: upperName, sectionTeacher: sectionTeacher || null }
+            }
+          });
+        }
+        handledNames.add(upperName);
+      }
+
+      // DELETE sections that were removed from the input
+      const sectionsToDelete = existingSections.filter(
+        s => !handledNames.has(s.name.toUpperCase())
+      );
+      for (const s of sectionsToDelete) {
+        bulkOps.push({ deleteOne: { filter: { _id: s._id } } });
+      }
+
+      if (bulkOps.length > 0) {
+        await Section.collection.bulkWrite(bulkOps, { ordered: false });
       }
     }
 
