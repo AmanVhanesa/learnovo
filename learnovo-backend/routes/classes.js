@@ -363,11 +363,22 @@ router.put('/:id', [
       const keptIds = new Set();
       const bulkOps = [];
 
+      // Import mongoose to use Types.ObjectId
+      const mongoose = require('mongoose');
+
       for (const s of inputSections) {
         const rawName = (typeof s === 'string' ? s.trim() : s.name?.trim());
         if (!rawName) continue;
         const upperName = rawName.toUpperCase();
-        const sectionTeacher = (typeof s === 'object' && s.sectionTeacher) ? s.sectionTeacher : null;
+
+        // Ensure sectionTeacher is converted to ObjectId if present
+        let sectionTeacher = (typeof s === 'object' && s.sectionTeacher) ? s.sectionTeacher : null;
+        if (sectionTeacher && mongoose.Types.ObjectId.isValid(sectionTeacher)) {
+          sectionTeacher = new mongoose.Types.ObjectId(sectionTeacher);
+        } else {
+          sectionTeacher = null;
+        }
+
         const inputId = s._id ? s._id.toString() : null;
 
         // Resolve the existing section — prefer _id match, fall back to name
@@ -381,14 +392,19 @@ router.put('/:id', [
           bulkOps.push({
             updateOne: {
               filter: { _id: existing._id },
-              update: { $set: { sectionTeacher: sectionTeacher || null } }
+              update: { $set: { sectionTeacher: sectionTeacher } }
             }
           });
         } else {
           // Brand-new section — insert
           bulkOps.push({
             insertOne: {
-              document: { tenantId, classId: targetClassId, name: upperName, sectionTeacher: sectionTeacher || null }
+              document: {
+                tenantId: new mongoose.Types.ObjectId(tenantId),
+                classId: new mongoose.Types.ObjectId(targetClassId),
+                name: upperName,
+                sectionTeacher: sectionTeacher
+              }
             }
           });
         }
