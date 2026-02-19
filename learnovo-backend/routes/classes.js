@@ -54,7 +54,7 @@ router.get('/', protect, async (req, res) => {
             {
               $lookup: {
                 from: 'users',
-                let: { secId: '$_id', secName: '$name', clsGrade: '$$classGrade', clsTenantId: '$$classTenantId' },
+                let: { secId: '$_id', secName: '$name', clsGrade: '$$classGrade', clsTenantId: '$$classTenantId', clsId: '$$classId' },
                 pipeline: [
                   {
                     $match: {
@@ -70,7 +70,12 @@ router.get('/', protect, async (req, res) => {
                                 $and: [
                                   { $eq: [{ $ifNull: ['$sectionId', null] }, null] },
                                   { $eq: [{ $toLower: '$section' }, { $toLower: '$$secName' }] },
-                                  { $eq: ['$class', '$$clsGrade'] }
+                                  {
+                                    $or: [
+                                      { $eq: ['$class', '$$clsGrade'] },
+                                      { $eq: ['$classId', '$$clsId'] }
+                                    ]
+                                  }
                                 ]
                               }
                             ]
@@ -110,13 +115,18 @@ router.get('/', protect, async (req, res) => {
       {
         $lookup: {
           from: 'users',
-          let: { classGrade: '$grade', classTenantId: '$tenantId' },
+          let: { classId: '$_id', classGrade: '$grade', classTenantId: '$tenantId' },
           pipeline: [
             {
               $match: {
                 $expr: {
                   $and: [
-                    { $eq: ['$class', '$$classGrade'] },
+                    {
+                      $or: [
+                        { $eq: ['$class', '$$classGrade'] },
+                        { $eq: ['$classId', '$$classId'] }
+                      ]
+                    },
                     { $eq: ['$role', 'student'] },
                     { $eq: ['$tenantId', '$$classTenantId'] },
                     { $ne: ['$isActive', false] }
