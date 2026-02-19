@@ -463,8 +463,8 @@ const AcademicsManagement = () => {
 
                                                 {/* Stats */}
                                                 <div className="flex gap-4 text-sm mb-3">
-                                                    <span className="text-gray-600">👥 <strong>{totalStudents}</strong> Students</span>
-                                                    <span className="text-gray-600">📚 <strong>{allSections.length}</strong> Sections</span>
+                                                    <span className="text-gray-500"><strong className="text-gray-800">{totalStudents}</strong> Students</span>
+                                                    <span className="text-gray-500"><strong className="text-gray-800">{allSections.length}</strong> Sections</span>
                                                 </div>
 
                                                 {/* Sections List */}
@@ -479,8 +479,8 @@ const AcademicsManagement = () => {
                                                                         <p className="text-xs text-gray-400">{section.sectionTeacherName || section.sectionTeacher?.name}</p>
                                                                     )}
                                                                 </div>
-                                                                <span className="flex items-center gap-1 text-xs font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                                                                    👥 {section.studentCount ?? 0}
+                                                                <span className="text-xs font-semibold text-gray-500 tabular-nums">
+                                                                    {section.studentCount ?? 0}
                                                                 </span>
                                                             </div>
                                                         ))}
