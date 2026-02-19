@@ -118,7 +118,8 @@ router.get('/', protect, async (req, res) => {
                   $and: [
                     { $eq: ['$class', '$$classGrade'] },
                     { $eq: ['$role', 'student'] },
-                    { $eq: ['$tenantId', '$$classTenantId'] }
+                    { $eq: ['$tenantId', '$$classTenantId'] },
+                    { $ne: ['$isActive', false] }
                   ]
                 }
               }
@@ -483,10 +484,19 @@ router.delete('/:id', [protect, authorize('admin')], async (req, res) => {
 // Get students in a class
 router.get('/:id/students', protect, async (req, res) => {
   try {
+    const classItem = await Class.findById(req.params.id);
+    if (!classItem) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+
     const students = await User.find({
-      classId: req.params.id,
-      role: 'student'
-    }).select('name email studentId rollNumber admissionDate guardianName guardianPhone');
+      $or: [
+        { classId: req.params.id },
+        { class: classItem.grade, tenantId: classItem.tenantId }
+      ],
+      role: 'student',
+      isActive: { $ne: false }
+    }).select('name email studentId rollNumber admissionDate guardianName guardianPhone section sectionId');
 
     res.json({
       success: true,
