@@ -50,19 +50,29 @@ router.get('/', protect, async (req, res) => {
               }
             },
             { $unwind: { path: '$sectionTeacherData', preserveNullAndEmptyArrays: true } },
-            // Count students assigned to this section via sectionId
+            // Count students assigned to this section — match by sectionId OR by section name string
             {
               $lookup: {
                 from: 'users',
-                let: { secId: '$_id' },
+                let: { secId: '$_id', secName: '$name', clsGrade: { $literal: null } },
                 pipeline: [
                   {
                     $match: {
                       $expr: {
                         $and: [
-                          { $eq: ['$sectionId', '$$secId'] },
                           { $eq: ['$role', 'student'] },
-                          { $ne: ['$isActive', false] }
+                          { $ne: ['$isActive', false] },
+                          {
+                            $or: [
+                              { $eq: ['$sectionId', '$$secId'] },
+                              {
+                                $and: [
+                                  { $eq: [{ $ifNull: ['$sectionId', null] }, null] },
+                                  { $eq: [{ $toLower: '$section' }, { $toLower: '$$secName' }] }
+                                ]
+                              }
+                            ]
+                          }
                         ]
                       }
                     }
@@ -309,96 +319,82 @@ router.put('/:id', [
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // --- Section Sync Logic: Grade-level sync ---
+    // --- Section Sync: safe upsert on target class only ---
     if (req.body.sections && Array.isArray(req.body.sections)) {
       const tenantId = req.user.tenantId;
       const targetClassId = req.params.id;
       const inputSections = req.body.sections;
 
-      console.log('[PUT /classes] targetClassId:', targetClassId);
-      console.log('[PUT /classes] grade:', updatedClass.grade);
-      console.log('[PUT /classes] inputSections:', JSON.stringify(inputSections));
+      // Fetch ONLY the sections belonging to this specific class document
+      const existingSections = await Section.find({ classId: targetClassId });
 
-      // Find ALL class documents for this grade+tenant (there may be multiple due to legacy data)
-      const allGradeClasses = await Class.find({
-        grade: updatedClass.grade,
-        tenantId,
-        _id: { $ne: targetClassId } // other class docs for same grade
-      });
-      const allClassIds = [targetClassId, ...allGradeClasses.map(c => c._id.toString())];
-      console.log('[PUT /classes] allClassIds:', allClassIds);
+      // Build lookup maps for existing sections
+      const existingById = new Map(existingSections.map(s => [s._id.toString(), s]));
+      const existingByName = new Map(existingSections.map(s => [s.name.toUpperCase(), s]));
 
-      // Fetch ALL existing sections across all class docs for this grade
-      const existingSections = await Section.find({ classId: { $in: allClassIds } });
-      console.log('[PUT /classes] existingSections:', existingSections.map(s => ({ id: s._id, name: s.name, classId: s.classId })));
-
-      // Check if any section being removed has students
-      const inputIds = new Set(
-        inputSections
-          .filter(s => s._id)
-          .map(s => s._id.toString())
-      );
-      const inputNames = new Set(
-        inputSections.map(s => (typeof s === 'string' ? s.trim() : s.name?.trim()))
-      );
-
-      for (const section of existingSections) {
-        const keptById = inputIds.has(section._id.toString());
-        const keptByName = !inputIds.size && inputNames.has(section.name);
-        if (!keptById && !keptByName) {
-          const studentCount = await User.countDocuments({ sectionId: section._id, role: 'student' });
-          if (studentCount > 0) {
-            return res.status(400).json({
-              success: false,
-              message: `Cannot delete section '${section.name}' because it has ${studentCount} active student(s).`
-            });
-          }
-        }
-      }
-
-      // --- Smart upsert: preserve existing section _id values so student
-      //     sectionId references remain valid ---
-
-      // Build a name → existing section map
-      const existingByName = new Map(
-        existingSections.map(s => [s.name.toUpperCase(), s])
-      );
-
+      // Track which existing section _ids are still present in the input
+      const keptIds = new Set();
       const bulkOps = [];
-      const handledNames = new Set();
 
       for (const s of inputSections) {
         const rawName = (typeof s === 'string' ? s.trim() : s.name?.trim());
         if (!rawName) continue;
         const upperName = rawName.toUpperCase();
         const sectionTeacher = (typeof s === 'object' && s.sectionTeacher) ? s.sectionTeacher : null;
+        const inputId = s._id ? s._id.toString() : null;
 
-        const existing = existingByName.get(upperName);
+        // Resolve the existing section — prefer _id match, fall back to name
+        const existing = (inputId && existingById.get(inputId))
+          || existingByName.get(upperName)
+          || null;
+
         if (existing) {
-          // UPDATE in-place — preserves _id so student sectionId links stay valid
+          keptIds.add(existing._id.toString());
+          // UPDATE in-place — preserves _id so student sectionId references stay valid
           bulkOps.push({
             updateOne: {
               filter: { _id: existing._id },
-              update: { $set: { sectionTeacher: sectionTeacher || null, classId: targetClassId } }
+              update: { $set: { sectionTeacher: sectionTeacher || null } }
             }
           });
         } else {
-          // INSERT brand-new section
+          // Brand-new section — insert
           bulkOps.push({
             insertOne: {
               document: { tenantId, classId: targetClassId, name: upperName, sectionTeacher: sectionTeacher || null }
             }
           });
         }
-        handledNames.add(upperName);
       }
 
-      // DELETE sections that were removed from the input
-      const sectionsToDelete = existingSections.filter(
-        s => !handledNames.has(s.name.toUpperCase())
+      // Only delete sections that the frontend explicitly sent (had an _id) but then removed.
+      // Sections that were never in the form are left untouched.
+      const inputIdsFromForm = new Set(
+        inputSections.filter(s => s._id).map(s => s._id.toString())
       );
-      for (const s of sectionsToDelete) {
-        bulkOps.push({ deleteOne: { filter: { _id: s._id } } });
+      const hadIds = inputIdsFromForm.size > 0; // were any _ids submitted?
+
+      for (const sec of existingSections) {
+        if (keptIds.has(sec._id.toString())) continue; // still in the list
+
+        // Only delete if the form originally contained section _ids (meaning removals are intentional)
+        if (hadIds && inputIdsFromForm.size > 0) {
+          // Check the section has no students before deleting
+          const studentCount = await User.countDocuments({
+            $or: [
+              { sectionId: sec._id, role: 'student' },
+              { section: { $regex: new RegExp(`^${sec.name}$`, 'i') }, sectionId: { $exists: false }, role: 'student' }
+            ]
+          });
+          if (studentCount > 0) {
+            return res.status(400).json({
+              success: false,
+              message: `Cannot remove section '${sec.name}' — it has ${studentCount} enrolled student(s).`
+            });
+          }
+          bulkOps.push({ deleteOne: { filter: { _id: sec._id } } });
+        }
+        // If no _ids were submitted (old form format), don't delete anything
       }
 
       if (bulkOps.length > 0) {
