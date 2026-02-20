@@ -2,6 +2,8 @@ import React from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { User, Mail, Phone, Calendar, Save } from 'lucide-react'
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+
 const Profile = () => {
   const { user, login } = useAuth()
   const [loading, setLoading] = React.useState(false)
@@ -36,7 +38,7 @@ const Profile = () => {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:5001/api/auth/profile', {
+      const response = await fetch(`${API_BASE}/api/auth/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -77,7 +79,7 @@ const Profile = () => {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
-      const response = await fetch('http://localhost:5001/api/auth/password', {
+      const response = await fetch(`${API_BASE}/api/auth/password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
