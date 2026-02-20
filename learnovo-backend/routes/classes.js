@@ -51,14 +51,15 @@ router.get('/', protect, async (req, res) => {
               }
             },
             // Deduplicate sections that matched both arms of the $or above or have duplicate names by grouping by name
+            // Use $max on sectionTeacher so a non-null value is always preferred over null
             {
               $group: {
                 _id: { $toUpper: '$name' },
-                docId: { $first: '$_id' },
+                docId: { $max: '$_id' },
                 name: { $first: '$name' },
                 classId: { $first: '$classId' },
                 tenantId: { $first: '$tenantId' },
-                sectionTeacher: { $first: '$sectionTeacher' },
+                sectionTeacher: { $max: '$sectionTeacher' },
                 createdAt: { $first: '$createdAt' },
                 updatedAt: { $first: '$updatedAt' }
               }
@@ -495,8 +496,16 @@ router.put('/:id', [
     }
 
 
-    // Re-fetch sections for response
-    const currentSections = await Section.find({ classId: req.params.id }).sort({ name: 1 });
+    // Re-fetch sections for response — match both ObjectId and string classId variants
+    const mongoose = require('mongoose');
+    let classObjectId;
+    try { classObjectId = new mongoose.Types.ObjectId(req.params.id); } catch (e) { classObjectId = null; }
+    const sectionQuery = classObjectId
+      ? { $or: [{ classId: classObjectId }, { classId: req.params.id }] }
+      : { classId: req.params.id };
+    const currentSections = await Section.find(sectionQuery)
+      .populate('sectionTeacher', 'name employeeId')
+      .sort({ name: 1 });
 
     res.json({
       success: true,
