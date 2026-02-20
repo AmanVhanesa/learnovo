@@ -131,7 +131,10 @@ const Login = () => {
       </div>
 
       {/* ── RIGHT FORM PANEL ── */}
-      <div className="flex-1 flex flex-col justify-center items-center bg-white px-6 py-12 sm:px-12">
+      <div
+        className="flex-1 flex flex-col justify-center items-center px-6 py-12 sm:px-12"
+        style={{ background: 'linear-gradient(150deg, #f8fffd 0%, #f0faf8 40%, #eaf6f6 100%)' }}
+      >
 
         {/* Mobile-only logo */}
         <div className="flex lg:hidden items-center gap-2 mb-8">
@@ -141,112 +144,118 @@ const Login = () => {
 
         <div className="w-full max-w-md">
 
-          {/* Heading */}
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-1">Welcome back</h2>
-            <p className="text-gray-500 text-sm">Sign in to your school account</p>
-          </div>
+          {/* Card wrapper */}
+          <div className="bg-white rounded-2xl shadow-lg shadow-teal-100/60 border border-white/80 px-8 py-8">
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
-
-            {/* School Code */}
-            <div>
-              <label htmlFor="schoolCode" className="block text-sm font-medium text-gray-700 mb-1.5">
-                School Code
-              </label>
-              <input
-                id="schoolCode"
-                name="schoolCode"
-                type="text"
-                value={formData.schoolCode}
-                onChange={handleChange}
-                className="input"
-                placeholder="e.g. spis"
-              />
+            {/* Heading */}
+            <div className="mb-7">
+              <h2 className="text-3xl font-bold text-gray-900 mb-1">Welcome back</h2>
+              <p className="text-gray-400 text-sm">Sign in to your school account</p>
             </div>
 
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email or Admission Number
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="text"
-                autoComplete="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="input"
-                placeholder="Enter email or admission number"
-              />
-              <p className="mt-1.5 text-xs text-gray-400">
-                Students can login with their admission number if email is unavailable.
-              </p>
-            </div>
+            <form className="space-y-5" onSubmit={handleSubmit}>
 
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
+              {/* School Code */}
+              <div>
+                <label htmlFor="schoolCode" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  School Code
+                </label>
                 <input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  required
-                  value={formData.password}
+                  id="schoolCode"
+                  name="schoolCode"
+                  type="text"
+                  value={formData.schoolCode}
                   onChange={handleChange}
-                  className="input pr-10"
-                  placeholder="Enter your password"
+                  className="input"
+                  placeholder="e.g. spis"
                 />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
               </div>
-            </div>
 
-            {/* Remember me */}
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer"
-              />
-              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600 cursor-pointer">
-                Remember my email and school code
-              </label>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
-                <p className="text-sm font-medium text-red-700">{error}</p>
+              {/* Email */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Email or Admission Number
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="text"
+                  autoComplete="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="input"
+                  placeholder="Enter email or admission number"
+                />
+                <p className="mt-1.5 text-xs text-gray-400">
+                  Students can login with their admission number if email is unavailable.
+                </p>
               </div>
-            )}
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="btn btn-primary w-full py-2.5 text-base font-semibold"
-              style={{ marginTop: '4px' }}
-            >
-              {isLoading ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent mx-auto" />
-              ) : 'Sign in'}
-            </button>
-          </form>
+              {/* Password */}
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="input pr-10"
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Remember me */}
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer"
+                />
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600 cursor-pointer">
+                  Remember my email and school code
+                </label>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
+                  <p className="text-sm font-medium text-red-700">{error}</p>
+                </div>
+              )}
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 rounded-xl text-base font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                style={{ background: 'linear-gradient(135deg, #1a9090 0%, #0d7070 60%, #0a5f5f 100%)' }}
+              >
+                {isLoading ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent mx-auto" />
+                ) : 'Sign in'}
+              </button>
+            </form>
+
+            {/* Close card wrapper */}
+          </div>
 
           {/* Demo access */}
           <div className="mt-8">
