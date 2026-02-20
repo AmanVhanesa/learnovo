@@ -23,6 +23,11 @@ const MobileHeader = ({ onMenuClick, onSearchClick }) => {
           >
             <Menu className="h-5 w-5 text-gray-600" />
           </button>
+          <img
+            src="/logo-icon.png"
+            alt="Learnovo"
+            className="h-8 w-8 object-contain"
+          />
           <h1 className="text-lg font-semibold text-gray-900">Learnovo</h1>
         </div>
 

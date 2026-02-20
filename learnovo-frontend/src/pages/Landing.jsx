@@ -113,16 +113,9 @@ const Landing = () => {
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
               <img
-                src="/learnovo.png"
+                src="/logo-icon.png"
                 alt="Learnovo Logo"
-                className="h-8 w-8 object-contain"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  const icon = document.createElement('div');
-                  icon.className = 'h-8 w-8 text-primary-600';
-                  icon.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /></svg>';
-                  e.target.parentElement.insertBefore(icon, e.target);
-                }}
+                className="h-10 w-10 object-contain"
               />
               <span className="ml-2 text-2xl font-bold text-gray-900">Learnovo</span>
             </div>
@@ -262,8 +255,8 @@ const Landing = () => {
                 <button
                   onClick={handleGetStarted}
                   className={`w-full py-3 px-4 rounded-lg font-medium ${plan.popular
-                      ? 'bg-primary-600 text-white hover:bg-primary-700'
-                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                    ? 'bg-primary-600 text-white hover:bg-primary-700'
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                     }`}
                 >
                   {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
@@ -339,7 +332,7 @@ const Landing = () => {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center mb-4">
-                <School className="h-8 w-8 text-primary-400" />
+                <img src="/logo-icon.png" alt="Learnovo" className="h-8 w-8 object-contain" />
                 <span className="ml-2 text-2xl font-bold">Learnovo</span>
               </div>
               <p className="text-gray-400">

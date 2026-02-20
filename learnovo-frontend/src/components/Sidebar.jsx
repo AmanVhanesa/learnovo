@@ -80,16 +80,15 @@ const Sidebar = ({ isOpen, onClose }) => {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <img
-                src="/learnovo.png"
+                src="/logo-icon.png"
                 alt="Learnovo Logo"
-                className="h-8 w-8 object-contain"
+                className="h-9 w-9 object-contain"
                 onError={(e) => {
-                  // Fallback to icon if logo fails to load
                   e.target.style.display = 'none';
                   e.target.nextSibling.style.display = 'flex';
                 }}
               />
-              <div className="h-8 w-8 bg-primary-500 rounded-lg items-center justify-center hidden">
+              <div className="h-9 w-9 bg-primary-500 rounded-lg items-center justify-center hidden">
                 <GraduationCap className="h-5 w-5 text-white" />
               </div>
             </div>
