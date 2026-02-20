@@ -50,16 +50,22 @@ router.get('/', protect, async (req, res) => {
                 }
               }
             },
-            // Deduplicate sections that matched both arms of the $or above
+            // Deduplicate sections that matched both arms of the $or above or have duplicate names by grouping by name
             {
               $group: {
-                _id: '$_id',
+                _id: { $toUpper: '$name' },
+                docId: { $first: '$_id' },
                 name: { $first: '$name' },
                 classId: { $first: '$classId' },
                 tenantId: { $first: '$tenantId' },
                 sectionTeacher: { $first: '$sectionTeacher' },
                 createdAt: { $first: '$createdAt' },
                 updatedAt: { $first: '$updatedAt' }
+              }
+            },
+            {
+              $addFields: {
+                _id: '$docId'
               }
             },
             // Populate sectionTeacher name
@@ -462,15 +468,11 @@ router.put('/:id', [
         }
       }
 
-      const inputIdsFromForm = new Set(
-        inputSections.filter(s => s._id).map(s => s._id.toString())
-      );
-      const hadIds = inputIdsFromForm.size > 0;
-
       for (const sec of existingByName.values()) {
         if (keptIds.has(sec._id.toString())) continue;
 
-        if (hadIds && inputIdsFromForm.size > 0) {
+        // Ensure missing sections are deleted
+        {
           const studentCount = await User.countDocuments({
             $or: [
               { sectionId: sec._id, role: 'student' },
