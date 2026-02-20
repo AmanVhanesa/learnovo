@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { X, Upload, User } from 'lucide-react'
+import { X, Upload, User, Camera } from 'lucide-react'
 
 const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
     const [form, setForm] = useState({
@@ -74,7 +74,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                     <div className="max-h-[70vh] overflow-y-auto space-y-6">
                         {/* Photo Upload */}
                         <div className="flex items-center gap-6">
-                            <div className="relative">
+                            <div className="relative flex-shrink-0">
                                 {form.photo ? (
                                     <img
                                         src={form.photo}
@@ -86,14 +86,36 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         <User className="h-12 w-12 text-gray-400" />
                                     </div>
                                 )}
-                                <label className="absolute bottom-0 right-0 p-1.5 bg-primary-600 rounded-full cursor-pointer hover:bg-primary-700">
-                                    <Upload className="h-4 w-4 text-white" />
-                                    <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                                </label>
                             </div>
                             <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-900">Employee Photo</p>
-                                <p className="text-xs text-gray-500 mt-1">Upload a clear photo (JPG, PNG)</p>
+                                <p className="text-sm font-medium text-gray-900 mb-1">Employee Photo</p>
+                                <p className="text-xs text-gray-500 mb-3">Upload a clear photo (JPG, PNG)</p>
+                                {/* Two separate buttons for universal Android/iPad compatibility */}
+                                <div className="flex flex-wrap gap-2">
+                                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium cursor-pointer hover:bg-primary-700 active:scale-95 transition-all">
+                                        <Upload className="h-3.5 w-3.5" />
+                                        Gallery
+                                        {/* No capture attribute = opens gallery picker on all devices */}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={handlePhotoUpload}
+                                        />
+                                    </label>
+                                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-700 text-white text-xs font-medium cursor-pointer hover:bg-gray-800 active:scale-95 transition-all">
+                                        <Camera className="h-3.5 w-3.5" />
+                                        Camera
+                                        {/* capture=environment = rear camera on Android/iPad */}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment"
+                                            className="hidden"
+                                            onChange={handlePhotoUpload}
+                                        />
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
