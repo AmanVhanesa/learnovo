@@ -1,8 +1,7 @@
 import React from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { User, Mail, Phone, Calendar, Save } from 'lucide-react'
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+import api from '../services/authService'
 
 const Profile = () => {
   const { user, login } = useAuth()
@@ -37,34 +36,20 @@ const Profile = () => {
   const handleProfileUpdate = async () => {
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE}/api/auth/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          // email: formData.email, // Email update might need special handling/verification
-          phone: formData.phone,
-          address: formData.address
-        })
+      const response = await api.put('/auth/profile', {
+        name: formData.name,
+        phone: formData.phone,
+        address: formData.address
       })
-
-      const data = await response.json()
-
+      const data = response.data
       if (data.success) {
-        // Update local user context if needed, or trigger a refresh
-        // For now, let's just show success
         alert('Profile updated successfully')
-        // Ideally update context user here
       } else {
         alert(data.message || 'Failed to update profile')
       }
     } catch (error) {
       console.error('Error updating profile:', error)
-      alert('An error occurred. Please try again.')
+      alert(error.response?.data?.message || 'An error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -75,24 +60,13 @@ const Profile = () => {
       alert('New passwords do not match')
       return
     }
-
     try {
       setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE}/api/auth/password`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          currentPassword: formData.currentPassword,
-          newPassword: formData.newPassword
-        })
+      const response = await api.put('/auth/password', {
+        currentPassword: formData.currentPassword,
+        newPassword: formData.newPassword
       })
-
-      const data = await response.json()
-
+      const data = response.data
       if (data.success) {
         alert('Password updated successfully')
         setFormData(prev => ({
@@ -106,7 +80,7 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error updating password:', error)
-      alert('An error occurred. Please try again.')
+      alert(error.response?.data?.message || 'An error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
