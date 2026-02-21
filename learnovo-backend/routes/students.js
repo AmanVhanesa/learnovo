@@ -1047,10 +1047,11 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async (req, res) 
     const tenantId = req.user.tenantId;
 
     // Aggregation to get distinct values efficiently
-    const [classes, sections, academicYears] = await Promise.all([
+    const [classes, sections, academicYears, drivers] = await Promise.all([
       User.distinct('class', { role: 'student', tenantId }),
       User.distinct('section', { role: 'student', tenantId }),
-      User.distinct('academicYear', { role: 'student', tenantId })
+      User.distinct('academicYear', { role: 'student', tenantId }),
+      Driver.find({ tenantId, isActive: true }).select('_id name').sort({ name: 1 })
     ]);
 
     // Sort values for better UI
@@ -1064,7 +1065,8 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async (req, res) 
         classes: classes.filter(Boolean).sort(sortAlphaNum),
         sections: sections.filter(Boolean).sort(sortAlphaNum),
         academicYears: academicYears.filter(Boolean).sort().reverse(), // Newest first
-        genders: ['Male', 'Female', 'Other']
+        genders: ['Male', 'Female', 'Other'],
+        drivers: drivers.map(d => ({ _id: d._id, name: d.name }))
       }
     });
   } catch (error) {
