@@ -119,12 +119,6 @@ const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
                                 Basic Details
                             </button>
                             <button
-                                onClick={() => applyPreset('full')}
-                                className="px-3 py-1.5 text-sm bg-green-50 text-green-700 rounded-md hover:bg-green-100 transition-colors"
-                            >
-                                Full Details
-                            </button>
-                            <button
                                 onClick={() => applyPreset('contact')}
                                 className="px-3 py-1.5 text-sm bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 transition-colors"
                             >
