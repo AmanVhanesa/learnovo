@@ -546,7 +546,6 @@ const Students = () => {
                     { label: '📞 Contact', fields: ['admissionNumber', 'name', 'fatherName', 'motherName', 'mobile', 'altMobile', 'email', 'address'] },
                     { label: '🚌 Transport', fields: ['admissionNumber', 'name', 'class', 'section', 'driverName', 'driverPhone', 'transportMode'] },
                     { label: '🎓 Academic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'academicYear', 'penNumber', 'subDepartment'] },
-                    { label: '📄 Full', fields: ALL_EXPORT_FIELDS.map(f => f.key) },
                   ].map(preset => (
                     <button
                       key={preset.label}
