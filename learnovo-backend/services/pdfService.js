@@ -260,7 +260,7 @@ const pdfService = {
 
         const bodyText = `This is to certify that Master/Miss ${data.studentName}, Son/Daughter of Mr. ${data.fatherName} and Mrs. ${data.motherName}, is a bonafide student of our school studying in Class ${data.class} (Section ${data.section}) for the academic year ${data.academicYear}.
 
-His/Her date of birth as per school records is ${data.dob} (in figures) and ${data.dobWords} (in words).
+His/Her date of birth as per school records is ${data.dob}.
 
 Admission Number: ${data.admissionNumber}`;
 
@@ -288,7 +288,7 @@ Admission Number: ${data.admissionNumber}`;
             { label: '3. Mother\'s Name', value: data.motherName },
             { label: '4. Nationality', value: data.nationality },
             { label: '5. Category (Gen/SC/ST/OBC)', value: data.category },
-            { label: '6. Date of Birth', value: `${data.dob} (${data.dobWords})` },
+            { label: '6. Date of Birth', value: data.dob },
             { label: '7. Admission Number', value: data.admissionNumber },
             { label: '8. Date of First Admission', value: data.admissionDate },
             { label: '9. Class Last Studied', value: data.class },

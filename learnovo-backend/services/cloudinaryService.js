@@ -327,6 +327,50 @@ class CloudinaryService {
             }
         });
     }
+
+    /**
+     * Upload driver profile photo
+     * @param {Object} file - Multer file object
+     * @param {string} tenantId - Tenant ID
+     * @param {string} driverId - Driver document ID
+     * @returns {Promise<Object>} - Upload result
+     */
+    async uploadDriverPhoto(file, tenantId, driverId) {
+        return this.uploadFromMulter(file, {
+            tenantId,
+            folder: 'drivers',
+            subPath: `${driverId}/photos`,
+            transformation: {
+                width: 500,
+                height: 500,
+                crop: 'fill',
+                gravity: 'face',
+                quality: 'auto:good'
+            }
+        });
+    }
+
+    /**
+     * Upload employee profile photo
+     * @param {Object} file - Multer file object
+     * @param {string} tenantId - Tenant ID
+     * @param {string} employeeId - Employee document ID
+     * @returns {Promise<Object>} - Upload result
+     */
+    async uploadEmployeePhoto(file, tenantId, employeeId) {
+        return this.uploadFromMulter(file, {
+            tenantId,
+            folder: 'employees',
+            subPath: `${employeeId}/photos`,
+            transformation: {
+                width: 500,
+                height: 500,
+                crop: 'fill',
+                gravity: 'face',
+                quality: 'auto:good'
+            }
+        });
+    }
 }
 
 module.exports = new CloudinaryService();

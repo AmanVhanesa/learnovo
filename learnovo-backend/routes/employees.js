@@ -643,5 +643,59 @@ router.get('/export', protect, authorize('admin'), async (req, res) => {
     }
 });
 
+// @desc    Upload employee profile photo
+// @route   POST /api/employees/:id/upload-photo
+// @access  Private (Admin)
+const upload = require('../middleware/upload');
+const cloudinaryService = require('../services/cloudinaryService');
+
+router.post('/:id/upload-photo', protect, authorize('admin'), upload.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No photo uploaded' });
+        }
+
+        const employee = await User.findById(req.params.id);
+
+        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+            return res.status(404).json({ success: false, message: 'Employee not found' });
+        }
+
+        // Check if Cloudinary is configured
+        if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+            return res.status(500).json({
+                success: false,
+                message: 'File upload service not configured. Please contact administrator.'
+            });
+        }
+
+        // Upload to Cloudinary
+        const result = await cloudinaryService.uploadEmployeePhoto(
+            req.file,
+            req.user.tenantId.toString(),
+            employee._id.toString()
+        );
+
+        // Save photo URL to employee
+        const updatedEmployee = await User.findByIdAndUpdate(
+            req.params.id,
+            { photo: result.secure_url },
+            { new: true }
+        ).select('-password');
+
+        res.json({
+            success: true,
+            message: 'Employee photo uploaded successfully',
+            data: { url: result.secure_url, employee: updatedEmployee }
+        });
+    } catch (error) {
+        console.error('Upload employee photo error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Server error while uploading employee photo'
+        });
+    }
+});
+
 module.exports = router;
 

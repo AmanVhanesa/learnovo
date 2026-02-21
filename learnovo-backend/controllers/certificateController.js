@@ -91,9 +91,9 @@ exports.previewCertificate = async (req, res) => {
 
         // --- Prepare Data ---
         // Format dates
-        const dob = student.dateOfBirth ? format(new Date(student.dateOfBirth), 'dd/MM/yyyy') : '';
+        const dob = student.dateOfBirth ? format(new Date(student.dateOfBirth), 'dd MMM yyyy') : '';
         const dobWords = student.dateOfBirth ? dateToWords(format(new Date(student.dateOfBirth), 'dd MMMM yyyy')) : '';
-        const today = format(new Date(), 'dd/MM/yyyy');
+        const today = format(new Date(), 'dd MMM yyyy');
 
         // Get guardian names and strip existing honorifics (PDF service will add them)
         const father = student.guardians?.find(g => g.relation === 'Father');
@@ -128,7 +128,7 @@ exports.previewCertificate = async (req, res) => {
             applicationDate: today, // Default to today
 
             // TC Specifics placeholders
-            admissionDate: student.admissionDate ? format(new Date(student.admissionDate), 'dd/MM/yyyy') : '-',
+            admissionDate: student.admissionDate ? format(new Date(student.admissionDate), 'dd MMM yyyy') : '-',
             boardResult: 'Passed', // TODO: Fetch from Exam Result model
             promotionStatus: 'Yes',
             subjects: 'English, Hindi, Maths, Science, Social Science', // TODO: Fetch

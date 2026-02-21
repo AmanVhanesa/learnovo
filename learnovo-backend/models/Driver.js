@@ -99,6 +99,11 @@ const driverSchema = new mongoose.Schema({
         trim: true
     },
 
+    nationalId: {
+        type: String,
+        trim: true
+    },
+
     // Employment Details
     dateOfJoining: {
         type: Date,

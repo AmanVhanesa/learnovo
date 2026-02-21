@@ -24,7 +24,8 @@ const Students = () => {
   const [sectionFilter, setSectionFilter] = useState('')
   const [yearFilter, setYearFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('') // active/inactive
-  const [filterOptions, setFilterOptions] = useState({ classes: [], sections: [], academicYears: [] })
+  const [driverFilter, setDriverFilter] = useState('')
+  const [filterOptions, setFilterOptions] = useState({ classes: [], sections: [], academicYears: [], drivers: [] })
 
   // UI state
   const [showForm, setShowForm] = useState(false)
@@ -44,12 +45,12 @@ const Students = () => {
 
   useEffect(() => {
     setCurrentPage(1) // reset to page 1 on filter change
-  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter])
+  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter])
 
   useEffect(() => {
     fetchStudents()
     fetchFilterOptions()
-  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter, currentPage, perPage])
+  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage])
 
   const fetchFilterOptions = async () => {
     try {
@@ -71,6 +72,7 @@ const Students = () => {
         section: sectionFilter,
         academicYear: yearFilter,
         status: statusFilter,
+        driver: driverFilter,
         page: currentPage,
         limit: perPage
       }
@@ -283,6 +285,7 @@ const Students = () => {
     setSectionFilter('')
     setYearFilter('')
     setStatusFilter('')
+    setDriverFilter('')
   }
 
   // if (isLoading) {
@@ -415,8 +418,29 @@ const Students = () => {
             </div>
           </div>
 
+          {/* Driver Filter */}
+          {filterOptions.drivers && filterOptions.drivers.length > 0 && (
+            <div className="relative">
+              <select
+                value={driverFilter}
+                onChange={(e) => setDriverFilter(e.target.value)}
+                className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+              >
+                <option value="">Driver</option>
+                {filterOptions.drivers.map(driver => (
+                  <option key={driver._id} value={driver._id}>{driver.name}</option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          )}
+
           {/* Clear Filters Button */}
-          {(searchQuery || classFilter || sectionFilter || yearFilter || statusFilter) && (
+          {(searchQuery || classFilter || sectionFilter || yearFilter || statusFilter || driverFilter) && (
             <button
               onClick={clearFilters}
               className="h-8 px-3 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all"
@@ -448,7 +472,7 @@ const Students = () => {
         </div>
 
         {/* Active Filters Display */}
-        {(classFilter || sectionFilter || yearFilter || statusFilter) && (
+        {(classFilter || sectionFilter || yearFilter || statusFilter || driverFilter) && (
           <div className="mt-3 pt-3 border-t border-gray-200">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-gray-500">Active filters:</span>
@@ -496,6 +520,19 @@ const Students = () => {
                   Status: {statusFilter === 'active' ? 'Active' : 'Inactive'}
                   <button
                     onClick={() => setStatusFilter('')}
+                    className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              {driverFilter && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
+                  Driver: {filterOptions.drivers.find(d => d._id === driverFilter)?.name || driverFilter}
+                  <button
+                    onClick={() => setDriverFilter('')}
                     className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
                   >
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

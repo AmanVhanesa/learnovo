@@ -74,6 +74,15 @@ export const exportDrivers = async (params = {}) => {
     return response.data;
 };
 
+export const uploadDriverPhoto = async (driverId, file) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const response = await axios.post(`${API_URL}/drivers/${driverId}/upload-photo`, formData, {
+        headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+};
+
 // ============================================================================
 // VEHICLES
 // ============================================================================
@@ -282,6 +291,7 @@ export default {
     toggleDriverStatus,
     getExpiringLicenses,
     exportDrivers,
+    uploadDriverPhoto,
 
     // Vehicles
     getVehicles,

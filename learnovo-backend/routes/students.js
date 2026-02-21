@@ -149,6 +149,11 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.isActive = req.query.status === 'active';
     }
 
+    // Add driver filter
+    if (req.query.driver) {
+      filter.driverId = req.query.driver;
+    }
+
     // Add search filter
     if (req.query.search) {
       filter.$or = [
@@ -1952,12 +1957,18 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async (req, res) 
       academicYear: { $exists: true, $ne: null, $ne: '' }
     });
 
+    // Get active drivers for this tenant
+    const drivers = await Driver.find({ tenantId, isActive: true })
+      .select('_id name')
+      .sort({ name: 1 });
+
     res.json({
       success: true,
       data: {
         classes: classes.filter(Boolean).sort(),
         sections: sections.filter(Boolean).sort(),
-        academicYears: academicYears.filter(Boolean).sort().reverse()
+        academicYears: academicYears.filter(Boolean).sort().reverse(),
+        drivers: drivers.map(d => ({ _id: d._id, name: d.name }))
       }
     });
   } catch (error) {
@@ -1969,6 +1980,7 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async (req, res) 
     });
   }
 });
+
 
 // @desc    Toggle student active/inactive status
 // @route   PUT /api/students/:id/toggle-status

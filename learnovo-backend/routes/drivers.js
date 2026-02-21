@@ -445,4 +445,59 @@ router.get('/export', protect, authorize('admin'), async (req, res) => {
     }
 });
 
+// @desc    Upload driver profile photo
+// @route   POST /api/drivers/:id/upload-photo
+// @access  Private (Admin)
+const upload = require('../middleware/upload');
+const cloudinaryService = require('../services/cloudinaryService');
+
+router.post('/:id/upload-photo', protect, authorize('admin'), upload.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No photo uploaded' });
+        }
+
+        const driver = await Driver.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId
+        });
+
+        if (!driver) {
+            return res.status(404).json({ success: false, message: 'Driver not found' });
+        }
+
+        // Check if Cloudinary is configured
+        if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+            return res.status(500).json({
+                success: false,
+                message: 'File upload service not configured. Please contact administrator.'
+            });
+        }
+
+        // Upload to Cloudinary
+        const result = await cloudinaryService.uploadDriverPhoto(
+            req.file,
+            req.user.tenantId.toString(),
+            driver._id.toString()
+        );
+
+        // Save photo URL to driver
+        driver.photo = result.secure_url;
+        driver.updatedBy = req.user._id;
+        await driver.save();
+
+        res.json({
+            success: true,
+            message: 'Driver photo uploaded successfully',
+            data: { url: result.secure_url }
+        });
+    } catch (error) {
+        console.error('Upload driver photo error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Server error while uploading driver photo'
+        });
+    }
+});
+
 module.exports = router;

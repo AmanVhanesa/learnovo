@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { X, Upload, User, Camera } from 'lucide-react'
+import employeesService from '../../services/employeesService'
 
 const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
     const [form, setForm] = useState({
@@ -36,24 +37,45 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         createLogin: true
     })
 
+    const [photoUploading, setPhotoUploading] = useState(false)
+    const [photoPreview, setPhotoPreview] = useState(employee?.photo || '')
+
     const updateField = (field, value) => {
         setForm(prev => ({ ...prev, [field]: value }))
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
-        onSave(form)
+        const { _pendingPhotoFile, ...payload } = form
+        onSave(payload, _pendingPhotoFile)
     }
 
     const handlePhotoUpload = async (e) => {
         const file = e.target.files[0]
         if (!file) return
 
+        // Show local preview immediately
         const reader = new FileReader()
-        reader.onloadend = () => {
-            updateField('photo', reader.result)
-        }
+        reader.onloadend = () => setPhotoPreview(reader.result)
         reader.readAsDataURL(file)
+
+        // For existing employees, upload to Cloudinary right away
+        if (employee?._id) {
+            try {
+                setPhotoUploading(true)
+                const result = await employeesService.uploadPhoto(employee._id, file)
+                updateField('photo', result.data.url)
+                setPhotoPreview(result.data.url)
+            } catch (error) {
+                console.error('Photo upload error:', error)
+                // Preview stays but photo won't be saved to Cloudinary
+            } finally {
+                setPhotoUploading(false)
+            }
+        } else {
+            // For new employees, keep base64 preview and store file for later
+            updateField('_pendingPhotoFile', file)
+        }
     }
 
     return (
@@ -75,15 +97,20 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                         {/* Photo Upload */}
                         <div className="flex items-center gap-6">
                             <div className="relative flex-shrink-0">
-                                {form.photo ? (
+                                {photoPreview ? (
                                     <img
-                                        src={form.photo}
+                                        src={photoPreview}
                                         alt="Employee"
                                         className="h-24 w-24 rounded-full object-cover border-2 border-gray-200"
                                     />
                                 ) : (
                                     <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center">
                                         <User className="h-12 w-12 text-gray-400" />
+                                    </div>
+                                )}
+                                {photoUploading && (
+                                    <div className="absolute inset-0 rounded-full bg-black bg-opacity-40 flex items-center justify-center">
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                                     </div>
                                 )}
                             </div>
@@ -101,6 +128,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                             accept="image/*"
                                             className="hidden"
                                             onChange={handlePhotoUpload}
+                                            disabled={photoUploading}
                                         />
                                     </label>
                                     <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-700 text-white text-xs font-medium cursor-pointer hover:bg-gray-800 active:scale-95 transition-all">
@@ -113,9 +141,13 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                             capture="environment"
                                             className="hidden"
                                             onChange={handlePhotoUpload}
+                                            disabled={photoUploading}
                                         />
                                     </label>
                                 </div>
+                                {photoUploading && (
+                                    <p className="text-xs text-blue-600 mt-2">Uploading photo...</p>
+                                )}
                             </div>
                         </div>
 
@@ -405,7 +437,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                         <button type="button" onClick={onCancel} className="btn btn-ghost">
                             Cancel
                         </button>
-                        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+                        <button type="submit" className="btn btn-primary" disabled={isLoading || photoUploading}>
                             {isLoading ? 'Saving...' : employee ? 'Update Employee' : 'Add Employee'}
                         </button>
                     </div>

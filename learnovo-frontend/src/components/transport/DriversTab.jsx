@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Plus, Edit, Trash2, X, Search } from 'lucide-react';
+import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
 
@@ -63,6 +63,30 @@ const DriversTab = ({ onStatsUpdate }) => {
             fetchDrivers();
             onStatsUpdate();
         }
+    };
+
+    // Driver avatar component — shows photo or initials fallback
+    const DriverAvatar = ({ driver, size = 'sm' }) => {
+        const sizeClasses = size === 'sm' ? 'w-10 h-10 text-sm' : 'w-20 h-20 text-2xl';
+        const initials = driver.name
+            ? driver.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+            : 'DR';
+
+        if (driver.photo) {
+            return (
+                <img
+                    src={driver.photo}
+                    alt={driver.name}
+                    className={`${sizeClasses} rounded-full object-cover border-2 border-gray-200 flex-shrink-0`}
+                />
+            );
+        }
+
+        return (
+            <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white font-semibold flex-shrink-0`}>
+                {initials}
+            </div>
+        );
     };
 
     return (
@@ -136,9 +160,12 @@ const DriversTab = ({ onStatsUpdate }) => {
                             {drivers.map((driver) => (
                                 <tr key={driver._id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div>
-                                            <div className="text-sm font-medium text-gray-900">{driver.name}</div>
-                                            <div className="text-sm text-gray-500">{driver.driverId}</div>
+                                        <div className="flex items-center gap-3">
+                                            <DriverAvatar driver={driver} size="sm" />
+                                            <div>
+                                                <div className="text-sm font-medium text-gray-900">{driver.name}</div>
+                                                <div className="text-sm text-gray-500">{driver.driverId}</div>
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
@@ -201,6 +228,7 @@ const DriverModal = ({ driver, onClose }) => {
         gender: driver?.gender || 'male',
         bloodGroup: driver?.bloodGroup || '',
         address: driver?.address || '',
+        nationalId: driver?.nationalId || '',
         dateOfJoining: driver?.dateOfJoining ? new Date(driver.dateOfJoining).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         salary: driver?.salary || '',
         experience: driver?.experience || '',
@@ -208,9 +236,12 @@ const DriverModal = ({ driver, onClose }) => {
             name: driver?.emergencyContact?.name || '',
             phone: driver?.emergencyContact?.phone || '',
             relation: driver?.emergencyContact?.relation || ''
-        }
+        },
+        photo: driver?.photo || ''
     });
     const [loading, setLoading] = useState(false);
+    const [photoUploading, setPhotoUploading] = useState(false);
+    const [photoPreview, setPhotoPreview] = useState(driver?.photo || '');
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -228,17 +259,66 @@ const DriverModal = ({ driver, onClose }) => {
         }
     };
 
+    const handlePhotoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Show local preview immediately
+        const reader = new FileReader();
+        reader.onloadend = () => setPhotoPreview(reader.result);
+        reader.readAsDataURL(file);
+
+        // If editing an existing driver, upload to Cloudinary right away
+        if (driver?._id) {
+            try {
+                setPhotoUploading(true);
+                const result = await transportService.uploadDriverPhoto(driver._id, file);
+                setFormData(prev => ({ ...prev, photo: result.data.url }));
+                setPhotoPreview(result.data.url);
+                toast.success('Photo uploaded successfully');
+            } catch (error) {
+                console.error('Photo upload error:', error);
+                toast.error(error.response?.data?.message || 'Failed to upload photo');
+                // Keep base64 preview even if upload fails; photo won't be saved to Cloudinary
+            } finally {
+                setPhotoUploading(false);
+            }
+        } else {
+            // For new drivers: store file object for later upload after driver is created
+            setFormData(prev => ({ ...prev, _pendingPhotoFile: file }));
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
 
         try {
+            // Exclude internal _pendingPhotoFile from payload
+            const { _pendingPhotoFile, ...payload } = formData;
+
+            let savedDriver;
             if (driver) {
-                await transportService.updateDriver(driver._id, formData);
+                const result = await transportService.updateDriver(driver._id, payload);
+                savedDriver = result.data;
                 toast.success('Driver updated successfully');
             } else {
-                await transportService.createDriver(formData);
+                const result = await transportService.createDriver(payload);
+                savedDriver = result.data;
                 toast.success('Driver created successfully');
+
+                // Upload pending photo for newly created driver
+                if (_pendingPhotoFile && savedDriver?._id) {
+                    try {
+                        setPhotoUploading(true);
+                        await transportService.uploadDriverPhoto(savedDriver._id, _pendingPhotoFile);
+                    } catch (photoErr) {
+                        console.error('Pending photo upload failed:', photoErr);
+                        toast.error('Driver saved but photo upload failed. You can re-upload by editing the driver.');
+                    } finally {
+                        setPhotoUploading(false);
+                    }
+                }
             }
             onClose(true);
         } catch (error) {
@@ -248,6 +328,10 @@ const DriverModal = ({ driver, onClose }) => {
             setLoading(false);
         }
     };
+
+    const initials = formData.name
+        ? formData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        : 'DR';
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -262,6 +346,60 @@ const DriverModal = ({ driver, onClose }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6">
+                    {/* Photo Upload Section */}
+                    <div className="flex items-center gap-6 mb-6 pb-6 border-b border-gray-100">
+                        <div className="relative flex-shrink-0">
+                            {photoPreview ? (
+                                <img
+                                    src={photoPreview}
+                                    alt="Driver"
+                                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+                                />
+                            ) : (
+                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white text-2xl font-semibold">
+                                    {initials}
+                                </div>
+                            )}
+                            {photoUploading && (
+                                <div className="absolute inset-0 rounded-full bg-black bg-opacity-40 flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900 mb-1">Driver Photo</p>
+                            <p className="text-xs text-gray-500 mb-3">Upload a clear photo (JPG, PNG)</p>
+                            <div className="flex flex-wrap gap-2">
+                                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium cursor-pointer hover:bg-primary-700 active:scale-95 transition-all">
+                                    <Upload className="h-3.5 w-3.5" />
+                                    Gallery
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handlePhotoUpload}
+                                        disabled={photoUploading}
+                                    />
+                                </label>
+                                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-700 text-white text-xs font-medium cursor-pointer hover:bg-gray-800 active:scale-95 transition-all">
+                                    <Camera className="h-3.5 w-3.5" />
+                                    Camera
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        className="hidden"
+                                        onChange={handlePhotoUpload}
+                                        disabled={photoUploading}
+                                    />
+                                </label>
+                            </div>
+                            {photoUploading && (
+                                <p className="text-xs text-blue-600 mt-2">Uploading photo...</p>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Personal Information */}
                         <div className="md:col-span-2">
@@ -355,6 +493,18 @@ const DriverModal = ({ driver, onClose }) => {
                                 value={formData.address}
                                 onChange={handleChange}
                                 rows="2"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">National ID</label>
+                            <input
+                                type="text"
+                                name="nationalId"
+                                value={formData.nationalId}
+                                onChange={handleChange}
+                                placeholder="Aadhaar / Passport / National ID"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                             />
                         </div>
@@ -491,7 +641,7 @@ const DriverModal = ({ driver, onClose }) => {
                         </button>
                         <button
                             type="submit"
-                            disabled={loading}
+                            disabled={loading || photoUploading}
                             className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
                         >
                             {loading ? 'Saving...' : driver ? 'Update Driver' : 'Add Driver'}

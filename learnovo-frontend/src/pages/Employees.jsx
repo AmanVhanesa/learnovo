@@ -142,7 +142,7 @@ const Employees = () => {
         setStatusFilter('')
     }
 
-    const handleSaveEmployee = async (formData) => {
+    const handleSaveEmployee = async (formData, pendingPhotoFile) => {
         try {
             setIsSaving(true)
 
@@ -158,6 +158,16 @@ const Employees = () => {
                     toast.success(`Login: ${response.data.credentials.email || response.data.credentials.phone} / ${response.data.credentials.password}`, {
                         duration: 10000
                     })
+                }
+
+                // Upload pending photo for new employees
+                if (pendingPhotoFile && response?.data?.id) {
+                    try {
+                        await employeesService.uploadPhoto(response.data.id, pendingPhotoFile)
+                    } catch (photoErr) {
+                        console.error('Pending photo upload failed:', photoErr)
+                        toast.error('Employee saved but photo upload failed. You can re-upload by editing the employee.')
+                    }
                 }
             }
 
@@ -366,6 +376,16 @@ const Employees = () => {
                                                 </button>
                                                 {user?.role === 'admin' && (
                                                     <>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingEmployee(employee)
+                                                                setShowAddModal(true)
+                                                            }}
+                                                            className="p-1 text-gray-400 hover:text-primary-600"
+                                                            title="Edit Employee"
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </button>
                                                         <button
                                                             onClick={() => handleResetPassword(employee)}
                                                             className="p-1 text-gray-400 hover:text-yellow-600"

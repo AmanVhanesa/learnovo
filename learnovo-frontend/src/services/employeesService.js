@@ -60,6 +60,15 @@ export const employeesService = {
     disableLogin: async (id) => {
         const res = await api.put(`/employees/${id}/disable-login`)
         return res.data
+    },
+
+    uploadPhoto: async (id, file) => {
+        const formData = new FormData()
+        formData.append('photo', file)
+        const res = await api.post(`/employees/${id}/upload-photo`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        return res.data
     }
 }
 
