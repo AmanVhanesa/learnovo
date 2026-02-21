@@ -960,9 +960,15 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
 
         // Decide what to do with this row (existingId already computed at top of loop)
         if (existingId && replaceDuplicates) {
-          // REPLACE: update all fields on the existing student record
-          const { role, tenantId: _t, createdAt, ...updateFields } = studentData;
-          await User.findByIdAndUpdate(existingId, { $set: updateFields, $currentDate: { updatedAt: true } });
+          // REPLACE: update fields on the existing student record
+          // Exclude: role, tenantId (immutable), createdAt (preserve original), updatedAt (set below), password (preserve unless explicitly in CSV)
+          const { role, tenantId: _t, createdAt, updatedAt, password, ...updateFields } = studentData;
+          // Only overwrite password if the CSV row provided one explicitly
+          if (row.password && row.password.trim()) {
+            updateFields.password = password; // already hashed above
+          }
+          updateFields.updatedAt = new Date();
+          await User.findByIdAndUpdate(existingId, { $set: updateFields });
           results.replaced++;
         } else if (existingId && skipDuplicates) {
           // SKIP: do nothing
