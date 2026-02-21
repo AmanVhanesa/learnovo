@@ -538,7 +538,27 @@ const Students = () => {
                     <button onClick={() => setSelectedExportFields([])} className="text-xs text-gray-400 hover:underline">None</button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-1 max-h-64 overflow-y-auto pr-1">
+
+                {/* Presets */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {[
+                    { label: '📋 Basic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'status'] },
+                    { label: '📞 Contact', fields: ['admissionNumber', 'name', 'fatherName', 'motherName', 'mobile', 'altMobile', 'email', 'address'] },
+                    { label: '🚌 Transport', fields: ['admissionNumber', 'name', 'class', 'section', 'driverName', 'driverPhone', 'transportMode'] },
+                    { label: '🎓 Academic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'academicYear', 'penNumber', 'subDepartment'] },
+                    { label: '📄 Full', fields: ALL_EXPORT_FIELDS.map(f => f.key) },
+                  ].map(preset => (
+                    <button
+                      key={preset.label}
+                      onClick={() => setSelectedExportFields(preset.fields)}
+                      className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-full hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-1 max-h-52 overflow-y-auto pr-1">
                   {ALL_EXPORT_FIELDS.map(field => (
                     <label key={field.key} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50">
                       <input
