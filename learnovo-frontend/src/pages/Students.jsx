@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Search, Eye, Power, PowerOff, Upload, Trash2 } from 'lucide-react'
+import { Plus, Search, Eye, Power, PowerOff, Upload, Trash2, X, CheckSquare, Square } from 'lucide-react'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -36,6 +36,38 @@ const Students = () => {
   const [selectedStudents, setSelectedStudents] = useState([])
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [isDeactivating, setIsDeactivating] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+
+  // Export column selection — keys must match backend fieldDefinitions
+  const ALL_EXPORT_FIELDS = [
+    { key: 'admissionNumber', label: 'Admission No' },
+    { key: 'name', label: 'Name' },
+    { key: 'class', label: 'Class' },
+    { key: 'section', label: 'Section' },
+    { key: 'rollNumber', label: 'Roll No' },
+    { key: 'academicYear', label: 'Academic Year' },
+    { key: 'status', label: 'Status' },
+    { key: 'fatherName', label: 'Father Name' },
+    { key: 'motherName', label: 'Mother Name' },
+    { key: 'mobile', label: 'Mobile' },
+    { key: 'altMobile', label: 'Alt Mobile' },
+    { key: 'email', label: 'Email' },
+    { key: 'address', label: 'Address' },
+    { key: 'dob', label: 'Date of Birth' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'bloodGroup', label: 'Blood Group' },
+    { key: 'category', label: 'Category' },
+    { key: 'religion', label: 'Religion' },
+    { key: 'penNumber', label: 'PEN Number' },
+    { key: 'subDepartment', label: 'Sub Department' },
+    { key: 'admissionDate', label: 'Admission Date' },
+    { key: 'driverName', label: 'Driver' },
+    { key: 'driverPhone', label: 'Driver Phone' },
+    { key: 'transportMode', label: 'Transport Mode' },
+  ]
+  const [selectedExportFields, setSelectedExportFields] = useState(
+    ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'fatherName', 'mobile', 'email', 'driverName', 'status']
+  )
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -260,23 +292,30 @@ const Students = () => {
   }
 
   const handleExport = () => {
-    const rows = [
-      ['Admission No', 'Name', 'Roll No', 'Class', 'Section', 'Year', 'Guardian', 'Phone', 'Status']
-    ].concat(
-      students.map(s => [
-        s.admissionNumber || 'N/A',
-        s.fullName || s.name,
-        s.rollNumber || '',
-        s.class || '',
-        s.section || '',
-        s.academicYear || '',
-        s.guardians?.[0]?.name || '',
-        s.guardians?.[0]?.phone || '',
-        s.isActive ? 'Active' : 'Inactive'
-      ])
+    setShowExportModal(true)
+  }
+
+  const handleDoExport = () => {
+    const params = new URLSearchParams()
+    if (classFilter) params.set('class', classFilter)
+    if (sectionFilter) params.set('section', sectionFilter)
+    if (yearFilter) params.set('academicYear', yearFilter)
+    if (statusFilter) params.set('status', statusFilter)
+    if (searchQuery) params.set('search', searchQuery)
+    if (driverFilter) params.set('driverId', driverFilter)   // correct param name
+    if (selectedExportFields.length > 0) {
+      params.set('fields', selectedExportFields.join(','))
+    }
+    const token = localStorage.getItem('token')
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+    window.open(`${base}/students/export?${params.toString()}&token=${token}`, '_blank')
+    setShowExportModal(false)
+  }
+
+  const toggleExportField = (key) => {
+    setSelectedExportFields(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     )
-    exportCSV('students.csv', rows)
-    toast.success('Students exported successfully')
   }
 
   const clearFilters = () => {
@@ -454,22 +493,79 @@ const Students = () => {
 
           {/* Export Button */}
           <button
-            onClick={() => {
-              const params = new URLSearchParams({
-                class: classFilter,
-                section: sectionFilter,
-                academicYear: yearFilter,
-                status: statusFilter,
-                search: searchQuery
-              });
-              window.open(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/students/export?${params.toString()}&token=${localStorage.getItem('token')}`, '_blank');
-            }}
+            onClick={handleExport}
             className="h-8 px-3 text-xs font-medium text-primary-600 border border-primary-600 hover:bg-primary-50 rounded-md transition-all inline-flex items-center gap-1.5"
           >
             <Upload className="h-3.5 w-3.5 rotate-180" />
             <span>Export CSV</span>
           </button>
         </div>
+
+        {/* ── Export Options Modal ── */}
+        {showExportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+              <div className="flex items-center justify-between px-6 py-4 border-b">
+                <h3 className="text-base font-semibold text-gray-900">Export Options</h3>
+                <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Active filters summary */}
+              <div className="px-6 pt-4">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Active Filters (applied to export)</p>
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {!classFilter && !sectionFilter && !yearFilter && !statusFilter && !driverFilter && !searchQuery && (
+                    <span className="text-xs text-gray-400 italic">None — will export all students</span>
+                  )}
+                  {classFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Class: {classFilter}</span>}
+                  {sectionFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Section: {sectionFilter}</span>}
+                  {yearFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Year: {yearFilter}</span>}
+                  {statusFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Status: {statusFilter}</span>}
+                  {driverFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Driver: {filterOptions.drivers?.find(d => d._id === driverFilter)?.name || driverFilter}</span>}
+                  {searchQuery && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Search: {searchQuery}</span>}
+                </div>
+              </div>
+
+              {/* Column selection */}
+              <div className="px-6 pb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Select Columns</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setSelectedExportFields(ALL_EXPORT_FIELDS.map(f => f.key))} className="text-xs text-primary-600 hover:underline">All</button>
+                    <span className="text-gray-300">|</span>
+                    <button onClick={() => setSelectedExportFields([])} className="text-xs text-gray-400 hover:underline">None</button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1 max-h-64 overflow-y-auto pr-1">
+                  {ALL_EXPORT_FIELDS.map(field => (
+                    <label key={field.key} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={selectedExportFields.includes(field.key)}
+                        onChange={() => toggleExportField(field.key)}
+                        className="h-3.5 w-3.5 text-primary-600 rounded"
+                      />
+                      <span className="text-sm text-gray-700">{field.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+                <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Cancel</button>
+                <button
+                  onClick={handleDoExport}
+                  disabled={selectedExportFields.length === 0}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Export {selectedExportFields.length} Column{selectedExportFields.length !== 1 ? 's' : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Active Filters Display */}
         {(classFilter || sectionFilter || yearFilter || statusFilter || driverFilter) && (
