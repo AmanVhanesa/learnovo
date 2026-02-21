@@ -629,23 +629,27 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
       });
     }
 
+    // Pre-cache all classes and drivers for this tenant to avoid N+1 queries in the loop
+    const Class = require('../models/Class');
+    const Section = require('../models/Section');
+    const allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
+    const allDrivers = await Driver.find({ tenantId, isActive: true }).select('_id name').lean();
+    const driverCache = new Map(allDrivers.map(d => [d.name.toLowerCase().trim(), d]));
+
     for (const row of validData) {
       let studentData = null; // Declare safely for error logging scope
       const rowNum = row._rowNumber || '?';
 
       try {
-        // Log the first row to see data structure
-        if (rowNum === 2 || rowNum === '?') {
-          console.log('=== FIRST ROW DATA ===');
-          console.log('Row keys:', Object.keys(row));
-          console.log('Row data:', JSON.stringify(row, null, 2));
-          console.log('======================');
-        }
+        // Check admission number for existing student (used for replace logic)
+        const admNoKey = row.admissionNumber ? row.admissionNumber.toString().trim().toUpperCase() : null;
+        const existingId = admNoKey ? existingStudentsMap.get(admNoKey) : null;
 
-        // Double check duplicates (race condition protection) - only if email provided
-        if (row.email && row.email.trim()) {
+        // Skip email duplicate check when replacing an already-identified student
+        // (the student exists by design; checking email would throw false errors)
+        if (!existingId && row.email && row.email.trim()) {
           const email = row.email.toLowerCase().trim();
-          const existingStudent = await User.findOne({ email, tenantId });
+          const existingStudent = await User.findOne({ email, tenantId }).select('_id').lean();
           if (existingStudent) {
             throw new Error(`Student with email ${email} already exists`);
           }
@@ -715,28 +719,21 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           subDepartmentId = subDept._id;
         }
 
-        // Handle Driver Assignment
+        // Handle Driver Assignment — use cached drivers
         let driverId = undefined;
         let transportMode = '';
 
         if (row.driverName) {
           const driverName = row.driverName.toString().trim();
-
           if (driverName.toLowerCase() === 'self') {
             transportMode = 'Self';
           } else {
-            // Case insensitive search for driver
-            const driver = await Driver.findOne({
-              tenantId,
-              name: { $regex: new RegExp(`^${driverName}$`, 'i') },
-              isActive: true
-            });
-
+            const driver = driverCache.get(driverName.toLowerCase().trim());
             if (driver) {
               driverId = driver._id;
               transportMode = 'School Transport';
             } else {
-              console.warn(`Driver not found for import: ${driverName}`);
+              console.warn(`Import: Driver not found: ${driverName}`);
             }
           }
         }
@@ -815,39 +812,22 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
             if (normalized !== rawClassValue) classValuesToTry.push(normalized);
           }
 
-          // --- Class lookup (independent try/catch) ---
+          // --- Class lookup using pre-fetched allClasses (no per-row DB query) ---
           let classDoc = null;
           try {
-            const Class = require('../models/Class');
-
-            // DEBUG: log what we're looking for and what's in DB
-            const allClasses = await Class.find({ tenantId }).select('name grade').lean();
-            console.log(`[Import DEBUG] Looking for class: "${rawClassValue}", candidates: ${JSON.stringify(classValuesToTry)}`);
-            console.log(`[Import DEBUG] Classes in DB:`, allClasses.map(c => `name="${c.name}" grade="${c.grade}"`));
-
             for (const candidate of classValuesToTry) {
-              // Escape special regex chars in candidate
-              const escaped = candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const lc = candidate.toLowerCase();
+              // Exact match first
+              classDoc = allClasses.find(c =>
+                c.name?.toLowerCase() === lc || c.grade?.toLowerCase() === lc
+              );
+              if (classDoc) break;
 
-              // Try exact match first
-              classDoc = await Class.findOne({
-                tenantId,
-                $or: [
-                  { name: { $regex: new RegExp(`^${escaped}$`, 'i') } },
-                  { grade: { $regex: new RegExp(`^${escaped}$`, 'i') } }
-                ]
-              });
-              if (classDoc) { console.log(`[Import DEBUG] Found class by exact match: "${classDoc.name}"`); break; }
-
-              // Try contains match as fallback (e.g. "8" inside "Class 8")
-              classDoc = await Class.findOne({
-                tenantId,
-                $or: [
-                  { name: { $regex: new RegExp(escaped, 'i') } },
-                  { grade: { $regex: new RegExp(escaped, 'i') } }
-                ]
-              });
-              if (classDoc) { console.log(`[Import DEBUG] Found class by partial match: "${classDoc.name}"`); break; }
+              // Partial match fallback (e.g. "8" inside "Class 8")
+              classDoc = allClasses.find(c =>
+                c.name?.toLowerCase().includes(lc) || c.grade?.toLowerCase().includes(lc)
+              );
+              if (classDoc) break;
             }
 
             if (classDoc) {
@@ -855,19 +835,16 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
               studentData.classId = classDoc._id;
             } else {
               studentData.class = rawClassValue;
-              console.warn(`[Import DEBUG] Class NOT found in DB for value "${rawClassValue}"`);
             }
           } catch (classLookupErr) {
             console.warn('Class lookup error during import:', classLookupErr.message);
             studentData.class = rawClassValue;
           }
 
-
-          // --- Section lookup (independent try/catch, only if class was found) ---
+          // --- Section lookup (only if class was found) ---
           if (classDoc && row.section && row.section.trim()) {
             try {
-              const Section = require('../models/Section');
-              const sectionName = row.section.trim().toUpperCase(); // sections stored uppercase
+              const sectionName = row.section.trim().toUpperCase();
               const escapedSection = sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
               const sectionDoc = await Section.findOne({
                 tenantId,
@@ -878,8 +855,6 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
               if (sectionDoc) {
                 studentData.sectionId = sectionDoc._id;
                 studentData.section = sectionDoc.name;
-              } else {
-                console.warn(`Import: Section "${sectionName}" not found in class "${classDoc.name}"`);
               }
             } catch (sectionLookupErr) {
               console.warn('Section lookup error during import:', sectionLookupErr.message);
@@ -983,10 +958,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           studentData.password = await bcrypt.hash(studentData.password, salt);
         }
 
-        // Check if student already exists by admission number
-        const admNoKey = admissionNumber ? admissionNumber.trim().toUpperCase() : null;
-        const existingId = admNoKey ? existingStudentsMap.get(admNoKey) : null;
-
+        // Decide what to do with this row (existingId already computed at top of loop)
         if (existingId && replaceDuplicates) {
           // REPLACE: update all fields on the existing student record
           const { role, tenantId: _t, createdAt, ...updateFields } = studentData;
