@@ -137,8 +137,21 @@ const ImportModal = ({
 
     // Execute import
     const handleExecuteImport = async () => {
-        if (!previewData || !previewData.validData) {
-            toast.error('No valid data to import');
+        if (!previewData) {
+            toast.error('No data to import');
+            return;
+        }
+
+        // When replacing or inserting as new, include the duplicate rows as well
+        // (previewData.validData only contains non-duplicate rows)
+        const duplicateRows = (previewData.duplicates || []).map(d => d.data);
+        let dataToSend = [...(previewData.validData || [])];
+        if (duplicateAction === 'replace' || duplicateAction === 'new') {
+            dataToSend = [...dataToSend, ...duplicateRows];
+        }
+
+        if (dataToSend.length === 0) {
+            toast.error('No records to import. All rows were skipped.');
             return;
         }
 
@@ -147,7 +160,7 @@ const ImportModal = ({
 
         try {
             const response = await api.post(executeUrl, {
-                validData: previewData.validData,
+                validData: dataToSend,
                 options: {
                     skipErrors: true,
                     skipDuplicates: duplicateAction === 'skip',
