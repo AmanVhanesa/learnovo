@@ -610,45 +610,26 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
     const settings = await Settings.getSettings(tenantId);
     const defaultUdiseCode = settings.institution?.udiseCode;
 
-    // Extract skipDuplicates option (default: false)
+    // Extract options
     const skipDuplicates = options?.skipDuplicates || false;
+    const replaceDuplicates = options?.replaceDuplicates || false;
 
-    // If skipDuplicates is enabled, filter out students with existing admission numbers
-    let dataToImport = validData;
-    let skippedCount = 0;
+    const results = { success: 0, failed: 0, skipped: 0, replaced: 0, errors: [] };
 
-    if (skipDuplicates) {
-      // Get existing admission numbers
-      const existingAdmissionNumbers = new Set();
-      const existingStudents = await User.find({
-        tenantId,
-        role: 'student'
-      }).select('admissionNumber');
-
+    // Pre-fetch all existing admission numbers for this tenant (for fast lookup)
+    const existingStudentsMap = new Map();
+    if (skipDuplicates || replaceDuplicates) {
+      const existingStudents = await User.find({ tenantId, role: 'student' })
+        .select('_id admissionNumber')
+        .lean();
       existingStudents.forEach(s => {
-        if (s.admissionNumber && s.admissionNumber.trim()) {
-          existingAdmissionNumbers.add(s.admissionNumber.toUpperCase());
+        if (s.admissionNumber) {
+          existingStudentsMap.set(s.admissionNumber.trim().toUpperCase(), s._id);
         }
       });
-
-      // Filter out duplicates
-      dataToImport = validData.filter(row => {
-        if (row.admissionNumber) {
-          const admNo = row.admissionNumber.toString().trim().toUpperCase();
-          if (existingAdmissionNumbers.has(admNo)) {
-            skippedCount++;
-            return false; // Skip this student
-          }
-        }
-        return true; // Import this student
-      });
-
-      console.log(`Skip duplicates enabled: ${skippedCount} students will be skipped`);
     }
 
-    const results = { success: 0, failed: 0, skipped: skippedCount, errors: [] };
-
-    for (const row of dataToImport) {
+    for (const row of validData) {
       let studentData = null; // Declare safely for error logging scope
       const rowNum = row._rowNumber || '?';
 
@@ -1002,9 +983,23 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           studentData.password = await bcrypt.hash(studentData.password, salt);
         }
 
-        // Use insertOne to bypass Mongoose validation (more lenient)
-        await User.collection.insertOne(studentData);
-        results.success++;
+        // Check if student already exists by admission number
+        const admNoKey = admissionNumber ? admissionNumber.trim().toUpperCase() : null;
+        const existingId = admNoKey ? existingStudentsMap.get(admNoKey) : null;
+
+        if (existingId && replaceDuplicates) {
+          // REPLACE: update all fields on the existing student record
+          const { role, tenantId: _t, createdAt, ...updateFields } = studentData;
+          await User.findByIdAndUpdate(existingId, { $set: updateFields, $currentDate: { updatedAt: true } });
+          results.replaced++;
+        } else if (existingId && skipDuplicates) {
+          // SKIP: do nothing
+          results.skipped++;
+        } else {
+          // INSERT: new student
+          await User.collection.insertOne(studentData);
+          results.success++;
+        }
 
       } catch (error) {
         results.failed++;
@@ -1029,7 +1024,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
 
     res.json({
       success: true,
-      message: `Import completed. Success: ${results.success}, Skipped: ${results.skipped}, Failed: ${results.failed}`,
+      message: `Import completed. Imported: ${results.success}, Replaced: ${results.replaced}, Skipped: ${results.skipped}, Failed: ${results.failed}`,
       data: results
     });
 

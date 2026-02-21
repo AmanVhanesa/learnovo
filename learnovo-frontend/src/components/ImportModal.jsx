@@ -22,7 +22,8 @@ const ImportModal = ({
     const [step, setStep] = useState('upload'); // upload, preview, importing, complete
     const [previewData, setPreviewData] = useState(null);
     const [importing, setImporting] = useState(false);
-    const [skipDuplicates, setSkipDuplicates] = useState(false);
+    // 'skip' = skip duplicates, 'replace' = overwrite existing, 'new' = always insert as new
+    const [duplicateAction, setDuplicateAction] = useState('skip');
 
     if (!isOpen) return null;
 
@@ -149,7 +150,9 @@ const ImportModal = ({
                 validData: previewData.validData,
                 options: {
                     skipErrors: true,
-                    skipDuplicates: skipDuplicates
+                    skipDuplicates: duplicateAction === 'skip',
+                    replaceDuplicates: duplicateAction === 'replace'
+                    // duplicateAction === 'new' means neither flag set → always insert
                 }
             });
 
@@ -178,12 +181,13 @@ const ImportModal = ({
         }
     };
 
-    // Calculate records to import based on skipDuplicates setting
+    // Calculate records that will be processed based on duplicate action
     const getRecordsToImport = () => {
         if (!previewData) return 0;
         const validRows = previewData.summary.validRows || 0;
         const duplicates = previewData.summary.duplicatesInDB || 0;
-        return skipDuplicates ? validRows : validRows + duplicates;
+        if (duplicateAction === 'skip') return validRows; // duplicates excluded
+        return validRows + duplicates; // replace or new: all rows processed
     };
 
     // Download error report
@@ -216,7 +220,7 @@ const ImportModal = ({
         setStep('upload');
         setPreviewData(null);
         setImporting(false);
-        setSkipDuplicates(false);
+        setDuplicateAction('skip');
         onClose();
     };
 
@@ -320,7 +324,7 @@ const ImportModal = ({
                                 </div>
                             </div>
 
-                            {/* Duplicates Warning & Skip Option */}
+                            {/* Duplicates Warning & Action Choice */}
                             {previewData.summary.duplicatesInDB > 0 && (
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
                                     <div className="flex items-start">
@@ -330,20 +334,52 @@ const ImportModal = ({
                                                 {previewData.summary.duplicatesInDB} student(s) already exist in the system
                                             </h3>
                                             <p className="text-sm text-yellow-700 mb-3">
-                                                These students have admission numbers that match existing records.
-                                                You can choose to skip them during import.
+                                                These students have admission numbers matching existing records. Choose what to do:
                                             </p>
-                                            <label className="flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={skipDuplicates}
-                                                    onChange={(e) => setSkipDuplicates(e.target.checked)}
-                                                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                                />
-                                                <span className="ml-2 text-sm font-medium text-yellow-900">
-                                                    Skip students that already exist (based on admission number)
-                                                </span>
-                                            </label>
+                                            <div className="space-y-2">
+                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 transition-colors">
+                                                    <input
+                                                        type="radio"
+                                                        name="duplicateAction"
+                                                        value="skip"
+                                                        checked={duplicateAction === 'skip'}
+                                                        onChange={() => setDuplicateAction('skip')}
+                                                        className="mt-0.5 h-4 w-4 text-primary-600"
+                                                    />
+                                                    <div>
+                                                        <span className="text-sm font-medium text-yellow-900">Skip duplicates</span>
+                                                        <p className="text-xs text-yellow-700">Existing students will not be changed</p>
+                                                    </div>
+                                                </label>
+                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 transition-colors">
+                                                    <input
+                                                        type="radio"
+                                                        name="duplicateAction"
+                                                        value="replace"
+                                                        checked={duplicateAction === 'replace'}
+                                                        onChange={() => setDuplicateAction('replace')}
+                                                        className="mt-0.5 h-4 w-4 text-primary-600"
+                                                    />
+                                                    <div>
+                                                        <span className="text-sm font-medium text-yellow-900">Replace (update) existing students</span>
+                                                        <p className="text-xs text-yellow-700">Existing records will be overwritten with CSV data</p>
+                                                    </div>
+                                                </label>
+                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 transition-colors">
+                                                    <input
+                                                        type="radio"
+                                                        name="duplicateAction"
+                                                        value="new"
+                                                        checked={duplicateAction === 'new'}
+                                                        onChange={() => setDuplicateAction('new')}
+                                                        className="mt-0.5 h-4 w-4 text-primary-600"
+                                                    />
+                                                    <div>
+                                                        <span className="text-sm font-medium text-yellow-900">Import as new</span>
+                                                        <p className="text-xs text-yellow-700">Duplicates will be inserted as separate new records</p>
+                                                    </div>
+                                                </label>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -440,6 +476,11 @@ const ImportModal = ({
                                     <p className="text-sm text-gray-600">
                                         <span className="font-semibold text-green-600">{previewData.data?.success || 0}</span> students imported successfully
                                     </p>
+                                    {previewData.data?.replaced > 0 && (
+                                        <p className="text-sm text-gray-600">
+                                            <span className="font-semibold text-blue-600">{previewData.data.replaced}</span> students replaced (updated)
+                                        </p>
+                                    )}
                                     {previewData.data?.skipped > 0 && (
                                         <p className="text-sm text-gray-600">
                                             <span className="font-semibold text-yellow-600">{previewData.data.skipped}</span> students skipped (already exist)
