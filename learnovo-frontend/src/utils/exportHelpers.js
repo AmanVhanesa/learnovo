@@ -13,16 +13,9 @@ export const exportCSV = (filename, rows) => {
 }
 
 export const exportExcel = (filename, rows, sheetName = 'Sheet1') => {
-  // Create a new workbook
   const wb = XLSX.utils.book_new();
-
-  // Convert rows to worksheet
   const ws = XLSX.utils.aoa_to_sheet(rows);
-
-  // Add worksheet to workbook
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
-
-  // Generate Excel file and trigger download
   XLSX.writeFile(wb, filename);
 }
 
@@ -35,6 +28,49 @@ export const exportData = (baseFilename, rows, format = 'csv') => {
   } else {
     exportCSV(`${filenameWithoutExt}.csv`, rows);
   }
+}
+
+/**
+ * Export data as PDF using jsPDF + autoTable (client-side)
+ * @param {string} filename  - e.g. "students_export_2026-02-21.pdf"
+ * @param {string[]} headers - Column header labels
+ * @param {string[][]} rows  - 2-D array of cell values
+ */
+export const exportPDF = async (filename, headers, rows) => {
+  // Lazy-import to avoid bundle cost when not needed
+  const { jsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+  // Title
+  doc.setFontSize(14);
+  doc.setTextColor(15, 118, 110); // teal-600
+  doc.text('Student Export Report', 40, 36);
+
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 52);
+
+  autoTable(doc, {
+    startY: 64,
+    head: [headers],
+    body: rows,
+    theme: 'striped',
+    headStyles: {
+      fillColor: [15, 118, 110],  // teal
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 8,
+    },
+    bodyStyles: { fontSize: 7.5, textColor: 40 },
+    alternateRowStyles: { fillColor: [240, 253, 250] },
+    margin: { left: 40, right: 40 },
+    tableWidth: 'auto',
+    styles: { overflow: 'linebreak', cellPadding: 3 },
+  });
+
+  doc.save(filename);
 }
 
 export const exportPNGPlaceholder = (filename) => {
@@ -56,5 +92,3 @@ export const exportPNGPlaceholder = (filename) => {
     URL.revokeObjectURL(url)
   })
 }
-
-

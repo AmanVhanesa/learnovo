@@ -1204,21 +1204,75 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
       ];
     }
 
-    // Generate CSV headers based on selected fields
-    const headers = selectedFields.map(field => fieldDefinitions[field].label);
-    const csvRows = [headers.join(',')];
+    const dateStr = new Date().toISOString().split('T')[0];
+    const format = (req.query.format || 'csv').toLowerCase();
 
-    // Generate CSV rows
-    students.forEach(student => {
-      const row = selectedFields.map(field => fieldDefinitions[field].extract(student));
-      csvRows.push(row.join(','));
-    });
+    // Build header labels and raw data rows (no CSV quoting for non-CSV formats)
+    const headerLabels = selectedFields.map(f => fieldDefinitions[f].label);
 
-    const csvContent = csvRows.join('\n');
+    const rawRows = students.map(student =>
+      selectedFields.map(field => {
+        const raw = fieldDefinitions[field].extract(student);
+        // Strip CSV quoting wrappers (e.g. `"value"`) for non-CSV output
+        return typeof raw === 'string' ? raw.replace(/^"|"$/g, '').replace(/""/g, '"') : (raw ?? '');
+      })
+    );
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=students_export_${new Date().toISOString().split('T')[0]}.csv`);
-    res.status(200).send(csvContent);
+    // ── CSV ─────────────────────────────────────────────────────────────────
+    if (format === 'csv') {
+      const csvQuote = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const csvRows = [
+        headerLabels.map(csvQuote).join(','),
+        ...rawRows.map(row => row.map(csvQuote).join(','))
+      ];
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=students_export_${dateStr}.csv`);
+      return res.status(200).send(csvRows.join('\n'));
+    }
+
+    // ── Excel (.xlsx) ────────────────────────────────────────────────────────
+    if (format === 'excel') {
+      const xlsx = require('xlsx');
+      const wsData = [headerLabels, ...rawRows];
+      const ws = xlsx.utils.aoa_to_sheet(wsData);
+
+      // Auto column widths
+      const colWidths = headerLabels.map((h, i) => ({
+        wch: Math.max(h.length, ...rawRows.map(r => String(r[i] ?? '').length), 10)
+      }));
+      ws['!cols'] = colWidths;
+
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws, 'Students');
+      const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=students_export_${dateStr}.xlsx`);
+      return res.status(200).send(buffer);
+    }
+
+    // ── TXT (tab-delimited) ──────────────────────────────────────────────────
+    if (format === 'txt') {
+      const txtRows = [
+        headerLabels.join('\t'),
+        ...rawRows.map(row => row.join('\t'))
+      ];
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename=students_export_${dateStr}.txt`);
+      return res.status(200).send(txtRows.join('\n'));
+    }
+
+    // ── JSON (used by client-side PDF generation) ────────────────────────────
+    if (format === 'json') {
+      const result = rawRows.map(row => {
+        const obj = {};
+        headerLabels.forEach((h, i) => { obj[h] = row[i]; });
+        return obj;
+      });
+      return res.status(200).json({ success: true, headers: headerLabels, rows: rawRows, data: result });
+    }
+
+    res.status(400).json({ success: false, message: `Unsupported format: ${format}` });
 
   } catch (error) {
     console.error('Export error:', error);

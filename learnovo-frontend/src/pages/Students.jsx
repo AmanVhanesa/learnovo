@@ -7,6 +7,7 @@ import StudentForm from '../components/students/StudentForm'
 import ImportModal from '../components/ImportModal'
 import ExportButton from '../components/ExportButton'
 import DeactivateStudentModal from '../components/students/DeactivateStudentModal'
+import { exportPDF } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 
 const Students = () => {
@@ -37,6 +38,7 @@ const Students = () => {
   const [showBulkActions, setShowBulkActions] = useState(false)
   const [isDeactivating, setIsDeactivating] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [selectedFormat, setSelectedFormat] = useState('csv')
 
   // Export column selection — keys must match backend fieldDefinitions
   const ALL_EXPORT_FIELDS = [
@@ -295,20 +297,40 @@ const Students = () => {
     setShowExportModal(true)
   }
 
-  const handleDoExport = () => {
+  const handleDoExport = async () => {
     const params = new URLSearchParams()
     if (classFilter) params.set('class', classFilter)
     if (sectionFilter) params.set('section', sectionFilter)
     if (yearFilter) params.set('academicYear', yearFilter)
     if (statusFilter) params.set('status', statusFilter)
     if (searchQuery) params.set('search', searchQuery)
-    if (driverFilter) params.set('driverId', driverFilter)   // correct param name
+    if (driverFilter) params.set('driverId', driverFilter)
     if (selectedExportFields.length > 0) {
       params.set('fields', selectedExportFields.join(','))
     }
     const token = localStorage.getItem('token')
     const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
-    window.open(`${base}/students/export?${params.toString()}&token=${token}`, '_blank')
+    const dateStr = new Date().toISOString().split('T')[0]
+
+    if (selectedFormat === 'pdf') {
+      // PDF: fetch data as JSON then generate client-side
+      try {
+        toast.loading('Generating PDF…', { id: 'pdf-export' })
+        const res = await fetch(`${base}/students/export?${params.toString()}&format=json&token=${token}`)
+        const json = await res.json()
+        if (!json.success) throw new Error(json.message)
+        await exportPDF(`students_export_${dateStr}.pdf`, json.headers, json.rows)
+        toast.success('PDF downloaded!', { id: 'pdf-export' })
+      } catch (err) {
+        console.error('PDF export error:', err)
+        toast.error('Failed to generate PDF', { id: 'pdf-export' })
+      }
+    } else {
+      // CSV / Excel / TXT: let backend stream the file
+      params.set('format', selectedFormat)
+      window.open(`${base}/students/export?${params.toString()}&token=${token}`, '_blank')
+    }
+
     setShowExportModal(false)
   }
 
@@ -528,6 +550,31 @@ const Students = () => {
                 </div>
               </div>
 
+              {/* Format selection */}
+              <div className="px-6 pb-4">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Export Format</p>
+                <div className="flex gap-2 mb-4">
+                  {[
+                    { id: 'csv', label: '📄 CSV', desc: 'Spreadsheet-compatible' },
+                    { id: 'excel', label: '📊 Excel', desc: '.xlsx file' },
+                    { id: 'pdf', label: '🖨️ PDF', desc: 'Print-ready' },
+                    { id: 'txt', label: '📝 TXT', desc: 'Tab-delimited text' },
+                  ].map(fmt => (
+                    <button
+                      key={fmt.id}
+                      onClick={() => setSelectedFormat(fmt.id)}
+                      title={fmt.desc}
+                      className={`flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-all ${selectedFormat === fmt.id
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                    >
+                      {fmt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Column selection */}
               <div className="px-6 pb-4">
                 <div className="flex items-center justify-between mb-2">
@@ -579,7 +626,7 @@ const Students = () => {
                   disabled={selectedExportFields.length === 0}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Export {selectedExportFields.length} Column{selectedExportFields.length !== 1 ? 's' : ''}
+                  Export {selectedExportFields.length} Column{selectedExportFields.length !== 1 ? 's' : ''} as {selectedFormat.toUpperCase()}
                 </button>
               </div>
             </div>
