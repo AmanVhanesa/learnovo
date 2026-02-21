@@ -208,10 +208,10 @@ const Reports = () => {
             <RefreshCw className={`h-4 w-4 ${loading.dashboard ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          {activeTab === 'activity' && <button onClick={exportActivities} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export CSV</button>}
-          {activeTab === 'attendance' && <button onClick={exportAttendance} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export CSV</button>}
-          {activeTab === 'enrollment' && <button onClick={exportEnrollment} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export CSV</button>}
-          {activeTab === 'fees' && <button onClick={exportFees} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export CSV</button>}
+          {activeTab === 'activity' && <button onClick={exportActivities} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
+          {activeTab === 'attendance' && <button onClick={exportAttendance} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
+          {activeTab === 'enrollment' && <button onClick={exportEnrollment} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
+          {activeTab === 'fees' && <button onClick={exportFees} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
         </div>
       </div>
 
@@ -245,8 +245,8 @@ const Reports = () => {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab.id
-                    ? 'border-teal-500 text-teal-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-teal-500 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
               >
                 <tab.icon className="h-4 w-4" />

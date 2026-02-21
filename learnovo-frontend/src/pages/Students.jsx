@@ -519,107 +519,110 @@ const Students = () => {
             className="h-8 px-3 text-xs font-medium text-primary-600 border border-primary-600 hover:bg-primary-50 rounded-md transition-all inline-flex items-center gap-1.5"
           >
             <Upload className="h-3.5 w-3.5 rotate-180" />
-            <span>Export CSV</span>
+            <span>Export</span>
           </button>
         </div>
 
         {/* ── Export Options Modal ── */}
         {showExportModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-              <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+              <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
                 <h3 className="text-base font-semibold text-gray-900">Export Options</h3>
                 <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="h-5 w-5" />
                 </button>
               </div>
 
-              {/* Active filters summary */}
-              <div className="px-6 pt-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Active Filters (applied to export)</p>
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {!classFilter && !sectionFilter && !yearFilter && !statusFilter && !driverFilter && !searchQuery && (
-                    <span className="text-xs text-gray-400 italic">None — will export all students</span>
-                  )}
-                  {classFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Class: {classFilter}</span>}
-                  {sectionFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Section: {sectionFilter}</span>}
-                  {yearFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Year: {yearFilter}</span>}
-                  {statusFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Status: {statusFilter}</span>}
-                  {driverFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Driver: {filterOptions.drivers?.find(d => d._id === driverFilter)?.name || driverFilter}</span>}
-                  {searchQuery && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Search: {searchQuery}</span>}
-                </div>
-              </div>
-
-              {/* Format selection */}
-              <div className="px-6 pb-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Export Format</p>
-                <div className="flex gap-2 mb-4">
-                  {[
-                    { id: 'csv', label: '📄 CSV', desc: 'Spreadsheet-compatible' },
-                    { id: 'excel', label: '📊 Excel', desc: '.xlsx file' },
-                    { id: 'pdf', label: '🖨️ PDF', desc: 'Print-ready' },
-                    { id: 'txt', label: '📝 TXT', desc: 'Tab-delimited text' },
-                  ].map(fmt => (
-                    <button
-                      key={fmt.id}
-                      onClick={() => setSelectedFormat(fmt.id)}
-                      title={fmt.desc}
-                      className={`flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-all ${selectedFormat === fmt.id
-                          ? 'border-primary-500 bg-primary-50 text-primary-700'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                    >
-                      {fmt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Column selection */}
-              <div className="px-6 pb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Select Columns</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => setSelectedExportFields(ALL_EXPORT_FIELDS.map(f => f.key))} className="text-xs text-primary-600 hover:underline">All</button>
-                    <span className="text-gray-300">|</span>
-                    <button onClick={() => setSelectedExportFields([])} className="text-xs text-gray-400 hover:underline">None</button>
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto">
+                {/* Active filters summary */}
+                <div className="px-6 pt-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Active Filters (applied to export)</p>
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {!classFilter && !sectionFilter && !yearFilter && !statusFilter && !driverFilter && !searchQuery && (
+                      <span className="text-xs text-gray-400 italic">None — will export all students</span>
+                    )}
+                    {classFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Class: {classFilter}</span>}
+                    {sectionFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Section: {sectionFilter}</span>}
+                    {yearFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Year: {yearFilter}</span>}
+                    {statusFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Status: {statusFilter}</span>}
+                    {driverFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Driver: {filterOptions.drivers?.find(d => d._id === driverFilter)?.name || driverFilter}</span>}
+                    {searchQuery && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Search: {searchQuery}</span>}
                   </div>
                 </div>
 
-                {/* Presets */}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {[
-                    { label: '📋 Basic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'status'] },
-                    { label: '📞 Contact', fields: ['admissionNumber', 'name', 'fatherName', 'motherName', 'mobile', 'altMobile', 'email', 'address'] },
-                    { label: '🚌 Transport', fields: ['admissionNumber', 'name', 'class', 'section', 'driverName', 'driverPhone', 'transportMode'] },
-                    { label: '🎓 Academic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'academicYear', 'penNumber', 'subDepartment'] },
-                  ].map(preset => (
-                    <button
-                      key={preset.label}
-                      onClick={() => setSelectedExportFields(preset.fields)}
-                      className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-full hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 transition-colors"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
+                {/* Format selection */}
+                <div className="px-6 pb-4">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Export Format</p>
+                  <div className="flex gap-2 mb-4">
+                    {[
+                      { id: 'csv', label: '📄 CSV', desc: 'Spreadsheet-compatible' },
+                      { id: 'excel', label: '📊 Excel', desc: '.xlsx file' },
+                      { id: 'pdf', label: '🖨️ PDF', desc: 'Print-ready' },
+                      { id: 'txt', label: '📝 TXT', desc: 'Tab-delimited text' },
+                    ].map(fmt => (
+                      <button
+                        key={fmt.id}
+                        onClick={() => setSelectedFormat(fmt.id)}
+                        title={fmt.desc}
+                        className={`flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-all ${selectedFormat === fmt.id
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                      >
+                        {fmt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1 max-h-52 overflow-y-auto pr-1">
-                  {ALL_EXPORT_FIELDS.map(field => (
-                    <label key={field.key} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50">
-                      <input
-                        type="checkbox"
-                        checked={selectedExportFields.includes(field.key)}
-                        onChange={() => toggleExportField(field.key)}
-                        className="h-3.5 w-3.5 text-primary-600 rounded"
-                      />
-                      <span className="text-sm text-gray-700">{field.label}</span>
-                    </label>
-                  ))}
+                {/* Column selection */}
+                <div className="px-6 pb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Select Columns</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setSelectedExportFields(ALL_EXPORT_FIELDS.map(f => f.key))} className="text-xs text-primary-600 hover:underline">All</button>
+                      <span className="text-gray-300">|</span>
+                      <button onClick={() => setSelectedExportFields([])} className="text-xs text-gray-400 hover:underline">None</button>
+                    </div>
+                  </div>
+
+                  {/* Presets */}
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {[
+                      { label: '📋 Basic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'status'] },
+                      { label: '📞 Contact', fields: ['admissionNumber', 'name', 'fatherName', 'motherName', 'mobile', 'altMobile', 'email', 'address'] },
+                      { label: '🚌 Transport', fields: ['admissionNumber', 'name', 'class', 'section', 'driverName', 'driverPhone', 'transportMode'] },
+                      { label: '🎓 Academic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'academicYear', 'penNumber', 'subDepartment'] },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        onClick={() => setSelectedExportFields(preset.fields)}
+                        className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-full hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1 max-h-52 overflow-y-auto pr-1">
+                    {ALL_EXPORT_FIELDS.map(field => (
+                      <label key={field.key} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50">
+                        <input
+                          type="checkbox"
+                          checked={selectedExportFields.includes(field.key)}
+                          onChange={() => toggleExportField(field.key)}
+                          className="h-3.5 w-3.5 text-primary-600 rounded"
+                        />
+                        <span className="text-sm text-gray-700">{field.label}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+              <div className="shrink-0 flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
                 <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Cancel</button>
                 <button
                   onClick={handleDoExport}
