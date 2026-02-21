@@ -104,8 +104,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         className="h-24 w-24 rounded-full object-cover border-2 border-gray-200"
                                     />
                                 ) : (
-                                    <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center">
-                                        <User className="h-12 w-12 text-gray-400" />
+                                    <div className="h-24 w-24 rounded-full bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center">
+                                        <User className="h-12 w-12 text-white" />
                                     </div>
                                 )}
                                 {photoUploading && (

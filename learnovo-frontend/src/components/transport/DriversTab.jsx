@@ -83,7 +83,7 @@ const DriversTab = ({ onStatsUpdate }) => {
         }
 
         return (
-            <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white font-semibold flex-shrink-0`}>
+            <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center text-white font-semibold flex-shrink-0`}>
                 {initials}
             </div>
         );
@@ -356,7 +356,7 @@ const DriverModal = ({ driver, onClose }) => {
                                     className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
                                 />
                             ) : (
-                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white text-2xl font-semibold">
+                                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center text-white text-2xl font-semibold">
                                     {initials}
                                 </div>
                             )}

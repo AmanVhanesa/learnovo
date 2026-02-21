@@ -637,9 +637,9 @@ const Students = () => {
                           className="h-10 w-10 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-700">
-                            {student.fullName?.charAt(0)}
+                        <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-semibold text-white">
+                            {student.fullName?.charAt(0).toUpperCase()}
                           </span>
                         </div>
                       )}
