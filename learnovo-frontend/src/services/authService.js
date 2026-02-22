@@ -40,7 +40,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Only redirect if it's not the login request itself
+    if (error.response?.status === 401 && error.config && !error.config.url.includes('/auth/login')) {
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
