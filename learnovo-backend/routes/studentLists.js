@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const { protect } = require('../middleware/auth');
 const StudentList = require('../models/StudentList');
 const User = require('../models/User');
@@ -222,57 +223,176 @@ const getExportData = async (listId, tenantId) => {
 router.get('/:id/export/pdf', protect, async (req, res) => {
     try {
         const list = await getExportData(req.params.id, req.user.tenantId);
+        const Settings = mongoose.model('Settings'); // Load Settings model dynamically if not imported
+        let settings = null;
+        try {
+            settings = await Settings.findOne({ tenantId: req.user.tenantId });
+        } catch (e) {
+            console.error('Settings fetch error:', e);
+        }
+
+        const schoolData = settings?.institution || {};
 
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${list.name.replace(/\\s+/g, '_')}_List.pdf"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${list.name.replace(/\s+/g, '_')}_List.pdf"`);
 
-        const doc = new PDFDocument({ margin: 30, size: 'A4' });
+        const doc = new PDFDocument({ margin: 40, size: 'A4' });
         doc.pipe(res);
+        const pageWidth = doc.page.width;
+        let currentY = 40;
 
-        // Header
-        doc.fontSize(20).text(list.name, { align: 'center' });
-        if (list.description) {
-            doc.fontSize(12).text(list.description, { align: 'center' });
+        // --- Header Rendering ---
+        if (schoolData && Object.keys(schoolData).length > 0) {
+            const centerX = pageWidth / 2;
+
+            // School Name
+            doc.font('Helvetica-Bold').fontSize(24).fillColor('#000000');
+            if (schoolData.name) {
+                doc.text(schoolData.name, { align: 'center' });
+                currentY = doc.y + 4;
+            }
+
+            // Address
+            doc.font('Helvetica').fontSize(10);
+            if (schoolData.address) {
+                const { street, city, state, pincode, country } = schoolData.address;
+                const addrParts = [street, city, state, pincode, country].filter(p => p && String(p).trim());
+                if (addrParts.length > 0) {
+                    doc.text(addrParts.join(', '), { align: 'center' });
+                    currentY = doc.y + 2;
+                }
+            }
+
+            // Contact Details
+            if (schoolData.contact) {
+                const { phone, email } = schoolData.contact;
+                const contactParts = [];
+                if (phone) contactParts.push(`Phone: ${phone}`);
+                if (email) contactParts.push(`Email: ${email}`);
+                if (contactParts.length > 0) {
+                    doc.text(contactParts.join(' | '), { align: 'center' });
+                    currentY = doc.y + 2;
+                }
+            }
+
+            // Board & Affiliation Details
+            const board = schoolData.board || '';
+            const affiliationNumber = schoolData.affiliationNumber || '';
+            const schoolCode = schoolData.schoolCode || '';
+            const affiliationParts = [];
+            if (board || affiliationNumber) {
+                affiliationParts.push(`${board} Affiliation No: ${affiliationNumber}`.trim());
+            }
+            if (schoolCode) {
+                affiliationParts.push(`School Code: ${schoolCode}`);
+            }
+            if (affiliationParts.length > 0) {
+                doc.text(affiliationParts.join(' | '), { align: 'center' });
+                currentY = doc.y + 2;
+            }
+
+            // UDISE Code
+            if (schoolData.udiseCode) {
+                doc.text(`UDISE No: ${schoolData.udiseCode}`, { align: 'center' });
+                currentY = doc.y + 4;
+            } else {
+                currentY = doc.y + 4;
+            }
+
+            // Logo Logic
+            if (schoolData.logo) {
+                try {
+                    const axios = require('axios');
+                    const response = await axios.get(schoolData.logo, { responseType: 'arraybuffer' });
+                    const logoBuffer = Buffer.from(response.data, 'utf-8');
+                    doc.image(logoBuffer, 40, 40, { width: 70 });
+                } catch (error) {
+                    console.error('Logo fetch error:', error);
+                }
+            }
+
+            // Separator Line
+            doc.lineWidth(1).moveTo(40, currentY).lineTo(pageWidth - 40, currentY).stroke('#000000');
+            currentY += 15;
+            doc.y = currentY;
         }
+
+        // Title
+        doc.font('Helvetica-Bold').fontSize(14).fillColor('#0f766e'); // teal-600
+        doc.text('Student List', { align: 'center' });
+        doc.moveDown(0.5);
+
+        // Generated Date and Subtitle mapping
+        doc.font('Helvetica').fontSize(10).fillColor('#666666');
+        doc.text(`List: ${list.name}`, 40, doc.y, { continued: true });
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'right' });
         doc.moveDown(1);
-        doc.fontSize(10).text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'right' });
-        doc.moveDown(1);
+
+        if (list.description) {
+            doc.text(`Description: ${list.description}`);
+            doc.moveDown(1);
+        }
 
         // Table settings
-        const tableTop = doc.y;
-        const colWidths = [40, 90, 180, 80, 120];
-        const colPositions = [30, 70, 160, 340, 420];
+        let tableTop = doc.y;
+        const colPositions = [40, 80, 180, 360, 440];
         const headers = ['S.No', 'Admission No', 'Student Name', 'Class/Sec', 'Phone'];
 
-        // Draw Headers
-        doc.font('Helvetica-Bold').fontSize(10);
+        // Draw Headers Background (Dark/neutral)
+        doc.rect(40, tableTop, pageWidth - 80, 20).fill('#0f766e');
+
+        // Draw Header Text (White, Bold)
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff');
         headers.forEach((header, i) => {
-            doc.text(header, colPositions[i], tableTop);
+            doc.text(header, colPositions[i] + 5, tableTop + 6);
         });
 
-        doc.moveTo(30, tableTop + 15).lineTo(560, tableTop + 15).stroke();
-
-        let y = tableTop + 20;
+        let y = tableTop + 25;
 
         // Draw Rows
-        doc.font('Helvetica').fontSize(10);
         list.students.forEach((student, index) => {
             if (y > 750) {
                 doc.addPage();
-                y = 30; // reset y for new page
+                y = 40; // reset y for new page
+
+                // Redraw Headers Background
+                doc.rect(40, y, pageWidth - 80, 20).fill('#0f766e');
+                // Redraw Header Text
+                doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff');
+                headers.forEach((header, i) => {
+                    doc.text(header, colPositions[i] + 5, y + 6);
+                });
+                y += 25;
             }
 
             const classSec = `${student.class || 'N/A'} ${student.section ? '- ' + student.section : ''}`;
 
-            doc.text((index + 1).toString(), colPositions[0], y);
-            doc.text(student.admissionNumber || '-', colPositions[1], y);
-            doc.text(student.fullName || student.name || '-', colPositions[2], y, { width: 170 });
-            doc.text(classSec, colPositions[3], y);
-            doc.text(student.phone || '-', colPositions[4], y);
+            // Reset text color for rows
+            doc.font('Helvetica').fontSize(9).fillColor('#000000');
 
-            doc.moveTo(30, y + 15).lineTo(560, y + 15).strokeColor('#e5e7eb').stroke();
+            doc.text((index + 1).toString(), colPositions[0] + 5, y);
+            doc.text(student.admissionNumber || '-', colPositions[1] + 5, y);
+            doc.text(student.fullName || student.name || '-', colPositions[2] + 5, y, { width: 170 });
+            doc.text(classSec, colPositions[3] + 5, y);
+            doc.text(student.phone || '-', colPositions[4] + 5, y);
+
+            // Row Bottom Border
+            doc.lineWidth(0.5).moveTo(40, y + 15).lineTo(pageWidth - 40, y + 15).strokeColor('#e5e7eb').stroke();
             y += 20;
         });
+
+        // Add page numbers
+        const pageCount = doc.bufferedPageRange ? doc.bufferedPageRange().count : 1;
+        for (let i = 0; i < pageCount; i++) {
+            doc.switchToPage(i);
+            doc.font('Helvetica').fontSize(8).fillColor('#666666');
+            doc.text(
+                `Page ${i + 1} of ${pageCount}`,
+                40,
+                doc.page.height - 30,
+                { align: 'center', width: doc.page.width - 80 }
+            );
+        }
 
         doc.end();
     } catch (error) {

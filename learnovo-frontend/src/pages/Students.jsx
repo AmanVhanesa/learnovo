@@ -9,10 +9,12 @@ import ExportButton from '../components/ExportButton'
 import DeactivateStudentModal from '../components/students/DeactivateStudentModal'
 import { exportPDF } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
+import { useSettings } from '../contexts/SettingsContext'
 
 const Students = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const { settings } = useSettings()
 
   // Data state
   const [students, setStudents] = useState([])
@@ -319,7 +321,7 @@ const Students = () => {
         const res = await fetch(`${base}/students/export?${params.toString()}&format=json&token=${token}`)
         const json = await res.json()
         if (!json.success) throw new Error(json.message)
-        await exportPDF(`students_export_${dateStr}.pdf`, json.headers, json.rows)
+        await exportPDF(`students_export_${dateStr}.pdf`, json.headers, json.rows, settings?.institution)
         toast.success('PDF downloaded!', { id: 'pdf-export' })
       } catch (err) {
         console.error('PDF export error:', err)
