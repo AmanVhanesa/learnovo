@@ -21,7 +21,8 @@ import {
   Bus,
   Award,
   Wallet,
-  BookCheck
+  BookCheck,
+  List
 } from 'lucide-react'
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -39,6 +40,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     const baseItems = [
       { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student', 'parent'] },
       { name: 'Students', href: '/app/students', icon: Users, roles: ['admin', 'teacher', 'parent'] },
+      { name: 'Student Lists', href: '/app/student-lists', icon: List, roles: ['admin', 'teacher'] },
       { name: 'Employees', href: '/app/employees', icon: UserPlus, roles: ['admin'] },
       { name: 'Academics', href: '/app/academics', icon: School, roles: ['admin', 'teacher', 'student'] },
       { name: 'Fees & Finance', href: '/app/fees-finance', icon: CreditCard, roles: ['admin'] },

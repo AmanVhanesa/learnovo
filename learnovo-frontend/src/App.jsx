@@ -12,6 +12,7 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
 import StudentDetail from './pages/StudentDetail'
+import StudentLists from './pages/StudentLists'
 import Employees from './pages/Employees'
 import EmployeeDetail from './pages/EmployeeDetail'
 import Teachers from './pages/Teachers'
@@ -86,6 +87,7 @@ function App() {
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="students" element={<Students />} />
                   <Route path="students/:id" element={<StudentDetail />} />
+                  <Route path="student-lists" element={<StudentLists />} />
                   <Route path="employees" element={<Employees />} />
                   <Route path="employees/:id" element={<EmployeeDetail />} />
                   <Route path="teachers" element={<Teachers />} />

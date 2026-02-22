@@ -181,6 +181,7 @@ app.use('/api/fee-structures', require('./routes/feeStructures'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/assignments', require('./routes/assignments'));
 app.use('/api/admissions', require('./routes/admissions'));
+app.use('/api/student-lists', require('./routes/studentLists'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/announcements', require('./routes/announcements'));
