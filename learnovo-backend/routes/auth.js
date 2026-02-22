@@ -610,4 +610,63 @@ router.put('/reset-password', [
   }
 });
 
+// @desc    Temp route to reset SPIS passwords
+// @route   GET /api/auth/temp-reset-spis
+// @access  Public
+router.get('/temp-reset-spis', async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const Tenant = require('../models/Tenant');
+
+    const tenant = await Tenant.findOne({ schoolCode: 'spis' });
+    if (!tenant) {
+      return res.status(404).json({ message: 'spis tenant not found' });
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const employeeHash = await bcrypt.hash('employee123', salt);
+    const studentHash = await bcrypt.hash('student123', salt);
+
+    const users = await User.find({ tenantId: tenant._id, role: { $ne: 'admin' } });
+
+    let employeeCount = 0;
+    let studentCount = 0;
+
+    const bulkOps = users.map(user => {
+      let hashToUse;
+      if (['teacher', 'staff', 'accountant', 'librarian'].includes(user.role) || (user.role === 'employee')) {
+        hashToUse = employeeHash;
+        employeeCount++;
+      } else if (user.role === 'student' || user.role === 'parent') {
+        hashToUse = studentHash;
+        studentCount++;
+      } else {
+        return null; // Skip admins or unknowns
+      }
+
+      return {
+        updateOne: {
+          filter: { _id: user._id },
+          update: {
+            $set: {
+              password: hashToUse,
+              hasLogin: true
+            }
+          }
+        }
+      };
+    }).filter(op => op !== null);
+
+    if (bulkOps.length > 0) {
+      const result = await User.bulkWrite(bulkOps);
+      return res.json({ success: true, message: `Updated ${result.modifiedCount} accounts. ${employeeCount} employees, ${studentCount} students/parents.` });
+    } else {
+      return res.json({ success: true, message: 'No valid users found.' });
+    }
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
