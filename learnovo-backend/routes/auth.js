@@ -224,7 +224,7 @@ router.post('/login', [
       userQuery = { email: identifier };
     } else {
       // Use case-insensitive search for admission number or employee ID
-      const safeIdentifier = identifier.replace(/[-[\\]{}()*+?.,\\\\^$|#\\s]/g, '\\\\$&');
+      const safeIdentifier = identifier.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
       userQuery = {
         $or: [
           { admissionNumber: { $regex: new RegExp(`^${safeIdentifier}$`, 'i') }, role: { $in: ['student', 'parent'] } },
@@ -244,7 +244,7 @@ router.post('/login', [
       if (isEmail) {
         userQuery = { email: identifier };
       } else {
-        const safeIdentifier = identifier.replace(/[-[\\]{}()*+?.,\\\\^$|#\\s]/g, '\\\\$&');
+        const safeIdentifier = identifier.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');
         userQuery = {
           $or: [
             { admissionNumber: { $regex: new RegExp(`^${safeIdentifier}$`, 'i') }, role: { $in: ['student', 'parent'] } },
