@@ -167,9 +167,9 @@ async function ensureDemoTenant() {
 // @access  Public
 router.post('/login', [
   body('email').custom((value) => {
-    // Allow either email or admission number
+    // Allow email, admission number, or employee ID
     if (!value || value.trim() === '') {
-      throw new Error('Email or Admission Number is required');
+      throw new Error('Email, Admission Number, or Employee ID is required');
     }
     return true;
   }),
@@ -216,11 +216,22 @@ router.post('/login', [
       }
     }
 
-    // Find user - check if identifier is email or admission number
+    // Find user - check if identifier is email or other ID (admissionNumber/employeeId)
     const isEmail = identifier.includes('@');
-    let userQuery = isEmail
-      ? { email: identifier }
-      : { admissionNumber: identifier, role: { $in: ['student', 'parent'] } }; // Only students/parents have admission numbers
+    let userQuery;
+
+    if (isEmail) {
+      userQuery = { email: identifier };
+    } else {
+      // Use case-insensitive search for admission number or employee ID
+      const safeIdentifier = identifier.replace(/[-[\\]{}()*+?.,\\\\^$|#\\s]/g, '\\\\$&');
+      userQuery = {
+        $or: [
+          { admissionNumber: { $regex: new RegExp(`^${safeIdentifier}$`, 'i') }, role: { $in: ['student', 'parent'] } },
+          { employeeId: { $regex: new RegExp(`^${safeIdentifier}$`, 'i') }, role: { $in: ['admin', 'teacher', 'staff', 'accountant'] } }
+        ]
+      };
+    }
 
     if (tenant) {
       userQuery.tenantId = tenant._id;
@@ -230,9 +241,17 @@ router.post('/login', [
 
     // If not found and no tenant specified, try finding by identifier only
     if (!user && !tenant) {
-      userQuery = isEmail
-        ? { email: identifier }
-        : { admissionNumber: identifier, role: { $in: ['student', 'parent'] } };
+      if (isEmail) {
+        userQuery = { email: identifier };
+      } else {
+        const safeIdentifier = identifier.replace(/[-[\\]{}()*+?.,\\\\^$|#\\s]/g, '\\\\$&');
+        userQuery = {
+          $or: [
+            { admissionNumber: { $regex: new RegExp(`^${safeIdentifier}$`, 'i') }, role: { $in: ['student', 'parent'] } },
+            { employeeId: { $regex: new RegExp(`^${safeIdentifier}$`, 'i') }, role: { $in: ['admin', 'teacher', 'staff', 'accountant'] } }
+          ]
+        };
+      }
 
       user = await User.findOne(userQuery).select('+password').populate('tenantId');
       if (user && user.tenantId) {
