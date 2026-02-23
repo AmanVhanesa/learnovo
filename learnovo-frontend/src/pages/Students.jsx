@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Search, Eye, Power, PowerOff, Upload, Trash2, X, CheckSquare, Square } from 'lucide-react'
+import { Plus, Search, Eye, Power, PowerOff, Upload, Trash2, X, CheckSquare, Square, TrendingUp } from 'lucide-react'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -373,7 +373,14 @@ const Students = () => {
           {user?.role === 'admin' && (
             <>
               <button
-                className="btn btn-outline"
+                className="btn btn-outline border-green-200 text-green-700 hover:bg-green-50"
+                onClick={() => navigate('/app/students/bulk-promote')}
+              >
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Bulk Promote
+              </button>
+              <button
+                className="btn btn-outline text-gray-700"
                 onClick={() => setShowImportModal(true)}
               >
                 <Upload className="h-4 w-4 mr-2" />

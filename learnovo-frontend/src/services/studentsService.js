@@ -77,8 +77,24 @@ export const studentsService = {
     const res = await api.delete('/students/bulk-delete', { data: { studentIds } })
     return res.data
   },
-  promote: async (data) => {
-    const res = await api.post('/students/promote', data)
+  getClassHistory: async (id) => {
+    const res = await api.get(`/students/${id}/class-history`)
+    return res.data
+  },
+  promoteStudent: async (id, data) => {
+    const res = await api.post(`/students/${id}/promote`, data)
+    return res.data
+  },
+  demoteStudent: async (id, data) => {
+    const res = await api.post(`/students/${id}/demote`, data)
+    return res.data
+  },
+  bulkClassAction: async (data) => {
+    const res = await api.post(`/students/bulk-class-action`, data)
+    return res.data
+  },
+  getPromotionsReport: async (params) => {
+    const res = await api.get(`/students/promotions/report`, { params })
     return res.data
   },
   // Inactive student management

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Power, PowerOff, Key, Download, Printer, Loader } from 'lucide-react'
+import { ArrowLeft, Edit, Power, PowerOff, Key, Download, Printer, Loader, TrendingUp, TrendingDown, Clock } from 'lucide-react'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
 import StudentForm from '../components/students/StudentForm'
+import ClassActionModal from '../components/students/ClassActionModal'
 import toast from 'react-hot-toast'
 
 const StudentDetail = () => {
@@ -16,6 +17,10 @@ const StudentDetail = () => {
     const [activeTab, setActiveTab] = useState('profile')
     const [showEditForm, setShowEditForm] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [classHistory, setClassHistory] = useState([])
+    const [admissionClassInfo, setAdmissionClassInfo] = useState('N/A')
+    const [classActionModal, setClassActionModal] = useState({ isOpen: false, type: null })
+    const [isProcessingAction, setIsProcessingAction] = useState(false)
 
     useEffect(() => {
         fetchStudent()
@@ -26,6 +31,12 @@ const StudentDetail = () => {
             setIsLoading(true)
             const response = await studentsService.get(id)
             setStudent(response.data)
+
+            try {
+                const historyRes = await studentsService.getClassHistory(id);
+                setClassHistory(historyRes.data || []);
+                setAdmissionClassInfo(historyRes.admissionClass || 'N/A');
+            } catch (e) { console.error('History fetch error', e) }
         } catch (error) {
             console.error('Error fetching student:', error)
             toast.error('Failed to load student details')
@@ -96,11 +107,35 @@ const StudentDetail = () => {
         }
     }
 
+    const handleClassAction = async (data) => {
+        try {
+            setIsProcessingAction(true)
+            if (classActionModal.type === 'promote') {
+                await studentsService.promoteStudent(id, data);
+                toast.success('Student promoted successfully');
+            } else {
+                await studentsService.demoteStudent(id, data);
+                toast.success('Student demoted successfully');
+            }
+            setClassActionModal({ isOpen: false, type: null });
+            fetchStudent();
+        } catch (error) {
+            console.error('Class action error:', error);
+            if (!error?.response?.data?.requiresOverride) {
+                toast.error(error?.response?.data?.message || `Failed to ${classActionModal.type} student`);
+            }
+            throw error; // Passing to modal to show override check if needed
+        } finally {
+            setIsProcessingAction(false)
+        }
+    }
+
     const tabs = [
         { id: 'profile', label: 'Profile' },
         { id: 'fees', label: 'Fees' },
         { id: 'attendance', label: 'Attendance' },
         { id: 'exams', label: 'Exams' },
+        { id: 'history', label: 'Class History' },
         { id: 'activity', label: 'Activity Log' }
     ]
 
@@ -141,6 +176,22 @@ const StudentDetail = () => {
 
                 {user?.role === 'admin' && (
                     <div className="flex gap-2">
+                        <button
+                            onClick={() => setClassActionModal({ isOpen: true, type: 'promote' })}
+                            className="btn btn-outline border-green-200 text-green-700 hover:bg-green-50"
+                            title="Promote Student"
+                        >
+                            <TrendingUp className="h-4 w-4 mr-1" />
+                            Promote
+                        </button>
+                        <button
+                            onClick={() => setClassActionModal({ isOpen: true, type: 'demote' })}
+                            className="btn btn-outline border-orange-200 text-orange-700 hover:bg-orange-50"
+                            title="Demote Student"
+                        >
+                            <TrendingDown className="h-4 w-4 mr-1" />
+                            Demote
+                        </button>
                         <button
                             onClick={handleResetPassword}
                             className="btn btn-outline"
@@ -227,6 +278,10 @@ const StudentDetail = () => {
                             <div>
                                 <p className="text-xs text-gray-500 uppercase">Academic Year</p>
                                 <p className="text-sm font-medium text-gray-900 mt-1">{student.academicYear}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase">Admission Class</p>
+                                <p className="text-sm font-medium text-gray-900 mt-1">{admissionClassInfo}</p>
                             </div>
                         </div>
                     </div>
@@ -438,6 +493,47 @@ const StudentDetail = () => {
                         </div>
                     </div>
                 )}
+
+                {activeTab === 'history' && (
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                                <Clock className="h-5 w-5 mr-2 text-gray-400" />
+                                Class Update History
+                            </h3>
+                            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full text-nowrap">
+                                Admitted In: <span className="font-semibold text-gray-800">{admissionClassInfo}</span>
+                            </span>
+                        </div>
+                        {classHistory.length > 0 ? (
+                            <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-gray-200 before:to-transparent">
+                                {classHistory.map((item) => (
+                                    <div key={item._id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                                        <div className="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-slate-100 text-slate-500 shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 shadow-sm z-10">
+                                            {item.actionType === 'promoted' ? <TrendingUp className="h-5 w-5 text-green-500" /> : <TrendingDown className="h-5 w-5 text-orange-500" />}
+                                        </div>
+                                        <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className={`font-semibold capitalize ${item.actionType === 'promoted' ? 'text-green-600' : 'text-orange-600'}`}>{item.actionType}</span>
+                                                <time className="text-xs font-medium text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</time>
+                                            </div>
+                                            <p className="text-sm text-gray-700">
+                                                Moved from <strong>{item.fromClass} {item.fromSection && `(${item.fromSection})`}</strong> to <strong>{item.toClass} {item.toSection && `(${item.toSection})`}</strong>
+                                            </p>
+                                            <div className="mt-2 text-xs flex gap-4 text-gray-500">
+                                                <span>A.Y: {item.academicYear}</span>
+                                                <span>By: {item.performedBy?.name || item.performedBy?.fullName || 'System'}</span>
+                                            </div>
+                                            {item.remarks && <p className="mt-2 text-xs text-gray-600 italic">Note: {item.remarks}</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500 text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-200">No promotion or demotion records found in history.</p>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Edit Form Modal */}
@@ -449,6 +545,16 @@ const StudentDetail = () => {
                     isLoading={isSaving}
                 />
             )}
+
+            {/* Class Action Modal */}
+            <ClassActionModal
+                isOpen={classActionModal.isOpen}
+                type={classActionModal.type}
+                student={student}
+                onClose={() => setClassActionModal({ isOpen: false, type: null })}
+                onConfirm={handleClassAction}
+                isLoading={isProcessingAction}
+            />
         </div>
     )
 }

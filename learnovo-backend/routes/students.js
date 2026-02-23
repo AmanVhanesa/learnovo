@@ -2431,5 +2431,289 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
   }
 });
 
+// --- Class Promotion & Demotion Routes ---
+const StudentClassHistory = require('../models/StudentClassHistory');
+const classSequence = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+
+const getNextClass = (currentClass) => {
+  const index = classSequence.indexOf(currentClass);
+  if (index === -1) return null; // Unknown class
+  if (index === classSequence.length - 1) return 'GRADUATED';
+  return classSequence[index + 1];
+};
+
+const getPrevClass = (currentClass) => {
+  const index = classSequence.indexOf(currentClass);
+  if (index === -1) return null;
+  if (index === 0) return 'LOWEST';
+  return classSequence[index - 1];
+};
+
+// @desc    Get bulk promotion/demotion history for reports
+// @route   GET /api/students/promotions/report
+// @access  Private (Admin)
+router.get('/promotions/report', protect, authorize('admin', 'principal'), async (req, res) => {
+  try {
+    const { startDate, endDate, academicYear, actionType } = req.query;
+    const filter = { tenantId: req.user.tenantId };
+
+    if (academicYear) filter.academicYear = academicYear;
+    if (actionType) filter.actionType = actionType;
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate);
+      if (endDate) {
+        const eDate = new Date(endDate);
+        eDate.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = eDate;
+      }
+    }
+
+    const history = await StudentClassHistory.find(filter)
+      .populate('studentId', 'name fullName admissionNumber')
+      .populate('performedBy', 'name fullName')
+      .sort({ createdAt: -1 })
+      .limit(1000); // Reasonable limit for now
+
+    res.json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    console.error('Get promotions report error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching promotion report' });
+  }
+});
+
+// @desc    Get student class history
+// @route   GET /api/students/:id/class-history
+// @access  Private
+router.get('/:id/class-history', protect, authorize('admin', 'teacher'), async (req, res) => {
+  try {
+    const history = await StudentClassHistory.find({
+      studentId: req.params.id,
+      tenantId: req.user.tenantId
+    })
+      .populate('performedBy', 'name fullName')
+      .sort({ createdAt: -1 });
+
+    const student = await User.findOne({ _id: req.params.id, tenantId: req.user.tenantId })
+      .select('admissionClass');
+
+    res.json({
+      success: true,
+      data: history,
+      admissionClass: student?.admissionClass || 'N/A'
+    });
+  } catch (error) {
+    console.error('Get class history error:', error);
+    res.status(500).json({ success: false, message: 'Server error fetching class history' });
+  }
+});
+
+// @desc    Promote individual student
+// @route   POST /api/students/:id/promote
+// @access  Private (Admin)
+router.post('/:id/promote', protect, authorize('admin', 'principal'), async (req, res) => {
+  try {
+    const { toClass, toSection, academicYear, remarks, forceOverride } = req.body;
+    const student = await User.findOne({ _id: req.params.id, tenantId: req.user.tenantId, role: 'student' });
+
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+
+    // Check if duplicate promotion this year unless overridden
+    if (!forceOverride) {
+      const existingAction = await StudentClassHistory.findOne({
+        studentId: student._id,
+        academicYear,
+        actionType: 'promoted',
+        tenantId: req.user.tenantId
+      });
+      if (existingAction) {
+        return res.status(400).json({ success: false, message: 'Student already promoted this academic year', requiresOverride: true });
+      }
+    }
+
+    // Set admission class if missing and this is their first move
+    if (!student.admissionClass) {
+      student.admissionClass = student.class;
+      student.admissionSection = student.section;
+    }
+
+    const fromClass = student.class;
+    const fromSection = student.section;
+
+    student.class = toClass;
+    if (toSection) student.section = toSection;
+    student.academicYear = academicYear;
+
+    // Lookup Class ID if class model changes are needed later (Optional but good practice)
+    const classDoc = await Class.findOne({ grade: toClass, tenantId: req.user.tenantId });
+    if (classDoc) student.classId = classDoc._id;
+
+    await student.save();
+
+    const history = await StudentClassHistory.create({
+      tenantId: req.user.tenantId,
+      studentId: student._id,
+      fromClass,
+      fromSection,
+      toClass,
+      toSection: student.section,
+      academicYear,
+      actionType: 'promoted',
+      performedBy: req.user._id,
+      remarks: remarks || `Promoted to ${toClass}`
+    });
+
+    res.json({ success: true, message: 'Student promoted successfully', data: student });
+  } catch (error) {
+    console.error('Promote student error:', error);
+    res.status(500).json({ success: false, message: 'Server error during promotion' });
+  }
+});
+
+// @desc    Demote individual student
+// @route   POST /api/students/:id/demote
+// @access  Private (Admin)
+router.post('/:id/demote', protect, authorize('admin', 'principal'), async (req, res) => {
+  try {
+    const { toClass, toSection, academicYear, remarks, forceOverride } = req.body;
+    const student = await User.findOne({ _id: req.params.id, tenantId: req.user.tenantId, role: 'student' });
+
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+
+    if (!forceOverride) {
+      const existingAction = await StudentClassHistory.findOne({
+        studentId: student._id,
+        academicYear,
+        actionType: 'demoted',
+        tenantId: req.user.tenantId
+      });
+      if (existingAction) {
+        return res.status(400).json({ success: false, message: 'Student already demoted this academic year', requiresOverride: true });
+      }
+    }
+
+    if (!student.admissionClass) {
+      student.admissionClass = student.class;
+      student.admissionSection = student.section;
+    }
+
+    const fromClass = student.class;
+    const fromSection = student.section;
+
+    student.class = toClass;
+    if (toSection) student.section = toSection;
+    student.academicYear = academicYear;
+
+    const classDoc = await Class.findOne({ grade: toClass, tenantId: req.user.tenantId });
+    if (classDoc) student.classId = classDoc._id;
+
+    await student.save();
+
+    await StudentClassHistory.create({
+      tenantId: req.user.tenantId,
+      studentId: student._id,
+      fromClass,
+      fromSection,
+      toClass,
+      toSection: student.section,
+      academicYear,
+      actionType: 'demoted',
+      performedBy: req.user._id,
+      remarks: remarks || `Demoted to ${toClass}`
+    });
+
+    res.json({ success: true, message: 'Student demoted successfully', data: student });
+  } catch (error) {
+    console.error('Demote student error:', error);
+    res.status(500).json({ success: false, message: 'Server error during demotion' });
+  }
+});
+
+// @desc    Bulk Promote/Demote Operations
+// @route   POST /api/students/bulk-class-action
+// @access  Private (Admin)
+router.post('/bulk-class-action', protect, authorize('admin', 'principal'), async (req, res) => {
+  try {
+    const { studentIds, actionType, toClass, toSection, academicYear, remarks, forceOverride } = req.body;
+
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'No students selected' });
+    }
+
+    const students = await User.find({
+      _id: { $in: studentIds },
+      tenantId: req.user.tenantId,
+      role: 'student'
+    });
+
+    const classDoc = await Class.findOne({ grade: toClass, tenantId: req.user.tenantId });
+
+    let successCount = 0;
+    let errors = [];
+
+    for (const student of students) {
+      try {
+        if (!forceOverride) {
+          const existingAction = await StudentClassHistory.findOne({
+            studentId: student._id,
+            academicYear,
+            actionType,
+            tenantId: req.user.tenantId
+          });
+          if (existingAction) {
+            errors.push(`${student.fullName} was already ${actionType} this year.`);
+            continue;
+          }
+        }
+
+        if (!student.admissionClass) {
+          student.admissionClass = student.class;
+          student.admissionSection = student.section;
+        }
+
+        const fromClass = student.class;
+        const fromSection = student.section;
+
+        student.class = toClass;
+        if (toSection) student.section = toSection;
+        student.academicYear = academicYear;
+        if (classDoc) student.classId = classDoc._id;
+
+        await student.save();
+
+        await StudentClassHistory.create({
+          tenantId: req.user.tenantId,
+          studentId: student._id,
+          fromClass,
+          fromSection,
+          toClass,
+          toSection: student.section,
+          academicYear,
+          actionType,
+          performedBy: req.user._id,
+          remarks: remarks || `Bulk ${actionType} to ${toClass}`
+        });
+
+        successCount++;
+      } catch (err) {
+        errors.push(`Failed for ${student.name || student.fullName}: ${err.message}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully ${actionType} ${successCount} students.`,
+      successCount,
+      errors
+    });
+  } catch (error) {
+    console.error('Bulk class action error:', error);
+    res.status(500).json({ success: false, message: 'Server error during bulk operation' });
+  }
+});
+
 module.exports = router;
 

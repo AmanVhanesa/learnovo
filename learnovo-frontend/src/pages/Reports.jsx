@@ -5,7 +5,11 @@ import {
   Clock, FileText, UserPlus, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
 import api from '../services/authService'
+import { studentsService } from '../services/studentsService'
+import { exportPDF } from '../utils/exportHelpers'
+import toast from 'react-hot-toast'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0)
@@ -69,15 +73,17 @@ const ActivityIcon = ({ type }) => {
 // ─── Main component ────────────────────────────────────────────────────────────
 const Reports = () => {
   const { user } = useAuth()
+  const { settings } = useSettings()
   const isAdmin = user?.role === 'admin'
 
   const [activeTab, setActiveTab] = useState('overview')
   const [dashboard, setDashboard] = useState(null)
   const [activities, setActivities] = useState([])
   const [attendanceReport, setAttendanceReport] = useState([])
+  const [promotionsReport, setPromotionsReport] = useState([])
   const [classes, setClasses] = useState([])
 
-  const [loading, setLoading] = useState({ dashboard: true, activities: false, attendance: false })
+  const [loading, setLoading] = useState({ dashboard: true, activities: false, attendance: false, promotions: false })
   const [error, setError] = useState({})
   const [actPage, setActPage] = useState(1)
   const [actTotal, setActTotal] = useState(0)
@@ -145,12 +151,31 @@ const Reports = () => {
     }
   }, [filters])
 
+  // ── fetch promotions report ──────────────────────────────────────────────────
+  const fetchPromotions = useCallback(async () => {
+    setLoading(l => ({ ...l, promotions: true }))
+    setError(e => ({ ...e, promotions: null }))
+    try {
+      const params = {}
+      if (filters.startDate) params.startDate = filters.startDate
+      if (filters.endDate) params.endDate = filters.endDate
+      const r = await studentsService.getPromotionsReport(params)
+      setPromotionsReport(r.data || [])
+    } catch (err) {
+      setError(e => ({ ...e, promotions: err.response?.data?.message || 'No promotion data found' }))
+      setPromotionsReport([])
+    } finally {
+      setLoading(l => ({ ...l, promotions: false }))
+    }
+  }, [filters])
+
   // ── initial load ─────────────────────────────────────────────────────────────
   useEffect(() => { fetchDashboard() }, [fetchDashboard])
   useEffect(() => {
     if (activeTab === 'activity') fetchActivities(1)
     if (activeTab === 'attendance') fetchAttendance()
-  }, [activeTab, fetchActivities, fetchAttendance])
+    if (activeTab === 'promotions') fetchPromotions()
+  }, [activeTab, fetchActivities, fetchAttendance, fetchPromotions])
 
   // ── tabs ─────────────────────────────────────────────────────────────────────
   const tabs = [
@@ -159,6 +184,7 @@ const Reports = () => {
     { id: 'fees', label: 'Fee Collection', icon: DollarSign },
     { id: 'attendance', label: 'Attendance', icon: Calendar },
     { id: 'activity', label: 'Activity Feed', icon: Activity },
+    { id: 'promotions', label: 'Class Actions', icon: RefreshCw },
   ]
 
   // ── export helpers ────────────────────────────────────────────────────────────
@@ -170,6 +196,26 @@ const Reports = () => {
     attendanceReport.map(r => ({ Student: r.studentName || r.name, Class: r.class, Present: r.presentDays, Absent: r.absentDays, Percentage: r.percentage })),
     'attendance-report.csv'
   )
+  const exportPromotions = async () => {
+    toast.loading('Generating Promotion PDF...', { id: 'promo-export' });
+    try {
+      const headers = ["Admission No", "Student Name", "Date", "Action", "From", "To", "Academic Year", "Performed By"];
+      const rows = promotionsReport.map(r => [
+        r.studentId?.admissionNumber || 'N/A',
+        r.studentId?.name || r.studentId?.fullName || 'N/A',
+        fmtDate(r.createdAt),
+        r.actionType,
+        `${r.fromClass || ''} ${r.fromSection || ''}`.trim(),
+        `${r.toClass || ''} ${r.toSection || ''}`.trim(),
+        r.academicYear,
+        r.performedBy?.name || r.performedBy?.fullName || 'System'
+      ]);
+      await exportPDF(`promotions_report_${todayStr}.pdf`, headers, rows, settings?.institution);
+      toast.success('Report exported!', { id: 'promo-export' });
+    } catch (err) {
+      toast.error('Export failed', { id: 'promo-export' });
+    }
+  }
   const exportEnrollment = () => {
     if (!dashboard?.enrollmentTrend) return
     const rows = dashboard.enrollmentTrend.labels.map((m, i) => ({ Month: m, Enrollments: dashboard.enrollmentTrend.data[i] }))
@@ -210,6 +256,7 @@ const Reports = () => {
           </button>
           {activeTab === 'activity' && <button onClick={exportActivities} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
           {activeTab === 'attendance' && <button onClick={exportAttendance} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
+          {activeTab === 'promotions' && <button onClick={exportPromotions} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export PDF</button>}
           {activeTab === 'enrollment' && <button onClick={exportEnrollment} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
           {activeTab === 'fees' && <button onClick={exportFees} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
         </div>
@@ -527,6 +574,72 @@ const Reports = () => {
                     </div>
                   </div>
                 </>
+              )}
+            </div>
+          )}
+
+          {/* ── PROMOTIONS ── */}
+          {activeTab === 'promotions' && (
+            <div className="space-y-4">
+              {/* Filters */}
+              <div className="flex flex-wrap gap-3 pb-4 border-b border-gray-100">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">From</label>
+                  <input type="date" value={filters.startDate} onChange={e => setFilters(f => ({ ...f, startDate: e.target.value }))} className="input text-sm h-9" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">To</label>
+                  <input type="date" value={filters.endDate} onChange={e => setFilters(f => ({ ...f, endDate: e.target.value }))} className="input text-sm h-9" />
+                </div>
+                <div className="flex items-end">
+                  <button onClick={fetchPromotions} className="btn btn-primary h-9 text-sm">Apply</button>
+                </div>
+              </div>
+
+              {loading.promotions ? (
+                <div className="py-16 flex justify-center"><RefreshCw className="h-6 w-6 animate-spin text-teal-500" /></div>
+              ) : error.promotions ? (
+                <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-4 text-sm text-yellow-700 flex gap-2 items-center">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {error.promotions}
+                </div>
+              ) : promotionsReport.length === 0 ? (
+                <div className="py-16 text-center text-gray-400 text-sm">
+                  <RefreshCw className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  No class action records found for the selected period.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-100">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+                      <tr>
+                        {['Date', 'Student', 'Action', 'From Class', 'To Class', 'A.Y', 'Performed By'].map(h => (
+                          <th key={h} className="px-4 py-3 text-left font-medium">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {promotionsReport.map((row, i) => (
+                        <tr key={row._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(row.createdAt)}</td>
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            {row.studentId?.name || row.studentId?.fullName || '—'}
+                            <span className="block text-xs text-gray-400 font-normal">{row.studentId?.admissionNumber}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full capitalize ${row.actionType === 'promoted' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              {row.actionType}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{row.fromClass} {row.fromSection && `(${row.fromSection})`}</td>
+                          <td className="px-4 py-3 text-gray-900 font-medium">{row.toClass} {row.toSection && `(${row.toSection})`}</td>
+                          <td className="px-4 py-3 text-gray-500">{row.academicYear}</td>
+                          <td className="px-4 py-3 text-gray-500 text-xs">{row.performedBy?.name || row.performedBy?.fullName || 'System'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}

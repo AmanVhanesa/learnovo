@@ -152,7 +152,7 @@ exports.previewCertificate = async (req, res) => {
  */
 exports.generateCertificate = async (req, res) => {
     try {
-        const { studentId, type, specificData } = req.body; // specificData allows overriding fields like 'leavingReason'
+        const { studentId, type, specificData, autoDeactivate } = req.body; // specificData allows overriding fields like 'leavingReason'
         const tenantId = req.user.tenantId;
 
         // 1. Re-validate (similar to preview)
@@ -196,6 +196,26 @@ exports.generateCertificate = async (req, res) => {
             issuedBy: req.user.id, // Assuming req.user is set
             contentSnapshot: finalData
         });
+
+        // 4.1. Auto-Deactivate Student logic if requested for TC
+        if (type === 'TC' && autoDeactivate) {
+            let parsedReason = specificData?.leavingReason || 'Transferred';
+            if (!['Graduated', 'Transferred', 'Withdrawn', 'Expelled', 'Other'].includes(parsedReason)) {
+                parsedReason = 'Other';
+            }
+
+            await User.updateOne(
+                { _id: studentId, tenantId },
+                {
+                    $set: {
+                        isActive: false,
+                        removalDate: new Date(),
+                        removalReason: parsedReason,
+                        removalNotes: `Auto-deactivated on TC generation (${certNumber})`
+                    }
+                }
+            );
+        }
 
         // 5. Get Template
         const template = await CertificateTemplate.findOne({ tenantId, type }) || { type };

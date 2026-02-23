@@ -13,6 +13,7 @@ const CertificateGeneration = () => {
     const [previewData, setPreviewData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [generating, setGenerating] = useState(false);
+    const [autoDeactivate, setAutoDeactivate] = useState(false);
 
     // Search State
     const [searchTerm, setSearchTerm] = useState('');
@@ -70,7 +71,8 @@ const CertificateGeneration = () => {
             const response = await certificateService.generateCertificate(
                 selectedStudent._id,
                 certType,
-                previewData // Sending back confirmed/edited data
+                previewData, // Sending back confirmed/edited data
+                autoDeactivate
             );
 
             // Create download link
@@ -263,6 +265,17 @@ const CertificateGeneration = () => {
                                                 value={previewData.remarks}
                                                 onChange={(e) => setPreviewData({ ...previewData, remarks: e.target.value })}
                                             />
+                                        </div>
+                                        <div className="col-span-2 mt-4">
+                                            <label className="flex items-center gap-2 cursor-pointer p-3 bg-red-50 border border-red-100 rounded-lg text-red-800">
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500"
+                                                    checked={autoDeactivate}
+                                                    onChange={(e) => setAutoDeactivate(e.target.checked)}
+                                                />
+                                                <span className="font-medium text-sm">Automatically deactivate student profile upon generation</span>
+                                            </label>
                                         </div>
                                     </>
                                 )}

@@ -11,6 +11,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
+import BulkPromotion from './pages/BulkPromotion'
 import StudentDetail from './pages/StudentDetail'
 import StudentLists from './pages/StudentLists'
 import Employees from './pages/Employees'
@@ -86,6 +87,7 @@ function App() {
                   <Route index element={<Navigate to="/app/dashboard" replace />} />
                   <Route path="dashboard" element={<Dashboard />} />
                   <Route path="students" element={<Students />} />
+                  <Route path="students/bulk-promote" element={<BulkPromotion />} />
                   <Route path="students/:id" element={<StudentDetail />} />
                   <Route path="student-lists" element={<StudentLists />} />
                   <Route path="employees" element={<Employees />} />

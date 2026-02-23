@@ -32,11 +32,11 @@ const certificateService = {
         return response.data;
     },
 
-    generateCertificate: async (studentId, type, specificData) => {
+    generateCertificate: async (studentId, type, specificData, autoDeactivate = false) => {
         // Response type blob for file download
         const token = localStorage.getItem('token');
         const response = await axios.post(`${API_URL}/certificates/generate`,
-            { studentId, type, specificData },
+            { studentId, type, specificData, autoDeactivate },
             {
                 headers: {
                     'Content-Type': 'application/json',
