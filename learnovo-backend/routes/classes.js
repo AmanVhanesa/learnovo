@@ -23,9 +23,19 @@ router.get('/', protect, async (req, res) => {
 
     // For teachers, only show classes they are assigned to
     if (req.user.role === 'teacher') {
+      // Find sections where the teacher is assigned
+      const assignedSections = await Section.find({
+        tenantId: req.user.tenantId,
+        sectionTeacher: req.user._id,
+        isActive: true
+      }).select('classId');
+
+      const classIdsFromSections = assignedSections.map(s => s.classId);
+
       filter.$or = [
         { classTeacher: req.user._id },
-        { 'subjects.teacher': req.user._id }
+        { 'subjects.teacher': req.user._id },
+        { _id: { $in: classIdsFromSections } }
       ];
     }
 
