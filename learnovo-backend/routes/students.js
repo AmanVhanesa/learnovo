@@ -60,6 +60,14 @@ router.get('/', protect, authorize('admin', 'teacher'), [
           ]
         }).select('name');
 
+        // 3. Fetch Section Model Assignments (Section Teacher)
+        const Section = require('../models/Section');
+        const sectionAssignments = await Section.find({
+          tenantId: req.user.tenantId,
+          sectionTeacher: req.user._id,
+          isActive: true
+        }).select('name classId');
+
         const criteria = [];
 
         // Add legacy classes
@@ -73,6 +81,20 @@ router.get('/', protect, authorize('admin', 'teacher'), [
           criteria.push({ class: { $in: classNames } });
           // Also try matching by ID if students have classId populated
           criteria.push({ classId: { $in: classAssignments.map(c => c._id) } });
+        }
+
+        // Add sections from Section model assignments
+        if (sectionAssignments.length > 0) {
+          const sectionNames = sectionAssignments.map(s => s.name);
+          const sectionIds = sectionAssignments.map(s => s._id);
+          const relatedClassIds = sectionAssignments.map(s => s.classId);
+
+          criteria.push({
+            $or: [
+              { sectionId: { $in: sectionIds } },
+              { section: { $in: sectionNames }, classId: { $in: relatedClassIds } }
+            ]
+          });
         }
 
         assignments.forEach(a => {
@@ -1062,10 +1084,54 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
       try {
         const legacyClasses = Array.isArray(req.user.assignedClasses) ? req.user.assignedClasses : [];
         const assignmentQuery = { teacherId: req.user._id, tenantId: req.user.tenantId, isActive: true };
+
+        // 1. Fetch TeacherSubjectAssignment
         const assignments = await TeacherSubjectAssignment.find(assignmentQuery);
 
+        // 2. Fetch Class Model Assignments
+        const classAssignments = await Class.find({
+          tenantId: req.user.tenantId,
+          $or: [
+            { classTeacher: req.user._id },
+            { 'subjects.teacher': req.user._id }
+          ]
+        }).select('name');
+
+        // 3. Fetch Section Model Assignments
+        const Section = require('../models/Section');
+        const sectionAssignments = await Section.find({
+          tenantId: req.user.tenantId,
+          sectionTeacher: req.user._id,
+          isActive: true
+        }).select('name classId');
+
         const criteria = [];
-        if (legacyClasses.length > 0) criteria.push({ class: { $in: legacyClasses } });
+
+        // Add legacy classes
+        if (legacyClasses.length > 0) {
+          criteria.push({ class: { $in: legacyClasses } });
+        }
+
+        // Add class assignments
+        if (classAssignments.length > 0) {
+          const classNames = classAssignments.map(c => c.name);
+          criteria.push({ class: { $in: classNames } });
+          criteria.push({ classId: { $in: classAssignments.map(c => c._id) } });
+        }
+
+        // Add section assignments
+        if (sectionAssignments.length > 0) {
+          const sectionNames = sectionAssignments.map(s => s.name);
+          const sectionIds = sectionAssignments.map(s => s._id);
+          const relatedClassIds = sectionAssignments.map(s => s.classId);
+
+          criteria.push({
+            $or: [
+              { sectionId: { $in: sectionIds } },
+              { section: { $in: sectionNames }, classId: { $in: relatedClassIds } }
+            ]
+          });
+        }
 
         assignments.forEach(a => {
           const clause = { classId: a.classId };
