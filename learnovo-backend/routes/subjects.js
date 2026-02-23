@@ -5,7 +5,7 @@ const { protect, authorize } = require('../middleware/auth');
 const Subject = require('../models/Subject');
 
 // Get all subjects
-router.get('/', protect, async(req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const { isActive } = req.query;
     const filter = {};
@@ -30,7 +30,7 @@ router.get('/', protect, async(req, res) => {
 });
 
 // Get a specific subject
-router.get('/:id', protect, async(req, res) => {
+router.get('/:id', protect, async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
 
@@ -61,7 +61,7 @@ router.post('/', [
   body('name').notEmpty().withMessage('Subject name is required'),
   body('subjectCode').notEmpty().withMessage('Subject code is required'),
   body('description').optional().isString().withMessage('Description must be a string')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -72,10 +72,10 @@ router.post('/', [
       });
     }
 
-    const { name, subjectCode, description } = req.body;
+    const { name, subjectCode, description, type, maxMarks, passingMarks } = req.body;
 
-    // Check if subject code already exists
-    const existingSubject = await Subject.findOne({ subjectCode });
+    // Check if subject code already exists within this tenant
+    const existingSubject = await Subject.findOne({ subjectCode, tenantId: req.user.tenantId });
     if (existingSubject) {
       return res.status(400).json({
         success: false,
@@ -84,8 +84,12 @@ router.post('/', [
     }
 
     const newSubject = new Subject({
+      tenantId: req.user.tenantId, // Mandatory for multi-tenant
       name,
-      subjectCode: subjectCode.toUpperCase(),
+      subjectCode: subjectCode ? subjectCode.toUpperCase() : undefined,
+      type: type || 'Theory',
+      maxMarks: maxMarks !== undefined ? maxMarks : 100,
+      passingMarks: passingMarks !== undefined ? passingMarks : 33,
       description
     });
 
@@ -112,7 +116,7 @@ router.put('/:id', [
   body('name').optional().notEmpty().withMessage('Subject name cannot be empty'),
   body('subjectCode').optional().notEmpty().withMessage('Subject code cannot be empty'),
   body('description').optional().isString().withMessage('Description must be a string')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -123,14 +127,15 @@ router.put('/:id', [
       });
     }
 
-    const { name, subjectCode, description } = req.body;
+    const { name, subjectCode, description, type, maxMarks, passingMarks } = req.body;
     const updates = {};
 
     if (name) updates.name = name;
     if (subjectCode) {
-      // Check if new subject code already exists (excluding current subject)
+      // Check if new subject code already exists (excluding current subject, within same tenant)
       const existingSubject = await Subject.findOne({
         subjectCode: subjectCode.toUpperCase(),
+        tenantId: req.user.tenantId,
         _id: { $ne: req.params.id }
       });
       if (existingSubject) {
@@ -142,6 +147,10 @@ router.put('/:id', [
       updates.subjectCode = subjectCode.toUpperCase();
     }
     if (description !== undefined) updates.description = description;
+
+    if (type) updates.type = type;
+    if (maxMarks !== undefined) updates.maxMarks = maxMarks;
+    if (passingMarks !== undefined) updates.passingMarks = passingMarks;
 
     const updatedSubject = await Subject.findByIdAndUpdate(
       req.params.id,
@@ -171,7 +180,7 @@ router.put('/:id', [
 });
 
 // Delete a subject
-router.delete('/:id', [protect, authorize('admin')], async(req, res) => {
+router.delete('/:id', [protect, authorize('admin')], async (req, res) => {
   try {
     const deletedSubject = await Subject.findByIdAndDelete(req.params.id);
 
@@ -196,7 +205,7 @@ router.delete('/:id', [protect, authorize('admin')], async(req, res) => {
 });
 
 // Toggle subject active status
-router.patch('/:id/toggle', [protect, authorize('admin')], async(req, res) => {
+router.patch('/:id/toggle', [protect, authorize('admin')], async (req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
 
