@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { DollarSign, TrendingUp, AlertCircle, Calendar, Users, FileText, Search, X, Plus, Receipt, Settings, Printer, History, Edit, Trash2 } from 'lucide-react'
+import { DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar, Users, FileText, Search, X, Plus, Receipt, Settings, Printer, History, Edit, Trash2 } from 'lucide-react'
 import { feesReportsService, invoicesService, paymentsService, feeStructuresService } from '../services/feesService'
 import { studentsService } from '../services/studentsService'
 import { academicSessionsService, classesService } from '../services/academicsService'
@@ -1599,8 +1599,8 @@ const FeesFinance = () => {
                                                                 <button
                                                                     onClick={() => setResolveForm(f => ({ ...f, action: 'APPROVE' }))}
                                                                     className={`flex-1 py-2 text-sm font-medium rounded-lg border-2 transition-colors ${resolveForm.action === 'APPROVE'
-                                                                            ? 'border-green-500 bg-green-50 text-green-700'
-                                                                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                                                                        ? 'border-green-500 bg-green-50 text-green-700'
+                                                                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
                                                                         }`}
                                                                 >
                                                                     ✓ Approve
@@ -1608,8 +1608,8 @@ const FeesFinance = () => {
                                                                 <button
                                                                     onClick={() => setResolveForm(f => ({ ...f, action: 'REJECT' }))}
                                                                     className={`flex-1 py-2 text-sm font-medium rounded-lg border-2 transition-colors ${resolveForm.action === 'REJECT'
-                                                                            ? 'border-red-500 bg-red-50 text-red-700'
-                                                                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                                                                        ? 'border-red-500 bg-red-50 text-red-700'
+                                                                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
                                                                         }`}
                                                                 >
                                                                     ✗ Reject
