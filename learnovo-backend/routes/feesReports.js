@@ -92,7 +92,7 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async (req, 
             isConfirmed: true,
             isReversed: false
         })
-            .populate('studentId', 'name studentId')
+            .populate('studentId', 'name fullName studentId admissionNumber')
             .populate('invoiceId', 'invoiceNumber')
             .populate('collectedBy', 'name')
             .sort({ paymentDate: -1 })

@@ -55,6 +55,12 @@ const FeesFinance = () => {
         endDate: ''
     })
 
+    // Disputes tab state
+    const [disputesData, setDisputesData] = useState({ disputes: [], stuckPayments: [] })
+    const [disputesLoading, setDisputesLoading] = useState(false)
+    const [resolvingDispute, setResolvingDispute] = useState(null)
+    const [resolveForm, setResolveForm] = useState({ action: 'APPROVE', note: '' })
+
     useEffect(() => {
         fetchActiveSession()
     }, [])
@@ -75,6 +81,8 @@ const FeesFinance = () => {
                 fetchCollectionReport()
             } else if (activeTab === 'receipts') {
                 fetchReceipts({})
+            } else if (activeTab === 'disputes') {
+                fetchDisputes()
             }
         }
     }, [activeTab, activeSession])
@@ -191,6 +199,57 @@ const FeesFinance = () => {
             setAllReceipts([])
         } finally {
             setReceiptsLoading(false)
+        }
+    }
+
+    const fetchDisputes = async () => {
+        setDisputesLoading(true)
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`${API_BASE}/admin-disputes`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            const json = await res.json()
+            if (json.success) {
+                setDisputesData(json.data)
+            }
+        } catch (error) {
+            console.error('Fetch disputes error:', error)
+        } finally {
+            setDisputesLoading(false)
+        }
+    }
+
+    const handleResolveDispute = async (disputeId) => {
+        if (!resolveForm.note.trim()) {
+            toast.error('Please add a note before resolving')
+            return
+        }
+        try {
+            const token = localStorage.getItem('token')
+            const res = await fetch(`${API_BASE}/admin-disputes/${disputeId}/resolve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    resolutionAction: resolveForm.action,
+                    adminNote: resolveForm.note
+                })
+            })
+            const json = await res.json()
+            if (json.success) {
+                toast.success(`Dispute ${resolveForm.action === 'APPROVE' ? 'approved' : 'rejected'} successfully`)
+                setResolvingDispute(null)
+                setResolveForm({ action: 'APPROVE', note: '' })
+                fetchDisputes()
+            } else {
+                toast.error(json.message || 'Failed to resolve dispute')
+            }
+        } catch (error) {
+            console.error('Resolve dispute error:', error)
+            toast.error('Failed to resolve dispute')
         }
     }
 
@@ -649,6 +708,7 @@ const FeesFinance = () => {
         { id: 'collect', label: 'Collect Payment', icon: DollarSign },
         { id: 'defaulters', label: 'Defaulters', icon: AlertCircle },
         { id: 'receipts', label: 'Receipts', icon: FileText },
+        { id: 'disputes', label: 'Disputes & Alerts', icon: AlertTriangle },
         { id: 'reports', label: 'Reports', icon: History }
     ]
 
@@ -791,8 +851,12 @@ const FeesFinance = () => {
                                                         {payment.receiptNumber}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-medium text-gray-900">{payment.studentId?.name}</div>
-                                                        <div className="text-xs text-gray-500">{payment.studentId?.studentId}</div>
+                                                        <div className="text-sm font-medium text-gray-900">
+                                                            {payment.studentId?.name || payment.studentId?.fullName || 'N/A'}
+                                                        </div>
+                                                        <div className="text-xs text-gray-500">
+                                                            {payment.studentId?.admissionNumber || payment.studentId?.studentId || ''}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
                                                         {formatCurrency(payment.amount)}
@@ -1403,6 +1467,184 @@ const FeesFinance = () => {
                                 </div>
                             )}
                         </div>
+                    </div>
+                )}
+
+                {/* DISPUTES & ALERTS TAB */}
+                {activeTab === 'disputes' && (
+                    <div className="space-y-6">
+                        {disputesLoading ? (
+                            <div className="flex justify-center py-12">
+                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600" />
+                            </div>
+                        ) : (
+                            <>
+                                {/* Stuck Payments Alert */}
+                                {disputesData.stuckPayments?.length > 0 && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-amber-900">Stuck Payments ({disputesData.stuckPayments.length})</h3>
+                                                <p className="text-xs text-amber-700 mt-0.5">These payments have been PENDING for more than 1 hour and may need attention.</p>
+                                            </div>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="text-left text-xs font-medium text-amber-800 uppercase tracking-wide border-b border-amber-200">
+                                                        <th className="pb-2 pr-4">Student</th>
+                                                        <th className="pb-2 pr-4">Invoice</th>
+                                                        <th className="pb-2 pr-4">Amount</th>
+                                                        <th className="pb-2">Since</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-amber-100">
+                                                    {disputesData.stuckPayments.map(p => (
+                                                        <tr key={p._id} className="py-2">
+                                                            <td className="py-2 pr-4 font-medium text-gray-900">
+                                                                {p.studentId?.fullName || p.studentId?.name || 'N/A'}
+                                                            </td>
+                                                            <td className="py-2 pr-4 text-gray-600">
+                                                                {p.invoiceId?.invoiceNumber || '-'}
+                                                            </td>
+                                                            <td className="py-2 pr-4 text-gray-800 font-mono">
+                                                                {formatCurrency(p.amount)}
+                                                            </td>
+                                                            <td className="py-2 text-gray-500 text-xs">
+                                                                {new Date(p.createdAt).toLocaleString('en-IN')}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Active Disputes */}
+                                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <AlertCircle className="h-5 w-5 text-red-500" />
+                                            <h3 className="font-semibold text-gray-900">Active Disputes</h3>
+                                            {disputesData.disputes?.length > 0 && (
+                                                <span className="ml-1 px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded-full">
+                                                    {disputesData.disputes.length}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={fetchDisputes}
+                                            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                                        >
+                                            Refresh
+                                        </button>
+                                    </div>
+
+                                    {disputesData.disputes?.length === 0 ? (
+                                        <div className="text-center py-16">
+                                            <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            </div>
+                                            <p className="text-gray-600 font-medium">No active disputes</p>
+                                            <p className="text-sm text-gray-400 mt-1">All payment disputes have been resolved</p>
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-gray-100">
+                                            {disputesData.disputes.map(dispute => (
+                                                <div key={dispute._id} className="px-6 py-5">
+                                                    <div className="flex items-start justify-between gap-4">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="font-semibold text-gray-900">
+                                                                    {dispute.studentId?.fullName || dispute.studentId?.name || 'N/A'}
+                                                                </span>
+                                                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${dispute.status === 'RAISED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                                                    }`}>
+                                                                    {dispute.status}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-sm text-gray-600 mt-1">
+                                                                Invoice: <span className="font-mono font-medium">{dispute.invoiceId?.invoiceNumber || '-'}</span>
+                                                                {dispute.invoiceId?.totalAmount && (
+                                                                    <> · {formatCurrency(dispute.invoiceId.totalAmount)}</>
+                                                                )}
+                                                            </p>
+                                                            {dispute.reason && (
+                                                                <p className="text-sm text-gray-500 mt-1 italic">"{dispute.reason}"</p>
+                                                            )}
+                                                            <p className="text-xs text-gray-400 mt-1">
+                                                                Raised {new Date(dispute.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            </p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                setResolvingDispute(dispute._id)
+                                                                setResolveForm({ action: 'APPROVE', note: '' })
+                                                            }}
+                                                            className="flex-shrink-0 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+                                                        >
+                                                            Resolve
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Inline resolve form */}
+                                                    {resolvingDispute === dispute._id && (
+                                                        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                                            <p className="text-sm font-medium text-gray-700 mb-3">Resolve Dispute</p>
+                                                            <div className="flex gap-3 mb-3">
+                                                                <button
+                                                                    onClick={() => setResolveForm(f => ({ ...f, action: 'APPROVE' }))}
+                                                                    className={`flex-1 py-2 text-sm font-medium rounded-lg border-2 transition-colors ${resolveForm.action === 'APPROVE'
+                                                                            ? 'border-green-500 bg-green-50 text-green-700'
+                                                                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                                                                        }`}
+                                                                >
+                                                                    ✓ Approve
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setResolveForm(f => ({ ...f, action: 'REJECT' }))}
+                                                                    className={`flex-1 py-2 text-sm font-medium rounded-lg border-2 transition-colors ${resolveForm.action === 'REJECT'
+                                                                            ? 'border-red-500 bg-red-50 text-red-700'
+                                                                            : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                                                                        }`}
+                                                                >
+                                                                    ✗ Reject
+                                                                </button>
+                                                            </div>
+                                                            <textarea
+                                                                value={resolveForm.note}
+                                                                onChange={e => setResolveForm(f => ({ ...f, note: e.target.value }))}
+                                                                placeholder="Admin note (required)..."
+                                                                rows={2}
+                                                                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                                                            />
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button
+                                                                    onClick={() => setResolvingDispute(null)}
+                                                                    className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleResolveDispute(dispute._id)}
+                                                                    className="px-4 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg"
+                                                                >
+                                                                    Confirm
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 
