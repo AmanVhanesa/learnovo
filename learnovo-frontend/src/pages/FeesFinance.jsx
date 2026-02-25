@@ -809,19 +809,17 @@ const FeesFinance = () => {
                                                         <div className="flex justify-end items-center gap-3">
                                                             <button
                                                                 onClick={() => handleViewReceipt(payment._id)}
-                                                                className="text-blue-600 hover:text-blue-900 inline-flex items-center gap-1 text-xs font-medium"
+                                                                className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
                                                                 title="View Receipt"
                                                             >
                                                                 <FileText className="h-4 w-4" />
-                                                                View
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDownloadReceipt(payment._id)}
-                                                                className="text-green-600 hover:text-green-900 inline-flex items-center gap-1 text-xs font-medium"
+                                                                className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
                                                                 title="Download Receipt"
                                                             >
                                                                 <Printer className="h-4 w-4" />
-                                                                Download
                                                             </button>
                                                         </div>
                                                     </td>
@@ -1374,19 +1372,17 @@ const FeesFinance = () => {
                                                         <div className="flex justify-end items-center gap-3">
                                                             <button
                                                                 onClick={() => handleViewReceipt(payment._id)}
-                                                                className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 text-xs font-semibold"
+                                                                className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
                                                                 title="View Receipt"
                                                             >
                                                                 <FileText className="h-3.5 w-3.5" />
-                                                                View
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDownloadReceipt(payment._id)}
-                                                                className="text-green-600 hover:text-green-800 inline-flex items-center gap-1 text-xs font-semibold"
+                                                                className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
                                                                 title="Download Receipt"
                                                             >
                                                                 <Printer className="h-3.5 w-3.5" />
-                                                                Download
                                                             </button>
                                                         </div>
                                                     </td>
