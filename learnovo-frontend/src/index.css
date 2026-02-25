@@ -70,6 +70,50 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  /*
+   * iOS Safari auto-zoom fix:
+   * Safari zooms in when a focused input has font-size < 16px.
+   * Force minimum 16px on all touch/mobile screens so the page
+   * never zooms on focus — the single biggest cause of the
+   * "page looks zoomed after refresh" issue on iPhone/iPad.
+   */
+  @media screen and (max-width: 768px) {
+
+    input,
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="week"],
+    input[type="time"],
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Prevent rubber-band overscroll causing layout shift on iOS */
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    /* prevent iOS text inflation */
+    text-size-adjust: 100%;
+  }
+
+  /* Safe-area insets for notched iPhones/iPads (paired with viewport-fit=cover) */
+  .safe-area-wrapper {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
 }
 
 @layer components {

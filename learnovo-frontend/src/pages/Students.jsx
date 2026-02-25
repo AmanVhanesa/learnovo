@@ -373,7 +373,7 @@ const Students = () => {
           {user?.role === 'admin' && (
             <>
               <button
-                className="btn btn-outline border-green-200 text-green-700 hover:bg-green-50"
+                className="btn btn-outline text-gray-700"
                 onClick={() => navigate('/app/students/bulk-promote')}
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
