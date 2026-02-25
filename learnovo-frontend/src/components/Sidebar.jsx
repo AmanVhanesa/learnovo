@@ -9,6 +9,7 @@ import {
   CreditCard,
   UserPlus,
   BarChart3,
+  Settings,
   Bell,
   LogOut,
   X,
