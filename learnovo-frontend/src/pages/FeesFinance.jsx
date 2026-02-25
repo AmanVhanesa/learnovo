@@ -1237,7 +1237,11 @@ const FeesFinance = () => {
                                             type="text"
                                             placeholder="Search..."
                                             value={receiptFilters.search}
-                                            onChange={e => setReceiptFilters(f => ({ ...f, search: e.target.value }))}
+                                            onChange={e => {
+                                                const updated = { ...receiptFilters, search: e.target.value }
+                                                setReceiptFilters(updated)
+                                                fetchReceipts(updated)
+                                            }}
                                             className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
                                         />
                                     </div>
@@ -1248,7 +1252,11 @@ const FeesFinance = () => {
                                     <label className="block text-xs font-medium text-gray-600 mb-1">Payment Method</label>
                                     <select
                                         value={receiptFilters.paymentMethod}
-                                        onChange={e => setReceiptFilters(f => ({ ...f, paymentMethod: e.target.value }))}
+                                        onChange={e => {
+                                            const updated = { ...receiptFilters, paymentMethod: e.target.value }
+                                            setReceiptFilters(updated)
+                                            fetchReceipts(updated)
+                                        }}
                                         className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
                                     >
                                         <option value="">All Methods</option>
@@ -1267,7 +1275,11 @@ const FeesFinance = () => {
                                     <input
                                         type="date"
                                         value={receiptFilters.startDate}
-                                        onChange={e => setReceiptFilters(f => ({ ...f, startDate: e.target.value }))}
+                                        onChange={e => {
+                                            const updated = { ...receiptFilters, startDate: e.target.value }
+                                            setReceiptFilters(updated)
+                                            fetchReceipts(updated)
+                                        }}
                                         className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
                                     />
                                 </div>
@@ -1278,26 +1290,24 @@ const FeesFinance = () => {
                                     <input
                                         type="date"
                                         value={receiptFilters.endDate}
-                                        onChange={e => setReceiptFilters(f => ({ ...f, endDate: e.target.value }))}
+                                        onChange={e => {
+                                            const updated = { ...receiptFilters, endDate: e.target.value }
+                                            setReceiptFilters(updated)
+                                            fetchReceipts(updated)
+                                        }}
                                         className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
                                     />
                                 </div>
 
-                                {/* Apply / Clear */}
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => fetchReceipts(receiptFilters)}
-                                        className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
-                                    >
-                                        Apply
-                                    </button>
+                                {/* Clear */}
+                                <div>
                                     <button
                                         onClick={() => {
                                             const cleared = { search: '', paymentMethod: '', startDate: '', endDate: '' }
                                             setReceiptFilters(cleared)
                                             fetchReceipts(cleared)
                                         }}
-                                        className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
+                                        className="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
                                     >
                                         <X className="h-3.5 w-3.5" /> Clear
                                     </button>
