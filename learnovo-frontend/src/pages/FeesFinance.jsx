@@ -45,6 +45,16 @@ const FeesFinance = () => {
     // Reports state
     const [collectionReport, setCollectionReport] = useState(null)
 
+    // Receipts tab state
+    const [allReceipts, setAllReceipts] = useState([])
+    const [receiptsLoading, setReceiptsLoading] = useState(false)
+    const [receiptFilters, setReceiptFilters] = useState({
+        search: '',
+        paymentMethod: '',
+        startDate: '',
+        endDate: ''
+    })
+
     useEffect(() => {
         fetchActiveSession()
     }, [])
@@ -63,6 +73,8 @@ const FeesFinance = () => {
                 fetchDefaulters()
             } else if (activeTab === 'reports') {
                 fetchCollectionReport()
+            } else if (activeTab === 'receipts') {
+                fetchReceipts({})
             }
         }
     }, [activeTab, activeSession])
@@ -150,6 +162,35 @@ const FeesFinance = () => {
                 summary: { totalAmount: 0, totalCount: 0 },
                 byDate: []
             })
+        }
+    }
+
+    const fetchReceipts = async (filters = {}) => {
+        setReceiptsLoading(true)
+        try {
+            const params = {}
+            if (filters.paymentMethod) params.paymentMethod = filters.paymentMethod
+            if (filters.startDate) params.startDate = filters.startDate
+            if (filters.endDate) params.endDate = filters.endDate
+            const res = await paymentsService.list(params)
+            let data = res.data || []
+            // Client-side text search across student name, receipt number, admission number
+            if (filters.search) {
+                const q = filters.search.toLowerCase()
+                data = data.filter(p =>
+                    (p.studentId?.name || '').toLowerCase().includes(q) ||
+                    (p.studentId?.fullName || '').toLowerCase().includes(q) ||
+                    (p.receiptNumber || '').toLowerCase().includes(q) ||
+                    (p.studentId?.admissionNumber || '').toLowerCase().includes(q) ||
+                    (p.studentId?.studentId || '').toLowerCase().includes(q)
+                )
+            }
+            setAllReceipts(data)
+        } catch (error) {
+            console.error('Fetch receipts error:', error)
+            setAllReceipts([])
+        } finally {
+            setReceiptsLoading(false)
         }
     }
 
@@ -607,7 +648,8 @@ const FeesFinance = () => {
         { id: 'invoices', label: 'Generate Invoices', icon: Receipt },
         { id: 'collect', label: 'Collect Payment', icon: DollarSign },
         { id: 'defaulters', label: 'Defaulters', icon: AlertCircle },
-        { id: 'reports', label: 'Reports', icon: FileText }
+        { id: 'receipts', label: 'Receipts', icon: FileText },
+        { id: 'reports', label: 'Reports', icon: History }
     ]
 
     if (isLoading) {
@@ -1179,6 +1221,182 @@ const FeesFinance = () => {
                                 </table>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* RECEIPTS TAB */}
+                {activeTab === 'receipts' && (
+                    <div className="space-y-4">
+                        {/* Filter Bar */}
+                        <div className="bg-white rounded-lg shadow-sm p-4">
+                            <div className="flex flex-wrap gap-3 items-end">
+                                {/* Search */}
+                                <div className="flex-1 min-w-[200px]">
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Search (name / receipt no. / adm. no.)</label>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search..."
+                                            value={receiptFilters.search}
+                                            onChange={e => setReceiptFilters(f => ({ ...f, search: e.target.value }))}
+                                            className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Payment Method */}
+                                <div className="min-w-[150px]">
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Payment Method</label>
+                                    <select
+                                        value={receiptFilters.paymentMethod}
+                                        onChange={e => setReceiptFilters(f => ({ ...f, paymentMethod: e.target.value }))}
+                                        className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                    >
+                                        <option value="">All Methods</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="Online">Online</option>
+                                        <option value="Cheque">Cheque</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
+                                        <option value="UPI">UPI</option>
+                                        <option value="DD">DD</option>
+                                    </select>
+                                </div>
+
+                                {/* From Date */}
+                                <div className="min-w-[140px]">
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">From Date</label>
+                                    <input
+                                        type="date"
+                                        value={receiptFilters.startDate}
+                                        onChange={e => setReceiptFilters(f => ({ ...f, startDate: e.target.value }))}
+                                        className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                    />
+                                </div>
+
+                                {/* To Date */}
+                                <div className="min-w-[140px]">
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">To Date</label>
+                                    <input
+                                        type="date"
+                                        value={receiptFilters.endDate}
+                                        onChange={e => setReceiptFilters(f => ({ ...f, endDate: e.target.value }))}
+                                        className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
+                                    />
+                                </div>
+
+                                {/* Apply / Clear */}
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => fetchReceipts(receiptFilters)}
+                                        className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+                                    >
+                                        Apply
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const cleared = { search: '', paymentMethod: '', startDate: '', endDate: '' }
+                                            setReceiptFilters(cleared)
+                                            fetchReceipts(cleared)
+                                        }}
+                                        className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
+                                    >
+                                        <X className="h-3.5 w-3.5" /> Clear
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Receipts Table */}
+                        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-primary-500" />
+                                    All Receipts
+                                    {!receiptsLoading && (
+                                        <span className="ml-1 text-xs font-normal text-gray-400">({allReceipts.length} found)</span>
+                                    )}
+                                </h3>
+                            </div>
+
+                            {receiptsLoading ? (
+                                <div className="flex justify-center items-center py-16">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                                </div>
+                            ) : allReceipts.length === 0 ? (
+                                <div className="text-center py-16">
+                                    <FileText className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                                    <p className="text-gray-500 font-medium">No receipts found</p>
+                                    <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Receipt No.</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Student</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Class</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Method</th>
+                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
+                                                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-100">
+                                            {allReceipts.map((payment) => (
+                                                <tr key={payment._id} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-5 py-3 whitespace-nowrap">
+                                                        <span className="text-sm font-mono font-semibold text-primary-600">{payment.receiptNumber}</span>
+                                                    </td>
+                                                    <td className="px-5 py-3 whitespace-nowrap">
+                                                        <div className="text-sm font-medium text-gray-900">
+                                                            {payment.studentId?.name || payment.studentId?.fullName || 'N/A'}
+                                                        </div>
+                                                        <div className="text-xs text-gray-400">
+                                                            {payment.studentId?.admissionNumber || payment.studentId?.studentId || ''}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600">
+                                                        {payment.studentId?.classId?.name || payment.studentId?.class || '-'}
+                                                        {payment.studentId?.section ? ` (${payment.studentId.section})` : ''}
+                                                    </td>
+                                                    <td className="px-5 py-3 whitespace-nowrap">
+                                                        <span className="text-sm font-semibold text-green-700">{formatCurrency(payment.amount)}</span>
+                                                    </td>
+                                                    <td className="px-5 py-3 whitespace-nowrap">
+                                                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded font-medium">{payment.paymentMethod}</span>
+                                                    </td>
+                                                    <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                        {new Date(payment.paymentDate).toLocaleDateString('en-IN')}
+                                                    </td>
+                                                    <td className="px-5 py-3 whitespace-nowrap text-right">
+                                                        <div className="flex justify-end items-center gap-3">
+                                                            <button
+                                                                onClick={() => handleViewReceipt(payment._id)}
+                                                                className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 text-xs font-semibold"
+                                                                title="View Receipt"
+                                                            >
+                                                                <FileText className="h-3.5 w-3.5" />
+                                                                View
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDownloadReceipt(payment._id)}
+                                                                className="text-green-600 hover:text-green-800 inline-flex items-center gap-1 text-xs font-semibold"
+                                                                title="Download Receipt"
+                                                            >
+                                                                <Printer className="h-3.5 w-3.5" />
+                                                                Download
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 
