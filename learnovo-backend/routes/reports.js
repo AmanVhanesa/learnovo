@@ -355,39 +355,58 @@ router.get('/dashboard', protect, async (req, res) => {
       const studentFees = await Fee.find({ student: user._id, tenantId: tenantId });
       const pendingFeeCount = studentFees.filter(f => f.status === 'pending' || f.status === 'overdue').length;
 
+      const studentInvoices = await FeeInvoice.find({ studentId: user._id, tenantId: tenantId });
+      const pendingInvoiceCount = studentInvoices.filter(i => ['Pending', 'Partial', 'Overdue'].includes(i.status)).length;
+
       statistics.student = {
         profileComplete: user.isActive ? 'Complete' : 'Incomplete',
-        pendingFees: pendingFeeCount,
+        pendingFees: pendingFeeCount + pendingInvoiceCount,
         assignments: 0,
         notifications: 0
       };
 
-      // Get assignment count (if Assignment model exists)
+      // Get assignment count
       try {
-        const Assignment = require('../models/Assignment');
-        const assignments = await Assignment.find({
+        const Homework = require('../models/Homework');
+        const assignmentsCount = await Homework.countDocuments({
           tenantId: tenantId,
-          assignedTo: user._id
+          class: user.classId,
+          isActive: true
         });
-        statistics.student.assignments = assignments.length;
+        statistics.student.assignments = assignmentsCount;
       } catch (assignmentError) {
-        console.warn('Assignment model not available:', assignmentError.message);
+        console.warn('Homework model not available:', assignmentError.message);
       }
 
-      // Get notification count (would need Notification model)
-      statistics.student.notifications = 0;
+      // Get notification count
+      try {
+        const Notification = require('../models/Notification');
+        statistics.student.notifications = await Notification.getUnreadCount(user._id, tenantId);
+      } catch (notificationError) {
+        console.warn('Notification model not available:', notificationError.message);
+      }
 
     } else if (user.role === 'parent') {
       const childrenCount = user.children && Array.isArray(user.children) ? user.children.length : 0;
       const childrenFees = await Fee.find({ student: { $in: user.children || [] }, tenantId: tenantId });
       const pendingFeeCount = childrenFees.filter(f => f.status === 'pending' || f.status === 'overdue').length;
 
+      const childrenInvoices = await FeeInvoice.find({ studentId: { $in: user.children || [] }, tenantId: tenantId });
+      const pendingInvoiceCount = childrenInvoices.filter(i => ['Pending', 'Partial', 'Overdue'].includes(i.status)).length;
+
       statistics.parent = {
         myChildren: childrenCount,
-        pendingFees: pendingFeeCount,
+        pendingFees: pendingFeeCount + pendingInvoiceCount,
         notifications: 0,
         performance: 'Good' // Would need actual calculation
       };
+
+      try {
+        const Notification = require('../models/Notification');
+        statistics.parent.notifications = await Notification.getUnreadCount(user._id, tenantId);
+      } catch (notificationError) {
+        console.warn('Notification model not available:', notificationError.message);
+      }
     }
 
     // Get enrollment trend (last 6 months) for admin

@@ -176,6 +176,8 @@ app.use('/api/class-subjects', require('./routes/classSubjects'));
 app.use('/api/teacher-assignments', require('./routes/teacherAssignments'));
 app.use('/api/fees', require('./routes/feesReports')); // Must come before generic fees routes
 app.use('/api/fees', require('./routes/fees'));
+app.use('/api/student-fees', require('./routes/studentFees'));
+app.use('/api/admin-disputes', require('./routes/adminDisputes'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/fee-structures', require('./routes/feeStructures'));
 app.use('/api/attendance', require('./routes/attendance'));
@@ -206,6 +208,14 @@ app.use(errorHandler);
 
 // 404 handler
 app.use('*', notFoundHandler);
+
+// Start background jobs
+try {
+  const reconciliationJob = require('./jobs/reconciliationJob');
+  reconciliationJob.startJob();
+} catch (e) {
+  console.error("Failed to start reconciliation job:", e);
+}
 
 // Start server
 const PORT = process.env.PORT || 5000;

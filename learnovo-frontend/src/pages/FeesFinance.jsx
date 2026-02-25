@@ -203,12 +203,6 @@ const FeesFinance = () => {
 
             toast.dismiss(toastId)
 
-            const printWindow = window.open('', '_blank', 'width=800,height=600')
-            if (!printWindow) {
-                toast.error('Please allow popups to print receipt')
-                return
-            }
-
             // Helper to get full Logo URL
             const getLogoUrl = (url) => {
                 if (!url) return null
@@ -221,6 +215,12 @@ const FeesFinance = () => {
             const logoUrl = getLogoUrl(school.logo)
             const signatureUrl = getLogoUrl(school.principalSignature)
 
+            // Resolve student name from all possible fields
+            const studentName = payment.studentId?.name || payment.studentId?.fullName || 'N/A'
+            const studentAdmNo = payment.studentId?.admissionNumber || payment.studentId?.studentId || '-'
+            const studentClass = payment.studentId?.classId?.name || payment.studentId?.class || '-'
+            const studentSection = payment.studentId?.section || ''
+
             const html = `
                 <!DOCTYPE html>
                 <html>
@@ -231,7 +231,7 @@ const FeesFinance = () => {
                         body { font-family: 'Inter', sans-serif; padding: 0; margin: 0; color: #1e293b; -webkit-print-color-adjust: exact; }
                         .container { max-width: 420px; margin: 0 auto; padding: 15px; }
                         
-                        /* Header Section - Compact */
+                        /* Header Section */
                         .header { display: flex; align-items: center; gap: 10px; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px; }
                         .logo-container { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 6px; flex-shrink: 0; }
                         .logo { max-width: 100%; max-height: 100%; object-fit: contain; }
@@ -239,41 +239,70 @@ const FeesFinance = () => {
                         .school-name { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin-bottom: 3px; letter-spacing: -0.3px; line-height: 1.2; }
                         .school-details { font-size: 8px; color: #64748b; line-height: 1.3; }
 
-                        /* Receipt Title & Meta - Compact */
+                        /* Receipt Title & Meta */
                         .receipt-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #f1f5f9; padding: 6px 10px; border-radius: 4px; border-left: 2px solid #2563eb; }
                         .receipt-title { font-size: 11px; font-weight: 700; color: #2563eb; text-transform: uppercase; }
                         .receipt-number { font-size: 9px; font-weight: 600; color: #475569; }
 
-                        /* Info Grid - Compact */
+                        /* Info Grid */
                         .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
                         .section-title { font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
                         .info-row { display: flex; margin-bottom: 4px; }
                         .label { width: 70px; font-size: 8px; font-weight: 500; color: #64748b; }
                         .value { flex: 1; font-size: 9px; font-weight: 600; color: #0f172a; }
 
-                        /* Amount Section - Compact */
+                        /* Amount Section */
                         .amount-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px; text-align: center; margin-bottom: 15px; }
                         .amount-label { font-size: 8px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
                         .amount-value { font-size: 20px; font-weight: 800; color: #1e40af; }
                         
-                        /* Footer - Compact */
+                        /* Signature Section */
                         .signatures { display: flex; justify-content: space-between; margin-top: 15px; padding: 0 10px; }
                         .sig-block { text-align: center; }
-                        .sig-line { width: 100px; border-top: 1px solid #94a3b8; margin-bottom: 4px; }
-                        .sig-image { width: 100px; height: 30px; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; }
+                        /* Empty space above depositor line for actual signature */
+                        .sig-space { width: 110px; height: 52px; margin-bottom: 4px; display: block; }
+                        .sig-line { width: 110px; border-top: 1.5px solid #94a3b8; margin: 0 auto 4px auto; }
+                        .sig-image { width: 110px; height: 44px; margin-bottom: 4px; display: flex; align-items: flex-end; justify-content: center; }
                         .sig-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
-                        .sig-text { font-size: 8px; font-weight: 500; color: #64748b; }
+                        .sig-text { font-size: 8px; font-weight: 600; color: #475569; }
 
                         .footer { margin-top: 12px; text-align: center; font-size: 7px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
                         
                         @media print {
-                            body { -webkit-print-color-adjust: exact; }
-                            @page { size: A5; margin: 0; }
-                            .container { padding: 15px; max-width: 100%; }
+                            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            @page { size: A5; margin: 10mm; }
+                            .container { padding: 0; max-width: 100%; }
+                            .toolbar { display: none !important; }
+                            .page-body { padding-top: 0 !important; }
                         }
+
+                        /* Toolbar */
+                        .toolbar { 
+                            position: fixed; top: 0; left: 0; right: 0; 
+                            background: #1e293b; color: white; 
+                            padding: 10px 20px; display: flex; gap: 10px; align-items: center;
+                            z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                            font-family: 'Inter', sans-serif;
+                        }
+                        .toolbar-title { flex: 1; font-size: 13px; font-weight: 600; }
+                        .btn { 
+                            padding: 7px 18px; border: none; border-radius: 6px; 
+                            cursor: pointer; font-size: 12px; font-weight: 600; font-family: 'Inter', sans-serif;
+                            transition: opacity 0.2s;
+                        }
+                        .btn:hover { opacity: 0.85; }
+                        .btn-print { background: #3b82f6; color: white; }
+                        .btn-close { background: #64748b; color: white; }
+                        .page-body { padding-top: 52px; }
                     </style>
                 </head>
                 <body>
+                    <div class="toolbar">
+                        <span class="toolbar-title">📄 Receipt #${payment.receiptNumber}</span>
+                        <button class="btn btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+                        <button class="btn btn-close" onclick="window.close()">✕ Close</button>
+                    </div>
+                    <div class="page-body">
                     <div class="container">
                         <div class="header">
                             <div class="logo-container">
@@ -295,7 +324,7 @@ const FeesFinance = () => {
                         <div class="grid-container">
                             <div class="info-column">
                                 <div class="section-title">Details</div>
-                                <div class="info-row"><div class="label">Date</div><div class="value">${new Date(payment.paymentDate).toLocaleDateString()}</div></div>
+                                <div class="info-row"><div class="label">Date</div><div class="value">${new Date(payment.paymentDate).toLocaleDateString('en-IN')}</div></div>
                                 <div class="info-row"><div class="label">Mode</div><div class="value">${payment.paymentMethod}</div></div>
                                 ${payment.transactionDetails?.referenceNumber ? `<div class="info-row"><div class="label">Ref. No</div><div class="value">${payment.transactionDetails.referenceNumber}</div></div>` : ''}
                                 ${payment.invoiceId?.billingPeriod?.displayText ? `<div class="info-row"><div class="label">Period</div><div class="value" style="color: #2563eb; font-weight: 600;">${payment.invoiceId.billingPeriod.displayText}</div></div>` : ''}
@@ -303,9 +332,9 @@ const FeesFinance = () => {
                             </div>
                             <div class="info-column">
                                 <div class="section-title">Student</div>
-                                <div class="info-row"><div class="label">Name</div><div class="value">${payment.studentId.fullName || payment.studentId.name}</div></div>
-                                <div class="info-row"><div class="label">Adm. No</div><div class="value">${payment.studentId.admissionNumber || payment.studentId.studentId}</div></div>
-                                <div class="info-row"><div class="label">Class</div><div class="value">${payment.studentId.class || '-'}${payment.studentId.section ? ` (${payment.studentId.section})` : ''}</div></div>
+                                <div class="info-row"><div class="label">Name</div><div class="value">${studentName}</div></div>
+                                <div class="info-row"><div class="label">Adm. No</div><div class="value">${studentAdmNo}</div></div>
+                                <div class="info-row"><div class="label">Class</div><div class="value">${studentClass}${studentSection ? ` (${studentSection})` : ''}</div></div>
                             </div>
                         </div>
 
@@ -316,32 +345,47 @@ const FeesFinance = () => {
 
                         <div class="signatures">
                             <div class="sig-block">
+                                <div class="sig-space"></div>
                                 <div class="sig-line"></div>
                                 <div class="sig-text">Depositor</div>
                             </div>
                             <div class="sig-block">
-                                ${signatureUrl ?
-                    `<div class="sig-image"><img src="${signatureUrl}" alt="Principal Signature" /></div>` :
-                    '<div class="sig-line"></div>'
+                                ${signatureUrl
+                    ? `<div class="sig-image"><img src="${signatureUrl}" alt="Principal Signature" /></div>`
+                    : '<div class="sig-space"></div>'
                 }
+                                <div class="sig-line"></div>
                                 <div class="sig-text">Authorized</div>
                             </div>
                         </div>
 
                         <div class="footer">
-                            <p>Computer-generated receipt. No signature required.</p>
+                            <p>Computer-generated receipt. Valid without physical signature.</p>
                         </div>
                     </div>
-
-                    <script>
-                        window.onload = function() { window.print(); }
-                    </script>
+                    </div>
                 </body>
                 </html>
             `
 
-            printWindow.document.write(html)
-            printWindow.document.close()
+            // Use Blob URL — avoids popup blocker that triggers on window.open('')
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+            const blobUrl = URL.createObjectURL(blob)
+            const receiptWindow = window.open(blobUrl, '_blank')
+
+            if (!receiptWindow) {
+                // Fallback: directly download as an HTML file the user can open & print
+                const a = document.createElement('a')
+                a.href = blobUrl
+                a.download = `Receipt-${payment.receiptNumber}.html`
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                toast.success('Receipt downloaded! Open the file to print.')
+            }
+
+            // Clean up blob URL after 2 minutes
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 120000)
         } catch (error) {
             console.error('Receipt print error:', error)
             toast.error('Failed to load receipt details')
