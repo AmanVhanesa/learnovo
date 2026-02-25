@@ -9,7 +9,6 @@ import {
   CreditCard,
   UserPlus,
   BarChart3,
-  Settings,
   Bell,
   LogOut,
   X,
@@ -140,30 +139,8 @@ const Sidebar = ({ isOpen, onClose }) => {
           </div>
         </nav>
 
-        {/* User info and logout */}
+        {/* Sign out */}
         <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
-          <div
-            className="flex items-center mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors duration-200"
-            onClick={() => navigate('/app/profile')}
-            title="Edit Profile"
-          >
-            <div className="flex-shrink-0">
-              <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-gray-700">
-                  {user?.name?.charAt(0)?.toUpperCase()}
-                </span>
-              </div>
-            </div>
-            <div className="ml-3 overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
-              {user?.admissionNumber && (
-                <p className="text-xs font-mono text-teal-600 truncate">{user.admissionNumber}</p>
-              )}
-              <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
-            </div>
-            <Settings className="ml-auto h-4 w-4 text-gray-400" />
-          </div>
-
           <button
             onClick={handleLogout}
             className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-md transition-colors duration-200"

@@ -1,13 +1,17 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, Search, User } from 'lucide-react'
+import { Menu, Search, User, LogOut, Settings, ChevronDown } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import NotificationBell from './NotificationBell'
 
+const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')
+
 const Header = ({ onToggleSidebar, sidebarOpen }) => {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
+  const [profileOpen, setProfileOpen] = useState(false)
+  const dropdownRef = useRef(null)
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -15,6 +19,29 @@ const Header = ({ onToggleSidebar, sidebarOpen }) => {
       navigate(`/app/search?q=${encodeURIComponent(searchQuery.trim())}`)
     }
   }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Resolve photo URL
+  const photoUrl = user?.photo
+    ? (user.photo.startsWith('http') ? user.photo : `${SERVER_URL}${user.photo}`)
+    : null
+
+  const initials = user?.name?.charAt(0)?.toUpperCase() || '?'
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -56,19 +83,76 @@ const Header = ({ onToggleSidebar, sidebarOpen }) => {
           {/* Notifications */}
           <NotificationBell />
 
-          {/* User menu */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 bg-primary-500 rounded-full flex items-center justify-center">
-                <span className="text-sm font-medium text-white">
-                  {user?.name?.charAt(0)?.toUpperCase()}
+          {/* Profile dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setProfileOpen(o => !o)}
+              className="flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none"
+            >
+              {/* Avatar */}
+              <div className="h-8 w-8 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0">
+                {photoUrl ? (
+                  <img
+                    src={photoUrl}
+                    alt={user?.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+                  />
+                ) : null}
+                <span
+                  className="text-sm font-medium text-white"
+                  style={{ display: photoUrl ? 'none' : 'flex' }}
+                >
+                  {initials}
                 </span>
               </div>
-              <div className="hidden md:block">
-                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+              {/* Name/role — desktop only */}
+              <div className="hidden md:block text-left">
+                <p className="text-sm font-medium text-gray-900 leading-tight">{user?.name}</p>
                 <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
               </div>
-            </div>
+              <ChevronDown className={`h-4 w-4 text-gray-400 hidden md:block transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown */}
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+                {/* User info */}
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0">
+                      {photoUrl ? (
+                        <img src={photoUrl} alt={user?.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-semibold text-white">{initials}</span>
+                      )}
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
+                      <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Edit Profile */}
+                <button
+                  onClick={() => { navigate('/app/profile'); setProfileOpen(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Settings className="h-4 w-4 text-gray-400" />
+                  Edit Profile
+                </button>
+
+                {/* Sign out */}
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
