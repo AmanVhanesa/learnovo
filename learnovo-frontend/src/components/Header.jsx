@@ -106,22 +106,27 @@ const Header = ({ onToggleSidebar }) => {
               onClick={() => setProfileOpen(o => !o)}
               className="flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none"
             >
-              <div className="h-8 w-8 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0">
+              {/* Avatar — always visible on ALL screen sizes */}
+              <div className="h-9 w-9 rounded-full overflow-hidden bg-primary-500 flex-shrink-0 flex items-center justify-center">
                 {photoUrl ? (
                   <img
                     src={photoUrl}
                     alt={user?.name}
                     className="h-full w-full object-cover"
-                    onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+                    onError={(e) => {
+                      e.target.style.display = 'none'
+                      e.target.parentElement.querySelector('span').style.display = 'flex'
+                    }}
                   />
                 ) : null}
                 <span
-                  className="text-sm font-medium text-white"
+                  className="text-sm font-medium text-white items-center justify-center"
                   style={{ display: photoUrl ? 'none' : 'flex' }}
                 >
                   {initials}
                 </span>
               </div>
+              {/* Name + role — only on md and above */}
               <div className="hidden md:block text-left">
                 <p className="text-sm font-medium text-gray-900 leading-tight">{user?.name}</p>
                 <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
@@ -130,15 +135,14 @@ const Header = ({ onToggleSidebar }) => {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
+              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1rem)] bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0">
+                    <div className="h-11 w-11 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0">
                       {photoUrl ? (
-                        <img src={photoUrl} alt={user?.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="text-sm font-semibold text-white">{initials}</span>
-                      )}
+                        <img src={photoUrl} alt={user?.name} className="h-full w-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+                      ) : null}
+                      <span className="text-sm font-semibold text-white" style={{ display: photoUrl ? 'none' : 'flex' }}>{initials}</span>
                     </div>
                     <div className="overflow-hidden">
                       <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
