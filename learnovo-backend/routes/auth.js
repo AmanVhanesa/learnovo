@@ -339,6 +339,8 @@ router.post('/login', [
         role: user.role,
         avatar: user.avatar || user.photo || null,
         photo: user.photo || user.avatar || null,
+        phone: user.phone,
+        address: user.address,
         lastLogin: user.lastLogin,
         tenantId: tenantId ? tenantId.toString() : null
       },
@@ -382,6 +384,9 @@ router.get('/me', protect, async (req, res) => {
         avatar: user.avatar || user.photo || null,
         photo: user.photo || user.avatar || null,
         phone: user.phone,
+        address: user.address,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
         lastLogin: user.lastLogin,
         createdAt: user.createdAt,
         tenantId: user.tenantId
