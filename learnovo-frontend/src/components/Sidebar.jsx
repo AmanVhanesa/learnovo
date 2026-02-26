@@ -25,6 +25,8 @@ import {
   List
 } from 'lucide-react'
 
+const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')
+
 const Sidebar = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -34,6 +36,15 @@ const Sidebar = ({ isOpen, onClose }) => {
     logout()
     navigate('/login')
   }
+
+  // Resolve photo URL (Cloudinary full URL or legacy relative path)
+  const photoUrl = (() => {
+    const raw = user?.avatar || user?.photo
+    if (!raw) return null
+    return raw.startsWith('http') ? raw : `${SERVER_URL}${raw}`
+  })()
+
+  const initials = user?.name?.charAt(0)?.toUpperCase() || '?'
 
   // Define menu items based on user role
   const getMenuItems = () => {
@@ -138,8 +149,39 @@ const Sidebar = ({ isOpen, onClose }) => {
           </div>
         </nav>
 
-        {/* Sign out */}
+        {/* User Profile + Sign out */}
         <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
+          {/* Profile row */}
+          <button
+            onClick={() => { navigate('/app/profile'); onClose() }}
+            className="w-full flex items-center gap-3 mb-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+          >
+            <div className="h-10 w-10 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0">
+              {photoUrl ? (
+                <img
+                  src={photoUrl}
+                  alt={user?.name}
+                  className="h-full w-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                    e.target.parentElement.querySelector('span').style.display = 'flex'
+                  }}
+                />
+              ) : null}
+              <span
+                className="text-sm font-bold text-white"
+                style={{ display: photoUrl ? 'none' : 'flex' }}
+              >
+                {initials}
+              </span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
+              <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+            </div>
+          </button>
+
+          {/* Sign out */}
           <button
             onClick={handleLogout}
             className="w-full flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-md transition-colors duration-200"
