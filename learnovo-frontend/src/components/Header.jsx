@@ -59,8 +59,8 @@ const Header = ({ onToggleSidebar }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const photoUrl = user?.photo
-    ? (user.photo.startsWith('http') ? user.photo : `${SERVER_URL}${user.photo}`)
+  const photoUrl = (user?.avatar || user?.photo)
+    ? ((user.avatar || user.photo).startsWith('http') ? (user.avatar || user.photo) : `${SERVER_URL}${user.avatar || user.photo}`)
     : null
 
   const initials = user?.name?.charAt(0)?.toUpperCase() || '?'

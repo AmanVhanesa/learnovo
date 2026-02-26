@@ -96,6 +96,14 @@ export const authService = {
   resetPassword: async (token, password) => {
     const response = await api.put('/auth/reset-password', { token, password })
     return response.data
+  },
+
+  // Upload profile photo
+  uploadPhoto: async (file) => {
+    const formData = new FormData()
+    formData.append('photo', file)
+    const response = await api.post('/auth/upload-photo', formData)
+    return response.data
   }
 }
 

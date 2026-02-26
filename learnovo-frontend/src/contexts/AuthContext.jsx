@@ -74,7 +74,7 @@ export function AuthProvider({ children }) {
       const token = localStorage.getItem('token')
       const user = localStorage.getItem('user')
       const tenant = localStorage.getItem('tenant')
-      
+
       if (token && user) {
         try {
           // Try to get fresh user data
@@ -109,39 +109,39 @@ export function AuthProvider({ children }) {
   const login = async (loginData) => {
     try {
       dispatch({ type: 'AUTH_START' })
-      
+
       const response = await authService.login(loginData)
       console.log('AuthService login response:', response)
-      
+
       // Handle both response formats (direct response.data or nested)
       const token = response.token || response.data?.token
       const user = response.user || response.data?.user
       const tenant = response.tenant || response.data?.tenant
-      
-      console.log('Extracted values:', { 
-        hasToken: !!token, 
-        hasUser: !!user, 
-        hasTenant: !!tenant 
+
+      console.log('Extracted values:', {
+        hasToken: !!token,
+        hasUser: !!user,
+        hasTenant: !!tenant
       })
-      
+
       if (!token) {
         console.error('No token in response:', response)
         throw new Error('No token received from server')
       }
-      
+
       // Store in localStorage
       localStorage.setItem('token', token)
       if (user) localStorage.setItem('user', JSON.stringify(user))
       if (tenant) localStorage.setItem('tenant', JSON.stringify(tenant))
-      
+
       console.log('Stored token in localStorage')
-      
+
       // Update auth state
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: { user, tenant, token }
       })
-      
+
       console.log('Auth state updated, user authenticated:', !!user)
       toast.success('Login successful!')
       return { success: true, user, tenant, token }
@@ -149,9 +149,9 @@ export function AuthProvider({ children }) {
       console.error('Login error details:', error)
       console.error('Error response:', error.response?.data)
       console.error('Error status:', error.response?.status)
-      
+
       let message = 'Login failed'
-      
+
       if (error.response?.data?.message) {
         message = error.response.data.message
       } else if (error.response?.status === 401) {
@@ -165,7 +165,7 @@ export function AuthProvider({ children }) {
       } else if (error.message) {
         message = error.message
       }
-      
+
       dispatch({
         type: 'AUTH_FAILURE',
         payload: message
@@ -178,17 +178,17 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     try {
       dispatch({ type: 'AUTH_START' })
-      
+
       const response = await authService.register(userData)
       const { token, user } = response
-      
+
       localStorage.setItem('token', token)
-      
+
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: { user, token }
       })
-      
+
       toast.success('Registration successful!')
       return { success: true }
     } catch (error) {
@@ -213,14 +213,36 @@ export function AuthProvider({ children }) {
   const updateProfile = async (profileData) => {
     try {
       const response = await authService.updateProfile(profileData)
+      const updatedUser = { ...state.user, ...response.user }
       dispatch({
         type: 'UPDATE_USER',
         payload: response.user
       })
+      // Persist to localStorage so photo survives refresh
+      localStorage.setItem('user', JSON.stringify(updatedUser))
       toast.success('Profile updated successfully!')
       return { success: true }
     } catch (error) {
       const message = error.response?.data?.message || 'Profile update failed'
+      toast.error(message)
+      return { success: false, error: message }
+    }
+  }
+
+  const uploadPhoto = async (file) => {
+    try {
+      const response = await authService.uploadPhoto(file)
+      const updatedUser = { ...state.user, avatar: response.avatar, photo: response.photo }
+      dispatch({
+        type: 'UPDATE_USER',
+        payload: { avatar: response.avatar, photo: response.photo }
+      })
+      // Persist to localStorage so photo survives refresh
+      localStorage.setItem('user', JSON.stringify(updatedUser))
+      toast.success('Profile photo updated!')
+      return { success: true, avatar: response.avatar }
+    } catch (error) {
+      const message = error.response?.data?.message || 'Photo upload failed'
       toast.error(message)
       return { success: false, error: message }
     }
@@ -248,6 +270,7 @@ export function AuthProvider({ children }) {
     register,
     logout,
     updateProfile,
+    uploadPhoto,
     changePassword,
     clearError
   }

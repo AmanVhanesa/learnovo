@@ -5,6 +5,9 @@ const Tenant = require('../models/Tenant');
 const { protect, generateToken, sendTokenResponse } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { getTenantFromRequest } = require('../middleware/tenant');
+const upload = require('../middleware/upload');
+const cloudinaryService = require('../services/cloudinaryService');
+
 
 const router = express.Router();
 
@@ -334,7 +337,8 @@ router.post('/login', [
         name: user.name,
         email: user.email,
         role: user.role,
-        avatar: user.avatar,
+        avatar: user.avatar || user.photo || null,
+        photo: user.photo || user.avatar || null,
         lastLogin: user.lastLogin,
         tenantId: tenantId ? tenantId.toString() : null
       },
@@ -375,7 +379,8 @@ router.get('/me', protect, async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        avatar: user.avatar,
+        avatar: user.avatar || user.photo || null,
+        photo: user.photo || user.avatar || null,
         phone: user.phone,
         lastLogin: user.lastLogin,
         createdAt: user.createdAt,
@@ -474,7 +479,8 @@ router.put('/profile', protect, [
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,
-        avatar: updatedUser.avatar,
+        avatar: updatedUser.avatar || updatedUser.photo || null,
+        photo: updatedUser.photo || updatedUser.avatar || null,
         phone: updatedUser.phone,
         address: updatedUser.address,
         dateOfBirth: updatedUser.dateOfBirth,
@@ -669,4 +675,49 @@ router.get('/temp-reset-spis', async (req, res) => {
   }
 });
 
+// @desc    Upload profile photo
+// @route   POST /api/auth/upload-photo
+// @access  Private
+router.post('/upload-photo', protect, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No image file provided' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Upload to Cloudinary
+    const result = await cloudinaryService.uploadFromMulter(req.file, {
+      tenantId: user.tenantId.toString(),
+      folder: 'avatars',
+      subPath: user._id.toString(),
+      transformation: {
+        width: 400,
+        height: 400,
+        crop: 'fill',
+        gravity: 'face',
+        quality: 'auto:good'
+      }
+    });
+
+    // Save to both fields for backward compatibility
+    const photoUrl = result.secure_url;
+    await User.findByIdAndUpdate(req.user.id, { avatar: photoUrl, photo: photoUrl });
+
+    res.json({
+      success: true,
+      message: 'Profile photo updated successfully',
+      avatar: photoUrl,
+      photo: photoUrl
+    });
+  } catch (error) {
+    console.error('Upload photo error:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload photo' });
+  }
+});
+
 module.exports = router;
+
