@@ -25,7 +25,6 @@ const PAGE_TITLES = {
   '/app/communication': 'Communication',
   '/app/certificates': 'Certificates',
   '/app/payroll': 'Payroll',
-  '/app/admin-disputes': 'Disputes & Alerts',
 }
 
 const Header = ({ onToggleSidebar }) => {

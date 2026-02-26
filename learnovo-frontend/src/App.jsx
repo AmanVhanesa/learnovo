@@ -42,7 +42,6 @@ import Activities from './pages/Activities'
 import Payroll from './pages/Payroll'
 import Homework from './pages/Homework'
 import StudentFeesDashboard from './pages/student/StudentFeesDashboard'
-import AdminPaymentDisputes from './pages/admin/AdminPaymentDisputes'
 
 function App() {
   return (
@@ -104,7 +103,6 @@ function App() {
                   <Route path="fees-finance" element={<FeesFinance />} />
                   <Route path="fees" element={<Fees />} />
                   <Route path="student/fees" element={<StudentFeesDashboard />} />
-                  <Route path="admin-disputes" element={<AdminPaymentDisputes />} />
 
                   <Route path="attendance" element={<Attendance />} />
                   <Route path="assignments" element={<Assignments />} />
