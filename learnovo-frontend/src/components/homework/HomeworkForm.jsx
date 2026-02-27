@@ -56,8 +56,15 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                 (cls.sections || []).map(sec => ({ ...sec, classId: cls._id }))
             );
             setSections(allSections);
-            // Reset class and section when grade changes
-            setFormData(prev => ({ ...prev, class: '', section: '' }));
+            // Only reset class/section if the current section doesn't belong to this grade.
+            // This preserves the values when restoring an existing homework for editing.
+            setFormData(prev => {
+                const sectionStillValid = allSections.some(
+                    s => s._id?.toString() === prev.section?.toString()
+                );
+                if (sectionStillValid) return prev;
+                return { ...prev, class: '', section: '' };
+            });
         } else {
             setSections([]);
         }
