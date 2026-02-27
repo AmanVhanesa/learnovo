@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Upload, Trash2, Image as ImageIcon, File } from 'lucide-react';
 import homeworkService from '../../services/homeworkService';
 import { classesService } from '../../services/classesService';
@@ -12,8 +12,8 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
         title: '',
         description: '',
         subject: '',
-        class: '',
-        section: '',
+        class: '',       // stores the Class document _id
+        section: '',     // stores the Section document _id
         assignedDate: new Date().toISOString().split('T')[0],
         dueDate: ''
     });
@@ -26,48 +26,77 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     const [selectedGrade, setSelectedGrade] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    // Track whether we are in the middle of restoring an existing homework
+    const restoringRef = useRef(false);
+
     // Derive unique grades from loaded classes
     const uniqueGrades = [...new Set(classes.map(cls => cls.grade).filter(Boolean))].sort();
 
+    // Initial load
     useEffect(() => {
         fetchOptions();
-        if (homework) {
-            setFormData({
-                title: homework.title || '',
-                description: homework.description || '',
-                subject: homework.subject?._id || '',
-                class: homework.class?._id || '',
-                section: homework.section?._id || '',
-                assignedDate: homework.assignedDate ? new Date(homework.assignedDate).toISOString().split('T')[0] : '',
-                dueDate: homework.dueDate ? new Date(homework.dueDate).toISOString().split('T')[0] : ''
-            });
-            setExistingAttachments(homework.attachments || []);
-            // Restore grade from existing homework class
-            if (homework.class?.grade) setSelectedGrade(homework.class.grade);
-        }
-    }, [homework]);
+    }, []);
 
-    // When grade changes, collect all sections from all classes of that grade
+    // When editing, restore form once classes are loaded
     useEffect(() => {
-        if (selectedGrade && classes.length > 0) {
-            const classesForGrade = classes.filter(cls => cls.grade === selectedGrade);
-            // Flatten all sections from all classes of this grade, attach classId to each
-            const allSections = classesForGrade.flatMap(cls =>
-                (cls.sections || []).map(sec => ({ ...sec, classId: cls._id }))
-            );
-            setSections(allSections);
-            // Only reset class/section if the current section doesn't belong to this grade.
-            // This preserves the values when restoring an existing homework for editing.
-            setFormData(prev => {
-                const sectionStillValid = allSections.some(
-                    s => s._id?.toString() === prev.section?.toString()
-                );
-                if (sectionStillValid) return prev;
-                return { ...prev, class: '', section: '' };
-            });
-        } else {
-            setSections([]);
+        if (isEditing && homework && classes.length > 0 && !restoringRef.current) {
+            restoringRef.current = true;
+            restoreEditingState();
         }
+    }, [isEditing, homework, classes]);
+
+    const restoreEditingState = () => {
+        // Find the class document that matches homework.class._id
+        const hwClassId = homework.class?._id || homework.class;
+        const classDoc = classes.find(c => c._id?.toString() === hwClassId?.toString());
+
+        if (classDoc) {
+            // Get all sections for this grade
+            const grade = classDoc.grade;
+            const gradeClasses = classes.filter(c => c.grade === grade);
+            const gradeSections = gradeClasses.flatMap(c =>
+                (c.sections || []).map(sec => ({ ...sec, classId: c._id }))
+            );
+            setSections(gradeSections);
+            setSelectedGrade(grade);
+        }
+
+        setFormData({
+            title: homework.title || '',
+            description: homework.description || '',
+            subject: homework.subject?._id || homework.subject || '',
+            class: homework.class?._id || homework.class || '',
+            section: homework.section?._id || homework.section || '',
+            assignedDate: homework.assignedDate
+                ? new Date(homework.assignedDate).toISOString().split('T')[0]
+                : new Date().toISOString().split('T')[0],
+            dueDate: homework.dueDate
+                ? new Date(homework.dueDate).toISOString().split('T')[0]
+                : ''
+        });
+
+        setExistingAttachments(homework.attachments || []);
+    };
+
+    // When grade changes (by user action), update sections list
+    useEffect(() => {
+        if (!selectedGrade || classes.length === 0) {
+            setSections([]);
+            return;
+        }
+
+        const gradeClasses = classes.filter(c => c.grade === selectedGrade);
+        const gradeSections = gradeClasses.flatMap(c =>
+            (c.sections || []).map(sec => ({ ...sec, classId: c._id }))
+        );
+        setSections(gradeSections);
+
+        if (!restoringRef.current) {
+            // User manually changed the grade — reset class and section
+            setFormData(prev => ({ ...prev, class: '', section: '' }));
+        }
+        // After first restore, allow subsequent user-driven grade changes to reset
+        restoringRef.current = false;
     }, [selectedGrade, classes]);
 
     const fetchOptions = async () => {
@@ -81,15 +110,20 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
             if (subjectsRes.success) setSubjects(subjectsRes.data || []);
         } catch (error) {
             console.error('Error fetching options:', error);
+            toast.error('Failed to load class/subject options');
         }
     };
 
     const handleFileChange = (e) => {
         const selectedFiles = Array.from(e.target.files);
 
-        // Validate file types and sizes
         const validFiles = selectedFiles.filter(file => {
-            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+            const validTypes = [
+                'image/jpeg', 'image/png', 'image/gif',
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            ];
             const maxSize = 5 * 1024 * 1024; // 5MB
 
             if (!validTypes.includes(file.type)) {
@@ -114,6 +148,15 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
         setExistingAttachments(existingAttachments.filter((_, i) => i !== index));
     };
 
+    const handleSectionChange = (sectionId) => {
+        const sec = sections.find(s => s._id?.toString() === sectionId);
+        setFormData(prev => ({
+            ...prev,
+            section: sectionId,
+            class: sec?.classId?.toString() || prev.class
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -122,13 +165,15 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
             return;
         }
 
+        if (!formData.class) {
+            toast.error('Could not determine class. Please re-select the section.');
+            return;
+        }
+
         try {
             setIsLoading(true);
 
-            // Process new file uploads
             const newAttachments = await homeworkService.processFileUploads(files);
-
-            // Combine existing and new attachments
             const allAttachments = [...existingAttachments, ...newAttachments];
 
             const homeworkData = {
@@ -153,9 +198,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
         }
     };
 
-    const isImage = (fileType) => {
-        return fileType?.startsWith('image/');
-    };
+    const isImage = (fileType) => fileType?.startsWith('image/');
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -165,10 +208,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                     <h2 className="text-2xl font-bold text-gray-900">
                         {isEditing ? 'Edit Homework' : 'Create Homework'}
                     </h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
@@ -207,6 +247,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
                     {/* Subject, Grade, Section */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Subject */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Subject <span className="text-red-500">*</span>
@@ -226,13 +267,17 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                             </select>
                         </div>
 
+                        {/* Grade */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Grade <span className="text-red-500">*</span>
                             </label>
                             <select
                                 value={selectedGrade}
-                                onChange={(e) => setSelectedGrade(e.target.value)}
+                                onChange={(e) => {
+                                    restoringRef.current = false; // user changed grade manually
+                                    setSelectedGrade(e.target.value);
+                                }}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                                 required
                             >
@@ -245,22 +290,14 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                             </select>
                         </div>
 
+                        {/* Section */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Section <span className="text-red-500">*</span>
                             </label>
                             <select
                                 value={formData.section}
-                                onChange={(e) => {
-                                    const sectionId = e.target.value;
-                                    // Find the section and its parent classId
-                                    const sec = sections.find(s => s._id?.toString() === sectionId);
-                                    setFormData(prev => ({
-                                        ...prev,
-                                        section: sectionId,
-                                        class: sec?.classId?.toString() || prev.class
-                                    }));
-                                }}
+                                onChange={(e) => handleSectionChange(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                                 disabled={!selectedGrade}
                                 required
@@ -289,7 +326,6 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                                 required
                             />
                         </div>
-
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Due Date <span className="text-red-500">*</span>
@@ -311,7 +347,6 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                             Attachments (Images & Files)
                         </label>
 
-                        {/* Upload Button */}
                         <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:border-primary-500 transition-colors">
                             <Upload className="h-5 w-5 text-gray-400 mr-2" />
                             <span className="text-sm text-gray-600">Click to upload images or files</span>

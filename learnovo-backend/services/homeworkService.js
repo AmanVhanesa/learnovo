@@ -1,6 +1,7 @@
 const Homework = require('../models/Homework');
 const HomeworkSubmission = require('../models/HomeworkSubmission');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 class HomeworkService {
     /**
@@ -16,10 +17,9 @@ class HomeworkService {
 
             await homework.save();
 
-            // Populate references before returning
             await homework.populate([
                 { path: 'subject', select: 'name' },
-                { path: 'class', select: 'name' },
+                { path: 'class', select: 'name grade' },
                 { path: 'section', select: 'name' },
                 { path: 'assignedBy', select: 'name email' }
             ]);
@@ -31,42 +31,109 @@ class HomeworkService {
     }
 
     /**
+     * Build the student homework query robustly.
+     * Students can be linked to a class via classId (ObjectId) or via the legacy `class` string field.
+     * Similarly sections via sectionId or the `section` string field.
+     */
+    async _buildStudentQuery(userId, tenantId) {
+        const student = await User.findById(userId)
+            .select('classId sectionId class section')
+            .lean();
+
+        if (!student) return null;
+
+        const query = { tenantId, isActive: true };
+
+        // Build class matching: prefer classId (ObjectId), fall back to class name string
+        const classConditions = [];
+        if (student.classId) {
+            classConditions.push({ class: student.classId });
+        }
+        if (student.class) {
+            // Also try matching by grade string in case homework.class is stored differently
+            classConditions.push({ class: student.class });
+        }
+
+        if (classConditions.length === 0) return null; // Student has no class assigned
+
+        if (classConditions.length === 1) {
+            Object.assign(query, classConditions[0]);
+        } else {
+            query.$or = classConditions;
+        }
+
+        // Build section matching: homework is shown if:
+        //   (a) section matches student's sectionId or section name, OR
+        //   (b) no section specified on the homework (the $or trick with null / missing)
+        const sectionConditions = [];
+        if (student.sectionId) {
+            sectionConditions.push(student.sectionId);
+        }
+        if (student.section) {
+            sectionConditions.push(student.section);
+        }
+
+        if (sectionConditions.length > 0) {
+            // Show homework assigned to student's section OR to the whole class (no section)
+            query.sectionFilter = { sectionId: student.sectionId, sectionName: student.section };
+        }
+
+        return { query, student };
+    }
+
+    /**
      * Get homework list with filters
      */
     async getHomeworkList(filters, userRole, userId, tenantId) {
         try {
-            const query = { tenantId, isActive: true };
+            const baseQuery = { tenantId, isActive: true };
 
             // Role-based filtering
             if (userRole === 'teacher') {
-                query.assignedBy = userId;
+                baseQuery.assignedBy = userId;
             } else if (userRole === 'student') {
-                // Get student's class and section
-                const student = await User.findById(userId).select('classId sectionId');
-                if (student) {
-                    query.class = student.classId;
-                    if (student.sectionId) {
-                        query.$or = [
-                            { section: student.sectionId },
-                            { section: null }
-                        ];
-                    }
+                const student = await User.findById(userId)
+                    .select('classId sectionId class section')
+                    .lean();
+
+                if (!student) return [];
+
+                // Match class: by classId ObjectId OR by class name/grade string
+                const classMatch = [];
+                if (student.classId) classMatch.push(student.classId);
+                if (student.class) classMatch.push(student.class);
+
+                if (classMatch.length === 0) return [];
+
+                baseQuery.class = { $in: classMatch };
+
+                // Match section: show homework for this section OR homework with no section (whole class)
+                const sectionMatch = [];
+                if (student.sectionId) sectionMatch.push(student.sectionId);
+                if (student.section) sectionMatch.push(student.section);
+
+                if (sectionMatch.length > 0) {
+                    baseQuery.$or = [
+                        { section: { $in: sectionMatch } },
+                        { section: null },
+                        { section: { $exists: false } }
+                    ];
                 }
             }
 
-            // Additional filters
-            if (filters.subject) query.subject = filters.subject;
-            if (filters.class) query.class = filters.class;
-            if (filters.section) query.section = filters.section;
+            // Additional teacher/admin filters
+            if (filters.subject) baseQuery.subject = filters.subject;
+            if (filters.class) baseQuery.class = filters.class;
+            if (filters.section) baseQuery.section = filters.section;
             if (filters.startDate || filters.endDate) {
-                query.assignedDate = {};
-                if (filters.startDate) query.assignedDate.$gte = new Date(filters.startDate);
-                if (filters.endDate) query.assignedDate.$lte = new Date(filters.endDate);
+                baseQuery.assignedDate = {};
+                if (filters.startDate) baseQuery.assignedDate.$gte = new Date(filters.startDate);
+                if (filters.endDate) baseQuery.assignedDate.$lte = new Date(filters.endDate);
             }
 
-            const homework = await Homework.find(query)
+            const homework = await Homework.find(baseQuery)
                 .populate('subject', 'name')
-                .populate('class', 'name')
+                .populate('class', 'name grade')
                 .populate('section', 'name')
                 .populate('assignedBy', 'name email')
                 .sort({ assignedDate: -1 })
@@ -80,14 +147,28 @@ class HomeworkService {
                         status: { $in: ['submitted', 'reviewed'] }
                     });
 
-                    // Get total students in class
-                    const totalStudents = await User.countDocuments({
+                    // Count students in the class/section using flexible matching
+                    const classId = hw.class?._id || hw.class;
+                    const sectionId = hw.section?._id || hw.section;
+
+                    const studentQuery = {
                         tenantId,
                         role: 'student',
-                        classId: hw.class._id,
-                        ...(hw.section ? { sectionId: hw.section._id } : {}),
                         isActive: true
-                    });
+                    };
+
+                    if (classId) {
+                        studentQuery.$or = [
+                            { classId: classId },
+                            { class: hw.class?.grade || hw.class?.name }
+                        ];
+                    }
+
+                    if (sectionId) {
+                        studentQuery.sectionId = sectionId;
+                    }
+
+                    const totalStudents = await User.countDocuments(studentQuery);
 
                     hw.submissionStats = {
                         submitted: submissions,
@@ -121,7 +202,7 @@ class HomeworkService {
         try {
             const homework = await Homework.findOne({ _id: id, tenantId })
                 .populate('subject', 'name')
-                .populate('class', 'name')
+                .populate('class', 'name grade')
                 .populate('section', 'name')
                 .populate('assignedBy', 'name email')
                 .lean();
@@ -130,7 +211,6 @@ class HomeworkService {
                 throw new Error('Homework not found');
             }
 
-            // For students, add their submission
             if (userRole === 'student') {
                 const submission = await HomeworkSubmission.findOne({
                     homeworkId: id,
@@ -139,7 +219,6 @@ class HomeworkService {
                 homework.mySubmission = submission;
             }
 
-            // For teachers, add submission list
             if (userRole === 'teacher') {
                 const submissions = await HomeworkSubmission.find({
                     homeworkId: id
@@ -177,7 +256,7 @@ class HomeworkService {
 
             await homework.populate([
                 { path: 'subject', select: 'name' },
-                { path: 'class', select: 'name' },
+                { path: 'class', select: 'name grade' },
                 { path: 'section', select: 'name' },
                 { path: 'assignedBy', select: 'name email' }
             ]);
@@ -189,8 +268,8 @@ class HomeworkService {
     }
 
     /**
-   * Delete homework (hard delete)
-   */
+     * Delete homework (hard delete)
+     */
     async deleteHomework(id, teacherId, tenantId) {
         try {
             const homework = await Homework.findOne({
@@ -203,13 +282,7 @@ class HomeworkService {
                 throw new Error('Homework not found or unauthorized');
             }
 
-            // Hard delete: Remove all submissions first to free up space
-            await HomeworkSubmission.deleteMany({
-                homeworkId: id,
-                tenantId
-            });
-
-            // Then remove the homework itself
+            await HomeworkSubmission.deleteMany({ homeworkId: id, tenantId });
             await Homework.deleteOne({ _id: id });
 
             return { message: 'Homework and all submissions deleted permanently' };
@@ -223,27 +296,19 @@ class HomeworkService {
      */
     async submitHomework(homeworkId, studentId, data, tenantId) {
         try {
-            // Check if homework exists
             const homework = await Homework.findOne({ _id: homeworkId, tenantId, isActive: true });
             if (!homework) {
                 throw new Error('Homework not found');
             }
 
-            // Check if submission already exists
-            let submission = await HomeworkSubmission.findOne({
-                homeworkId,
-                studentId,
-                tenantId
-            });
+            let submission = await HomeworkSubmission.findOne({ homeworkId, studentId, tenantId });
 
             if (submission) {
-                // Update existing submission
                 submission.submissionText = data.submissionText;
                 submission.attachments = data.attachments || [];
                 submission.status = 'submitted';
                 submission.submittedAt = new Date();
             } else {
-                // Create new submission
                 submission = new HomeworkSubmission({
                     homeworkId,
                     studentId,
@@ -269,7 +334,6 @@ class HomeworkService {
      */
     async getSubmissions(homeworkId, teacherId, tenantId) {
         try {
-            // Verify teacher owns this homework
             const homework = await Homework.findOne({
                 _id: homeworkId,
                 tenantId,
@@ -280,10 +344,7 @@ class HomeworkService {
                 throw new Error('Homework not found or unauthorized');
             }
 
-            const submissions = await HomeworkSubmission.find({
-                homeworkId,
-                tenantId
-            })
+            const submissions = await HomeworkSubmission.find({ homeworkId, tenantId })
                 .populate('studentId', 'name admissionNumber email')
                 .sort({ submittedAt: -1 })
                 .lean();
@@ -308,7 +369,6 @@ class HomeworkService {
                 throw new Error('Submission not found');
             }
 
-            // Verify teacher owns the homework
             if (submission.homeworkId.assignedBy.toString() !== teacherId.toString()) {
                 throw new Error('Unauthorized');
             }
@@ -344,7 +404,7 @@ class HomeworkService {
                     path: 'homeworkId',
                     populate: [
                         { path: 'subject', select: 'name' },
-                        { path: 'class', select: 'name' }
+                        { path: 'class', select: 'name grade' }
                     ]
                 })
                 .sort({ submittedAt: -1 })
@@ -364,14 +424,12 @@ class HomeworkService {
             const stats = {};
 
             if (userRole === 'teacher') {
-                // Count homework created by teacher
                 stats.totalHomework = await Homework.countDocuments({
                     assignedBy: userId,
                     tenantId,
                     isActive: true
                 });
 
-                // Count pending reviews
                 const homeworkIds = await Homework.find({
                     assignedBy: userId,
                     tenantId,
@@ -383,28 +441,39 @@ class HomeworkService {
                     status: 'submitted'
                 });
             } else if (userRole === 'student') {
-                // Get student's class
-                const student = await User.findById(userId).select('classId sectionId');
+                const student = await User.findById(userId)
+                    .select('classId sectionId class section')
+                    .lean();
 
                 if (student) {
-                    // Count total homework for student's class
-                    const query = {
+                    const classMatch = [];
+                    if (student.classId) classMatch.push(student.classId);
+                    if (student.class) classMatch.push(student.class);
+
+                    const hwQuery = {
                         tenantId,
-                        class: student.classId,
                         isActive: true
                     };
 
-                    if (student.sectionId) {
-                        query.$or = [
-                            { section: student.sectionId },
-                            { section: null }
+                    if (classMatch.length > 0) {
+                        hwQuery.class = { $in: classMatch };
+                    }
+
+                    const sectionMatch = [];
+                    if (student.sectionId) sectionMatch.push(student.sectionId);
+                    if (student.section) sectionMatch.push(student.section);
+
+                    if (sectionMatch.length > 0) {
+                        hwQuery.$or = [
+                            { section: { $in: sectionMatch } },
+                            { section: null },
+                            { section: { $exists: false } }
                         ];
                     }
 
-                    const allHomework = await Homework.find(query).distinct('_id');
+                    const allHomework = await Homework.find(hwQuery).distinct('_id');
                     stats.totalHomework = allHomework.length;
 
-                    // Count pending homework
                     const submittedIds = await HomeworkSubmission.find({
                         studentId: userId,
                         status: { $in: ['submitted', 'reviewed'] }
@@ -414,7 +483,6 @@ class HomeworkService {
                         id => !submittedIds.some(subId => subId.toString() === id.toString())
                     ).length;
 
-                    // Count submitted
                     stats.submittedHomework = submittedIds.length;
                 }
             }
