@@ -1,7 +1,39 @@
 const Homework = require('../models/Homework');
 const HomeworkSubmission = require('../models/HomeworkSubmission');
 const User = require('../models/User');
+const Class = require('../models/Class');
 const mongoose = require('mongoose');
+
+/**
+ * Resolve ObjectId(s) for a student's class.
+ * Homework.class is an ObjectId ref — we must NEVER pass plain strings into it.
+ */
+async function resolveStudentClassIds(student, tenantId) {
+    const ids = [];
+
+    // Best case: student already has classId (ObjectId)
+    if (student.classId) {
+        ids.push(student.classId);
+    }
+
+    // Fallback: student has a class string — look up matching Class docs
+    if (student.class && ids.length === 0) {
+        try {
+            const classDocs = await Class.find({
+                tenantId,
+                $or: [
+                    { grade: student.class },
+                    { name: student.class }
+                ]
+            }).select('_id').lean();
+            classDocs.forEach(c => ids.push(c._id));
+        } catch (e) {
+            console.warn('Class lookup fallback failed:', e.message);
+        }
+    }
+
+    return ids;
+}
 
 class HomeworkService {
     /**
@@ -98,19 +130,15 @@ class HomeworkService {
 
                 if (!student) return [];
 
-                // Match class: by classId ObjectId OR by class name/grade string
-                const classMatch = [];
-                if (student.classId) classMatch.push(student.classId);
-                if (student.class) classMatch.push(student.class);
+                // Resolve to ObjectId(s) only — Homework.class is an ObjectId ref
+                const classIds = await resolveStudentClassIds(student, tenantId);
+                if (classIds.length === 0) return [];
 
-                if (classMatch.length === 0) return [];
+                baseQuery.class = { $in: classIds };
 
-                baseQuery.class = { $in: classMatch };
-
-                // Match section: show homework for this section OR homework with no section (whole class)
+                // Section: only use ObjectId (sectionId). String fallback not safe here.
                 const sectionMatch = [];
                 if (student.sectionId) sectionMatch.push(student.sectionId);
-                if (student.section) sectionMatch.push(student.section);
 
                 if (sectionMatch.length > 0) {
                     baseQuery.$or = [
@@ -446,22 +474,19 @@ class HomeworkService {
                     .lean();
 
                 if (student) {
-                    const classMatch = [];
-                    if (student.classId) classMatch.push(student.classId);
-                    if (student.class) classMatch.push(student.class);
+                    const classIds = await resolveStudentClassIds(student, tenantId);
 
                     const hwQuery = {
                         tenantId,
                         isActive: true
                     };
 
-                    if (classMatch.length > 0) {
-                        hwQuery.class = { $in: classMatch };
+                    if (classIds.length > 0) {
+                        hwQuery.class = { $in: classIds };
                     }
 
                     const sectionMatch = [];
                     if (student.sectionId) sectionMatch.push(student.sectionId);
-                    if (student.section) sectionMatch.push(student.section);
 
                     if (sectionMatch.length > 0) {
                         hwQuery.$or = [
