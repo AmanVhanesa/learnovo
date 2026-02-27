@@ -334,7 +334,8 @@ router.post('/login', [
       token,
       user: {
         id: user._id,
-        name: user.name,
+        name: user.fullName || user.name,
+        fullName: user.fullName || user.name,
         email: user.email,
         role: user.role,
         avatar: user.avatar || user.photo || null,
@@ -378,7 +379,8 @@ router.get('/me', protect, async (req, res) => {
       success: true,
       user: {
         id: user._id,
-        name: user.name,
+        name: user.fullName || user.name,
+        fullName: user.fullName || user.name,
         email: user.email,
         role: user.role,
         avatar: user.avatar || user.photo || null,
@@ -453,6 +455,11 @@ router.put('/profile', protect, [
       }
     }
 
+    // If name is being updated, also sync fullName so imported students are consistent
+    if (updateData.name) {
+      updateData.fullName = updateData.name;
+    }
+
     // Check email uniqueness if being updated
     if (updateData.email && updateData.email !== user.email) {
       const existingUser = await User.findOne({
@@ -481,7 +488,8 @@ router.put('/profile', protect, [
       message: 'Profile updated successfully',
       user: {
         id: updatedUser._id,
-        name: updatedUser.name,
+        name: updatedUser.fullName || updatedUser.name,
+        fullName: updatedUser.fullName || updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,
         avatar: updatedUser.avatar || updatedUser.photo || null,

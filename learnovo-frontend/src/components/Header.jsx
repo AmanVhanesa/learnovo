@@ -63,7 +63,8 @@ const Header = ({ onToggleSidebar }) => {
     ? ((user.avatar || user.photo).startsWith('http') ? (user.avatar || user.photo) : `${SERVER_URL}${user.avatar || user.photo}`)
     : null
 
-  const initials = user?.name?.charAt(0)?.toUpperCase() || '?'
+  const displayName = user?.fullName || user?.name || ''
+  const initials = displayName.charAt(0)?.toUpperCase() || '?'
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -128,7 +129,7 @@ const Header = ({ onToggleSidebar }) => {
               </div>
               {/* Name + role — only on md and above */}
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium text-gray-900 leading-tight">{user?.name}</p>
+                <p className="text-sm font-medium text-gray-900 leading-tight">{displayName}</p>
                 <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
               </div>
               <ChevronDown className={`h-4 w-4 text-gray-400 hidden md:block transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
@@ -145,7 +146,7 @@ const Header = ({ onToggleSidebar }) => {
                       <span className="text-sm font-semibold text-white" style={{ display: photoUrl ? 'none' : 'flex' }}>{initials}</span>
                     </div>
                     <div className="overflow-hidden">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
+                      <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
                       <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
                     </div>
                   </div>

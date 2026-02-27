@@ -42,12 +42,12 @@ class HomeworkService {
                 query.assignedBy = userId;
             } else if (userRole === 'student') {
                 // Get student's class and section
-                const student = await User.findById(userId).select('currentClass currentSection');
+                const student = await User.findById(userId).select('classId sectionId');
                 if (student) {
-                    query.class = student.currentClass;
-                    if (student.currentSection) {
+                    query.class = student.classId;
+                    if (student.sectionId) {
                         query.$or = [
-                            { section: student.currentSection },
+                            { section: student.sectionId },
                             { section: null }
                         ];
                     }
@@ -84,8 +84,8 @@ class HomeworkService {
                     const totalStudents = await User.countDocuments({
                         tenantId,
                         role: 'student',
-                        currentClass: hw.class._id,
-                        ...(hw.section ? { currentSection: hw.section._id } : {}),
+                        classId: hw.class._id,
+                        ...(hw.section ? { sectionId: hw.section._id } : {}),
                         isActive: true
                     });
 
@@ -384,19 +384,19 @@ class HomeworkService {
                 });
             } else if (userRole === 'student') {
                 // Get student's class
-                const student = await User.findById(userId).select('currentClass currentSection');
+                const student = await User.findById(userId).select('classId sectionId');
 
                 if (student) {
                     // Count total homework for student's class
                     const query = {
                         tenantId,
-                        class: student.currentClass,
+                        class: student.classId,
                         isActive: true
                     };
 
-                    if (student.currentSection) {
+                    if (student.sectionId) {
                         query.$or = [
-                            { section: student.currentSection },
+                            { section: student.sectionId },
                             { section: null }
                         ];
                     }

@@ -26,7 +26,7 @@ const Profile = () => {
     if (user) {
       setFormData(prev => ({
         ...prev,
-        name: user.name || '',
+        name: user.fullName || user.name || '',
         email: user.email || '',
         phone: user.phone || '',
         address: user.address || ''
@@ -45,7 +45,8 @@ const Profile = () => {
     return raw.startsWith('http') ? raw : `${SERVER_URL}${raw}`
   })()
 
-  const initials = user?.name?.charAt(0)?.toUpperCase() || '?'
+  const displayName = user?.fullName || user?.name || ''
+  const initials = displayName.charAt(0)?.toUpperCase() || '?'
 
   const handlePhotoClick = () => {
     fileInputRef.current?.click()
@@ -169,7 +170,7 @@ const Profile = () => {
 
           {/* Info + button */}
           <div>
-            <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+            <p className="text-sm font-medium text-gray-900">{displayName}</p>
             <p className="text-sm text-gray-500 capitalize">{user?.role}</p>
             <button
               onClick={handlePhotoClick}

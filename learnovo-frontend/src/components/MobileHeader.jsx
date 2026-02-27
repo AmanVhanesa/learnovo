@@ -19,7 +19,8 @@ const MobileHeader = ({ onMenuClick }) => {
     return raw.startsWith('http') ? raw : `${SERVER_URL}${raw}`
   })()
 
-  const initials = user?.name?.charAt(0)?.toUpperCase() || '?'
+  const displayName = user?.fullName || user?.name || ''
+  const initials = displayName.charAt(0)?.toUpperCase() || '?'
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -122,7 +123,7 @@ const MobileHeader = ({ onMenuClick }) => {
                       </span>
                     </div>
                     <div className="overflow-hidden">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
+                      <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
                       <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
                     </div>
                   </div>
