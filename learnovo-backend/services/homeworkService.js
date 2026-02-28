@@ -35,6 +35,36 @@ async function resolveStudentClassIds(student, tenantId) {
     return ids;
 }
 
+/**
+ * Resolve ObjectId(s) for a teacher's assigned classes.
+ * A teacher may have classTeacher (string) and/or assignedClasses (string[]).
+ * We look up matching Class documents by name or grade.
+ */
+async function resolveTeacherClassIds(teacher, tenantId) {
+    const classNames = new Set();
+
+    if (teacher.classTeacher) classNames.add(teacher.classTeacher);
+    if (Array.isArray(teacher.assignedClasses)) {
+        teacher.assignedClasses.forEach(c => c && classNames.add(c));
+    }
+
+    if (classNames.size === 0) return [];
+
+    try {
+        const classDocs = await Class.find({
+            tenantId,
+            $or: [
+                { name: { $in: [...classNames] } },
+                { grade: { $in: [...classNames] } }
+            ]
+        }).select('_id').lean();
+        return classDocs.map(c => c._id);
+    } catch (e) {
+        console.warn('Teacher class lookup failed:', e.message);
+        return [];
+    }
+}
+
 class HomeworkService {
     /**
      * Create new homework
@@ -122,7 +152,27 @@ class HomeworkService {
 
             // Role-based filtering
             if (userRole === 'teacher') {
-                baseQuery.assignedBy = userId;
+                // Teachers see ALL homework assigned to their classes (including admin-created).
+                // We match by class ObjectId resolved from the teacher's assignedClasses / classTeacher.
+                const teacher = await User.findById(userId)
+                    .select('assignedClasses classTeacher')
+                    .lean();
+
+                if (teacher) {
+                    const classIds = await resolveTeacherClassIds(teacher, tenantId);
+                    if (classIds.length > 0) {
+                        // Show homework for teacher's class(es) OR homework they personally created
+                        baseQuery.$or = [
+                            { class: { $in: classIds } },
+                            { assignedBy: userId }
+                        ];
+                    } else {
+                        // Fallback: nothing resolved — show only their own homework
+                        baseQuery.assignedBy = userId;
+                    }
+                } else {
+                    baseQuery.assignedBy = userId;
+                }
             } else if (userRole === 'student') {
                 const student = await User.findById(userId)
                     .select('classId sectionId class section')
@@ -359,17 +409,31 @@ class HomeworkService {
 
     /**
      * Get submissions for a homework (teacher)
+     * Teachers can view submissions for any homework assigned to their class,
+     * including homework created by the admin.
      */
     async getSubmissions(homeworkId, teacherId, tenantId) {
         try {
-            const homework = await Homework.findOne({
-                _id: homeworkId,
-                tenantId,
-                assignedBy: teacherId
-            });
+            // First try to find homework directly
+            const homework = await Homework.findOne({ _id: homeworkId, tenantId });
 
             if (!homework) {
-                throw new Error('Homework not found or unauthorized');
+                throw new Error('Homework not found');
+            }
+
+            // Authorization: teacher must have created it OR it must be for their class
+            const isCreator = homework.assignedBy.toString() === teacherId.toString();
+            if (!isCreator) {
+                const teacher = await User.findById(teacherId)
+                    .select('assignedClasses classTeacher')
+                    .lean();
+                const classIds = await resolveTeacherClassIds(teacher || {}, tenantId);
+                const isForTeacherClass = classIds.some(
+                    id => id.toString() === (homework.class?.toString() || '')
+                );
+                if (!isForTeacherClass) {
+                    throw new Error('Homework not found or unauthorized');
+                }
             }
 
             const submissions = await HomeworkSubmission.find({ homeworkId, tenantId })
@@ -452,17 +516,27 @@ class HomeworkService {
             const stats = {};
 
             if (userRole === 'teacher') {
-                stats.totalHomework = await Homework.countDocuments({
-                    assignedBy: userId,
-                    tenantId,
-                    isActive: true
-                });
+                const teacher = await User.findById(userId)
+                    .select('assignedClasses classTeacher')
+                    .lean();
 
-                const homeworkIds = await Homework.find({
-                    assignedBy: userId,
-                    tenantId,
-                    isActive: true
-                }).distinct('_id');
+                const classIds = teacher
+                    ? await resolveTeacherClassIds(teacher, tenantId)
+                    : [];
+
+                const hwFilterQuery = { tenantId, isActive: true };
+                if (classIds.length > 0) {
+                    hwFilterQuery.$or = [
+                        { class: { $in: classIds } },
+                        { assignedBy: userId }
+                    ];
+                } else {
+                    hwFilterQuery.assignedBy = userId;
+                }
+
+                stats.totalHomework = await Homework.countDocuments(hwFilterQuery);
+
+                const homeworkIds = await Homework.find(hwFilterQuery).distinct('_id');
 
                 stats.pendingReviews = await HomeworkSubmission.countDocuments({
                     homeworkId: { $in: homeworkIds },
