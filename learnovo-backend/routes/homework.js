@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const homeworkService = require('../services/homeworkService');
+const notificationService = require('../services/notificationService');
 
 /**
  * @route   POST /api/homework
@@ -15,6 +16,10 @@ router.post('/', protect, authorize('teacher', 'admin'), async (req, res) => {
             req.user._id,
             req.user.tenantId
         );
+
+        // Fire homework assignment notifications (async, non-blocking)
+        notificationService.notifyHomeworkAssigned(homework, req.user._id, req.user.tenantId)
+            .catch(err => console.error('notifyHomeworkAssigned failed:', err));
 
         res.status(201).json({
             success: true,
@@ -210,6 +215,16 @@ router.post('/:id/submit', protect, authorize('student'), async (req, res) => {
             req.body,
             req.user.tenantId
         );
+
+        // Notify the assigning teacher about the submission (async, non-blocking)
+        const Homework = require('../models/Homework');
+        Homework.findById(req.params.id).select('assignedBy title').lean()
+            .then(hw => {
+                if (hw) {
+                    notificationService.notifyHomeworkSubmitted(hw, req.user, req.user.tenantId)
+                        .catch(err => console.error('notifyHomeworkSubmitted failed:', err));
+                }
+            });
 
         res.status(201).json({
             success: true,

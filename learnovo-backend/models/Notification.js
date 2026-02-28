@@ -174,13 +174,23 @@ notificationSchema.methods.softDelete = function () {
 };
 
 // Static methods
-notificationSchema.statics.getUnreadCount = function (userId, tenantId) {
-    return this.countDocuments({
+notificationSchema.statics.getUnreadCount = async function (userId, tenantId) {
+    const User = require('./User');
+    const user = await User.findById(userId).select('role').lean();
+
+    const query = {
         userId,
         tenantId,
         isRead: false,
         isDeleted: false
-    });
+    };
+
+    // Apply same visibility filter as getNotifications()
+    if (user && user.role !== 'admin') {
+        query.visibility = user.role;
+    }
+
+    return this.countDocuments(query);
 };
 
 notificationSchema.statics.getRecentNotifications = function (userId, tenantId, limit = 5) {

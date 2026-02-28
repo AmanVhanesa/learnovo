@@ -916,6 +916,117 @@ async function notifySystemUpdate(message, users, tenantId) {
 }
 
 // ============================================================================
+// HOMEWORK NOTIFICATIONS
+// ============================================================================
+
+/**
+ * Notify students in a class + the class teacher when homework is assigned.
+ * Called after homework is successfully created.
+ */
+async function notifyHomeworkAssigned(homework, assignedByUserId, tenantId) {
+    try {
+        const notifications = [];
+        const classId = homework.class?._id || homework.class;
+        const subjectName = homework.subject?.name || 'a subject';
+        const dueDate = homework.dueDate
+            ? new Date(homework.dueDate).toLocaleDateString()
+            : 'TBD';
+
+        // 1. Notify all students in the class
+        if (classId) {
+            const students = await User.find({
+                tenantId,
+                role: 'student',
+                isActive: true,
+                $or: [
+                    { classId: classId },
+                    { class: homework.class?.grade || homework.class?.name }
+                ]
+            }).select('_id').lean();
+
+            students.forEach(student => {
+                notifications.push({
+                    tenantId,
+                    userId: student._id,
+                    title: 'New Homework Assigned 📚',
+                    message: `New homework "${homework.title}" for ${subjectName} is due on ${dueDate}.`,
+                    type: 'info',
+                    category: 'academic',
+                    visibility: ['student', 'admin'],
+                    actionUrl: `/app/homework`,
+                    actionLabel: 'View Homework',
+                    metadata: {
+                        homeworkId: homework._id,
+                        subjectName,
+                        dueDate: homework.dueDate
+                    }
+                });
+            });
+        }
+
+        // 2. Notify the class teacher (if homework was created by admin)
+        if (classId) {
+            const Class = require('../models/Class');
+            const classDoc = await Class.findById(classId).select('classTeacher').lean();
+            if (classDoc?.classTeacher) {
+                const teacherId = classDoc.classTeacher.toString();
+                // Don't notify the teacher if they created it themselves
+                if (teacherId !== assignedByUserId.toString()) {
+                    notifications.push({
+                        tenantId,
+                        userId: classDoc.classTeacher,
+                        title: 'New Homework Added to Your Class 📝',
+                        message: `Homework "${homework.title}" for ${subjectName} has been assigned to your class. Due: ${dueDate}.`,
+                        type: 'info',
+                        category: 'academic',
+                        visibility: ['teacher', 'admin'],
+                        actionUrl: `/app/homework`,
+                        actionLabel: 'View Homework',
+                        metadata: {
+                            homeworkId: homework._id,
+                            subjectName,
+                            dueDate: homework.dueDate
+                        }
+                    });
+                }
+            }
+        }
+
+        if (notifications.length > 0) {
+            return await createBulkNotifications(notifications);
+        }
+    } catch (error) {
+        console.error('Error in notifyHomeworkAssigned:', error);
+    }
+}
+
+/**
+ * Notify the assigning teacher when a student submits homework.
+ */
+async function notifyHomeworkSubmitted(homework, student, tenantId) {
+    try {
+        if (!homework.assignedBy) return;
+
+        return await createNotification({
+            tenantId,
+            userId: homework.assignedBy,
+            title: 'Homework Submitted ✅',
+            message: `${student.name || student.fullName || 'A student'} has submitted homework for "${homework.title}".`,
+            type: 'success',
+            category: 'academic',
+            actionUrl: `/app/homework`,
+            actionLabel: 'Review Submission',
+            metadata: {
+                homeworkId: homework._id,
+                studentId: student._id
+            }
+        });
+    } catch (error) {
+        console.error('Error in notifyHomeworkSubmitted:', error);
+    }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -959,5 +1070,9 @@ module.exports = {
 
     // System notifications
     notifyDataExportCompleted,
-    notifySystemUpdate
+    notifySystemUpdate,
+
+    // Homework notifications
+    notifyHomeworkAssigned,
+    notifyHomeworkSubmitted
 };
