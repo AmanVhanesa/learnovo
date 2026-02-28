@@ -146,8 +146,8 @@ router.get('/:id', protect, async (req, res) => {
 
 /**
  * @route   PUT /api/homework/:id
- * @desc    Update homework (teacher only)
- * @access  Private (Teacher)
+ * @desc    Update homework (teacher or admin)
+ * @access  Private (Teacher, Admin)
  */
 router.put('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
     try {
@@ -155,7 +155,8 @@ router.put('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
             req.params.id,
             req.body,
             req.user._id,
-            req.user.tenantId
+            req.user.tenantId,
+            req.user.role
         );
 
         res.json({
@@ -172,15 +173,16 @@ router.put('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
 
 /**
  * @route   DELETE /api/homework/:id
- * @desc    Delete homework (hard delete)
- * @access  Private (Teacher)
+ * @desc    Delete homework (teacher or admin)
+ * @access  Private (Teacher, Admin)
  */
 router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
     try {
         const result = await homeworkService.deleteHomework(
             req.params.id,
             req.user._id,
-            req.user.tenantId
+            req.user.tenantId,
+            req.user.role
         );
 
         res.json({

@@ -333,14 +333,17 @@ class HomeworkService {
 
     /**
      * Update homework
+     * Admin can update any homework; teachers can only update their own.
      */
-    async updateHomework(id, data, teacherId, tenantId) {
+    async updateHomework(id, data, userId, tenantId, userRole) {
         try {
-            const homework = await Homework.findOne({
-                _id: id,
-                tenantId,
-                assignedBy: teacherId
-            });
+            const query = { _id: id, tenantId };
+            // Admins can update any homework; teachers only their own
+            if (userRole !== 'admin') {
+                query.assignedBy = userId;
+            }
+
+            const homework = await Homework.findOne(query);
 
             if (!homework) {
                 throw new Error('Homework not found or unauthorized');
@@ -364,14 +367,17 @@ class HomeworkService {
 
     /**
      * Delete homework (hard delete)
+     * Admin can delete any homework; teachers can only delete their own.
      */
-    async deleteHomework(id, teacherId, tenantId) {
+    async deleteHomework(id, userId, tenantId, userRole) {
         try {
-            const homework = await Homework.findOne({
-                _id: id,
-                tenantId,
-                assignedBy: teacherId
-            });
+            const query = { _id: id, tenantId };
+            // Admins can delete any homework; teachers only their own
+            if (userRole !== 'admin') {
+                query.assignedBy = userId;
+            }
+
+            const homework = await Homework.findOne(query);
 
             if (!homework) {
                 throw new Error('Homework not found or unauthorized');
