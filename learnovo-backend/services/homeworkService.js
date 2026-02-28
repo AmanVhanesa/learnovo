@@ -35,35 +35,60 @@ async function resolveStudentClassIds(student, tenantId) {
     return ids;
 }
 
+
 /**
- * Resolve ObjectId(s) for a teacher's assigned classes.
- * A teacher may have classTeacher (string) and/or assignedClasses (string[]).
- * We look up matching Class documents by name or grade.
+ * Resolve ObjectId(s) for a teacher's assigned classes using ALL available signals:
+ *  1. Class.classTeacher = teacherId  (ObjectId on the Class doc — most reliable)
+ *  2. User.assignedClasses / User.classTeacher strings → Class name/grade lookup
+ * Returns an array of unique Class ObjectIds.
  */
-async function resolveTeacherClassIds(teacher, tenantId) {
-    const classNames = new Set();
+async function resolveTeacherClassIds(teacherIdOrObj, tenantId) {
+    const ids = new Map(); // keyed by string to dedupe
 
-    if (teacher.classTeacher) classNames.add(teacher.classTeacher);
-    if (Array.isArray(teacher.assignedClasses)) {
-        teacher.assignedClasses.forEach(c => c && classNames.add(c));
-    }
+    const teacherId = teacherIdOrObj?._id || teacherIdOrObj;
 
-    if (classNames.size === 0) return [];
-
+    // ── Strategy 1: Class docs where classTeacher === this teacher ──────────
     try {
-        const classDocs = await Class.find({
+        const byClassTeacher = await Class.find({
             tenantId,
-            $or: [
-                { name: { $in: [...classNames] } },
-                { grade: { $in: [...classNames] } }
-            ]
+            classTeacher: teacherId
         }).select('_id').lean();
-        return classDocs.map(c => c._id);
+        byClassTeacher.forEach(c => ids.set(c._id.toString(), c._id));
     } catch (e) {
-        console.warn('Teacher class lookup failed:', e.message);
-        return [];
+        console.warn('Class.classTeacher lookup failed:', e.message);
     }
+
+    // ── Strategy 2: User.assignedClasses / classTeacher string → name/grade ─
+    try {
+        const teacher = await User.findById(teacherId)
+            .select('assignedClasses classTeacher')
+            .lean();
+
+        if (teacher) {
+            const classNames = new Set();
+            if (teacher.classTeacher) classNames.add(teacher.classTeacher);
+            if (Array.isArray(teacher.assignedClasses)) {
+                teacher.assignedClasses.forEach(c => c && classNames.add(c));
+            }
+
+            if (classNames.size > 0) {
+                const byName = await Class.find({
+                    tenantId,
+                    $or: [
+                        { name: { $in: [...classNames] } },
+                        { grade: { $in: [...classNames] } }
+                    ]
+                }).select('_id').lean();
+                byName.forEach(c => ids.set(c._id.toString(), c._id));
+            }
+        }
+    } catch (e) {
+        console.warn('User.assignedClasses lookup failed:', e.message);
+    }
+
+    return [...ids.values()];
 }
+
 
 class HomeworkService {
     /**
@@ -152,25 +177,16 @@ class HomeworkService {
 
             // Role-based filtering
             if (userRole === 'teacher') {
-                // Teachers see ALL homework assigned to their classes (including admin-created).
-                // We match by class ObjectId resolved from the teacher's assignedClasses / classTeacher.
-                const teacher = await User.findById(userId)
-                    .select('assignedClasses classTeacher')
-                    .lean();
-
-                if (teacher) {
-                    const classIds = await resolveTeacherClassIds(teacher, tenantId);
-                    if (classIds.length > 0) {
-                        // Show homework for teacher's class(es) OR homework they personally created
-                        baseQuery.$or = [
-                            { class: { $in: classIds } },
-                            { assignedBy: userId }
-                        ];
-                    } else {
-                        // Fallback: nothing resolved — show only their own homework
-                        baseQuery.assignedBy = userId;
-                    }
+                // Teachers see ALL homework for their classes (including admin-created).
+                // resolveTeacherClassIds uses Class.classTeacher (ObjectId) + string fallbacks.
+                const classIds = await resolveTeacherClassIds(userId, tenantId);
+                if (classIds.length > 0) {
+                    baseQuery.$or = [
+                        { class: { $in: classIds } },
+                        { assignedBy: userId }
+                    ];
                 } else {
+                    // Fallback: teacher not assigned to any class — show their own homework
                     baseQuery.assignedBy = userId;
                 }
             } else if (userRole === 'student') {
@@ -199,10 +215,11 @@ class HomeworkService {
                 }
             }
 
-            // Additional teacher/admin filters
+            // Additional filters (subject, section only — class filter handled above for teachers)
             if (filters.subject) baseQuery.subject = filters.subject;
-            if (filters.class) baseQuery.class = filters.class;
+            if (filters.class && userRole !== 'teacher') baseQuery.class = filters.class;
             if (filters.section) baseQuery.section = filters.section;
+
             if (filters.startDate || filters.endDate) {
                 baseQuery.assignedDate = {};
                 if (filters.startDate) baseQuery.assignedDate.$gte = new Date(filters.startDate);
@@ -516,13 +533,8 @@ class HomeworkService {
             const stats = {};
 
             if (userRole === 'teacher') {
-                const teacher = await User.findById(userId)
-                    .select('assignedClasses classTeacher')
-                    .lean();
-
-                const classIds = teacher
-                    ? await resolveTeacherClassIds(teacher, tenantId)
-                    : [];
+                // Use same class resolution as getHomeworkList
+                const classIds = await resolveTeacherClassIds(userId, tenantId);
 
                 const hwFilterQuery = { tenantId, isActive: true };
                 if (classIds.length > 0) {
