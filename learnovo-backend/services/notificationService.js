@@ -175,9 +175,36 @@ async function getNotifications(userId, tenantId, options = {}) {
 }
 
 /**
- * Get unread notification count
+ * Get unread notification count.
+ * Also auto-cleans any stale notifications that don't match the user's
+ * visibility, so phantom badge counts (e.g. admin-only notifs showing for
+ * teachers) are permanently resolved on the first call.
  */
 async function getUnreadCount(userId, tenantId) {
+    try {
+        const user = await User.findById(userId).select('role').lean();
+
+        // For non-admins: soft-delete any notifications that are unread but
+        // NOT visible to this user's role (stale data from previous bugs).
+        if (user && user.role !== 'admin') {
+            await Notification.updateMany(
+                {
+                    userId,
+                    tenantId,
+                    isRead: false,
+                    isDeleted: false,
+                    // visibility array does NOT contain this user's role
+                    visibility: { $nin: [user.role] }
+                },
+                {
+                    $set: { isDeleted: true, deletedAt: new Date() }
+                }
+            );
+        }
+    } catch (cleanupErr) {
+        console.warn('getUnreadCount cleanup warn:', cleanupErr.message);
+    }
+
     return await Notification.getUnreadCount(userId, tenantId);
 }
 
