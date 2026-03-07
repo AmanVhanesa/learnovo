@@ -239,161 +239,187 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
 
     return (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-            <div className="w-full max-w-3xl mx-4 max-h-[92vh] flex flex-col">
-                <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm text-white font-medium">Exam Series:</label>
-                        <select className="input w-36 text-sm" value={filterSeries} onChange={e => setFilterSeries(e.target.value)}>
-                            <option value="">All Series</option>
-                            {SERIES_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[92vh] flex flex-col">
+
+                {/* ── Modal Header ── */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+                    <div className="flex items-center gap-2.5">
+                        <FileText className="h-5 w-5 text-primary-600 shrink-0" />
+                        <div>
+                            <h3 className="text-base font-semibold text-gray-900 leading-tight">Student Report Card</h3>
+                            {(student?.fullName || student?.name || studentName) && (
+                                <p className="text-xs text-gray-400 mt-0.5">{student?.fullName || student?.name || studentName}</p>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button className="btn btn-primary gap-2" onClick={handlePrint} disabled={loading || !subjects.length || printing}>
-                            <Printer className="h-4 w-4" />{printing ? 'Opening…' : 'Print / Save PDF'}
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <div className="flex items-center gap-1.5">
+                            <label className="text-xs text-gray-500 font-medium whitespace-nowrap">Exam Series:</label>
+                            <select
+                                className="input w-32 text-sm h-9"
+                                value={filterSeries}
+                                onChange={e => setFilterSeries(e.target.value)}
+                            >
+                                <option value="">All Series</option>
+                                {SERIES_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                        </div>
+                        <button
+                            className="btn btn-primary btn-sm gap-1.5"
+                            onClick={handlePrint}
+                            disabled={loading || !subjects.length || printing}
+                        >
+                            <Printer className="h-4 w-4" />
+                            {printing ? 'Opening…' : 'Print / PDF'}
                         </button>
-                        <button className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white" onClick={onClose}>
-                            <X className="h-5 w-5" />
+                        <button
+                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                            onClick={onClose}
+                        >
+                            <X className="h-5 w-5 text-gray-500" />
                         </button>
                     </div>
                 </div>
 
-                {/* ══ Certificate-style Card ══ */}
-                <div className="bg-white border-2 border-gray-900 rounded-none shadow-2xl overflow-y-auto flex-1">
-                    <div className="border border-gray-500 m-1.5">
+                {/* ── Scrollable Body ── */}
+                <div className="overflow-y-auto flex-1 bg-gray-100 p-4">
 
-                        {/* Loading / Empty */}
-                        {loading ? (
-                            <div className="flex flex-col items-center py-16 text-gray-400">
-                                <div className="loading-spinner mb-3" />
-                                <p className="text-sm">Loading result card…</p>
-                            </div>
-                        ) : !subjects.length ? (
-                            <div className="flex flex-col items-center py-16 text-gray-400">
-                                <FileText className="h-10 w-10 mb-3 opacity-40" />
-                                <p className="font-medium">No results found</p>
-                                <p className="text-sm mt-1 text-center px-8">
-                                    {filterSeries ? `No results for "${filterSeries}". Try "All Series".` : 'No exam results entered yet.'}
-                                </p>
-                            </div>
-                        ) : (<>
+                    {/* Loading */}
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                            <div className="loading-spinner mb-3" />
+                            <p className="text-sm">Loading result card…</p>
+                        </div>
+                    ) : !subjects.length ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                            <FileText className="h-10 w-10 mb-3 opacity-40" />
+                            <p className="font-medium">No results found</p>
+                            <p className="text-sm mt-1 text-center px-8">
+                                {filterSeries
+                                    ? `No results for "${filterSeries}". Try "All Series".`
+                                    : 'No exam results entered yet.'}
+                            </p>
+                        </div>
+                    ) : (
 
-                            {/* ── Certificate Header: Logo left, School centered ── */}
-                            <div className="flex items-start gap-5 px-7 py-5 border-b-2 border-gray-900">
-                                {/* Logo */}
-                                <div className="shrink-0">
-                                    {schoolInfo.logo
-                                        ? <img src={schoolInfo.logo} alt="Logo" className="w-16 h-16 object-contain rounded-lg" />
-                                        : <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-2xl font-black text-indigo-600">{(schoolInfo.name || 'S')[0]}</div>
-                                    }
-                                </div>
-                                {/* School info (centered) */}
-                                <div className="flex-1 text-center">
-                                    <h1 className="text-2xl font-black tracking-tight text-gray-900">{schoolInfo.name}</h1>
-                                    {schoolInfo.address && <p className="text-xs text-gray-500 mt-0.5">{schoolInfo.address}</p>}
-                                    {schoolInfo.phone && <p className="text-xs text-gray-400 mt-0.5">Phone: {schoolInfo.phone}{schoolInfo.email && `  |  Email: ${schoolInfo.email}`}</p>}
-                                    {schoolInfo.board && <p className="text-xs text-gray-400 mt-0.5">{schoolInfo.board}{schoolInfo.affiliation && ` | Affil: ${schoolInfo.affiliation}`}{schoolInfo.udise && ` | UDISE: ${schoolInfo.udise}`}</p>}
-                                    <div className="inline-block mt-2 text-xs font-bold tracking-widest uppercase text-blue-700 border-b-2 border-blue-700 pb-0.5">
-                                        Student Report Card{filterSeries ? ` — ${filterSeries}` : ''}
+                        /* ══ Certificate Card ══ */
+                        <div className="bg-white border-2 border-gray-800 shadow-xl max-w-3xl mx-auto">
+                            <div className="border border-gray-400 m-1.5">
+
+                                {/* Certificate Header */}
+                                <div className="flex items-start gap-5 px-7 py-5 border-b-2 border-gray-800">
+                                    <div className="shrink-0">
+                                        {schoolInfo.logo
+                                            ? <img src={schoolInfo.logo} alt="Logo" className="w-16 h-16 object-contain rounded-lg" />
+                                            : <div className="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center text-2xl font-black text-indigo-600">{(schoolInfo.name || 'S')[0]}</div>
+                                        }
                                     </div>
-                                </div>
-                                {/* Date right */}
-                                <div className="shrink-0 text-right text-xs text-gray-400">Date:<br />{issueDate}</div>
-                            </div>
-
-                            {/* ── Student Info (indigo strip) ── */}
-                            <div className="grid grid-cols-4 gap-4 bg-indigo-50 border-b-2 border-indigo-200 px-7 py-3">
-                                {[
-                                    { label: 'Student Name', value: student?.fullName || student?.name || studentName || '—', bold: true },
-                                    { label: 'Adm. Number', value: student?.admissionNumber || '—' },
-                                    { label: 'Class / Section', value: `${student?.class || subjects[0]?.class || '—'}${(student?.section || subjects[0]?.section) ? ' – ' + (student?.section || subjects[0]?.section) : ''}` },
-                                    { label: 'Roll Number', value: student?.rollNumber || '—' },
-                                ].map(c => (
-                                    <div key={c.label}>
-                                        <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">{c.label}</p>
-                                        <p className={`mt-0.5 ${c.bold ? 'text-base font-black text-indigo-900' : 'text-sm font-bold text-gray-800'}`}>{c.value}</p>
+                                    <div className="flex-1 text-center">
+                                        <h1 className="text-2xl font-black tracking-tight text-gray-900">{schoolInfo.name}</h1>
+                                        {schoolInfo.address && <p className="text-xs text-gray-500 mt-0.5">{schoolInfo.address}</p>}
+                                        {schoolInfo.phone && <p className="text-xs text-gray-400 mt-0.5">Phone: {schoolInfo.phone}{schoolInfo.email && `  |  Email: ${schoolInfo.email}`}</p>}
+                                        {schoolInfo.board && <p className="text-xs text-gray-400 mt-0.5">{schoolInfo.board}{schoolInfo.affiliation && ` | Affil: ${schoolInfo.affiliation}`}{schoolInfo.udise && ` | UDISE: ${schoolInfo.udise}`}</p>}
+                                        <div className="inline-block mt-2 text-xs font-bold tracking-widest uppercase text-blue-700 border-b-2 border-blue-700 pb-0.5">
+                                            Student Report Card{filterSeries ? ` — ${filterSeries}` : ''}
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="shrink-0 text-right text-xs text-gray-400">Date:<br />{issueDate}</div>
+                                </div>
 
-                            {/* ── Marks table ── */}
-                            <div className="px-7 py-4">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Subject-wise Performance</p>
-                                <div className="overflow-x-auto border border-gray-200 rounded">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500 border-b-2 border-gray-200">
-                                                {['Subject', 'Exam', 'Max', 'Obtained', '%', 'Grade', 'Result', 'Remarks'].map((h, i) => (
-                                                    <th key={h} className={`px-3 py-2.5 ${i >= 2 && i <= 6 ? 'text-center' : 'text-left'}`}>{h}</th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {subjects.map((s, i) => (
-                                                <tr key={s.examId} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                                                    <td className="px-3 py-2.5 font-semibold text-gray-900">{s.subject}</td>
-                                                    <td className="px-3 py-2.5">
-                                                        <div className="text-xs font-medium text-gray-700">{s.examName}</div>
-                                                        <div className="text-xs text-gray-400">{new Date(s.date).toLocaleDateString('en-IN')}</div>
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-center text-gray-600">{s.totalMarks}</td>
-                                                    <td className="px-3 py-2.5 text-center font-black text-gray-900 text-base">{s.marksObtained}</td>
-                                                    <td className="px-3 py-2.5 text-center text-gray-700">{s.percentage}%</td>
-                                                    <td className="px-3 py-2.5 text-center">
-                                                        <span style={{ background: gradeBg(s.grade), color: gradeColor(s.grade) }} className="inline-block px-2 py-0.5 rounded font-bold text-sm">{s.grade}</span>
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-center">
-                                                        {s.isPassed
-                                                            ? <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">✓ Pass</span>
-                                                            : <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">✗ Fail</span>}
-                                                    </td>
-                                                    <td className="px-3 py-2.5 text-xs text-gray-400 italic">{s.remarks || '—'}</td>
+                                {/* Student Info Strip */}
+                                <div className="grid grid-cols-4 gap-4 bg-indigo-50 border-b-2 border-indigo-200 px-7 py-3">
+                                    {[
+                                        { label: 'Student Name', value: student?.fullName || student?.name || studentName || '—', bold: true },
+                                        { label: 'Adm. Number', value: student?.admissionNumber || '—' },
+                                        { label: 'Class / Section', value: `${student?.class || subjects[0]?.class || '—'}${(student?.section || subjects[0]?.section) ? ' – ' + (student?.section || subjects[0]?.section) : ''}` },
+                                        { label: 'Roll Number', value: student?.rollNumber || '—' },
+                                    ].map(c => (
+                                        <div key={c.label}>
+                                            <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">{c.label}</p>
+                                            <p className={`mt-0.5 ${c.bold ? 'text-base font-black text-indigo-900' : 'text-sm font-bold text-gray-800'}`}>{c.value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Marks Table */}
+                                <div className="px-7 py-4">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Subject-wise Performance</p>
+                                    <div className="overflow-x-auto border border-gray-200 rounded">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="bg-gray-50 text-[10px] font-bold uppercase tracking-wide text-gray-500 border-b-2 border-gray-200">
+                                                    {['Subject', 'Exam', 'Max', 'Obtained', '%', 'Grade', 'Result', 'Remarks'].map((h, i) => (
+                                                        <th key={h} className={`px-3 py-2.5 ${i >= 2 && i <= 6 ? 'text-center' : 'text-left'}`}>{h}</th>
+                                                    ))}
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr className="bg-blue-700 text-white font-bold text-sm">
-                                                <td className="px-3 py-3" colSpan={2}>Grand Total</td>
-                                                <td className="px-3 py-3 text-center">{summary.grandTotal}</td>
-                                                <td className="px-3 py-3 text-center text-base font-black">{summary.grandObtained}</td>
-                                                <td className="px-3 py-3 text-center">{summary.overallPercentage}%</td>
-                                                <td className="px-3 py-3 text-center">
-                                                    <span style={{ background: gradeBg(summary.overallGrade), color: gradeColor(summary.overallGrade) }} className="inline-block px-2 py-0.5 rounded font-bold">{summary.overallGrade}</span>
-                                                </td>
-                                                <td className="px-3 py-3 text-center" colSpan={2}>
-                                                    <span className={`inline-block px-4 py-1 rounded-full font-black ${summary.overallPassed ? 'bg-green-500' : 'bg-red-500'}`}>{summary.overallPassed ? '✓ PASS' : '✗ FAIL'}</span>
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                {subjects.map((s, i) => (
+                                                    <tr key={s.examId} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                                                        <td className="px-3 py-2.5 font-semibold text-gray-900">{s.subject}</td>
+                                                        <td className="px-3 py-2.5">
+                                                            <div className="text-xs font-medium text-gray-700">{s.examName}</div>
+                                                            <div className="text-xs text-gray-400">{new Date(s.date).toLocaleDateString('en-IN')}</div>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center text-gray-600">{s.totalMarks}</td>
+                                                        <td className="px-3 py-2.5 text-center font-black text-gray-900 text-base">{s.marksObtained}</td>
+                                                        <td className="px-3 py-2.5 text-center text-gray-700">{s.percentage}%</td>
+                                                        <td className="px-3 py-2.5 text-center">
+                                                            <span style={{ background: gradeBg(s.grade), color: gradeColor(s.grade) }} className="inline-block px-2 py-0.5 rounded font-bold text-sm">{s.grade}</span>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center">
+                                                            {s.isPassed
+                                                                ? <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">✓ Pass</span>
+                                                                : <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">✗ Fail</span>}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-xs text-gray-400 italic">{s.remarks || '—'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr className="bg-blue-700 text-white font-bold text-sm">
+                                                    <td className="px-3 py-3" colSpan={2}>Grand Total</td>
+                                                    <td className="px-3 py-3 text-center">{summary.grandTotal}</td>
+                                                    <td className="px-3 py-3 text-center text-base font-black">{summary.grandObtained}</td>
+                                                    <td className="px-3 py-3 text-center">{summary.overallPercentage}%</td>
+                                                    <td className="px-3 py-3 text-center">
+                                                        <span style={{ background: gradeBg(summary.overallGrade), color: gradeColor(summary.overallGrade) }} className="inline-block px-2 py-0.5 rounded font-bold">{summary.overallGrade}</span>
+                                                    </td>
+                                                    <td className="px-3 py-3 text-center" colSpan={2}>
+                                                        <span className={`inline-block px-4 py-1 rounded-full font-black ${summary.overallPassed ? 'bg-green-500' : 'bg-red-500'}`}>{summary.overallPassed ? '✓ PASS' : '✗ FAIL'}</span>
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                    <div className="mt-2 flex gap-4 text-xs text-gray-500">
+                                        <span>Total Subjects: <strong className="text-gray-700">{summary.totalSubjects}</strong></span>
+                                        <span className="text-green-700">Passed: <strong>{summary.passCount}</strong></span>
+                                        {summary.failCount > 0 && <span className="text-red-600">Failed: <strong>{summary.failCount}</strong></span>}
+                                    </div>
                                 </div>
-                                <div className="mt-2 flex gap-4 text-xs text-gray-500">
-                                    <span>Total Subjects: <strong className="text-gray-700">{summary.totalSubjects}</strong></span>
-                                    <span className="text-green-700">Passed: <strong>{summary.passCount}</strong></span>
-                                    {summary.failCount > 0 && <span className="text-red-600">Failed: <strong>{summary.failCount}</strong></span>}
+
+                                {/* Result Banner */}
+                                <div className={`mx-7 mb-5 py-3 rounded text-center ${summary.overallPassed ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                                    <p className={`text-lg font-black tracking-widest uppercase ${summary.overallPassed ? 'text-green-700' : 'text-red-700'}`}>
+                                        {summary.overallPassed ? '✅ Promoted to Next Class' : '❌ Detained / Failed'}
+                                    </p>
                                 </div>
-                            </div>
 
-                            {/* ── Result Banner ── */}
-                            <div className={`mx-7 mb-5 py-3 rounded text-center ${summary.overallPassed ? 'bg-green-50' : 'bg-red-50'}`}>
-                                <p className={`text-lg font-black tracking-widest uppercase ${summary.overallPassed ? 'text-green-700' : 'text-red-700'}`}>
-                                    {summary.overallPassed ? '✅ Promoted to Next Class' : '❌ Detained / Failed'}
-                                </p>
-                            </div>
-
-                            {/* ── Signatures (matches certificate bottom) ── */}
-                            <div className="border-t-2 border-dashed border-gray-300 mx-7 pt-5 mb-6 grid grid-cols-3 gap-6 text-center">
-                                <div><div className="h-10 border-b border-gray-500 mb-2" /><p className="text-sm font-bold text-gray-700">Class Teacher</p><p className="text-xs text-gray-400">Signature &amp; Seal</p></div>
-                                <div className="flex flex-col items-center">
-                                    <div className="w-14 h-14 rounded-full border-2 border-dashed border-gray-400 mb-2" />
-                                    <p className="text-sm text-gray-500">Official Stamp</p>
+                                {/* Signatures */}
+                                <div className="border-t-2 border-dashed border-gray-300 mx-7 pt-5 mb-6 grid grid-cols-3 gap-6 text-center">
+                                    <div><div className="h-10 border-b border-gray-500 mb-2" /><p className="text-sm font-bold text-gray-700">Class Teacher</p><p className="text-xs text-gray-400">Signature &amp; Seal</p></div>
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-14 h-14 rounded-full border-2 border-dashed border-gray-400 mb-2" />
+                                        <p className="text-sm text-gray-500">Official Stamp</p>
+                                    </div>
+                                    <div><div className="h-10 border-b border-gray-500 mb-2" /><p className="text-sm font-bold text-gray-700">Principal</p><p className="text-xs text-gray-400">Signature &amp; Seal</p></div>
                                 </div>
-                                <div><div className="h-10 border-b border-gray-500 mb-2" /><p className="text-sm font-bold text-gray-700">Principal</p><p className="text-xs text-gray-400">Signature &amp; Seal</p></div>
-                            </div>
-                            <p className="text-center text-xs text-gray-400 pb-5 italic px-7">This is a computer-generated report card issued by {schoolInfo.name}.</p>
+                                <p className="text-center text-xs text-gray-400 pb-5 italic px-7">This is a computer-generated report card issued by {schoolInfo.name}.</p>
 
-                        </>)}
-                    </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -401,3 +427,5 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
 };
 
 export default ResultCard;
+
+
