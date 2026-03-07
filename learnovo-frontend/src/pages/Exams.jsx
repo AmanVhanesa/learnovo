@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Plus, Search, Calendar, Trash2, X, ClipboardList,
-    Clock, BookOpen, User, MapPin, ChevronDown, AlertCircle, CheckCircle2
+    Clock, BookOpen, User, MapPin, ChevronDown, AlertCircle, CheckCircle2, FileText
 } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
 import { teachersService } from '../services/teachersService';
 import ExamResultsModal from '../components/ExamResultsModal';
+import ResultCard from '../components/ResultCard';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -65,6 +66,7 @@ const Exams = () => {
     /* ── Modal / selection state ── */
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedExam, setSelectedExam] = useState(null);
+    const [resultCardTarget, setResultCardTarget] = useState(null); // { student, examSeries }
     const [form, setForm] = useState(EMPTY_FORM);
     const [formErrors, setFormErrors] = useState({});
     const [submitting, setSubmitting] = useState(false);
@@ -224,7 +226,9 @@ const Exams = () => {
                 <select className="input w-auto" value={filterClass} onChange={e => setFilterClass(e.target.value)}>
                     <option value="">All Classes</option>
                     {availableClasses.map(c => (
-                        <option key={c._id} value={c.grade}>{c.name} ({c.grade})</option>
+                        <option key={c._id} value={c.grade}>
+                            {c.name === c.grade ? c.name : `${c.name} (${c.grade})`}
+                        </option>
                     ))}
                 </select>
                 <select className="input w-auto" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
@@ -275,7 +279,7 @@ const Exams = () => {
                                     <td>
                                         <span className="badge badge-blue">{exam.class}</span>
                                         {exam.section && (
-                                            <span className="ml-1 text-xs text-gray-500">§{exam.section}</span>
+                                            <span className="ml-1 text-xs text-gray-500">/ {exam.section}</span>
                                         )}
                                     </td>
                                     <td className="text-gray-700">{exam.subject}</td>
@@ -387,7 +391,7 @@ const Exams = () => {
                                             <option value="">Select Class</option>
                                             {availableClasses.map(cls => (
                                                 <option key={cls._id} value={cls.grade}>
-                                                    {cls.name} ({cls.grade})
+                                                    {cls.name === cls.grade ? cls.name : `${cls.name} (${cls.grade})`}
                                                 </option>
                                             ))}
                                         </select>
@@ -580,6 +584,16 @@ const Exams = () => {
                 <ExamResultsModal
                     exam={selectedExam}
                     onClose={() => setSelectedExam(null)}
+                />
+            )}
+
+            {/* Series-level Result Card (opened from within the ExamResultsModal) */}
+            {resultCardTarget && (
+                <ResultCard
+                    studentId={resultCardTarget.studentId}
+                    studentName={resultCardTarget.studentName}
+                    defaultExamSeries={resultCardTarget.examSeries}
+                    onClose={() => setResultCardTarget(null)}
                 />
             )}
         </div>

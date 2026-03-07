@@ -30,7 +30,8 @@ const ExamResultsModal = ({ exam, onClose }) => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const studentsRes = await studentsService.list({ className: exam.class, limit: 100 });
+            // Use correct filter key 'class' (not 'className')
+            const studentsRes = await studentsService.list({ class: exam.class, section: exam.section || undefined, limit: 200 });
             const studentList = studentsRes.data || studentsRes.students || [];
             setStudents(studentList);
 
@@ -151,7 +152,7 @@ const ExamResultsModal = ({ exam, onClose }) => {
                                         return (
                                             <tr key={id}>
                                                 <td className="text-gray-500 text-xs">{student.rollNumber || '—'}</td>
-                                                <td className="font-medium text-gray-900">{student.name}</td>
+                                                <td className="font-medium text-gray-900">{student.fullName || student.name || '—'}</td>
                                                 <td>
                                                     <input
                                                         type="number"
@@ -194,7 +195,7 @@ const ExamResultsModal = ({ exam, onClose }) => {
                                                         type="button"
                                                         title="View Result Card"
                                                         className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-colors"
-                                                        onClick={() => setResultCardStudent({ id, name: student.name })}
+                                                        onClick={() => setResultCardStudent({ id, name: student.fullName || student.name })}
                                                     >
                                                         <FileText className="h-4 w-4" />
                                                     </button>
