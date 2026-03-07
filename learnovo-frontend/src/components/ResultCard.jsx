@@ -120,7 +120,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   .sig-sub{font-size:10px;color:#94a3b8;margin-top:2px}
   .stamp{width:56px;height:56px;border-radius:50%;border:1.5px dashed #cbd5e1;margin:0 auto 6px}
   .footer-note{text-align:center;font-size:10.5px;color:#94a3b8;padding:0 32px 18px;font-style:italic}
-  @media print{body{background:#fff}.page{border:1.5px solid #1a1a1a;margin:0;max-width:100%}@page{margin:8mm;size:A4}}
+  @media print{body{background:#fff}.page{border:1.5px solid #1a1a1a;margin:0;max-width:100%;border-radius:12px;overflow:hidden}.inner{border-radius:6px;overflow:hidden}@page{margin:8mm;size:A4}}
 </style>
 </head>
 <body>
