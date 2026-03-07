@@ -65,9 +65,6 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
         : `<div style="width:100px;height:52px"></div>`;
 
     const sigUrl = getSignatureUrl(schoolInfo.principalSignature);
-    const principalSigTag = sigUrl
-        ? `<div style="width:120px;height:52px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:0"><img src="${sigUrl}" alt="Principal Signature" style="max-width:100%;max-height:100%;object-fit:contain"></div>`
-        : `<div style="width:120px;height:52px"></div>`;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -201,8 +198,9 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
       <div class="sig-sub">Signature &amp; Seal</div>
     </div>
     <div>
-      ${principalSigTag}
-      <div class="sig-line"></div>
+      <div class="sig-line">
+        ${schoolInfo.principalSignature ? `<img src="${getSignatureUrl(schoolInfo.principalSignature)}" class="sig-img" alt="Principal Signature" />` : ''}
+      </div>
       <div class="sig-label">Principal</div>
       <div class="sig-sub">Signature &amp; Seal</div>
     </div>
