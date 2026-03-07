@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Plus, Search, Calendar, Trash2, X, ClipboardList,
-    Clock, BookOpen, User, MapPin, ChevronDown, AlertCircle, CheckCircle2, FileText
+    Clock, BookOpen, User, MapPin, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, FileText
 } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
@@ -75,6 +75,21 @@ const Exams = () => {
     const [filterClass, setFilterClass] = useState('');
     const [searchText, setSearchText] = useState('');
 
+    /* ── Accordion collapse state: Set of "class" keys that are collapsed ── */
+    const [collapsedClasses, setCollapsedClasses] = useState(new Set());
+    const [collapsedSections, setCollapsedSections] = useState(new Set());
+
+    const toggleClass = (cls) => setCollapsedClasses(prev => {
+        const next = new Set(prev);
+        next.has(cls) ? next.delete(cls) : next.add(cls);
+        return next;
+    });
+    const toggleSection = (key) => setCollapsedSections(prev => {
+        const next = new Set(prev);
+        next.has(key) ? next.delete(key) : next.add(key);
+        return next;
+    });
+
     /* ── Load data on mount ── */
     useEffect(() => { fetchExams(); fetchClasses(); fetchTeachers(); }, []);
 
@@ -119,6 +134,31 @@ const Exams = () => {
         }
         return true;
     }), [exams, filterStatus, filterClass, searchText]);
+
+    /* ── Group filtered exams: { class → { section → exam[] } } ── */
+    const groupedExams = useMemo(() => {
+        const map = {};
+        filteredExams.forEach(e => {
+            const cls = e.class || 'Unknown';
+            const sec = e.section || 'All';
+            if (!map[cls]) map[cls] = {};
+            if (!map[cls][sec]) map[cls][sec] = [];
+            map[cls][sec].push(e);
+        });
+        // Sort classes numerically/alphabetically, sections alphabetically
+        const sorted = {};
+        Object.keys(map).sort((a, b) => {
+            const na = Number(a), nb = Number(b);
+            if (!isNaN(na) && !isNaN(nb)) return na - nb;
+            return a.localeCompare(b);
+        }).forEach(cls => {
+            sorted[cls] = {};
+            Object.keys(map[cls]).sort().forEach(sec => {
+                sorted[cls][sec] = map[cls][sec].sort((a, b) => new Date(b.date) - new Date(a.date));
+            });
+        });
+        return sorted;
+    }, [filteredExams]);
 
     /* ── Field change handler ── */
     const handleField = (key, value) => {
@@ -234,102 +274,145 @@ const Exams = () => {
                 </select>
             </div>
 
-            {/* ── Table ── */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Exam Name</th>
-                                <th>Class / Section</th>
-                                <th>Subject</th>
-                                <th>Time</th>
-                                <th>Marks</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="8" className="text-center py-10">
-                                    <div className="loading-spinner mx-auto" />
-                                </td></tr>
-                            ) : filteredExams.length === 0 ? (
-                                <tr><td colSpan="8" className="text-center py-10 text-gray-400">
-                                    No exams found
-                                </td></tr>
-                            ) : filteredExams.map(exam => (
-                                <tr key={exam._id}>
-                                    <td>
-                                        <div className="flex items-center gap-1.5 text-gray-700">
-                                            <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                                            {new Date(exam.date).toLocaleDateString()}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className="font-medium text-gray-900">{exam.name}</div>
-                                        {exam.examSeries && (
-                                            <div className="text-xs text-gray-400">{exam.examSeries}</div>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <span className="badge badge-blue">{exam.class}</span>
-                                        {exam.section && (
-                                            <span className="ml-1 text-xs text-gray-500">– {exam.section}</span>
-                                        )}
-                                    </td>
-                                    <td className="text-gray-700">{exam.subject}</td>
-                                    <td>
-                                        {exam.startTime && exam.endTime ? (
-                                            <div className="flex items-center gap-1 text-xs text-gray-600">
-                                                <Clock className="h-3 w-3 text-gray-400" />
-                                                {exam.startTime}–{exam.endTime}
-                                                <span className="text-gray-400">
-                                                    ({calcDuration(exam.startTime, exam.endTime)})
-                                                </span>
+            {/* ── Grouped Exam List ── */}
+            <div className="space-y-3">
+                {loading ? (
+                    <div className="bg-white rounded-lg shadow-sm flex justify-center items-center py-16">
+                        <div className="loading-spinner" />
+                    </div>
+                ) : Object.keys(groupedExams).length === 0 ? (
+                    <div className="bg-white rounded-lg shadow-sm flex flex-col items-center py-16 text-gray-400">
+                        <BookOpen className="h-10 w-10 mb-3 opacity-30" />
+                        <p className="font-medium">No exams found</p>
+                    </div>
+                ) : Object.entries(groupedExams).map(([cls, sectionMap]) => {
+                    const isClassCollapsed = collapsedClasses.has(cls);
+                    const totalInClass = Object.values(sectionMap).reduce((a, arr) => a + arr.length, 0);
+                    return (
+                        <div key={cls} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                            {/* Class header */}
+                            <button
+                                className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200"
+                                onClick={() => toggleClass(cls)}
+                            >
+                                <div className="flex items-center gap-3">
+                                    {isClassCollapsed
+                                        ? <ChevronRight className="h-4 w-4 text-gray-400" />
+                                        : <ChevronDown className="h-4 w-4 text-gray-400" />
+                                    }
+                                    <span className="font-bold text-gray-900 text-base">Class {cls}</span>
+                                    <span className="text-xs font-medium bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
+                                        {totalInClass} exam{totalInClass !== 1 ? 's' : ''}
+                                    </span>
+                                </div>
+                                <span className="text-xs text-gray-400">{Object.keys(sectionMap).length} section{Object.keys(sectionMap).length !== 1 ? 's' : ''}</span>
+                            </button>
+
+                            {/* Sections */}
+                            {!isClassCollapsed && Object.entries(sectionMap).map(([sec, examList]) => {
+                                const sectionKey = `${cls}-${sec}`;
+                                const isSecCollapsed = collapsedSections.has(sectionKey);
+                                return (
+                                    <div key={sec}>
+                                        {/* Section sub-header */}
+                                        <button
+                                            className="w-full flex items-center gap-2.5 px-6 py-2.5 bg-indigo-50/60 hover:bg-indigo-100/50 transition-colors border-b border-indigo-100 text-left"
+                                            onClick={() => toggleSection(sectionKey)}
+                                        >
+                                            {isSecCollapsed
+                                                ? <ChevronRight className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                                                : <ChevronDown className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                                            }
+                                            <span className="text-sm font-semibold text-indigo-700">
+                                                {sec === 'All' ? 'All Sections' : `Section ${sec}`}
+                                            </span>
+                                            <span className="text-xs text-indigo-400 ml-auto">{examList.length} exam{examList.length !== 1 ? 's' : ''}</span>
+                                        </button>
+
+                                        {/* Exam rows for this section */}
+                                        {!isSecCollapsed && (
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm">
+                                                    <thead>
+                                                        <tr className="bg-gray-50 border-b border-gray-100">
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Name</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marks</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {examList.map((exam, idx) => (
+                                                            <tr key={exam._id} className={`border-b border-gray-100 transition-colors hover:bg-primary-50/40 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                                                <td className="px-5 py-3">
+                                                                    <div className="flex items-center gap-1.5 text-gray-700">
+                                                                        <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                                                        {new Date(exam.date).toLocaleDateString()}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-5 py-3">
+                                                                    <div className="font-semibold text-gray-900">{exam.name}</div>
+                                                                    {exam.examSeries && (
+                                                                        <div className="text-xs text-gray-400">{exam.examSeries}</div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-5 py-3 text-gray-700 font-medium">{exam.subject}</td>
+                                                                <td className="px-5 py-3">
+                                                                    {exam.startTime && exam.endTime ? (
+                                                                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                                                                            <Clock className="h-3 w-3 text-gray-400" />
+                                                                            {exam.startTime}–{exam.endTime}
+                                                                            <span className="text-gray-400">({calcDuration(exam.startTime, exam.endTime)})</span>
+                                                                        </div>
+                                                                    ) : <span className="text-gray-300 text-xs">—</span>}
+                                                                </td>
+                                                                <td className="px-5 py-3">
+                                                                    <span className="font-medium text-gray-900">{exam.totalMarks}</span>
+                                                                    {exam.passingMarks != null && (
+                                                                        <span className="text-gray-400 text-xs ml-1">/ {exam.passingMarks} pass</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="px-5 py-3">
+                                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[exam.status] || 'bg-gray-100 text-gray-600'}`}>
+                                                                        {exam.status}
+                                                                    </span>
+                                                                </td>
+                                                                <td className="px-5 py-3">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <button
+                                                                            className="btn btn-sm btn-outline text-teal-600 hover:bg-teal-50"
+                                                                            onClick={() => setSelectedExam(exam)}
+                                                                            title="Enter / View Results"
+                                                                        >
+                                                                            <ClipboardList className="h-3.5 w-3.5 mr-1" />
+                                                                            Results
+                                                                        </button>
+                                                                        {(user.role === 'admin' || user.role === 'teacher') && (
+                                                                            <button
+                                                                                className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                                                                                onClick={() => handleDelete(exam._id)}
+                                                                                title="Delete exam"
+                                                                            >
+                                                                                <Trash2 className="h-4 w-4" />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
-                                        ) : (
-                                            <span className="text-gray-300 text-xs">—</span>
                                         )}
-                                    </td>
-                                    <td>
-                                        <span className="font-medium">{exam.totalMarks}</span>
-                                        {exam.passingMarks != null && (
-                                            <span className="text-gray-400 text-xs ml-1">/ {exam.passingMarks} pass</span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[exam.status] || 'bg-gray-100 text-gray-600'}`}>
-                                            {exam.status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                className="btn btn-sm btn-outline text-teal-600 hover:bg-teal-50"
-                                                onClick={() => setSelectedExam(exam)}
-                                                title="Enter / View Results"
-                                            >
-                                                <ClipboardList className="h-3.5 w-3.5 mr-1" />
-                                                Results
-                                            </button>
-                                            {(user.role === 'admin' || user.role === 'teacher') && (
-                                                <button
-                                                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                                                    onClick={() => handleDelete(exam._id)}
-                                                    title="Delete exam"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                })}
             </div>
 
             {/* ══════════════════════════════════════

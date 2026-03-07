@@ -238,9 +238,8 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const issueDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-start justify-center overflow-y-auto py-4 px-4">
-            {/* Action bar */}
-            <div className="w-full max-w-3xl">
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+            <div className="w-full max-w-3xl mx-4 max-h-[92vh] flex flex-col">
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
                     <div className="flex items-center gap-3">
                         <label className="text-sm text-white font-medium">Exam Series:</label>
@@ -260,7 +259,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                 </div>
 
                 {/* ══ Certificate-style Card ══ */}
-                <div className="bg-white border-2 border-gray-900 rounded-none shadow-2xl">
+                <div className="bg-white border-2 border-gray-900 rounded-none shadow-2xl overflow-y-auto flex-1">
                     <div className="border border-gray-500 m-1.5">
 
                         {/* Loading / Empty */}
