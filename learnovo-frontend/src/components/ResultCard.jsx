@@ -323,12 +323,12 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                     <div className="shrink-0">
                                         {schoolInfo.logo
                                             ? <img src={schoolInfo.logo} alt="Logo" className="w-20 h-20 object-contain" />
-                                            : <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center text-3xl font-black text-slate-500" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{(schoolInfo.name || 'S')[0]}</div>
+                                            : <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center text-3xl font-black text-slate-500">{(schoolInfo.name || 'S')[0]}</div>
                                         }
                                     </div>
                                     {/* School info */}
                                     <div className="flex-1 text-center">
-                                        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{schoolInfo.name}</h1>
+                                        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight" style={{ fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.02em' }}>{schoolInfo.name}</h1>
                                         {schoolInfo.address && <p className="text-[11px] text-slate-500 mt-1">{schoolInfo.address}</p>}
                                         {schoolInfo.phone && <p className="text-[11px] text-slate-400 mt-0.5">Phone: {schoolInfo.phone}{schoolInfo.email && `  ·  Email: ${schoolInfo.email}`}</p>}
                                         {schoolInfo.board && <p className="text-[11px] text-slate-400 mt-0.5">{schoolInfo.board}{schoolInfo.affiliation && ` · Affil: ${schoolInfo.affiliation}`}{schoolInfo.udise && ` · UDISE: ${schoolInfo.udise}`}</p>}
@@ -349,7 +349,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                     ].map((c, i) => (
                                         <div key={c.label} className={`px-5 py-3 ${i < 3 ? 'border-r border-gray-200' : ''}`}>
                                             <p className="text-[9.5px] font-semibold uppercase tracking-[.1em] text-slate-400">{c.label}</p>
-                                            <p className="mt-1 text-sm font-bold text-slate-900" style={c.serif ? { fontFamily: "'Playfair Display', Georgia, serif", fontSize: '15px' } : {}}>{c.value}</p>
+                                            <p className="mt-1 text-sm font-bold text-slate-900" style={c.serif ? { fontFamily: "'Inter', system-ui, sans-serif", fontSize: '15px', fontWeight: 700 } : {}}>{c.value}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -375,7 +375,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                                             <div className="text-xs text-slate-400">{new Date(s.date).toLocaleDateString('en-IN')}</div>
                                                         </td>
                                                         <td className="px-3 py-2.5 text-center text-slate-500">{s.totalMarks}</td>
-                                                        <td className="px-3 py-2.5 text-center font-black text-slate-900 text-base" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{s.marksObtained}</td>
+                                                        <td className="px-3 py-2.5 text-center font-bold text-slate-900 text-base">{s.marksObtained}</td>
                                                         <td className="px-3 py-2.5 text-center text-slate-600">{s.percentage}%</td>
                                                         <td className="px-3 py-2.5 text-center">
                                                             <span style={{ background: GRADE_BG(s.grade), color: GRADE_COLOR(s.grade) }} className="inline-block px-2 py-0.5 text-xs font-bold tracking-wide">{s.grade}</span>
@@ -392,7 +392,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                                 <tr className="text-white text-sm font-bold" style={{ background: '#0f172a' }}>
                                                     <td className="px-3 py-3" colSpan={2}>Grand Total</td>
                                                     <td className="px-3 py-3 text-center">{summary.grandTotal}</td>
-                                                    <td className="px-3 py-3 text-center text-base" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>{summary.grandObtained}</td>
+                                                    <td className="px-3 py-3 text-center text-base font-bold">{summary.grandObtained}</td>
                                                     <td className="px-3 py-3 text-center">{summary.overallPercentage}%</td>
                                                     <td className="px-3 py-3 text-center">
                                                         <span style={{ background: GRADE_BG(summary.overallGrade), color: GRADE_COLOR(summary.overallGrade) }} className="inline-block px-2 py-0.5 font-bold text-xs">{summary.overallGrade}</span>
@@ -410,7 +410,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 </div>
 
                                 {/* ── Result Footer — minimal ── */}
-                                <div className="mx-7 mb-6 flex items-center gap-4 py-3 border-t border-gray-200">
+                                <div className="mx-7 mb-6 flex items-center gap-4 py-4">
                                     <div className="flex-1 h-px bg-gray-200" />
                                     <div className="text-center px-2">
                                         <p className="text-xs font-semibold tracking-[.14em] uppercase text-slate-700">
