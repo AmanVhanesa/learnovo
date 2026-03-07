@@ -29,6 +29,12 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
     const { student, subjects, summary } = cardData;
     const issueDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
+    const isFinalExam = (filterSeries || '').toLowerCase() === 'final';
+    const passTitle = isFinalExam ? 'Promoted to Next Class' : 'Passed Exam';
+    const failTitle = isFinalExam ? 'Detained &mdash; Failed' : 'Failed Exam';
+    const passSub = isFinalExam ? 'Academic Year Progress' : 'Satisfactory Performance';
+    const failSub = 'Please consult the school';
+
     const sName = student?.fullName || student?.name || '—';
     const sClass = student?.class || subjects[0]?.class || '—';
     const sSection = student?.section || subjects[0]?.section || '—';
@@ -177,8 +183,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
     <div class="result-inner">
       <div class="result-line"></div>
       <div>
-        <div class="result-text">${summary.overallPassed ? 'Promoted to Next Class' : 'Detained — Failed'}</div>
-        <div class="result-sub">${summary.overallPassed ? 'Academic Year Progress' : 'Please consult the school'}</div>
+        <div class="result-text">${summary.overallPassed ? passTitle : failTitle}</div>
+        <div class="result-sub">${summary.overallPassed ? passSub : failSub}</div>
       </div>
       <div class="result-line"></div>
     </div>
@@ -187,9 +193,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
 
   <!-- Signatures -->
   <div class="sep"></div>
-  <div class="sigs">
+  <div class="sigs" style="grid-template-columns: 1fr 1fr;">
     <div><div class="sig-line"></div><div class="sig-label">Class Teacher</div><div class="sig-sub">Signature &amp; Seal</div></div>
-    <div><div class="stamp"></div><div class="sig-label">Official Stamp</div></div>
     <div>${principalSigTag}<div class="sig-line"></div><div class="sig-label">Principal</div><div class="sig-sub">Signature &amp; Seal</div></div>
   </div>
   <div class="footer-note">This is a computer-generated report card issued by ${schoolInfo.name}.</div>
@@ -260,6 +265,12 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const subjects = cardData?.subjects || [];
     const summary = cardData?.summary;
     const issueDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    const isFinalExam = (filterSeries || '').toLowerCase() === 'final';
+    const passTitle = isFinalExam ? 'Promoted to Next Class' : 'Passed Exam';
+    const failTitle = isFinalExam ? 'Detained — Failed' : 'Failed Exam';
+    const passSub = isFinalExam ? 'Academic Year Progress' : 'Satisfactory Performance';
+    const failSub = 'Please consult the school';
 
     return ReactDOM.createPortal(
         <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -430,32 +441,28 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                     <div className="flex-1 h-px bg-gray-200" />
                                     <div className="text-center px-2">
                                         <p className="text-xs font-semibold tracking-[.14em] uppercase text-slate-700">
-                                            {summary.overallPassed ? 'Promoted to Next Class' : 'Detained — Failed'}
+                                            {summary.overallPassed ? passTitle : failTitle}
                                         </p>
                                         <p className="text-[9.5px] tracking-[.08em] uppercase text-slate-400 mt-0.5">
-                                            {summary.overallPassed ? 'Academic Year Progress' : 'Please consult the school'}
+                                            {summary.overallPassed ? passSub : failSub}
                                         </p>
                                     </div>
                                     <div className="flex-1 h-px bg-gray-200" />
                                 </div>
 
                                 {/* ── Signatures ── */}
-                                <div className="border-t border-dashed border-gray-300 mx-7 pt-5 mb-6 grid grid-cols-3 gap-6 text-center items-end">
+                                <div className="border-t border-dashed border-gray-300 mx-7 pt-5 mb-6 grid grid-cols-2 gap-12 text-center items-end">
                                     <div>
                                         <div className="h-10" />
-                                        <div className="border-b border-gray-400 mb-2" />
+                                        <div className="border-b border-gray-400 mb-2 max-w-[200px] mx-auto" />
                                         <p className="text-xs font-semibold text-slate-700">Class Teacher</p>
                                         <p className="text-[10px] text-slate-400 mt-0.5">Signature &amp; Seal</p>
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <div className="w-12 h-12 rounded-full border border-dashed border-gray-300 mb-2" />
-                                        <p className="text-xs text-slate-400">Official Stamp</p>
                                     </div>
                                     <div className="flex flex-col items-center">
                                         {schoolInfo.principalSignature
                                             ? <img src={getSignatureUrl(schoolInfo.principalSignature)} alt="Principal Signature" className="h-10 w-28 object-contain" />
                                             : <div className="h-10" />}
-                                        <div className="w-full border-b border-gray-400 mb-2" />
+                                        <div className="w-full border-b border-gray-400 mb-2 max-w-[200px] mx-auto" />
                                         <p className="text-xs font-semibold text-slate-700 w-full text-center">Principal</p>
                                         <p className="text-[10px] text-slate-400 mt-0.5 w-full text-center">Signature &amp; Seal</p>
                                     </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Save, TrendingUp, FileText } from 'lucide-react';
 import { studentsService } from '../services/studentsService';
 import { examsService } from '../services/examsService';
@@ -85,9 +86,9 @@ const ExamResultsModal = ({ exam, onClose }) => {
         ? Math.round(filled.reduce((acc, s) => acc + Number(marks[s._id]), 0) / filled.length / exam.totalMarks * 1000) / 10
         : null;
 
-    return (
+    return ReactDOM.createPortal(
         <>
-            <div className="modal-overlay" role="dialog" aria-modal="true">
+            <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 max-h-[92vh] flex flex-col">
 
                     {/* Header */}
@@ -235,7 +236,7 @@ const ExamResultsModal = ({ exam, onClose }) => {
                 />
             )}
         </>
-    );
+        , document.body);
 };
 
 export default ExamResultsModal;
