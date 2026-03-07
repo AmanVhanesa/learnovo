@@ -184,7 +184,7 @@ router.get('/result-card/:studentId', protect, async (req, res) => {
                 path: 'exam',
                 select: 'name subject class section date totalMarks passingMarks examSeries examType status'
             })
-            .populate('student', 'name rollNumber class section photo')
+            .populate('student', 'name rollNumber admissionNumber class section photo')
             .sort({ 'exam.date': 1 });
 
         if (!results.length) {
@@ -398,7 +398,7 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
 router.get('/:id/results', protect, async (req, res) => {
     try {
         const results = await Result.find({ exam: req.params.id })
-            .populate('student', 'name rollNumber')
+            .populate('student', 'name rollNumber admissionNumber')
             .sort({ 'student.rollNumber': 1 });
 
         res.json({ success: true, data: results });

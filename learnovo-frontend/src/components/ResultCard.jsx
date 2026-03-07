@@ -17,6 +17,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
     const sClass = student?.class || subjects[0]?.class || '—';
     const sSection = student?.section || subjects[0]?.section || '—';
     const sRoll = student?.rollNumber || '—';
+    const sAdm = student?.admissionNumber || '—';
 
     const gradeColor = (g) => ({ 'A+': '#166534', 'A': '#14532d', 'B': '#134e4a', 'C': '#1e3a8a', 'D': '#713f12', 'F': '#7f1d1d' }[g] || '#1f2937');
     const gradeBg = (g) => ({ 'A+': '#dcfce7', 'A': '#d1fae5', 'B': '#ccfbf1', 'C': '#dbeafe', 'D': '#fef9c3', 'F': '#fee2e2' }[g] || '#f3f4f6');
@@ -117,9 +118,9 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   <!-- Student info strip -->
   <div class="student-strip">
     <div class="info-cell"><label>Student Name</label><div class="val">${sName}</div></div>
-    <div class="info-cell"><label>Class</label><div class="val">${sClass}</div></div>
+    <div class="info-cell"><label>Adm. Number</label><div class="val">${sAdm}</div></div>
+    <div class="info-cell"><label>Class / Section</label><div class="val">${sClass}${sSection !== '—' ? ' – ' + sSection : ''}</div></div>
     <div class="info-cell"><label>Roll Number</label><div class="val">${sRoll}</div></div>
-    <div class="info-cell"><label>Section</label><div class="val">${sSection}</div></div>
   </div>
 
   <!-- Marks table -->
@@ -305,9 +306,9 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                             <div className="grid grid-cols-4 gap-4 bg-indigo-50 border-b-2 border-indigo-200 px-7 py-3">
                                 {[
                                     { label: 'Student Name', value: student?.fullName || student?.name || studentName || '—', bold: true },
-                                    { label: 'Class', value: student?.class || subjects[0]?.class || '—' },
+                                    { label: 'Adm. Number', value: student?.admissionNumber || '—' },
+                                    { label: 'Class / Section', value: `${student?.class || subjects[0]?.class || '—'}${(student?.section || subjects[0]?.section) ? ' – ' + (student?.section || subjects[0]?.section) : ''}` },
                                     { label: 'Roll Number', value: student?.rollNumber || '—' },
-                                    { label: 'Section', value: student?.section || subjects[0]?.section || '—' },
                                 ].map(c => (
                                     <div key={c.label}>
                                         <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-500">{c.label}</p>

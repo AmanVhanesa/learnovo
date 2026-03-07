@@ -98,7 +98,7 @@ const ExamResultsModal = ({ exam, onClose }) => {
                             </h3>
                             <p className="text-sm text-gray-500 mt-0.5">
                                 {exam.subject} &nbsp;|&nbsp; Class&nbsp;{exam.class}
-                                {exam.section && ` §${exam.section}`}
+                                {exam.section && ` – Section ${exam.section}`}
                                 &nbsp;|&nbsp; Max:&nbsp;<strong>{exam.totalMarks}</strong>
                                 &nbsp;|&nbsp; Pass:&nbsp;<strong className="text-amber-600">{passingMarks}</strong>
                             </p>
@@ -136,6 +136,7 @@ const ExamResultsModal = ({ exam, onClose }) => {
                                 <thead className="sticky top-0 bg-white z-10 shadow-sm">
                                     <tr>
                                         <th className="w-16">Roll</th>
+                                        <th className="w-28">Adm. No</th>
                                         <th>Student Name</th>
                                         <th className="w-32">Marks / {exam.totalMarks}</th>
                                         <th className="w-20">%</th>
@@ -152,6 +153,7 @@ const ExamResultsModal = ({ exam, onClose }) => {
                                         return (
                                             <tr key={id}>
                                                 <td className="text-gray-500 text-xs">{student.rollNumber || '—'}</td>
+                                                <td className="text-gray-500 text-xs font-mono">{student.admissionNumber || '—'}</td>
                                                 <td className="font-medium text-gray-900">{student.fullName || student.name || '—'}</td>
                                                 <td>
                                                     <input

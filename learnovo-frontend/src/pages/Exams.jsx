@@ -60,7 +60,6 @@ const Exams = () => {
     const [exams, setExams] = useState([]);
     const [loading, setLoading] = useState(true);
     const [availableClasses, setClasses] = useState([]);
-    const [sections, setSections] = useState([]);
     const [teachers, setTeachers] = useState([]);
 
     /* ── Modal / selection state ── */
@@ -102,15 +101,12 @@ const Exams = () => {
         } catch { /* non-critical */ }
     };
 
-    /* ── When class changes, load its sections ── */
-    useEffect(() => {
-        setSections([]);
-        setForm(prev => ({ ...prev, section: '' }));
-        if (!form.classId) return;
-        classesService.getSections(form.classId)
-            .then(res => setSections(res.data || []))
-            .catch(() => { });
-    }, [form.classId]);
+    /* ── Derive sections from the selected class (no extra API call) ── */
+    const sections = useMemo(() => {
+        if (!form.classId) return [];
+        const cls = availableClasses.find(c => c._id === form.classId);
+        return cls?.sections || [];
+    }, [form.classId, availableClasses]);
 
     /* ── Derived: filtered exam list ── */
     const filteredExams = useMemo(() => exams.filter(e => {
@@ -128,10 +124,11 @@ const Exams = () => {
     const handleField = (key, value) => {
         setForm(prev => {
             const next = { ...prev, [key]: value };
-            // If class changes, update classId too
+            // If class changes, update classId and reset section
             if (key === 'class') {
                 const cls = availableClasses.find(c => c.grade === value);
                 next.classId = cls ? cls._id : '';
+                next.section = '';
             }
             return next;
         });
@@ -279,7 +276,7 @@ const Exams = () => {
                                     <td>
                                         <span className="badge badge-blue">{exam.class}</span>
                                         {exam.section && (
-                                            <span className="ml-1 text-xs text-gray-500">/ {exam.section}</span>
+                                            <span className="ml-1 text-xs text-gray-500">– {exam.section}</span>
                                         )}
                                     </td>
                                     <td className="text-gray-700">{exam.subject}</td>
