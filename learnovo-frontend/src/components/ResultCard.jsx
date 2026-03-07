@@ -99,6 +99,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   .marks-wrap{padding:0 28px 16px}
   .marks-ttl{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;padding:14px 0 8px}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .table-box{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
   table th{background:#f8fafc;padding:8px 12px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:#64748b;font-weight:700;border-bottom:1.5px solid #e2e8f0}
   table th.c,table td.c{text-align:center}
   .grand-row td{background:#0f172a;color:#fff;padding:11px 12px;font-weight:700;font-size:13px}
@@ -151,7 +152,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   <!-- Marks table -->
   <div class="marks-wrap">
     <div class="marks-ttl">Subject-wise Performance</div>
-    <table>
+    <div class="table-box">
+      <table>
       <thead><tr>
         <th>Subject</th><th>Exam</th><th class="c">Max</th><th class="c">Obtained</th>
         <th class="c">%</th><th class="c">Grade</th><th class="c">Result</th><th>Remarks</th>
@@ -168,6 +170,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
         </tr>
       </tfoot>
     </table>
+    </div>
   </div>
 
   <!-- Stats -->
@@ -384,7 +387,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 {/* ── Marks Table ── */}
                                 <div className="px-7 py-4">
                                     <p className="text-[9.5px] font-bold uppercase tracking-[.12em] text-slate-400 mb-3">Subject-wise Performance</p>
-                                    <div className="overflow-x-auto border border-gray-200">
+                                    <div className="overflow-x-auto border border-gray-200 rounded-xl overflow-hidden">
                                         <table className="w-full text-sm">
                                             <thead>
                                                 <tr className="bg-slate-50 text-[9.5px] font-bold uppercase tracking-wide text-slate-500 border-b-2 border-slate-200">
