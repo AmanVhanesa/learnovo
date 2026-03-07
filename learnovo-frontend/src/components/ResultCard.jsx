@@ -79,8 +79,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Inter',system-ui,sans-serif;background:#fff;color:#1a1a1a;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .page{max-width:820px;margin:20px auto;border:1.5px solid #1a1a1a}
-  .inner{border:1px solid #888;margin:5px;padding:0}
+  .page{max-width:820px;margin:20px auto;border:1.5px solid #1a1a1a;border-radius:12px;overflow:hidden}
+  .inner{border:1px solid #888;margin:5px;padding:0;border-radius:6px;overflow:hidden}
   /* ── Header ── */
   .hdr{padding:28px 32px;display:flex;align-items:center;gap:24px;border-bottom:2px solid #1a1a1a}
   .hdr-mid{flex:1;text-align:center}
@@ -338,7 +338,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                     ) : (
 
                         /* ══ Certificate Card ══ */
-                        <div className="bg-white border border-gray-800 shadow-xl max-w-3xl mx-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+                        <div className="bg-white border border-gray-800 shadow-xl max-w-3xl mx-auto rounded-2xl overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
                             {/* Load Playfair Display from Google Fonts */}
                             <link rel="preconnect" href="https://fonts.googleapis.com" />
                             <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />

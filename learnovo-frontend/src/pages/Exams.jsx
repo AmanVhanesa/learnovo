@@ -384,8 +384,18 @@ const Exams = () => {
                                                                     <div className="flex items-center gap-2">
                                                                         <button
                                                                             className="btn btn-sm btn-outline text-teal-600 hover:bg-teal-50"
-                                                                            onClick={() => setSelectedExam(exam)}
-                                                                            title="Enter / View Results"
+                                                                            onClick={() => {
+                                                                                if (user.role === 'student') {
+                                                                                    setResultCardTarget({
+                                                                                        studentId: user._id || user.id,
+                                                                                        studentName: user.name || user.fullName,
+                                                                                        examSeries: exam.examSeries
+                                                                                    });
+                                                                                } else {
+                                                                                    setSelectedExam(exam);
+                                                                                }
+                                                                            }}
+                                                                            title={user.role === 'student' ? "View My Result" : "Enter / View Results"}
                                                                         >
                                                                             <ClipboardList className="h-3.5 w-3.5 mr-1" />
                                                                             Results
