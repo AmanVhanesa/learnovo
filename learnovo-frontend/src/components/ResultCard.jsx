@@ -4,6 +4,15 @@ import { examsService } from '../services/examsService';
 import { settingsService } from '../services/settingsService';
 import toast from 'react-hot-toast';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const SERVER_URL = API_BASE.replace(/\/api\/?$/, '');
+
+const getSignatureUrl = (url) => {
+    if (!url) return null;
+    const full = url.startsWith('http') ? url : `${SERVER_URL}${url}`;
+    return encodeURI(full);
+};
+
 const SERIES_OPTIONS = ['Unit Test', 'Midterm', 'Final', 'Annual', 'Custom'];
 
 /* ─────────────────────────────────────────────────────────
@@ -45,8 +54,13 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
       </tr>`).join('');
 
     const logoTag = schoolInfo.logo
-        ? `<img src="${schoolInfo.logo}" alt="Logo" style="width:80px;height:80px;object-fit:contain;border-radius:6px">`
-        : `<div style="width:80px;height:80px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#334155;font-family:'Playfair Display',Georgia,serif">${(schoolInfo.name || 'S')[0]}</div>`;
+        ? `<img src="${getSignatureUrl(schoolInfo.logo) || schoolInfo.logo}" alt="Logo" style="width:80px;height:80px;object-fit:contain;border-radius:6px">`
+        : `<div style="width:80px;height:80px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#334155">${(schoolInfo.name || 'S')[0]}</div>`;
+
+    const sigUrl = getSignatureUrl(schoolInfo.principalSignature);
+    const principalSigTag = sigUrl
+        ? `<div style="width:120px;height:52px;display:flex;align-items:flex-end;justify-content:center;margin-bottom:0"><img src="${sigUrl}" alt="Principal Signature" style="max-width:100%;max-height:100%;object-fit:contain"></div>`
+        : `<div style="width:120px;height:52px"></div>`;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -175,7 +189,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   <div class="sigs">
     <div><div class="sig-line"></div><div class="sig-label">Class Teacher</div><div class="sig-sub">Signature &amp; Seal</div></div>
     <div><div class="stamp"></div><div class="sig-label">Official Stamp</div></div>
-    <div><div class="sig-line"></div><div class="sig-label">Principal</div><div class="sig-sub">Signature &amp; Seal</div></div>
+    <div>${principalSigTag}<div class="sig-line"></div><div class="sig-label">Principal</div><div class="sig-sub">Signature &amp; Seal</div></div>
   </div>
   <div class="footer-note">This is a computer-generated report card issued by ${schoolInfo.name}.</div>
 
@@ -194,7 +208,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const [cardData, setCardData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [printing, setPrinting] = useState(false);
-    const [schoolInfo, setSchoolInfo] = useState({ name: 'School', address: '', logo: null });
+    const [schoolInfo, setSchoolInfo] = useState({ name: 'School', address: '', logo: null, principalSignature: null });
     const [filterSeries, setFilterSeries] = useState(defaultExamSeries || '');
 
     /* ── settings ── */
@@ -212,6 +226,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                     affiliation: inst.affiliationNumber || '',
                     udise: inst.udiseCode || '',
                     logo: inst.logo || null,
+                    principalSignature: inst.principalSignature || null,
                 });
             })
             .catch(() => { });
@@ -315,7 +330,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                             {/* Load Playfair Display from Google Fonts */}
                             <link rel="preconnect" href="https://fonts.googleapis.com" />
                             <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-                            <div className="border border-gray-500 m-1.5">
+                            <div>
 
                                 {/* ── Certificate Header ── */}
                                 <div className="flex items-center gap-6 px-7 py-5 border-b-2 border-gray-800">
@@ -427,7 +442,14 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 <div className="border-t border-dashed border-gray-300 mx-7 pt-5 mb-6 grid grid-cols-3 gap-6 text-center">
                                     <div><div className="h-9 border-b border-gray-400 mb-2" /><p className="text-xs font-semibold text-slate-700">Class Teacher</p><p className="text-[10px] text-slate-400 mt-0.5">Signature &amp; Seal</p></div>
                                     <div className="flex flex-col items-center"><div className="w-12 h-12 rounded-full border border-dashed border-gray-300 mb-2" /><p className="text-xs text-slate-400">Official Stamp</p></div>
-                                    <div><div className="h-9 border-b border-gray-400 mb-2" /><p className="text-xs font-semibold text-slate-700">Principal</p><p className="text-[10px] text-slate-400 mt-0.5">Signature &amp; Seal</p></div>
+                                    <div className="flex flex-col items-end">
+                                        {schoolInfo.principalSignature
+                                            ? <img src={getSignatureUrl(schoolInfo.principalSignature)} alt="Principal Signature" className="h-12 w-28 object-contain mb-0 ml-auto" />
+                                            : <div className="h-9" />}
+                                        <div className="w-full border-b border-gray-400 mb-2" />
+                                        <p className="text-xs font-semibold text-slate-700 w-full text-center">Principal</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5 w-full text-center">Signature &amp; Seal</p>
+                                    </div>
                                 </div>
                                 <p className="text-center text-[10px] text-slate-300 pb-5 italic px-7">This is a computer-generated report card issued by {schoolInfo.name}.</p>
 
