@@ -409,22 +409,18 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                     </div>
                                 </div>
 
-                                {/* ── Result Footer — elegant, decorative lines, no colored bg ── */}
-                                <div className="mx-7 mb-6">
-                                    <div className="h-px bg-slate-800" />
-                                    <div className="flex items-center gap-4 py-4">
-                                        <div className="flex-1 h-px bg-slate-200" />
-                                        <div className="text-center">
-                                            <p className="text-sm font-black tracking-[.18em] uppercase text-slate-800" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-                                                {summary.overallPassed ? 'Promoted to Next Class' : 'Detained — Failed'}
-                                            </p>
-                                            <p className="text-[10px] tracking-[.1em] uppercase text-slate-400 mt-0.5">
-                                                {summary.overallPassed ? 'Academic Year Progress' : 'Please consult the school'}
-                                            </p>
-                                        </div>
-                                        <div className="flex-1 h-px bg-slate-200" />
+                                {/* ── Result Footer — minimal ── */}
+                                <div className="mx-7 mb-6 flex items-center gap-4 py-3 border-t border-gray-200">
+                                    <div className="flex-1 h-px bg-gray-200" />
+                                    <div className="text-center px-2">
+                                        <p className="text-xs font-semibold tracking-[.14em] uppercase text-slate-700">
+                                            {summary.overallPassed ? 'Promoted to Next Class' : 'Detained — Failed'}
+                                        </p>
+                                        <p className="text-[9.5px] tracking-[.08em] uppercase text-slate-400 mt-0.5">
+                                            {summary.overallPassed ? 'Academic Year Progress' : 'Please consult the school'}
+                                        </p>
                                     </div>
-                                    <div className="h-px bg-slate-800" />
+                                    <div className="flex-1 h-px bg-gray-200" />
                                 </div>
 
                                 {/* ── Signatures ── */}
