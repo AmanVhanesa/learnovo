@@ -40,5 +40,13 @@ export const examsService = {
     saveResults: async (id, results) => {
         const res = await api.post(`/exams/${id}/results`, { results })
         return res.data
+    },
+
+    getResultCard: async (studentId, filters = {}) => {
+        const params = new URLSearchParams()
+        if (filters.examSeries) params.append('examSeries', filters.examSeries)
+        if (filters.class) params.append('class', filters.class)
+        const res = await api.get(`/exams/result-card/${studentId}?${params.toString()}`)
+        return res.data
     }
 }

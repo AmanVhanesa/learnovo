@@ -164,6 +164,96 @@ router.post('/', protect, authorize('admin', 'teacher'), [
     }
 });
 
+// @desc    Get result card for a student (aggregated across exams)
+// @route   GET /api/exams/result-card/:studentId
+// @access  Private
+router.get('/result-card/:studentId', protect, async (req, res) => {
+    try {
+        const { studentId } = req.params;
+        const { examSeries, class: className } = req.query;
+
+        // Build result filter
+        const resultFilter = {
+            tenantId: req.user.tenantId,
+            student: studentId
+        };
+
+        // Fetch all results for this student
+        const results = await Result.find(resultFilter)
+            .populate({
+                path: 'exam',
+                select: 'name subject class section date totalMarks passingMarks examSeries examType status'
+            })
+            .populate('student', 'name rollNumber class section photo')
+            .sort({ 'exam.date': 1 });
+
+        if (!results.length) {
+            return res.json({
+                success: true,
+                data: { student: null, subjects: [], summary: null }
+            });
+        }
+
+        // Filter by examSeries / class if provided
+        let filtered = results.filter(r => r.exam); // ensure exam populated
+        if (examSeries) filtered = filtered.filter(r => r.exam.examSeries === examSeries);
+        if (className) filtered = filtered.filter(r => r.exam.class === className);
+
+        // Build subject rows
+        const subjects = filtered.map(r => ({
+            examId: r.exam._id,
+            examName: r.exam.name,
+            examSeries: r.exam.examSeries,
+            subject: r.exam.subject,
+            class: r.exam.class,
+            section: r.exam.section,
+            date: r.exam.date,
+            examType: r.exam.examType,
+            totalMarks: r.exam.totalMarks,
+            passingMarks: r.exam.passingMarks ?? Math.ceil(r.exam.totalMarks * 0.4),
+            marksObtained: r.marksObtained,
+            percentage: r.percentage,
+            grade: r.grade,
+            isPassed: r.isPassed,
+            remarks: r.remarks || ''
+        }));
+
+        // Compute overall summary
+        const grandTotal = subjects.reduce((acc, s) => acc + s.totalMarks, 0);
+        const grandObtained = subjects.reduce((acc, s) => acc + s.marksObtained, 0);
+        const overallPercentage = grandTotal > 0
+            ? Math.round((grandObtained / grandTotal) * 100 * 10) / 10
+            : 0;
+        const overallGrade = calculateGrade(overallPercentage);
+        const overallPassed = subjects.every(s => s.isPassed);
+        const passCount = subjects.filter(s => s.isPassed).length;
+        const failCount = subjects.length - passCount;
+
+        const student = results[0].student;
+
+        res.json({
+            success: true,
+            data: {
+                student,
+                subjects,
+                summary: {
+                    grandTotal,
+                    grandObtained,
+                    overallPercentage,
+                    overallGrade,
+                    overallPassed,
+                    passCount,
+                    failCount,
+                    totalSubjects: subjects.length
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Get result card error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
 // @desc    Get exam details
 // @route   GET /api/exams/:id
 // @access  Private
