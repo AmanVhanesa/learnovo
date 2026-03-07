@@ -42,20 +42,20 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
     const sAdm = student?.admissionNumber || '—';
 
     const subjectRows = subjects.map((s, i) => `
-      <tr style="background:${i % 2 === 0 ? '#fff' : '#fafafa'}">
+      <tr style="background:${i % 2 === 0 ? '#fff' : '#fafafa'};-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
         <td style="padding:9px 12px;font-weight:600;color:#111;border-bottom:1px solid #e5e7eb">${s.subject}</td>
         <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb">
           <div style="font-weight:500;color:#374151;font-size:12px">${s.examName}</div>
           <div style="color:#9ca3af;font-size:11px">${new Date(s.date).toLocaleDateString('en-IN')}</div>
         </td>
         <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb;color:#555">${s.totalMarks}</td>
-        <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-weight:800;font-size:15px;color:#111;font-family:'Playfair Display',Georgia,serif">${s.marksObtained}</td>
+        <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-weight:800;font-size:15px;color:#111;font-family:'Inter',sans-serif !important">${s.marksObtained}</td>
         <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb;color:#555">${s.percentage}%</td>
         <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb">
-          <span style="background:${GRADE_BG(s.grade)};color:${GRADE_COLOR(s.grade)};padding:2px 9px;border-radius:4px;font-weight:700;font-size:12px;letter-spacing:.04em">${s.grade}</span>
+          <span style="background:${GRADE_BG(s.grade)};color:${GRADE_COLOR(s.grade)};padding:2px 9px;border-radius:4px;font-weight:700;font-size:12px;letter-spacing:.04em;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">${s.grade}</span>
         </td>
         <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb">
-          <span style="font-size:12px;font-weight:600;color:${s.isPassed ? '#166534' : '#b91c1c'}">${s.isPassed ? '✓ Pass' : '✗ Fail'}</span>
+          <span style="font-size:12px;font-weight:600;color:${s.isPassed ? '#166534' : '#b91c1c'};-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">${s.isPassed ? '✓ Pass' : '✗ Fail'}</span>
         </td>
         <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;color:#9ca3af;font-size:11px;font-style:italic">${s.remarks || '—'}</td>
       </tr>`).join('');
@@ -78,13 +78,13 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Inter',system-ui,sans-serif;background:#fff !important;color:#1a1a1a}
+  body{font-family:'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;background:#fff !important;color:#1a1a1a}
   .page{max-width:820px;margin:20px auto;border:1.5px solid #1a1a1a;border-radius:12px;overflow:hidden}
   .inner{border:1px solid #888;margin:5px;padding:0;border-radius:6px;overflow:hidden}
   /* ── Header ── */
   .hdr{padding:28px 32px;display:flex;align-items:center;gap:24px;border-bottom:2px solid #1a1a1a}
   .hdr-mid{flex:1;text-align:center}
-  .school-name{font-family:'Playfair Display',Georgia,serif;font-size:28px;font-weight:900;letter-spacing:-.01em;color:#0f172a}
+  .school-name{font-family:'Playfair Display', Georgia, serif !important;font-size:28px;font-weight:900;letter-spacing:-.01em;color:#0f172a}
   .school-addr{font-size:11.5px;color:#555;margin-top:4px;line-height:1.6}
   .card-badge{display:inline-block;margin-top:10px;padding:3px 14px;border:1px solid #0f172a;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#0f172a}
   .hdr-right{min-width:72px;text-align:right;font-size:10.5px;color:#777;line-height:1.6}
@@ -93,8 +93,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   .stu-cell{padding:12px 16px;border-right:1px solid #e5e7eb}
   .stu-cell:last-child{border-right:none}
   .stu-label{font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:#94a3b8;font-weight:600;display:block;margin-bottom:4px}
-  .stu-val{font-size:14px;font-weight:700;color:#0f172a}
-  .stu-val.lg{font-family:'Playfair Display',Georgia,serif;font-size:15px;font-weight:900}
+  .stu-val{font-family:'Inter', sans-serif !important;font-size:14px;font-weight:700;color:#0f172a}
+  .stu-val.lg{font-family:'Inter', sans-serif !important;font-size:15px;font-weight:900}
   /* ── Marks ── */
   .marks-wrap{padding:0 28px 16px}
   .marks-ttl{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;padding:14px 0 8px}
@@ -102,7 +102,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   .table-box{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
   table th{background:#f8fafc;padding:8px 12px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:#64748b;font-weight:700;border-bottom:1.5px solid #e2e8f0}
   table th.c,table td.c{text-align:center}
-  .grand-row td{background:#0f172a;color:#fff;padding:11px 12px;font-weight:700;font-size:13px}
+  .grand-row td{background:#312e81 !important;color:#fff !important;padding:11px 12px;font-weight:700;font-size:13px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
   /* ── Stats ── */
   .stats{padding:8px 28px;font-size:11.5px;color:#64748b;display:flex;gap:20px;border-bottom:1px solid #e5e7eb}
   /* ── Result footer ── */
@@ -110,7 +110,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   .result-rule{height:1px;background:#1a1a1a;margin:0 60px}
   .result-inner{padding:14px 0;display:flex;align-items:center;justify-content:center;gap:16px}
   .result-line{flex:1;height:1px;background:#d1d5db}
-  .result-text{font-family:'Playfair Display',Georgia,serif;font-size:14px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#0f172a;white-space:nowrap}
+  .result-text{font-family:'Inter', sans-serif !important;font-size:14px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#0f172a;white-space:nowrap}
   .result-sub{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;margin-top:4px}
   /* ── Signatures ── */
   .sep{border-top:1px dashed #d1d5db;margin:0 28px}
@@ -160,13 +160,13 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
       </tr></thead>
       <tbody>${subjectRows}</tbody>
       <tfoot>
-        <tr class="grand-row">
-          <td colspan="2">Grand Total</td>
-          <td class="c">${summary.grandTotal}</td>
-          <td class="c" style="font-size:16px;font-family:'Playfair Display',Georgia,serif">${summary.grandObtained}</td>
-          <td class="c">${summary.overallPercentage}%</td>
-          <td class="c"><span style="background:${GRADE_BG(summary.overallGrade)};color:${GRADE_COLOR(summary.overallGrade)};padding:2px 10px;border-radius:4px;font-weight:700">${summary.overallGrade}</span></td>
-          <td colspan="2" class="c"><span style="font-weight:800;letter-spacing:.06em">${summary.overallPassed ? '✓ PASS' : '✗ FAIL'}</span></td>
+        <tr class="grand-row" style="-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;background:#312e81 !important;">
+          <td colspan="2" style="background:#312e81 !important;color:#fff !important;">Grand Total</td>
+          <td class="c" style="background:#312e81 !important;color:#fff !important;">${summary.grandTotal}</td>
+          <td class="c" style="font-size:16px;font-family:'Inter',sans-serif !important;font-weight:800;background:#312e81 !important;color:#fff !important;">${summary.grandObtained}</td>
+          <td class="c" style="background:#312e81 !important;color:#fff !important;">${summary.overallPercentage}%</td>
+          <td class="c" style="background:#312e81 !important;"><span style="background:${GRADE_BG(summary.overallGrade)};color:${GRADE_COLOR(summary.overallGrade)};padding:2px 10px;border-radius:4px;font-weight:700;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">${summary.overallGrade}</span></td>
+          <td colspan="2" class="c" style="background:#312e81 !important;color:#fff !important;"><span style="font-weight:800;letter-spacing:.06em;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">${summary.overallPassed ? '✓ PASS' : '✗ FAIL'}</span></td>
         </tr>
       </tfoot>
     </table>
