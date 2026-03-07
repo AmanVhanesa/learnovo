@@ -61,8 +61,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
       </tr>`).join('');
 
     const logoTag = schoolInfo.logo
-        ? `<img src="${getSignatureUrl(schoolInfo.logo) || schoolInfo.logo}" alt="Logo" style="width:80px;height:80px;object-fit:contain;border-radius:6px">`
-        : `<div style="width:80px;height:80px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#334155">${(schoolInfo.name || 'S')[0]}</div>`;
+        ? `<img src="${schoolInfo.logo}" alt="Logo" style="width:100px;height:auto;object-fit:contain">`
+        : `<div style="width:100px;height:52px"></div>`;
 
     const sigUrl = getSignatureUrl(schoolInfo.principalSignature);
     const principalSigTag = sigUrl
@@ -106,19 +106,19 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   /* ── Stats ── */
   .stats{padding:8px 28px;font-size:11.5px;color:#64748b;display:flex;gap:20px;border-bottom:1px solid #e5e7eb}
   /* ── Result footer ── */
-  .result-area{padding:20px 32px;text-align:center}
-  .result-rule{height:1px;background:#1a1a1a;margin:0 60px}
-  .result-inner{padding:14px 0;display:flex;align-items:center;justify-content:center;gap:16px}
-  .result-line{flex:1;height:1px;background:#d1d5db}
-  .result-text{font-family:'Inter', sans-serif !important;font-size:14px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#0f172a;white-space:nowrap}
+  .result-area{padding:16px 28px;margin-bottom:24px}
+  .result-inner{display:flex;align-items:center;gap:16px}
+  .result-line{flex:1;height:1px;background:#e5e7eb}
+  .result-text-wrap{text-align:center}
+  .result-text{font-family:'Inter', sans-serif !important;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#0f172a;white-space:nowrap}
   .result-sub{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;margin-top:4px}
   /* ── Signatures ── */
-  .sep{border-top:1px dashed #d1d5db;margin:0 28px}
-  .sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;padding:20px 32px;text-align:center}
-  .sig-line{border-bottom:1px solid #aaa;height:36px;margin-bottom:6px}
-  .sig-label{font-size:12px;font-weight:600;color:#1e293b}
-  .sig-sub{font-size:10px;color:#94a3b8;margin-top:2px}
-  .stamp{width:56px;height:56px;border-radius:50%;border:1.5px dashed #cbd5e1;margin:0 auto 6px}
+  .sep{border-top:1px dashed #e5e7eb;margin:0 28px}
+  .sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:32px 28px 20px;text-align:center;align-items:end}
+  .sig-line{border-bottom:1px solid #d1d5db;height:40px;margin:0 auto 8px;width:180px;position:relative}
+  .sig-img{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);max-height:48px;max-width:140px;object-fit:contain}
+  .sig-label{font-size:11px;font-weight:700;color:#0f172a}
+  .sig-sub{font-size:9px;color:#94a3b8;margin-top:2px}
   .footer-note{text-align:center;font-size:10.5px;color:#94a3b8;padding:0 32px 18px;font-style:italic}
   @media print{body{background:#fff}.page{border:1.5px solid #1a1a1a;margin:0;max-width:100%;border-radius:12px;overflow:hidden}.inner{border-radius:6px;overflow:hidden}@page{margin:8mm;size:A4}}
 </style>
@@ -180,25 +180,32 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
     ${summary.failCount > 0 ? `<span>Failed: <strong style="color:#b91c1c">${summary.failCount}</strong></span>` : ''}
   </div>
 
-  <!-- Result footer (elegant) -->
+  <!-- Result footer (minimal) -->
   <div class="result-area">
-    <div class="result-rule"></div>
     <div class="result-inner">
       <div class="result-line"></div>
-      <div>
+      <div class="result-text-wrap">
         <div class="result-text">${summary.overallPassed ? passTitle : failTitle}</div>
         <div class="result-sub">${summary.overallPassed ? passSub : failSub}</div>
       </div>
       <div class="result-line"></div>
     </div>
-    <div class="result-rule"></div>
   </div>
 
   <!-- Signatures -->
   <div class="sep"></div>
-  <div class="sigs" style="grid-template-columns: 1fr 1fr;">
-    <div><div class="sig-line"></div><div class="sig-label">Class Teacher</div><div class="sig-sub">Signature &amp; Seal</div></div>
-    <div>${principalSigTag}<div class="sig-line"></div><div class="sig-label">Principal</div><div class="sig-sub">Signature &amp; Seal</div></div>
+  <div class="sigs">
+    <div>
+      <div class="sig-line"></div>
+      <div class="sig-label">Class Teacher</div>
+      <div class="sig-sub">Signature &amp; Seal</div>
+    </div>
+    <div>
+      ${principalSigTag}
+      <div class="sig-line"></div>
+      <div class="sig-label">Principal</div>
+      <div class="sig-sub">Signature &amp; Seal</div>
+    </div>
   </div>
   <div class="footer-note">This is a computer-generated report card issued by ${schoolInfo.name}.</div>
 
