@@ -261,7 +261,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const issueDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
     return (
-        <div className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 60 }}>
+        <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[92vh] flex flex-col">
 
                 {/* ── Modal Header ── */}
@@ -404,7 +404,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                             </tbody>
                                             <tfoot>
                                                 {/* Dark navy grand total — no bright blue */}
-                                                <tr className="text-white text-sm font-bold" style={{ background: '#0f172a' }}>
+                                                <tr className="text-white text-sm font-bold" style={{ background: '#312e81' }}>
                                                     <td className="px-3 py-3" colSpan={2}>Grand Total</td>
                                                     <td className="px-3 py-3 text-center">{summary.grandTotal}</td>
                                                     <td className="px-3 py-3 text-center text-base font-bold">{summary.grandObtained}</td>
@@ -439,13 +439,21 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 </div>
 
                                 {/* ── Signatures ── */}
-                                <div className="border-t border-dashed border-gray-300 mx-7 pt-5 mb-6 grid grid-cols-3 gap-6 text-center">
-                                    <div><div className="h-9 border-b border-gray-400 mb-2" /><p className="text-xs font-semibold text-slate-700">Class Teacher</p><p className="text-[10px] text-slate-400 mt-0.5">Signature &amp; Seal</p></div>
-                                    <div className="flex flex-col items-center"><div className="w-12 h-12 rounded-full border border-dashed border-gray-300 mb-2" /><p className="text-xs text-slate-400">Official Stamp</p></div>
+                                <div className="border-t border-dashed border-gray-300 mx-7 pt-5 mb-6 grid grid-cols-3 gap-6 text-center items-end">
+                                    <div>
+                                        <div className="h-10" />
+                                        <div className="border-b border-gray-400 mb-2" />
+                                        <p className="text-xs font-semibold text-slate-700">Class Teacher</p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">Signature &amp; Seal</p>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <div className="w-12 h-12 rounded-full border border-dashed border-gray-300 mb-2" />
+                                        <p className="text-xs text-slate-400">Official Stamp</p>
+                                    </div>
                                     <div className="flex flex-col items-center">
                                         {schoolInfo.principalSignature
-                                            ? <img src={getSignatureUrl(schoolInfo.principalSignature)} alt="Principal Signature" className="h-12 w-28 object-contain mb-0" />
-                                            : <div className="h-9" />}
+                                            ? <img src={getSignatureUrl(schoolInfo.principalSignature)} alt="Principal Signature" className="h-10 w-28 object-contain" />
+                                            : <div className="h-10" />}
                                         <div className="w-full border-b border-gray-400 mb-2" />
                                         <p className="text-xs font-semibold text-slate-700 w-full text-center">Principal</p>
                                         <p className="text-[10px] text-slate-400 mt-0.5 w-full text-center">Signature &amp; Seal</p>
