@@ -8,12 +8,37 @@ const { handleValidationErrors } = require('../middleware/validation');
 
 const router = express.Router();
 
+// Helper: calculate grade from percentage
+function calculateGrade(percentage) {
+    if (percentage >= 90) return 'A+';
+    if (percentage >= 80) return 'A';
+    if (percentage >= 70) return 'B';
+    if (percentage >= 60) return 'C';
+    if (percentage >= 50) return 'D';
+    return 'F';
+}
+
+// Helper: check time overlap  (HH:MM strings)
+function timesOverlap(startA, endA, startB, endB) {
+    if (!startA || !endA || !startB || !endB) return false;
+    // compare as minutes since midnight
+    const toMin = (t) => {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+    };
+    const sA = toMin(startA), eA = toMin(endA);
+    const sB = toMin(startB), eB = toMin(endB);
+    return sA < eB && eA > sB;
+}
+
 // @desc    Get all exams
 // @route   GET /api/exams
 // @access  Private
 router.get('/', protect, [
     query('class').optional().trim(),
     query('subject').optional().trim(),
+    query('section').optional().trim(),
+    query('status').optional().trim(),
     query('from').optional().isDate(),
     query('to').optional().isDate(),
     handleValidationErrors
@@ -24,11 +49,7 @@ router.get('/', protect, [
         // Role based filtering
         if (req.user.role === 'student') {
             filter.class = req.user.class;
-        } else if (req.user.role === 'parent') {
-            // Parents see exams for their children's classes
-            // Complex query, for now let's just show all exams or filter by query params
         } else if (req.user.role === 'teacher') {
-            // Teachers see all or filtered by their assigned classes
             if (req.user.assignedClasses && req.user.assignedClasses.length > 0) {
                 filter.class = { $in: req.user.assignedClasses };
             }
@@ -36,6 +57,8 @@ router.get('/', protect, [
 
         if (req.query.class) filter.class = req.query.class;
         if (req.query.subject) filter.subject = req.query.subject;
+        if (req.query.section) filter.section = req.query.section;
+        if (req.query.status) filter.status = req.query.status;
 
         if (req.query.from || req.query.to) {
             filter.date = {};
@@ -43,7 +66,9 @@ router.get('/', protect, [
             if (req.query.to) filter.date.$lte = new Date(req.query.to);
         }
 
-        const exams = await Exam.find(filter).sort({ date: -1 });
+        const exams = await Exam.find(filter)
+            .populate('supervisor', 'name')
+            .sort({ date: -1 });
 
         res.json({
             success: true,
@@ -60,34 +85,38 @@ router.get('/', protect, [
 // @route   POST /api/exams
 // @access  Private (Admin, Teacher)
 router.post('/', protect, authorize('admin', 'teacher'), [
-    body('name').notEmpty().withMessage('Name is required'),
+    body('name').notEmpty().withMessage('Exam name is required'),
     body('class').notEmpty().withMessage('Class is required'),
     body('subject').notEmpty().withMessage('Subject is required'),
     body('date').isISO8601().withMessage('Valid date is required'),
     body('totalMarks').isNumeric().withMessage('Total marks must be a number'),
+    body('passingMarks').optional().isNumeric().withMessage('Passing marks must be a number'),
     handleValidationErrors
 ], async (req, res) => {
     try {
+        const { class: cls, section, date, startTime, endTime, totalMarks, passingMarks } = req.body;
+
+        // Validate passing marks
+        if (passingMarks !== undefined && passingMarks !== null && passingMarks !== '') {
+            if (Number(passingMarks) >= Number(totalMarks)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Passing marks must be less than total marks'
+                });
+            }
+        }
+
         // For teachers, verify they can only schedule exams for their assigned classes
         if (req.user.role === 'teacher') {
             const Class = require('../models/Class');
-
-            // Find the class by grade to verify teacher assignment
-            const classDoc = await Class.findOne({
-                grade: req.body.class,
-                tenantId: req.user.tenantId
-            });
+            const classDoc = await Class.findOne({ grade: cls, tenantId: req.user.tenantId });
 
             if (!classDoc) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'Class not found'
-                });
+                return res.status(404).json({ success: false, message: 'Class not found' });
             }
 
-            // Check if teacher is assigned to this class
             const isClassTeacher = classDoc.classTeacher && classDoc.classTeacher.toString() === req.user._id.toString();
-            const isAssignedToClass = req.user.assignedClasses && req.user.assignedClasses.includes(req.body.class);
+            const isAssignedToClass = req.user.assignedClasses && req.user.assignedClasses.includes(cls);
 
             if (!isClassTeacher && !isAssignedToClass) {
                 return res.status(403).json({
@@ -97,15 +126,38 @@ router.post('/', protect, authorize('admin', 'teacher'), [
             }
         }
 
+        // Overlap check: same class, same section, same date, overlapping time
+        if (startTime && endTime) {
+            const examDate = new Date(date);
+            const dayStart = new Date(examDate);
+            dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(examDate);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            const existingExams = await Exam.find({
+                tenantId: req.user.tenantId,
+                class: cls,
+                section: section || null,
+                date: { $gte: dayStart, $lte: dayEnd },
+                status: { $ne: 'Cancelled' }
+            });
+
+            for (const existing of existingExams) {
+                if (timesOverlap(startTime, endTime, existing.startTime, existing.endTime)) {
+                    return res.status(409).json({
+                        success: false,
+                        message: `Exam time overlaps with "${existing.name}" (${existing.startTime} - ${existing.endTime}) for this class/section on the same day`
+                    });
+                }
+            }
+        }
+
         const exam = await Exam.create({
             ...req.body,
             tenantId: req.user.tenantId
         });
 
-        res.status(201).json({
-            success: true,
-            data: exam
-        });
+        res.status(201).json({ success: true, data: exam });
     } catch (error) {
         console.error('Create exam error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -120,18 +172,58 @@ router.get('/:id', protect, async (req, res) => {
         const exam = await Exam.findOne({
             _id: req.params.id,
             tenantId: req.user.tenantId
-        });
+        }).populate('supervisor', 'name');
 
         if (!exam) {
             return res.status(404).json({ success: false, message: 'Exam not found' });
         }
 
-        res.json({
-            success: true,
-            data: exam
-        });
+        res.json({ success: true, data: exam });
     } catch (error) {
         console.error('Get exam error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @desc    Update exam (status, fields)
+// @route   PATCH /api/exams/:id
+// @access  Private (Admin, Teacher)
+router.patch('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
+    try {
+        const exam = await Exam.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
+
+        if (!exam) {
+            return res.status(404).json({ success: false, message: 'Exam not found' });
+        }
+
+        // Validate passing marks if being updated
+        const totalMarks = req.body.totalMarks !== undefined ? req.body.totalMarks : exam.totalMarks;
+        const passingMarks = req.body.passingMarks !== undefined ? req.body.passingMarks : exam.passingMarks;
+
+        if (passingMarks !== undefined && passingMarks !== null && Number(passingMarks) >= Number(totalMarks)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Passing marks must be less than total marks'
+            });
+        }
+
+        const allowedFields = [
+            'name', 'examSeries', 'class', 'classId', 'section', 'subject',
+            'date', 'startTime', 'endTime', 'totalMarks', 'passingMarks',
+            'examType', 'examMode', 'supervisor', 'examRoom', 'description', 'status'
+        ];
+
+        allowedFields.forEach(field => {
+            if (req.body[field] !== undefined) {
+                exam[field] = req.body[field];
+            }
+        });
+
+        await exam.save();
+
+        res.json({ success: true, data: exam });
+    } catch (error) {
+        console.error('Update exam error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
@@ -141,23 +233,16 @@ router.get('/:id', protect, async (req, res) => {
 // @access  Private (Admin, Teacher)
 router.delete('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
     try {
-        const exam = await Exam.findOne({
-            _id: req.params.id,
-            tenantId: req.user.tenantId
-        });
+        const exam = await Exam.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
 
         if (!exam) {
             return res.status(404).json({ success: false, message: 'Exam not found' });
         }
 
-        // Delete associated results
         await Result.deleteMany({ exam: req.params.id });
         await exam.deleteOne();
 
-        res.json({
-            success: true,
-            message: 'Exam and associated results deleted'
-        });
+        res.json({ success: true, message: 'Exam and associated results deleted' });
     } catch (error) {
         console.error('Delete exam error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -172,7 +257,7 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
         const exam = await Exam.findById(req.params.id);
         if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
 
-        const resultsToProcess = req.body.results; // Expect array of { studentId, marks, remarks }
+        const resultsToProcess = req.body.results; // Array of { studentId, marks, remarks }
 
         if (!Array.isArray(resultsToProcess) || resultsToProcess.length === 0) {
             return res.status(400).json({ success: false, message: 'No results provided' });
@@ -183,11 +268,22 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
 
         for (const item of resultsToProcess) {
             try {
-                // Upsert result
+                const marksObtained = Number(item.marks);
+                const percentage = exam.totalMarks > 0
+                    ? Math.round((marksObtained / exam.totalMarks) * 100 * 10) / 10
+                    : 0;
+                const grade = calculateGrade(percentage);
+                const isPassed = exam.passingMarks != null
+                    ? marksObtained >= exam.passingMarks
+                    : percentage >= 40;
+
                 const result = await Result.findOneAndUpdate(
                     { exam: exam._id, student: item.studentId, tenantId: req.user.tenantId },
                     {
-                        marksObtained: item.marks,
+                        marksObtained,
+                        percentage,
+                        grade,
+                        isPassed,
                         remarks: item.remarks,
                         tenantId: req.user.tenantId
                     },
@@ -199,12 +295,7 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
             }
         }
 
-        res.json({
-            success: true,
-            processed: processed.length,
-            errors: errors
-        });
-
+        res.json({ success: true, processed: processed.length, errors });
     } catch (error) {
         console.error('Save results error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -220,10 +311,7 @@ router.get('/:id/results', protect, async (req, res) => {
             .populate('student', 'name rollNumber')
             .sort({ 'student.rollNumber': 1 });
 
-        res.json({
-            success: true,
-            data: results
-        });
+        res.json({ success: true, data: results });
     } catch (error) {
         console.error('Get results error:', error);
         res.status(500).json({ success: false, message: 'Server error' });

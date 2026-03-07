@@ -22,6 +22,19 @@ const resultSchema = new mongoose.Schema({
         required: true,
         min: 0
     },
+    percentage: {
+        type: Number,
+        min: 0,
+        max: 100
+    },
+    grade: {
+        type: String,
+        trim: true
+    },
+    isPassed: {
+        type: Boolean,
+        default: false
+    },
     remarks: {
         type: String,
         trim: true
