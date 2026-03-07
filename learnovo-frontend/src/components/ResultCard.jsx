@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Printer, FileText } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { settingsService } from '../services/settingsService';
@@ -260,7 +261,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const summary = cardData?.summary;
     const issueDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
-    return (
+    return ReactDOM.createPortal(
         <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[92vh] flex flex-col">
 
@@ -467,7 +468,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                 </div>
             </div>
         </div>
-    );
+        , document.body);
 };
 
 export default ResultCard;
