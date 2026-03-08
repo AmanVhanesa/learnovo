@@ -25,7 +25,7 @@ const GRADE_BG = (g) => ({ 'A+': '#f0fdf4', 'A': '#f0fdf4', 'B': '#f0fdfa', 'C':
 /* ─────────────────────────────────────────────────────────
    Build a premium, minimal certificate HTML for print
 ───────────────────────────────────────────────────────── */
-function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
+function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
     const { student, subjects, summary } = cardData;
     const issueDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -35,7 +35,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
     const passSub = isFinalExam ? 'Academic Year Progress' : 'Satisfactory Performance';
     const failSub = 'Please consult the school';
 
-    const sName = student?.fullName || student?.name || '—';
+    const sName = student?.fullName || student?.name || studentName || '—';
     const sClass = student?.class || subjects[0]?.class || '—';
     const sSection = student?.section || subjects[0]?.section || '—';
     const sRoll = student?.rollNumber || '—';
@@ -72,7 +72,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
 <meta charset="UTF-8">
 <title>Report Card — ${sName}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display+SC:wght@700;900&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;background:#fff !important;color:#1a1a1a}
@@ -81,7 +81,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   /* ── Header ── */
   .hdr{padding:28px 32px;display:flex;align-items:center;gap:24px;border-bottom:2px solid #1a1a1a}
   .hdr-mid{flex:1;text-align:center}
-  .school-name{font-family:'Playfair Display', Georgia, serif !important;font-size:28px;font-weight:900;letter-spacing:-.01em;color:#0f172a}
+  .school-name{font-family:'Playfair Display SC', Georgia, serif !important;font-size:28px;font-weight:900;letter-spacing:-.01em;color:#0f172a}
   .school-addr{font-size:11.5px;color:#555;margin-top:4px;line-height:1.6}
   .card-badge{display:inline-block;margin-top:10px;padding:3px 14px;border:1px solid #0f172a;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#0f172a}
   .hdr-right{min-width:72px;text-align:right;font-size:10.5px;color:#777;line-height:1.6}
@@ -262,7 +262,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
         if (!cardData?.subjects?.length) return;
         setPrinting(true);
         try {
-            const html = buildPrintHTML({ cardData, schoolInfo, filterSeries });
+            const html = buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName });
             const win = window.open('', '_blank', 'width=900,height=700');
             if (!win) { toast.error('Popup blocked — allow popups for this site'); setPrinting(false); return; }
             win.document.write(html);

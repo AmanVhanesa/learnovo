@@ -88,8 +88,8 @@ const ExamResultsModal = ({ exam, onClose }) => {
 
     return ReactDOM.createPortal(
         <>
-            <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 max-h-[92vh] flex flex-col">
+            <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9998, background: 'rgba(0,0,0,0.5)', overflowY: 'auto', padding: '24px 0', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 my-auto shrink-0 flex flex-col" style={{ maxHeight: 'calc(100vh - 48px)' }}>
 
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-gray-200 shrink-0 flex items-start justify-between">
