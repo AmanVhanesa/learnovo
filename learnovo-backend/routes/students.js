@@ -28,6 +28,9 @@ router.get('/', protect, authorize('admin', 'teacher'), [
   query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
   handleValidationErrors
 ], async (req, res) => {
+  console.log('--- GET /api/students ---');
+  console.log('req.query:', req.query);
+  console.log('req.originalUrl:', req.originalUrl);
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -123,42 +126,13 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.class = req.query.class;
     }
 
-    // Add section filter
+    // Add section filter — SIMPLE STRING MATCH ONLY (no sectionId!)
+    // Using sectionId caused students with orphaned/deleted section IDs to be invisible.
+    // The section string field is always reliable.
     if (req.query.section) {
-      // If section is provided, we need to find the section by name and classId
-      // Then filter by sectionId for accurate results
-      try {
-        const Section = require('../models/Section');
-        const sectionQuery = {
-          name: req.query.section,
-          tenantId: req.user.tenantId,
-          isActive: true
-        };
-
-        // If class filter is also provided, use it to narrow down section lookup
-        if (req.query.class) {
-          const Class = require('../models/Class');
-          const classDoc = await Class.findOne({
-            grade: req.query.class,
-            tenantId: req.user.tenantId
-          });
-          if (classDoc) {
-            sectionQuery.classId = classDoc._id;
-          }
-        }
-
-        const section = await Section.findOne(sectionQuery);
-        if (section) {
-          filter.sectionId = section._id;
-        } else {
-          // If section not found, also try string match as fallback for legacy data
-          filter.section = req.query.section;
-        }
-      } catch (err) {
-        console.error('Section filter error:', err);
-        // Fallback to string match
-        filter.section = req.query.section;
-      }
+      const sectionStr = req.query.section.trim();
+      // Case-insensitive exact match
+      filter.section = new RegExp(`^${sectionStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
     }
 
     // Add academic year filter
@@ -1155,7 +1129,11 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
 
     // Apply filters
     if (req.query.class) filter.class = req.query.class;
-    if (req.query.section) filter.section = req.query.section;
+    // Section filter — SIMPLE STRING MATCH (no sectionId dependency)
+    if (req.query.section) {
+      const sectionStr = req.query.section.trim();
+      filter.section = new RegExp(`^${sectionStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+    }
     if (req.query.academicYear) filter.academicYear = req.query.academicYear;
     if (req.query.status) filter.isActive = req.query.status === 'active';
 
@@ -2427,8 +2405,10 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
       filter.class = req.query.class;
     }
 
+    // Section filter — SIMPLE STRING MATCH (no sectionId dependency)
     if (req.query.section) {
-      filter.section = req.query.section;
+      const sectionStr = req.query.section.trim();
+      filter.section = new RegExp(`^${sectionStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
     }
 
     if (req.query.academicYear) {

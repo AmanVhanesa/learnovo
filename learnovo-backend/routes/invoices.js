@@ -1035,4 +1035,174 @@ router.get('/payments/:id/receipt', protect, async (req, res) => {
     }
 });
 
+
+// @desc    Download payment receipt as PDF
+// @route   GET /api/invoices/payments/:id/receipt/pdf
+// @access  Private
+router.get('/payments/:id/receipt/pdf', protect, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.user.tenantId;
+
+        const payment = await Payment.findOne({ _id: id, tenantId })
+            .populate({
+                path: 'studentId',
+                select: 'name fullName admissionNumber studentId class section classId',
+                populate: { path: 'classId', select: 'name' }
+            })
+            .populate('invoiceId')
+            .populate('collectedBy', 'name');
+
+        if (!payment) {
+            return res.status(404).json({ success: false, message: 'Payment not found' });
+        }
+
+        const tenant = await Tenant.findById(tenantId).select('schoolName schoolCode address phone email logo fullAddress website');
+        const settings = await Settings.getSettings(tenantId);
+
+        const schoolData = tenant ? tenant.toObject() : {};
+        if (settings && settings.institution) {
+            if (settings.institution.contact) {
+                if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
+                if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
+            }
+            if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
+            if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+            if (settings.institution.principalSignature) schoolData.principalSignature = settings.institution.principalSignature;
+        }
+
+        const PDFDocument = require('pdfkit');
+        const https = require('https');
+        const http = require('http');
+
+        // Helper to fetch image buffer from URL using native Node.js modules
+        const fetchImage = (url) => new Promise((resolve) => {
+            if (!url) return resolve(null);
+            try {
+                const fullUrl = url.startsWith('http') ? url : `https://learnovo-backend.onrender.com${url}`;
+                const protocol = fullUrl.startsWith('https') ? https : http;
+                const request = protocol.get(fullUrl, { timeout: 5000 }, (response) => {
+                    if (response.statusCode !== 200) return resolve(null);
+                    const chunks = [];
+                    response.on('data', chunk => chunks.push(chunk));
+                    response.on('end', () => resolve(Buffer.concat(chunks)));
+                    response.on('error', () => resolve(null));
+                });
+                request.on('error', () => resolve(null));
+                request.on('timeout', () => { request.destroy(); resolve(null); });
+            } catch (e) {
+                resolve(null);
+            }
+        });
+
+        const [logoBuffer, signatureBuffer] = await Promise.all([
+            fetchImage(schoolData.logo),
+            fetchImage(schoolData.principalSignature)
+        ]);
+
+        const doc = new PDFDocument({ size: 'A5', margin: 30 });
+        const chunks = [];
+        doc.on('data', chunk => chunks.push(chunk));
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Receipt-${payment.receiptNumber}.pdf"`);
+
+        doc.pipe(res);
+
+        // ─── Header ───────────────────────────────────────────────────────────
+        const headerTop = 30;
+        if (logoBuffer) {
+            try { doc.image(logoBuffer, 30, headerTop, { width: 50, height: 50 }); } catch (e) { }
+        }
+        doc.fontSize(13).font('Helvetica-Bold')
+            .text((schoolData.schoolName || '').toUpperCase(), 90, headerTop, { width: 300 });
+        doc.fontSize(7).font('Helvetica')
+            .text(schoolData.fullAddress || schoolData.address?.city || '', 90)
+            .text(`Ph: ${schoolData.phone || '-'}  |  ${schoolData.email || '-'}`, 90)
+            .text(`School Code: ${schoolData.schoolCode || '-'}  |  UDISE: ${schoolData.udiseCode || '-'}`, 90);
+
+        doc.moveTo(30, 95).lineTo(545, 95).lineWidth(1).stroke('#e2e8f0');
+
+        // ─── Receipt Label ────────────────────────────────────────────────────
+        doc.rect(30, 102, 515, 20).fill('#eff6ff');
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#2563eb')
+            .text('PAYMENT RECEIPT', 35, 107);
+        doc.fontSize(8).font('Helvetica').fillColor('#475569')
+            .text(`#${payment.receiptNumber}`, 420, 107, { align: 'right', width: 120 });
+
+        // ─── Student + Details Grid ───────────────────────────────────────────
+        const gridTop = 132;
+        const student = payment.studentId;
+        const studentName = student?.name || student?.fullName || 'N/A';
+        const admNo = student?.admissionNumber || student?.studentId || '-';
+        const cls = student?.classId?.name || student?.class || '-';
+        const sec = student?.section || '';
+
+        doc.fillColor('#94a3b8').fontSize(7).font('Helvetica-Bold')
+            .text('STUDENT', 30, gridTop)
+            .text('PAYMENT DETAILS', 290, gridTop);
+
+        doc.moveTo(30, gridTop + 10).lineTo(260, gridTop + 10).lineWidth(0.5).stroke('#e2e8f0');
+        doc.moveTo(290, gridTop + 10).lineTo(545, gridTop + 10).stroke('#e2e8f0');
+
+        const drawRow = (x, y, label, value) => {
+            doc.fillColor('#64748b').fontSize(7).font('Helvetica').text(label, x, y);
+            doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold').text(value || '-', x + 60, y);
+        };
+
+        const infoTop = gridTop + 15;
+        drawRow(30, infoTop, 'Name', studentName);
+        drawRow(30, infoTop + 14, 'Adm. No.', admNo);
+        drawRow(30, infoTop + 28, 'Class', `${cls}${sec ? ` (${sec})` : ''}`);
+
+        drawRow(290, infoTop, 'Date', new Date(payment.paymentDate).toLocaleDateString('en-IN'));
+        drawRow(290, infoTop + 14, 'Mode', payment.paymentMethod || '-');
+        drawRow(290, infoTop + 28, 'Status', 'Paid');
+        if (payment.transactionDetails?.referenceNumber) {
+            drawRow(290, infoTop + 42, 'Ref. No.', payment.transactionDetails.referenceNumber);
+        }
+
+        // ─── Amount Box ───────────────────────────────────────────────────────
+        const amtTop = gridTop + 80;
+        doc.rect(30, amtTop, 515, 48).fill('#eff6ff');
+        doc.rect(30, amtTop).lineWidth(1).stroke('#bfdbfe');
+        doc.fillColor('#3b82f6').fontSize(8).font('Helvetica-Bold')
+            .text('TOTAL AMOUNT PAID', 30, amtTop + 8, { align: 'center', width: 515 });
+        doc.fillColor('#1e40af').fontSize(22).font('Helvetica-Bold')
+            .text(`₹${payment.amount.toLocaleString('en-IN')}`, 30, amtTop + 18, { align: 'center', width: 515 });
+
+        // ─── Signatures ───────────────────────────────────────────────────────
+        const sigTop = amtTop + 80;
+
+        // Depositor
+        doc.moveTo(50, sigTop + 50).lineTo(170, sigTop + 50).lineWidth(1).stroke('#64748b');
+        doc.fillColor('#475569').fontSize(7).font('Helvetica-Bold')
+            .text('Depositor', 50, sigTop + 55, { width: 120, align: 'center' });
+
+        // Authorized (with signature image if available)
+        if (signatureBuffer) {
+            try {
+                doc.image(signatureBuffer, 355, sigTop, { width: 120, height: 50 });
+            } catch (e) { }
+        }
+        doc.moveTo(350, sigTop + 50).lineTo(470, sigTop + 50).lineWidth(1).stroke('#64748b');
+        doc.fillColor('#475569').fontSize(7).font('Helvetica-Bold')
+            .text('Authorized Signatory', 350, sigTop + 55, { width: 120, align: 'center' });
+
+        // ─── Footer ───────────────────────────────────────────────────────────
+        doc.moveTo(30, sigTop + 80).lineTo(545, sigTop + 80).lineWidth(0.5).stroke('#e2e8f0');
+        doc.fillColor('#94a3b8').fontSize(6).font('Helvetica')
+            .text('Computer-generated receipt. Valid without physical signature.', 30, sigTop + 85, { align: 'center', width: 515 });
+
+        doc.end();
+
+    } catch (error) {
+        console.error('Receipt PDF error:', error);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, message: 'Server error generating receipt PDF' });
+        }
+    }
+});
+
 module.exports = router;
+
