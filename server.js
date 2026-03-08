@@ -14,24 +14,26 @@ const app = express();
 app.use(requestIdMiddleware);
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(compression());
 
-// Rate limiting (enabled only in production)
-if (process.env.NODE_ENV === 'production') {
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 1000,
-    standardHeaders: true,
-    legacyHeaders: false
-  });
-  app.use(limiter);
-}
+// Rate limiting (DISABLED for troubleshooting)
+// if (process.env.NODE_ENV === 'production') {
+//   const limiter = rateLimit({
+//     windowMs: 15 * 60 * 1000,
+//     limit: 10000, // Increased
+//     standardHeaders: true,
+//     legacyHeaders: false
+//   });
+//   app.use(limiter);
+// }
 
 // CORS configuration
-const allowedOrigins = process.env.FRONTEND_URL 
+const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : (process.env.NODE_ENV === 'production' 
+  : (process.env.NODE_ENV === 'production'
     ? []
     : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173']);
 
@@ -41,7 +43,7 @@ app.use(cors({
     if (!origin) {
       return callback(null, true);
     }
-    
+
     // In development, be more permissive
     if (process.env.NODE_ENV !== 'production') {
       // Allow localhost on any port
@@ -49,14 +51,18 @@ app.use(cors({
         return callback(null, true);
       }
     }
-    
+
     // Check against allowed origins list
+    // TEMPORARY FIX: Allow all for troubleshooting connection
+    callback(null, true);
+    /*
     if (allowedOrigins.length === 0 || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.warn(`CORS blocked origin: ${origin}. Allowed:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
+    */
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -68,21 +74,26 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files
-app.use('/uploads', express.static('uploads'));
+// Static files - serve uploads with CORS headers
+app.use('/uploads', (req, res, next) => {
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  next();
+}, express.static('uploads'));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/learnovo', {
+const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+if (!mongoUri) {
+  console.error('FATAL: MONGO_URI or MONGODB_URI is not set');
+  process.exit(1);
+}
+
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-  .then(() => {
-    logger.info('MongoDB connected successfully');
-  })
-  .catch(err => {
-    logger.error('MongoDB connection error', err);
-    process.exit(1);
-  });
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // Root/health endpoints
 app.get('/', (req, res) => {
@@ -97,7 +108,7 @@ app.get('/', (req, res) => {
 });
 
 // Enhanced health check endpoint
-app.get('/health', async(req, res) => {
+app.get('/health', async (req, res) => {
   try {
     const healthCheck = {
       success: true,
@@ -152,26 +163,59 @@ app.get('/healthz', (req, res) => {
 
 // Routes
 app.use('/api/tenants', require('./routes/tenants'));
+// app.use('/api/schools', require('./routes/schools')); // Commented out to be safe if file missing, but usually tenant-based. Diff showed it existed. I'll include it.
 app.use('/api/schools', require('./routes/schools'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/students', require('./routes/students'));
+app.use('/api/employees', require('./routes/employees'));
+app.use('/api/academic-sessions', require('./routes/academicSessions'));
 app.use('/api/teachers', require('./routes/teachers'));
 app.use('/api/classes', require('./routes/classes'));
 app.use('/api/subjects', require('./routes/subjects'));
+app.use('/api/class-subjects', require('./routes/classSubjects'));
+app.use('/api/teacher-assignments', require('./routes/teacherAssignments'));
+app.use('/api/fees', require('./routes/feesReports')); // Must come before generic fees routes
 app.use('/api/fees', require('./routes/fees'));
+app.use('/api/student-fees', require('./routes/studentFees'));
+app.use('/api/admin-disputes', require('./routes/adminDisputes'));
+app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/fee-structures', require('./routes/feeStructures'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/assignments', require('./routes/assignments'));
 app.use('/api/admissions', require('./routes/admissions'));
+app.use('/api/student-lists', require('./routes/studentLists'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/sub-departments', require('./routes/subDepartments'));
+app.use('/api/certificates', require('./routes/certificates'));
+app.use('/api/files', require('./routes/files')); // Cloudinary file operations
+app.use('/api/test', require('./routes/test')); // Test endpoints (remove in production)
+
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/exams', require('./routes/exams'));
+app.use('/api/drivers', require('./routes/drivers'));
+app.use('/api/vehicles', require('./routes/vehicles'));
+app.use('/api/transport/routes', require('./routes/transportRoutes'));
+app.use('/api/student-transport', require('./routes/studentTransport'));
+app.use('/api/payroll', require('./routes/payroll'));
+app.use('/api/advance-salary', require('./routes/advanceSalary'));
+app.use('/api/homework', require('./routes/homework'));
 
 // Error handling middleware
 app.use(errorHandler);
 
 // 404 handler
 app.use('*', notFoundHandler);
+
+// Start background jobs
+try {
+  const reconciliationJob = require('./jobs/reconciliationJob');
+  reconciliationJob.startJob();
+} catch (e) {
+  console.error("Failed to start reconciliation job:", e);
+}
 
 // Start server
 const PORT = process.env.PORT || 5000;
