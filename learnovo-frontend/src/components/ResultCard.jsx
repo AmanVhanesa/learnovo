@@ -81,7 +81,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   /* ── Header ── */
   .hdr{padding:28px 32px;display:flex;align-items:center;gap:24px;border-bottom:2px solid #1a1a1a}
   .hdr-mid{flex:1;text-align:center}
-  .school-name{font-family:'Playfair Display SC', Georgia, serif !important;font-size:28px;font-weight:900;letter-spacing:-.01em;color:#0f172a}
+  .school-name{font-family:'Inter', sans-serif !important;font-size:28px;font-weight:900;letter-spacing:-.02em;color:#0f172a}
   .school-addr{font-size:11.5px;color:#555;margin-top:4px;line-height:1.6}
   .card-badge{display:inline-block;margin-top:10px;padding:3px 14px;border:1px solid #0f172a;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#0f172a}
   .hdr-right{min-width:72px;text-align:right;font-size:10.5px;color:#777;line-height:1.6}
