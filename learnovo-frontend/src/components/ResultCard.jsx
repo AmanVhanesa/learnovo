@@ -42,22 +42,22 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
     const sAdm = student?.admissionNumber || '—';
 
     const subjectRows = subjects.map((s, i) => `
-      <tr style="background:${i % 2 === 0 ? '#fff' : '#fafafa'};-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
-        <td style="padding:9px 12px;font-weight:600;color:#111;border-bottom:1px solid #e5e7eb">${s.subject}</td>
-        <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb">
-          <div style="font-weight:500;color:#374151;font-size:12px">${s.examName}</div>
-          <div style="color:#9ca3af;font-size:11px">${new Date(s.date).toLocaleDateString('en-IN')}</div>
+      <tr style="background:${i % 2 === 0 ? '#fff' : '#f8fafc'};-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">
+        <td style="font-weight:600;color:#0f172a">${s.subject}</td>
+        <td>
+          <div style="font-weight:500;color:#334155;font-size:12px">${s.examName}</div>
+          <div style="color:#9ca3af;font-size:12px">${new Date(s.date).toLocaleDateString('en-IN')}</div>
         </td>
-        <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb;color:#555">${s.totalMarks}</td>
-        <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb;font-weight:800;font-size:15px;color:#111;font-family:'Inter',sans-serif !important">${s.marksObtained}</td>
-        <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb;color:#555">${s.percentage}%</td>
-        <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb">
-          <span style="background:${GRADE_BG(s.grade)};color:${GRADE_COLOR(s.grade)};padding:2px 9px;border-radius:4px;font-weight:700;font-size:12px;letter-spacing:.04em;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">${s.grade}</span>
+        <td class="c" style="color:#64748b">${s.totalMarks}</td>
+        <td class="c" style="font-weight:700;font-size:16px;color:#0f172a;font-family:'Inter',sans-serif !important">${s.marksObtained}</td>
+        <td class="c" style="color:#475569">${s.percentage}%</td>
+        <td class="c">
+          <span style="background:${GRADE_BG(s.grade)};color:${GRADE_COLOR(s.grade)};padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;letter-spacing:.05em;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">${s.grade}</span>
         </td>
-        <td style="padding:9px 12px;text-align:center;border-bottom:1px solid #e5e7eb">
-          <span style="font-size:12px;font-weight:600;color:${s.isPassed ? '#166534' : '#b91c1c'};-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">${s.isPassed ? '✓ Pass' : '✗ Fail'}</span>
+        <td class="c">
+          <span style="font-size:12px;font-weight:600;color:${s.isPassed ? '#047857' : '#dc2626'};-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important">${s.isPassed ? '✓ Pass' : '✗ Fail'}</span>
         </td>
-        <td style="padding:9px 12px;border-bottom:1px solid #e5e7eb;color:#9ca3af;font-size:11px;font-style:italic">${s.remarks || '—'}</td>
+        <td style="color:#9ca3af;font-size:12px;font-style:italic">${s.remarks || '—'}</td>
       </tr>`).join('');
 
     const logoTag = schoolInfo.logo
@@ -99,15 +99,16 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   .table-box{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
   table th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:700;border-bottom:2px solid #e2e8f0}
   table th.c,table td.c{text-align:center}
-  .grand-row td{background:#312e81 !important;color:#fff !important;padding:11px 12px;font-weight:700;font-size:13px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  table td{padding:10px 12px;border-bottom:1px solid #f3f4f6}
+  .grand-row td{background:#312e81 !important;color:#fff !important;padding:12px 12px;font-weight:700;font-size:14px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
   /* ── Stats ── */
-  .stats{padding:8px 28px;font-size:11.5px;color:#64748b;display:flex;gap:20px;border-bottom:1px solid #e5e7eb}
+  .stats{padding:8px 28px;font-size:12px;color:#94a3b8;display:flex;gap:16px;border-bottom:none}
   /* ── Result footer ── */
   .result-area{padding:16px 28px;margin-bottom:24px}
   .result-inner{display:flex;align-items:center;gap:16px}
   .result-line{flex:1;height:1px;background:#e5e7eb}
-  .result-text-wrap{text-align:center}
-  .result-text{font-family:'Inter', sans-serif !important;font-size:14px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#0f172a;white-space:nowrap}
+  .result-text-wrap{text-align:center;padding:0 16px}
+  .result-text{font-family:'Inter', sans-serif !important;font-size:14px;font-weight:800;letter-spacing:.15em;text-transform:uppercase;color:#0f172a;white-space:nowrap}
   .result-sub{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8;margin-top:4px}
   /* ── Signatures ── */
   .sep{border-top:1px dashed #e5e7eb;margin:0 28px}
