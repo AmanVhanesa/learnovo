@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar, Users, FileText, Search, X, Plus, Receipt, Settings, Printer, History, Edit, Trash2 } from 'lucide-react'
+import { DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar, Users, FileText, Search, X, Plus, Receipt, Settings, Printer, History, Edit, Trash2, Eye } from 'lucide-react'
 import { feesReportsService, invoicesService, paymentsService, feeStructuresService } from '../services/feesService'
 import { studentsService } from '../services/studentsService'
 import { academicSessionsService, classesService } from '../services/academicsService'
@@ -456,6 +456,28 @@ const FeesFinance = () => {
         `
     }
 
+    // View receipt in new tab (without downloading)
+    const handleViewReceiptPdf = async (paymentId) => {
+        try {
+            const toastId = toast.loading('Opening PDF receipt...')
+            const token = localStorage.getItem('token')
+            const url = `${API_BASE}/invoices/payments/${paymentId}/receipt/pdf`
+            const response = await fetch(url, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            if (!response.ok) throw new Error(`PDF generation failed (${response.status})`)
+            const blob = await response.blob()
+            toast.dismiss(toastId)
+            const blobUrl = URL.createObjectURL(blob)
+            window.open(blobUrl, '_blank')
+            // Revoke after a delay to ensure it loads in the new tab first
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
+        } catch (error) {
+            console.error('View receipt PDF error:', error)
+            toast.error('Failed to open receipt')
+        }
+    }
+
     // Download receipt as a proper PDF (works on all devices including iPad)
     const handleDownloadReceiptPdf = async (paymentId) => {
         try {
@@ -852,6 +874,13 @@ const FeesFinance = () => {
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                         <div className="flex justify-end items-center">
+                                                            <button
+                                                                onClick={() => handleViewReceiptPdf(payment._id)}
+                                                                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors mr-2"
+                                                                title="View Receipt"
+                                                            >
+                                                                <Eye className="h-4 w-4" />
+                                                            </button>
                                                             <button
                                                                 onClick={() => handleDownloadReceiptPdf(payment._id)}
                                                                 className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors"
@@ -1418,6 +1447,13 @@ const FeesFinance = () => {
                                                     </td>
                                                     <td className="px-5 py-3 whitespace-nowrap text-right">
                                                         <div className="flex justify-end items-center">
+                                                            <button
+                                                                onClick={() => handleViewReceiptPdf(payment._id)}
+                                                                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors mr-2"
+                                                                title="View Receipt"
+                                                            >
+                                                                <Eye className="h-3.5 w-3.5" />
+                                                            </button>
                                                             <button
                                                                 onClick={() => handleDownloadReceiptPdf(payment._id)}
                                                                 className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors"
