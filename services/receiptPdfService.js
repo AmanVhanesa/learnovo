@@ -39,7 +39,7 @@ async function generateReceiptPdf(payment, schoolData) {
     ]);
 
     return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ size: 'A5', margin: 30, bufferPages: true });
+        const doc = new PDFDocument({ size: 'A4', margin: 30, bufferPages: true });
         const chunks = [];
 
         doc.on('data', chunk => chunks.push(chunk));
@@ -128,18 +128,18 @@ function buildReceiptPdf(doc, payment, schoolData, logoBuffer, signatureBuffer) 
 
     // ── Amount box ────────────────────────────────────────────────────────────
     const amtTop = gridTop + 82;
-    doc.rect(30, amtTop, 515, 50).fill('#eff6ff');
-    doc.rect(30, amtTop, 515, 50).lineWidth(1).strokeColor('#bfdbfe').stroke();
+    doc.rect(30, amtTop, 515, 58).fill('#eff6ff');
+    doc.rect(30, amtTop, 515, 58).lineWidth(1).strokeColor('#bfdbfe').stroke();
 
-    doc.fillColor('#3b82f6').fontSize(8).font('Helvetica-Bold')
-        .text('TOTAL AMOUNT PAID', 30, amtTop + 8, { align: 'center', width: 515 });
+    doc.fillColor('#3b82f6').fontSize(9).font('Helvetica-Bold')
+        .text('TOTAL AMOUNT PAID', 30, amtTop + 10, { align: 'center', width: 515 });
 
-    const amtStr = `\u20b9${(payment.amount || 0).toLocaleString('en-IN')}`;
-    doc.fillColor('#1e40af').fontSize(22).font('Helvetica-Bold')
-        .text(amtStr, 30, amtTop + 20, { align: 'center', width: 515 });
+    const amtStr = `Rs. ${(payment.amount || 0).toLocaleString('en-IN')}`;
+    doc.fillColor('#1e40af').fontSize(24).font('Helvetica-Bold')
+        .text(amtStr, 30, amtTop + 26, { align: 'center', width: 515 });
 
     // ── Signatures ────────────────────────────────────────────────────────────
-    const sigTop = amtTop + 76;
+    const sigTop = amtTop + 86;
 
     // Depositor (left)
     doc.moveTo(40, sigTop + 50).lineTo(175, sigTop + 50).lineWidth(1).strokeColor('#64748b').stroke();
