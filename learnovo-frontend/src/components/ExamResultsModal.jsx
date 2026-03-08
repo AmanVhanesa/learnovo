@@ -27,6 +27,10 @@ const ExamResultsModal = ({ exam, onClose }) => {
     const passingMarks = exam.passingMarks ?? Math.ceil(exam.totalMarks * 0.4);
 
     useEffect(() => { fetchData(); }, [exam]);
+    useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = 'unset'; };
+    }, []);
 
     const fetchData = async () => {
         try {
