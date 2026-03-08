@@ -456,49 +456,29 @@ const FeesFinance = () => {
         `
     }
 
-    // Opens receipt in a new browser tab (view mode)
-    const handleViewReceipt = async (paymentId) => {
+    // Download receipt as a proper PDF (works on all devices including iPad)
+    const handleDownloadReceiptPdf = async (paymentId) => {
         try {
-            const toastId = toast.loading('Loading receipt...')
-            const { payment, school } = await getReceiptData(paymentId)
+            const toastId = toast.loading('Generating PDF receipt...')
+            const token = localStorage.getItem('token')
+            const response = await fetch(
+                `${SERVER_URL}/api/invoices/payments/${paymentId}/receipt/pdf`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            )
+            if (!response.ok) throw new Error('PDF generation failed')
+            const blob = await response.blob()
             toast.dismiss(toastId)
-
-            const html = buildReceiptHtml(payment, school)
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-            const blobUrl = URL.createObjectURL(blob)
-            const w = window.open(blobUrl, '_blank')
-            if (!w) {
-                // If popup still blocked, fall back to download
-                toast.error('Could not open tab — downloading instead')
-                handleDownloadReceipt(paymentId)
-            }
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 120000)
-        } catch (error) {
-            console.error('View receipt error:', error)
-            toast.error('Failed to load receipt')
-        }
-    }
-
-    // Directly downloads receipt as HTML file (no popup)
-    const handleDownloadReceipt = async (paymentId) => {
-        try {
-            const toastId = toast.loading('Preparing download...')
-            const { payment, school } = await getReceiptData(paymentId)
-            toast.dismiss(toastId)
-
-            const html = buildReceiptHtml(payment, school)
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
             const blobUrl = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = blobUrl
-            a.download = `Receipt-${payment.receiptNumber}.html`
+            a.download = `Receipt-${paymentId}.pdf`
             document.body.appendChild(a)
             a.click()
             document.body.removeChild(a)
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 5000)
-            toast.success(`Receipt ${payment.receiptNumber} downloaded!`)
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
+            toast.success('Receipt downloaded!')
         } catch (error) {
-            console.error('Download receipt error:', error)
+            console.error('Download receipt PDF error:', error)
             toast.error('Failed to download receipt')
         }
     }
@@ -870,20 +850,13 @@ const FeesFinance = () => {
                                                         {new Date(payment.paymentDate).toLocaleDateString()}
                                                     </td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <div className="flex justify-end items-center gap-3">
+                                                        <div className="flex justify-end items-center">
                                                             <button
-                                                                onClick={() => handleViewReceipt(payment._id)}
-                                                                className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors"
-                                                                title="View Receipt"
+                                                                onClick={() => handleDownloadReceiptPdf(payment._id)}
+                                                                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors"
+                                                                title="Download Receipt as PDF"
                                                             >
                                                                 <FileText className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDownloadReceipt(payment._id)}
-                                                                className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors"
-                                                                title="Download Receipt"
-                                                            >
-                                                                <Printer className="h-4 w-4" />
                                                             </button>
                                                         </div>
                                                     </td>
@@ -1443,20 +1416,13 @@ const FeesFinance = () => {
                                                         {new Date(payment.paymentDate).toLocaleDateString('en-IN')}
                                                     </td>
                                                     <td className="px-5 py-3 whitespace-nowrap text-right">
-                                                        <div className="flex justify-end items-center gap-3">
+                                                        <div className="flex justify-end items-center">
                                                             <button
-                                                                onClick={() => handleViewReceipt(payment._id)}
-                                                                className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-                                                                title="View Receipt"
+                                                                onClick={() => handleDownloadReceiptPdf(payment._id)}
+                                                                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors"
+                                                                title="Download Receipt as PDF"
                                                             >
                                                                 <FileText className="h-3.5 w-3.5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDownloadReceipt(payment._id)}
-                                                                className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-                                                                title="Download Receipt"
-                                                            >
-                                                                <Printer className="h-3.5 w-3.5" />
                                                             </button>
                                                         </div>
                                                     </td>
