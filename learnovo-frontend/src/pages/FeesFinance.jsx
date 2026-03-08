@@ -461,11 +461,12 @@ const FeesFinance = () => {
         try {
             const toastId = toast.loading('Generating PDF receipt...')
             const token = localStorage.getItem('token')
-            const response = await fetch(
-                `${SERVER_URL}/api/invoices/payments/${paymentId}/receipt/pdf`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            )
-            if (!response.ok) throw new Error('PDF generation failed')
+            // API_BASE already includes /api so we do NOT add it again
+            const url = `${API_BASE}/invoices/payments/${paymentId}/receipt/pdf`
+            const response = await fetch(url, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+            if (!response.ok) throw new Error(`PDF generation failed (${response.status})`)
             const blob = await response.blob()
             toast.dismiss(toastId)
             const blobUrl = URL.createObjectURL(blob)
