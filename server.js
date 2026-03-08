@@ -221,6 +221,10 @@ app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/advance-salary', require('./routes/advanceSalary'));
 app.use('/api/homework', require('./routes/homework'));
 
+// Super Admin Routes
+app.use('/api/super-admin/auth', require('./routes/superAdminAuth'));
+app.use('/api/super-admin', require('./routes/superAdmin'));
+
 // Error handling middleware
 app.use(errorHandler);
 
