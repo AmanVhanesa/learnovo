@@ -875,7 +875,7 @@ const FeesFinance = () => {
                                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                         <div className="flex justify-end items-center">
                                                             <button
-                                                                onClick={() => handleViewReceiptPdf(payment._id)}
+                                                                onClick={() => handlePrintReceipt(payment._id)}
                                                                 className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors mr-2"
                                                                 title="View Receipt"
                                                             >
@@ -1448,7 +1448,7 @@ const FeesFinance = () => {
                                                     <td className="px-5 py-3 whitespace-nowrap text-right">
                                                         <div className="flex justify-end items-center">
                                                             <button
-                                                                onClick={() => handleViewReceiptPdf(payment._id)}
+                                                                onClick={() => handlePrintReceipt(payment._id)}
                                                                 className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors mr-2"
                                                                 title="View Receipt"
                                                             >
