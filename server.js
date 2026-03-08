@@ -8,6 +8,24 @@ const { v4: uuidv4 } = require('uuid');
 const { requestIdMiddleware, errorHandler, notFoundHandler, logger } = require('./middleware/errorHandler');
 require('dotenv').config({ path: './config.env' });
 
+// ── Process-level error guards ─────────────────────────────────────────────
+// Prevent stream/pipe errors from crashing the entire server process.
+// These are defensive; the receipt PDF route already buffers to avoid them.
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err.code, err.message);
+  // Only exit for truly fatal errors (e.g. EADDRINUSE), not stream errors
+  if (err.code === 'ERR_STREAM_WRITE_AFTER_END' || err.code === 'EPIPE') {
+    console.warn('[uncaughtException] Stream error – ignoring, not exiting');
+  } else {
+    console.error('[uncaughtException] Fatal – exiting:', err.stack);
+    process.exit(1);
+  }
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+  // Do NOT exit — Express async handlers catch these at the route level
+});
+
 const app = express();
 
 // Request ID middleware (must be first)
