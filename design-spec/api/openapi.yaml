@@ -1,0 +1,72 @@
+openapi: 3.0.3
+info:
+  title: Learnovo API
+  version: 1.0.0
+  description: Core resources, multi-tenant, and billing endpoints
+servers:
+  - url: https://api.learnovo.com
+  - url: http://localhost:5001
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    SchoolId:
+      name: X-School-Id
+      in: header
+      required: true
+      schema:
+        type: string
+paths:
+  /api/auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /api/schools:
+    get:
+      summary: List schools (SuperAdmin)
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create school (SuperAdmin)
+      responses:
+        '201': { description: Created }
+
+  /api/students:
+    get:
+      summary: List students
+      parameters:
+        - $ref: '#/components/parameters/SchoolId'
+      responses:
+        '200': { description: OK }
+
+  /api/billing/checkout:
+    post:
+      summary: Create checkout session (Stripe/Razorpay)
+      parameters:
+        - $ref: '#/components/parameters/SchoolId'
+      responses:
+        '200': { description: OK }
+
+  /api/billing/webhook:
+    post:
+      summary: Payment provider webhook
+      responses:
+        '200': { description: OK }
+
+

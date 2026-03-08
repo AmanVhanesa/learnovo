@@ -1,0 +1,30 @@
+# Environment
+config.env
+.env
+.env.local
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Test
+coverage/
+.nyc_output/
+
+# MongoDB
+*.db
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+

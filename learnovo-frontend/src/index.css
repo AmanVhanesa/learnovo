@@ -1,0 +1,267 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  * {
+    @apply border-gray-200;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  /* Smooth GPU-composited transitions — only links & buttons, NOT form inputs */
+  a,
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="menuitem"] {
+    transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    transition-duration: 150ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Slim smooth custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  /* Honor reduced-motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /*
+   * iOS Safari auto-zoom fix:
+   * Safari zooms in when a focused input has font-size < 16px.
+   * Force minimum 16px on all touch/mobile screens so the page
+   * never zooms on focus — the single biggest cause of the
+   * "page looks zoomed after refresh" issue on iPhone/iPad.
+   */
+  @media screen and (max-width: 768px) {
+
+    input,
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="url"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="month"],
+    input[type="week"],
+    input[type="time"],
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Prevent rubber-band overscroll causing layout shift on iOS */
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    /* prevent iOS text inflation */
+    text-size-adjust: 100%;
+  }
+
+  /* Safe-area insets for notched iPhones/iPads (paired with viewport-fit=cover) */
+  .safe-area-wrapper {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg text-sm font-medium h-10 px-4 py-2 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95;
+  }
+
+  .btn-primary {
+    @apply bg-primary-600 text-white shadow-md hover:bg-primary-700 hover:shadow-lg hover:-translate-y-0.5;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary-600 text-white shadow-md hover:bg-secondary-700 hover:shadow-lg hover:-translate-y-0.5;
+  }
+
+  .btn-outline {
+    @apply border-2 border-primary-600 text-primary-600 hover:bg-primary-50 hover:border-primary-700 hover:text-primary-700;
+  }
+
+  .btn-ghost {
+    @apply hover:bg-gray-100 hover:text-gray-900;
+  }
+
+  .btn-sm {
+    @apply h-8 px-3 text-xs;
+  }
+
+  .btn-md {
+    @apply h-10 px-4 py-2;
+  }
+
+  .btn-lg {
+    @apply h-12 px-8 text-base;
+  }
+
+  .card {
+    @apply rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:shadow-md;
+  }
+
+  .input {
+    @apply flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm transition-all duration-200 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 focus-visible:border-primary-500 disabled:cursor-not-allowed disabled:opacity-50 hover:border-gray-400;
+  }
+
+  .label {
+    @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+  }
+
+  .sidebar {
+    @apply fixed left-0 top-0 z-40 h-screen w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out;
+  }
+
+  .sidebar-open {
+    @apply translate-x-0;
+  }
+
+  .sidebar-closed {
+    @apply -translate-x-full;
+  }
+
+  .main-content {
+    @apply flex-1 transition-all duration-300 ease-in-out;
+  }
+
+  .main-content-sidebar-open {
+    @apply ml-64;
+  }
+
+  .main-content-sidebar-closed {
+    @apply ml-0;
+  }
+
+  .stat-card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow duration-200;
+  }
+
+  .table {
+    @apply w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm;
+  }
+
+  .table th {
+    @apply bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200;
+  }
+
+  .table td {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 border-b border-gray-200;
+  }
+
+  .table tbody tr {
+    @apply transition-colors duration-150;
+  }
+
+  .table tbody tr:hover {
+    @apply bg-primary-50/50;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .status-pending {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .status-paid {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .status-overdue {
+    @apply bg-red-100 text-red-800;
+  }
+
+  .status-active {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .status-inactive {
+    @apply bg-gray-100 text-gray-800;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+  }
+
+  .modal-content {
+    @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto;
+  }
+
+  .loading-spinner {
+    @apply animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500;
+  }
+
+  .toast {
+    @apply fixed top-4 right-4 z-50 max-w-sm w-full bg-white rounded-lg shadow-lg border border-gray-200 p-4;
+  }
+
+  .toast-success {
+    @apply border-l-4 border-green-500;
+  }
+
+  .toast-error {
+    @apply border-l-4 border-red-500;
+  }
+
+  .toast-warning {
+    @apply border-l-4 border-yellow-500;
+  }
+
+  .toast-info {
+    @apply border-l-4 border-blue-500;
+  }
+}
