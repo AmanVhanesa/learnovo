@@ -76,8 +76,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
 <style>
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;background:#fff !important;color:#1a1a1a}
-  .page{max-width:820px;margin:20px auto;border:1.5px solid #1a1a1a;border-radius:12px;overflow:hidden}
-  .inner{border:1px solid #888;margin:5px;padding:0;border-radius:6px;overflow:hidden}
+  .page{max-width:820px;margin:20px auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)}
+  .inner{background:#fff;padding:0;overflow:hidden}
   /* ── Header ── */
   .hdr{padding:28px 32px;display:flex;align-items:center;gap:24px;border-bottom:2px solid #1a1a1a}
   .hdr-mid{flex:1;text-align:center}
@@ -97,7 +97,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries }) {
   .marks-ttl{font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;padding:14px 0 8px}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   .table-box{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
-  table th{background:#f8fafc;padding:8px 12px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:#64748b;font-weight:700;border-bottom:1.5px solid #e2e8f0}
+  table th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:700;border-bottom:2px solid #e2e8f0}
   table th.c,table td.c{text-align:center}
   .grand-row td{background:#312e81 !important;color:#fff !important;padding:11px 12px;font-weight:700;font-size:13px;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
   /* ── Stats ── */
