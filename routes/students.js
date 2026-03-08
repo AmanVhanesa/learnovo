@@ -126,61 +126,13 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.class = req.query.class;
     }
 
-    // Add section filter
+    // Add section filter — SIMPLE STRING MATCH ONLY (no sectionId!)
+    // Using sectionId caused students with orphaned/deleted section IDs to be invisible.
+    // The section string field is always reliable.
     if (req.query.section) {
-      try {
-        const Section = require('../models/Section');
-
-        // Use a case-insensitive exact regex for section name safely
-        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
-
-        const sectionQuery = {
-          name: sectionNameRegex,
-          tenantId: req.user.tenantId
-          // Remove isActive constraint to ensure we find it even if it's deactivated
-        };
-
-        if (req.query.class) {
-          const Class = require('../models/Class');
-          const classDoc = await Class.findOne({
-            $or: [
-              { grade: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              { name: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
-            ],
-            tenantId: req.user.tenantId
-          });
-          if (classDoc) {
-            sectionQuery.classId = classDoc._id;
-          }
-        }
-
-        // Find ALL sections matching this name (in case there are formatting errors or multiple)
-        const sections = await Section.find(sectionQuery);
-
-        const sectionIds = sections.map(s => s._id);
-
-        if (!filter.$and) {
-          filter.$and = [];
-        }
-
-        if (sectionIds.length > 0) {
-          // It MUST match either one of these sectionIds OR exactly the raw string fallback.
-          // This strict enforcement prevents cross-contamination.
-          filter.$and.push({
-            $or: [
-              { sectionId: { $in: sectionIds } },
-              { section: sectionNameRegex }
-            ]
-          });
-        } else {
-          // If no mapped Section found, explicitly require the raw section string
-          filter.$and.push({ section: sectionNameRegex });
-        }
-      } catch (err) {
-        console.error('Section filter error:', err);
-        if (!filter.$and) filter.$and = [];
-        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
-      }
+      const sectionStr = req.query.section.trim();
+      // Case-insensitive exact match
+      filter.section = new RegExp(`^${sectionStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
     }
 
     // Add academic year filter
@@ -1177,34 +1129,10 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
 
     // Apply filters
     if (req.query.class) filter.class = req.query.class;
+    // Section filter — SIMPLE STRING MATCH (no sectionId dependency)
     if (req.query.section) {
-      try {
-        const Section = require('../models/Section');
-        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
-        const sectionQuery = { name: sectionNameRegex, tenantId: req.user.tenantId };
-        if (req.query.class) {
-          const Class = require('../models/Class');
-          const classDoc = await Class.findOne({
-            $or: [
-              { grade: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              { name: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
-            ],
-            tenantId: req.user.tenantId
-          });
-          if (classDoc) sectionQuery.classId = classDoc._id;
-        }
-        const sections = await Section.find(sectionQuery);
-        const sectionIds = sections.map(s => s._id);
-        if (!filter.$and) filter.$and = [];
-        if (sectionIds.length > 0) {
-          filter.$and.push({ $or: [{ sectionId: { $in: sectionIds } }, { section: sectionNameRegex }] });
-        } else {
-          filter.$and.push({ section: sectionNameRegex });
-        }
-      } catch (err) {
-        if (!filter.$and) filter.$and = [];
-        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
-      }
+      const sectionStr = req.query.section.trim();
+      filter.section = new RegExp(`^${sectionStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
     }
     if (req.query.academicYear) filter.academicYear = req.query.academicYear;
     if (req.query.status) filter.isActive = req.query.status === 'active';
@@ -2477,34 +2405,10 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
       filter.class = req.query.class;
     }
 
+    // Section filter — SIMPLE STRING MATCH (no sectionId dependency)
     if (req.query.section) {
-      try {
-        const Section = require('../models/Section');
-        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
-        const sectionQuery = { name: sectionNameRegex, tenantId: req.user.tenantId };
-        if (req.query.class) {
-          const Class = require('../models/Class');
-          const classDoc = await Class.findOne({
-            $or: [
-              { grade: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              { name: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
-            ],
-            tenantId: req.user.tenantId
-          });
-          if (classDoc) sectionQuery.classId = classDoc._id;
-        }
-        const sections = await Section.find(sectionQuery);
-        const sectionIds = sections.map(s => s._id);
-        if (!filter.$and) filter.$and = [];
-        if (sectionIds.length > 0) {
-          filter.$and.push({ $or: [{ sectionId: { $in: sectionIds } }, { section: sectionNameRegex }] });
-        } else {
-          filter.$and.push({ section: sectionNameRegex });
-        }
-      } catch (err) {
-        if (!filter.$and) filter.$and = [];
-        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
-      }
+      const sectionStr = req.query.section.trim();
+      filter.section = new RegExp(`^${sectionStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
     }
 
     if (req.query.academicYear) {
