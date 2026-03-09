@@ -372,9 +372,18 @@ const TenantSlideOver = ({ isOpen, onClose, tenantId, onUpdate }) => {
                                     <div className="space-y-2">
                                         <FeatureRow label="Core Academics" enabled={true} />
                                         <FeatureRow label="Attendance Tracking" enabled={true} />
-                                        <FeatureRow label="Fees & Finance" enabled={plan !== 'free' && plan !== 'free_trial'} />
+                                        <FeatureRow label="Timetable & Homework" enabled={true} />
+                                        <FeatureRow label="Grades & Exams" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
+                                        <FeatureRow label="Result Cards (PDF)" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
+                                        <FeatureRow label="Fees & Finance" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
+                                        <FeatureRow label="Fee Receipts (PDF)" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
+                                        <FeatureRow label="Basic Reports" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
                                         <FeatureRow label="Advanced Analytics" enabled={['pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="API Access" enabled={['enterprise'].includes(plan)} />
+                                        <FeatureRow label="Custom Reports" enabled={['pro', 'premium', 'enterprise'].includes(plan)} />
+                                        <FeatureRow label="CSV Import" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
+                                        <FeatureRow label="API Access" enabled={['pro', 'premium', 'enterprise'].includes(plan)} />
+                                        <FeatureRow label="Custom Integrations" enabled={['enterprise'].includes(plan)} />
+                                        <FeatureRow label="Dedicated Account Manager" enabled={['enterprise'].includes(plan)} />
                                     </div>
                                 </div>
 
