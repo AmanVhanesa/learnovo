@@ -2,8 +2,17 @@ import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './contexts/AuthContext'
+import { SuperAdminProvider } from './contexts/SuperAdminContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import SuperAdminRoute from './components/superadmin/SuperAdminRoute'
+import SuperAdminLogin from './pages/superadmin/Login'
+import SuperAdminDashboard from './pages/superadmin/Dashboard'
+import SuperAdminTenants from './pages/superadmin/Tenants'
+import SuperAdminUsers from './pages/superadmin/Users'
+import SuperAdminPlans from './pages/superadmin/Plans'
+import SuperAdminAuditLog from './pages/superadmin/AuditLog'
+import SuperAdminLayout from './components/superadmin/SuperAdminLayout'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import Landing from './pages/Landing'
@@ -47,96 +56,114 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <SettingsProvider>
-          <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-            <div className="App">
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 4000,
-                  style: {
-                    background: '#fff',
-                    color: '#333',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                  },
-                  success: {
-                    iconTheme: {
-                      primary: '#10b981',
-                      secondary: '#fff',
+        <SuperAdminProvider>
+          <SettingsProvider>
+            <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+              <div className="App">
+                <Toaster
+                  position="top-right"
+                  toastOptions={{
+                    duration: 4000,
+                    style: {
+                      background: '#fff',
+                      color: '#333',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
                     },
-                  },
-                  error: {
-                    iconTheme: {
-                      primary: '#ef4444',
-                      secondary: '#fff',
+                    success: {
+                      iconTheme: {
+                        primary: '#10b981',
+                        secondary: '#fff',
+                      },
                     },
-                  },
-                }}
-              />
+                    error: {
+                      iconTheme: {
+                        primary: '#ef4444',
+                        secondary: '#fff',
+                      },
+                    },
+                  }}
+                />
 
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/app" element={
-                  <ProtectedRoute>
-                    <Layout />
-                  </ProtectedRoute>
-                }>
-                  <Route index element={<Navigate to="/app/dashboard" replace />} />
-                  <Route path="dashboard" element={<Dashboard />} />
-                  <Route path="students" element={<Students />} />
-                  <Route path="students/bulk-promote" element={<BulkPromotion />} />
-                  <Route path="students/:id" element={<StudentDetail />} />
-                  <Route path="student-lists" element={<StudentLists />} />
-                  <Route path="employees" element={<Employees />} />
-                  <Route path="employees/:id" element={<EmployeeDetail />} />
-                  <Route path="teachers" element={<Teachers />} />
-                  {/* Academics Module */}
-                  <Route path="academics" element={<Academics />} />
-                  <Route path="classes" element={<Classes />} />
-                  <Route path="classes/:id" element={<ClassDetail />} />
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/app" element={
+                    <ProtectedRoute>
+                      <Layout />
+                    </ProtectedRoute>
+                  }>
+                    <Route index element={<Navigate to="/app/dashboard" replace />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="students" element={<Students />} />
+                    <Route path="students/bulk-promote" element={<BulkPromotion />} />
+                    <Route path="students/:id" element={<StudentDetail />} />
+                    <Route path="student-lists" element={<StudentLists />} />
+                    <Route path="employees" element={<Employees />} />
+                    <Route path="employees/:id" element={<EmployeeDetail />} />
+                    <Route path="teachers" element={<Teachers />} />
+                    {/* Academics Module */}
+                    <Route path="academics" element={<Academics />} />
+                    <Route path="classes" element={<Classes />} />
+                    <Route path="classes/:id" element={<ClassDetail />} />
 
-                  {/* Finance Module */}
-                  <Route path="fees-finance" element={<FeesFinance />} />
-                  <Route path="fees" element={<Fees />} />
-                  <Route path="student/fees" element={<StudentFeesDashboard />} />
+                    {/* Finance Module */}
+                    <Route path="fees-finance" element={<FeesFinance />} />
+                    <Route path="fees" element={<Fees />} />
+                    <Route path="student/fees" element={<StudentFeesDashboard />} />
 
-                  <Route path="attendance" element={<Attendance />} />
-                  <Route path="assignments" element={<Assignments />} />
-                  <Route path="homework" element={<Homework />} />
-                  <Route path="exams" element={<Exams />} />
-                  <Route path="admissions" element={<Admissions />} />
-                  <Route path="activities" element={<Activities />} />
-                  <Route path="reports" element={<Reports />} />
+                    <Route path="attendance" element={<Attendance />} />
+                    <Route path="assignments" element={<Assignments />} />
+                    <Route path="homework" element={<Homework />} />
+                    <Route path="exams" element={<Exams />} />
+                    <Route path="admissions" element={<Admissions />} />
+                    <Route path="activities" element={<Activities />} />
+                    <Route path="reports" element={<Reports />} />
 
-                  {/* Communication Module */}
-                  <Route path="communication" element={<Communication />} />
-                  <Route path="announcements" element={<Announcements />} />
-                  <Route path="notifications" element={<Notifications />} />
-                  <Route path="notification-preferences" element={<NotificationPreferences />} />
+                    {/* Communication Module */}
+                    <Route path="communication" element={<Communication />} />
+                    <Route path="announcements" element={<Announcements />} />
+                    <Route path="notifications" element={<Notifications />} />
+                    <Route path="notification-preferences" element={<NotificationPreferences />} />
 
-                  {/* Transport Module */}
-                  <Route path="transport" element={<Transport />} />
+                    {/* Transport Module */}
+                    <Route path="transport" element={<Transport />} />
 
-                  {/* Payroll Module */}
-                  <Route path="payroll" element={<Payroll />} />
+                    {/* Payroll Module */}
+                    <Route path="payroll" element={<Payroll />} />
 
-                  {/* Certificates Module */}
-                  <Route path="certificates" element={<CertificateManager />} />
-                  <Route path="certificates/generate" element={<CertificateGeneration />} />
-                  <Route path="certificates/templates" element={<TemplateSettings />} />
+                    {/* Certificates Module */}
+                    <Route path="certificates" element={<CertificateManager />} />
+                    <Route path="certificates/generate" element={<CertificateGeneration />} />
+                    <Route path="certificates/templates" element={<TemplateSettings />} />
 
-                  <Route path="search" element={<Search />} />
-                  <Route path="settings" element={<Settings />} />
-                  <Route path="profile" element={<Profile />} />
-                </Route>
-              </Routes>
-            </div>
-          </Router>
-        </SettingsProvider>
+                    <Route path="search" element={<Search />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="profile" element={<Profile />} />
+                  </Route>
+
+                  {/* Super Admin Routes */}
+                  <Route path="/super-admin-login" element={<SuperAdminLogin />} />
+                  <Route path="/super-admin" element={
+                    <SuperAdminRoute>
+                      <SuperAdminLayout />
+                    </SuperAdminRoute>
+                  }>
+                    <Route index element={<Navigate to="/super-admin/dashboard" replace />} />
+                    <Route path="dashboard" element={<SuperAdminDashboard />} />
+                    <Route path="schools" element={<SuperAdminTenants />} />
+                    <Route path="users" element={<SuperAdminUsers />} />
+                    <Route path="plans" element={<SuperAdminPlans />} />
+                    <Route path="audit-log" element={<SuperAdminAuditLog />} />
+                  </Route>
+
+                </Routes>
+              </div>
+            </Router>
+          </SettingsProvider>
+        </SuperAdminProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

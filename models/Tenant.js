@@ -135,6 +135,11 @@ const tenantSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isDeleted: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -154,7 +159,7 @@ tenantSchema.index({ email: 1 });
 tenantSchema.index({ 'subscription.status': 1 });
 
 // Virtual for full address
-tenantSchema.virtual('fullAddress').get(function() {
+tenantSchema.virtual('fullAddress').get(function () {
   const addr = this.address;
   if (!addr) return '';
   return [addr.street, addr.city, addr.state, addr.country, addr.zipCode]
@@ -163,7 +168,7 @@ tenantSchema.virtual('fullAddress').get(function() {
 });
 
 // Pre-save middleware
-tenantSchema.pre('save', function(next) {
+tenantSchema.pre('save', function (next) {
   this.updatedAt = new Date();
   next();
 });

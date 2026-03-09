@@ -131,7 +131,8 @@ router.patch('/tenants/:id/plan', async (req, res) => {
     try {
         const { plan, status, customLimits } = req.body;
 
-        const validPlans = ['free_trial', 'basic', 'premium', 'enterprise'];
+        // Match the actual Tenant model schema enum values
+        const validPlans = ['free', 'basic', 'pro', 'enterprise'];
         const validStatuses = ['trial', 'active', 'suspended', 'cancelled'];
 
         if (plan && !validPlans.includes(plan)) {
@@ -473,6 +474,26 @@ router.delete('/users/:id', async (req, res) => {
     }
 });
 
+/**
+ * PATCH /api/super-admin/users/:id/activate
+ * Re-activate a previously deactivated user
+ */
+router.patch('/users/:id/activate', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ success: false, message: 'User not found.', requestId: req.requestId });
+
+        user.isActive = true;
+        await user.save({ validateBeforeSave: false });
+        await audit(req, 'ACTIVATE_USER', 'User', user._id, { email: user.email, role: user.role });
+
+        return res.json({ success: true, message: 'User activated successfully.', requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: activate user error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error activating user.', requestId: req.requestId });
+    }
+});
+
 // ─── DASHBOARD & ANALYTICS ───────────────────────────────────────────────────
 
 /**
@@ -481,6 +502,12 @@ router.delete('/users/:id', async (req, res) => {
  */
 router.get('/dashboard', async (req, res) => {
     try {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+        sixMonthsAgo.setDate(1);
+        sixMonthsAgo.setHours(0, 0, 0, 0);
+
+        console.log('[DEBUG Dashboard] Starting Promise.all for aggregations...');
         const [
             totalTenants,
             activeTenants,
@@ -489,7 +516,8 @@ router.get('/dashboard', async (req, res) => {
             totalStudents,
             totalTeachers,
             totalUsers,
-            recentRegistrations
+            recentRegistrations,
+            registrationsTrendRaw
         ] = await Promise.all([
             Tenant.countDocuments({ isDeleted: { $ne: true } }),
             Tenant.countDocuments({ isDeleted: { $ne: true }, 'subscription.status': 'active' }),
@@ -505,13 +533,25 @@ router.get('/dashboard', async (req, res) => {
                 .select('schoolName schoolCode email subscription.plan subscription.status createdAt')
                 .sort({ createdAt: -1 })
                 .limit(10)
-                .lean()
+                .lean(),
+            Tenant.aggregate([
+                { $match: { isDeleted: { $ne: true }, createdAt: { $gte: sixMonthsAgo } } },
+                {
+                    $group: {
+                        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+                        count: { $sum: 1 }
+                    }
+                },
+                { $sort: { "_id.year": 1, "_id.month": 1 } }
+            ])
         ]);
+        console.log('[DEBUG Dashboard] Promise.all finished successfully!');
 
-        // Build plan breakdown object
-        const planBreakdown = { free_trial: 0, basic: 0, premium: 0, enterprise: 0 };
-        planBreakdownRaw.forEach(({ _id, count }) => {
-            if (_id && planBreakdown[_id] !== undefined) planBreakdown[_id] = count;
+        // Build plan breakdown as array (matches chart component expectation)
+        const allPlans = ['free', 'basic', 'pro', 'enterprise'];
+        const planBreakdown = allPlans.map(plan => {
+            const found = planBreakdownRaw.find(r => r._id === plan);
+            return { _id: plan, count: found ? found.count : 0 };
         });
 
         // Calculate estimated revenue from active paid plans
@@ -532,6 +572,25 @@ router.get('/dashboard', async (req, res) => {
             }
         });
 
+        // Build Registrations Trend
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const trendLabels = [];
+        const trendData = [];
+
+        let curr = new Date(sixMonthsAgo);
+        const now = new Date();
+        while (curr <= now) {
+            const year = curr.getFullYear();
+            const month = curr.getMonth() + 1;
+            trendLabels.push(monthNames[curr.getMonth()]);
+
+            const found = registrationsTrendRaw.find(r => r._id.year === year && r._id.month === month);
+            trendData.push(found ? found.count : 0);
+
+            curr.setMonth(curr.getMonth() + 1);
+        }
+
+        console.log('[DEBUG Dashboard] Before res.json');
         return res.json({
             success: true,
             data: {
@@ -544,6 +603,10 @@ router.get('/dashboard', async (req, res) => {
                 totalTeachers,
                 totalUsers,
                 recentRegistrations,
+                registrationsTrend: {
+                    labels: trendLabels,
+                    data: trendData
+                },
                 revenue: {
                     monthly: monthlyRevenue,
                     annual: monthlyRevenue * 12
@@ -554,6 +617,45 @@ router.get('/dashboard', async (req, res) => {
     } catch (error) {
         logger.error('Super admin: dashboard error', error, { requestId: req.requestId });
         return res.status(500).json({ success: false, message: 'Server error loading dashboard.', requestId: req.requestId });
+    }
+});
+
+// ─── AUDIT LOGS ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/audit-logs
+ * Paginated audit log of all super admin actions
+ * Query: page, limit, action, targetType
+ */
+router.get('/audit-logs', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+        if (req.query.action) filter.action = req.query.action;
+        if (req.query.targetType) filter.targetType = req.query.targetType;
+
+        const [logs, total] = await Promise.all([
+            SuperAdminAuditLog.find(filter)
+                .populate('superAdminId', 'name email')
+                .sort({ timestamp: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            SuperAdminAuditLog.countDocuments(filter)
+        ]);
+
+        return res.json({
+            success: true,
+            data: logs,
+            pagination: { current: page, pages: Math.ceil(total / limit), total },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: audit logs error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error loading audit logs.', requestId: req.requestId });
     }
 });
 
