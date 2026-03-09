@@ -21,13 +21,13 @@ const SuperAdminLayout = () => {
     }
 
     return (
-        <div className="flex h-screen bg-gray-50">
-            {/* Sidebar - uses the new 210px width standard */}
+        <div className="flex h-screen bg-gray-50 overflow-hidden">
+            {/* Sidebar */}
             <SuperAdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-            {/* Main content - matching modern Learnovo platform style */}
-            <div className="flex-1 flex flex-col overflow-hidden xl:ml-[210px]">
-                {/* Mobile / Desktop Unified Header Wrapper */}
+            {/* Main content area */}
+            <div className="flex-1 flex flex-col min-h-0 xl:ml-[210px]">
+                {/* Header — flush at the very top, no extra padding */}
                 <SuperAdminHeader
                     onToggleSidebar={toggleSidebar}
                     sidebarOpen={sidebarOpen}
@@ -35,7 +35,6 @@ const SuperAdminLayout = () => {
 
                 {/* Page content */}
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50">
-                    {/* Padding exactly matches the Learnovo component structure */}
                     <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
                         <Outlet />
                     </div>
