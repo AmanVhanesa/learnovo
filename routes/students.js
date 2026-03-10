@@ -1384,7 +1384,7 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
     }
 
     const {
-      fullName, firstName, middleName, lastName, email, phone, password,
+      fullName, name, firstName, middleName, lastName, email, phone, password,
       class: studentClass, section, academicYear, rollNumber, admissionDate,
       guardians, address, avatar,
       penNumber, subDepartment, udiseCode, // Legacy fields
@@ -1481,8 +1481,12 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
       }
     }
 
+    // Support both fullName and name (since StudentForm.jsx renames fullName to name)
+    const finalName = fullName || name;
+
     const studentData = {
-      fullName: fullName ? fullName.trim() : undefined,
+      fullName: finalName ? finalName.trim() : undefined,
+      name: finalName ? finalName.trim() : undefined,
       firstName: firstName ? firstName.trim() : undefined,
       middleName: middleName ? middleName.trim() : undefined,
       lastName: lastName ? lastName.trim() : undefined,
