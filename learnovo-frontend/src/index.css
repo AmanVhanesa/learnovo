@@ -238,7 +238,10 @@
   }
 
   .modal-content {
-    @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto;
+    @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto overflow-hidden ring-0 outline-none border border-transparent;
+    /* Extra specific boundary enforcement for Safari/Mac to prevent ghost borders at top */
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    mask-image: radial-gradient(white, black);
   }
 
   .loading-spinner {
