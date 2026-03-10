@@ -32,7 +32,7 @@ const counterSchema = new mongoose.Schema({
 
 // Compound index for efficient lookups
 counterSchema.index({ name: 1, year: 1 })
-counterSchema.index({ name: 1, year: 1, tenantId: 1 }, { unique: true, sparse: true })
+counterSchema.index({ name: 1, year: 1, tenantId: 1 })
 
 /**
  * Get next sequence number for a given counter and year.
@@ -98,7 +98,7 @@ counterSchema.statics.getNextSequence = async function (name, year, tenantId = n
   // Standard atomic increment
   const counter = await this.findOneAndUpdate(
     filter,
-    { $inc: { sequence: 1 }, $setOnInsert: { sequence: 1 } },
+    { $inc: { sequence: 1 } },
     { new: true, upsert: true }
   )
 
