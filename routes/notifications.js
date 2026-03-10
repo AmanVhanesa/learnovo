@@ -2,8 +2,28 @@ const express = require('express');
 const { body, query } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const Notification = require('../models/Notification'); // Import Notification model
 
 const router = express.Router();
+
+// @desc    Get unread notification count
+// @route   GET /api/notifications/unread-count
+// @access  Private
+router.get('/unread-count', protect, async (req, res) => {
+  try {
+    const count = await Notification.getUnreadCount(req.user._id, req.user.tenantId);
+    res.json({
+      success: true,
+      data: { count }
+    });
+  } catch (error) {
+    console.error('Get unread notifications count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching unread notification count'
+    });
+  }
+});
 
 // @desc    Get notifications
 // @route   GET /api/notifications
@@ -12,7 +32,7 @@ router.get('/', protect, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     // Mock notifications for now
     const notifications = [

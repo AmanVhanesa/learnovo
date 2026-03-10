@@ -3,6 +3,8 @@ import { Search, Filter, Shield, Key, Ban, CheckCircle2, AlertTriangle, MoreVert
 import { superAdminService } from '../../services/superAdminService'
 import toast from 'react-hot-toast'
 
+const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')
+
 // Modal to show temp password after reset
 const TempPasswordModal = ({ data, onClose }) => {
     const [copied, setCopied] = useState(false)
@@ -284,10 +286,19 @@ const SuperAdminUsers = () => {
                                             <div className="flex items-center">
                                                 <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
                                                     {user.avatar ? (
-                                                        <img src={user.avatar} alt={user.name || 'User'} className="h-full w-full object-cover" />
-                                                    ) : (
-                                                        <span className="text-gray-600 font-bold text-sm">{(user.name || user.firstName || 'U').charAt(0).toUpperCase()}</span>
-                                                    )}
+                                                        <img
+                                                            src={user.avatar.startsWith('http') ? user.avatar : `${SERVER_URL}${user.avatar}`}
+                                                            alt={user.name || 'User'}
+                                                            className="h-full w-full object-cover"
+                                                            onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+                                                        />
+                                                    ) : null}
+                                                    <span
+                                                        className="text-gray-600 font-bold text-sm"
+                                                        style={{ display: user.avatar ? 'none' : 'flex' }}
+                                                    >
+                                                        {(user.name || user.firstName || 'U').charAt(0).toUpperCase()}
+                                                    </span>
                                                 </div>
                                                 <div className="ml-4">
                                                     <div className="text-sm font-medium text-gray-900">{user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User'}</div>
