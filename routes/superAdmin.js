@@ -659,4 +659,46 @@ router.get('/audit-logs', async (req, res) => {
     }
 });
 
+
+// ─── ADMISSION COUNTER RESEED ─────────────────────────────────────────────────
+
+/**
+ * POST /api/super-admin/tenants/:id/reseed-counter
+ * Resync the admission counter for a tenant to the highest existing admissionNumber.
+ * Use this after a bulk migration so new admissions continue from the correct number.
+ */
+router.post('/tenants/:id/reseed-counter', async (req, res) => {
+    try {
+        const Counter = require('../models/Counter');
+        const User = require('../models/User');
+
+        const tenantId = req.params.id;
+        const year = req.query.year || new Date().getFullYear().toString();
+
+        const students = await User.find(
+            { tenantId, role: 'student', admissionNumber: { $exists: true, $nin: [null, ''] } },
+            { admissionNumber: 1 }
+        ).lean();
+
+        let maxSeq = 0;
+        for (const s of students) {
+            const match = s.admissionNumber && s.admissionNumber.match(/(\d+)$/);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > maxSeq) maxSeq = num;
+            }
+        }
+
+        await Counter.seedAdmissionCounter(tenantId, maxSeq, year);
+
+        return res.json({
+            success: true,
+            message: `Counter reseeded to ${maxSeq}. Next admission will be #${maxSeq + 1}.`,
+            data: { maxFound: maxSeq, nextWillBe: maxSeq + 1, year }
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: 'Server error reseeding counter.', error: error.message });
+    }
+});
+
 module.exports = router;
