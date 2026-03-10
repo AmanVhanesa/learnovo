@@ -190,6 +190,7 @@ const userSchema = new mongoose.Schema({
 userSchema.index({ email: 1, tenantId: 1 }, { unique: true }); // Email unique per tenant
 userSchema.index({ role: 1, tenantId: 1 });
 userSchema.index({ tenantId: 1 });
+userSchema.index({ tenantId: 1, admissionNumber: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

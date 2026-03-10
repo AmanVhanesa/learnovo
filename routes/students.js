@@ -10,6 +10,7 @@ const SubDepartment = require('../models/SubDepartment');
 const { formatCurrencyWithSettings } = require('../utils/currency');
 const upload = require('../middleware/upload');
 const { parseCSV } = require('../utils/csvHandler');
+const { generateAdmissionNumber } = require('../utils/admissionUtils');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
@@ -650,15 +651,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
         let admissionNumber = row.admissionNumber ? row.admissionNumber.toString().trim() : null;
 
         if (!admissionNumber) {
-          const settings = await Settings.getSettings(tenantId);
-          const { mode, prefix, yearFormat, counterPadding, startFrom } = settings.admission;
-
-          const currentYear = new Date().getFullYear().toString();
-          const yearStr = yearFormat === 'YY' ? currentYear.substring(2) : currentYear;
-          const effectivePrefix = mode === 'CUSTOM' ? (prefix || 'ADM') : 'ADM';
-
-          const sequence = await Counter.getNextSequence('admission', currentYear, tenantId);
-          admissionNumber = `${effectivePrefix}${yearStr}${String(sequence).padStart(counterPadding, '0')}`;
+          admissionNumber = await generateAdmissionNumber(tenantId);
         }
 
         // Prepare Guardians with auto-added honorifics
@@ -1437,16 +1430,7 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
     let admissionNumber = req.body.admissionNumber ? req.body.admissionNumber.trim() : null;
 
     if (!admissionNumber) {
-      const settings = await Settings.getSettings(tenantId);
-      const admissionSettings = settings?.admission || { mode: 'DEFAULT', prefix: 'ADM', yearFormat: 'YYYY', counterPadding: 4 };
-      const { mode, prefix, yearFormat, counterPadding } = admissionSettings;
-
-      const currentYear = new Date().getFullYear().toString();
-      const yearStr = yearFormat === 'YY' ? currentYear.substring(2) : currentYear;
-      const effectivePrefix = mode === 'CUSTOM' ? (prefix || 'ADM') : 'ADM';
-
-      const sequence = await Counter.getNextSequence('admission', currentYear, tenantId);
-      admissionNumber = `${effectivePrefix}${yearStr}${String(sequence).padStart(counterPadding, '0')}`;
+      admissionNumber = await generateAdmissionNumber(tenantId);
     }
 
     // Look up sectionId if section name is provided
