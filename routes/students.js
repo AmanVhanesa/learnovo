@@ -163,13 +163,24 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     }
 
     // Get students
-    const students = await User.find(filter)
-      .select('-password')
-      .populate('subDepartment', 'name')
-      .populate('driverId', 'name phone')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    let students;
+    try {
+      students = await User.find(filter)
+        .select('-password')
+        .populate({ path: 'subDepartment', select: 'name', strictPopulate: false })
+        .populate({ path: 'driverId', select: 'name phone', strictPopulate: false })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+    } catch (populateError) {
+      // Populate failed (e.g. ref model not loaded) — retry without populates
+      console.error('GET /students populate error (retrying without populate):', populateError.name, populateError.message);
+      students = await User.find(filter)
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+    }
 
     // Get total count
     const total = await User.countDocuments(filter);
@@ -184,10 +195,15 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       }
     });
   } catch (error) {
-    console.error('Get students error:', error);
+    console.error('GET /students error:', error.name, error.message);
+    console.error('GET /students stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Server error while fetching students'
+      message: 'Server error while fetching students',
+      ...(process.env.NODE_ENV !== 'production' && {
+        errorName: error.name,
+        errorMessage: error.message
+      })
     });
   }
 });

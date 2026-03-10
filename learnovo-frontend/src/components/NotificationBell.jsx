@@ -20,14 +20,19 @@ const NotificationBell = () => {
             setIsLoading(true);
             const response = await notificationsService.getUnreadCount();
             if (response.success) {
-                setUnreadCount(response.data.count);
+                setUnreadCount(response.data?.count ?? response.count ?? 0);
             }
         } catch (error) {
-            console.error('Error fetching unread count:', error);
+            // Silently ignore 404 (route not deployed yet) or network errors
+            // to avoid polluting the console on older deploys
+            if (error?.response?.status !== 404) {
+                console.error('Error fetching unread count:', error);
+            }
         } finally {
             setIsLoading(false);
         }
     };
+
 
     const handleToggle = (e) => {
         e.preventDefault();
