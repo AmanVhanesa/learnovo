@@ -996,11 +996,38 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
       }
     }
 
+    // ── Auto-reseed the admission counter after import ────────────────────
+    // This ensures the next manually-added student gets the right number
+    // even if migrated students had higher numbers than the counter tracked.
+    try {
+      const currentYear = new Date().getFullYear().toString();
+      const allStudents = await User.find(
+        { tenantId, role: 'student', admissionNumber: { $exists: true, $nin: [null, ''] } },
+        { admissionNumber: 1 }
+      ).lean();
+
+      let maxSeq = 0;
+      for (const s of allStudents) {
+        const match = s.admissionNumber && s.admissionNumber.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxSeq) maxSeq = num;
+        }
+      }
+
+      await Counter.seedAdmissionCounter(tenantId, maxSeq, currentYear);
+      console.log(`[Import] Admission counter reseeded to ${maxSeq} for tenant ${tenantId}`);
+    } catch (reseedErr) {
+      console.warn('[Import] Counter reseed failed (non-fatal):', reseedErr.message);
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     res.json({
       success: true,
       message: `Import completed. Imported: ${results.success}, Replaced: ${results.replaced}, Skipped: ${results.skipped}, Failed: ${results.failed}`,
       data: results
     });
+
 
   } catch (error) {
     console.error('Import execute error:', error);
