@@ -174,30 +174,9 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     // Get total count
     const total = await User.countDocuments(filter);
 
-    // Get fee summary for each student
-    const studentsWithFees = await Promise.all(
-      students.map(async (student) => {
-        const fees = await Fee.find({ student: student._id });
-        const totalFees = fees.reduce((sum, fee) => sum + fee.amount, 0);
-        const paidFees = fees.filter(fee => fee.status === 'paid').reduce((sum, fee) => sum + fee.amount, 0);
-        const pendingFees = fees.filter(fee => fee.status === 'pending').reduce((sum, fee) => sum + fee.amount, 0);
-        const overdueFees = fees.filter(fee => fee.status === 'overdue').reduce((sum, fee) => sum + fee.amount, 0);
-
-        return {
-          ...student.toJSON(),
-          feeSummary: {
-            total: await formatCurrencyWithSettings(totalFees),
-            paid: await formatCurrencyWithSettings(paidFees),
-            pending: await formatCurrencyWithSettings(pendingFees),
-            overdue: await formatCurrencyWithSettings(overdueFees)
-          }
-        };
-      })
-    );
-
     res.json({
       success: true,
-      data: studentsWithFees,
+      data: students,
       pagination: {
         current: page,
         pages: Math.ceil(total / limit),
