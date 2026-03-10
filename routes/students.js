@@ -1377,7 +1377,7 @@ router.get('/:id', protect, canAccessStudent, async (req, res) => {
 // @desc    Create new student
 // @route   POST /api/students
 // @access  Private (Admin)
-router.post('/', protect, authorize('admin'), validateStudent, async (req, res) => {
+router.post('/', protect, authorize('admin'), validateStudent, handleValidationErrors, async (req, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
       return res.status(400).json({ success: false, message: 'User tenant not found.' });
@@ -1438,7 +1438,8 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
 
     if (!admissionNumber) {
       const settings = await Settings.getSettings(tenantId);
-      const { mode, prefix, yearFormat, counterPadding } = settings.admission;
+      const admissionSettings = settings?.admission || { mode: 'DEFAULT', prefix: 'ADM', yearFormat: 'YYYY', counterPadding: 4 };
+      const { mode, prefix, yearFormat, counterPadding } = admissionSettings;
 
       const currentYear = new Date().getFullYear().toString();
       const yearStr = yearFormat === 'YY' ? currentYear.substring(2) : currentYear;
