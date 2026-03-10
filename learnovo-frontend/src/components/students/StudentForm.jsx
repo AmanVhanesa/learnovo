@@ -427,7 +427,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                         updateField('sectionId', selectedSection._id)
                                                     }
                                                 }}
-                                                disabled={!form.class || loadingSections}
+                                                disabled={!form.classId || loadingSections}
                                             >
                                                 <option value="">
                                                     {loadingSections ? 'Loading sections...' : 'Select Section'}
