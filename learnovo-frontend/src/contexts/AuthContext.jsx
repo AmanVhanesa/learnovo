@@ -79,10 +79,21 @@ export function AuthProvider({ children }) {
         try {
           // Try to get fresh user data
           const response = await authService.getCurrentUser()
+          const cachedUser = JSON.parse(user)
+          // Merge: prefer fresh server data but fall back to cached for missing fields
+          const mergedUser = {
+            ...cachedUser,      // base: cached (includes avatar from login)
+            ...response.user,  // override with fresh server data
+            // Preserve cached avatar/photo if server doesn't return one
+            avatar: response.user?.avatar || cachedUser?.avatar || null,
+            photo: response.user?.photo || cachedUser?.photo || null,
+          }
+          // Keep localStorage in sync with the merged user
+          localStorage.setItem('user', JSON.stringify(mergedUser))
           dispatch({
             type: 'AUTH_SUCCESS',
             payload: {
-              user: response.user,
+              user: mergedUser,
               tenant: tenant ? JSON.parse(tenant) : null,
               token
             }
