@@ -9,7 +9,7 @@ const router = express.Router();
 // @desc    Get dashboard statistics
 // @route   GET /api/reports/dashboard
 // @access  Private
-router.get('/dashboard', protect, async(req, res) => {
+router.get('/dashboard', protect, async (req, res) => {
   try {
     const user = req.user;
     const tenantId = user.tenantId;
@@ -24,8 +24,8 @@ router.get('/dashboard', protect, async(req, res) => {
       const teacherAssignedClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
       if (teacherAssignedClasses.length > 0) {
         // Find students by class name (since class field is string)
-        const studentsInClass = await User.find({ 
-          role: 'student', 
+        const studentsInClass = await User.find({
+          role: 'student',
           class: { $in: teacherAssignedClasses },
           tenantId: tenantId
         }).select('_id');
@@ -108,11 +108,11 @@ router.get('/dashboard', protect, async(req, res) => {
           date: { $gte: today, $lt: tomorrow },
           student: { $in: myStudents.map(s => s._id) }
         });
-        
+
         if (todayAttendance.length > 0) {
           const presentCount = todayAttendance.filter(a => a.status === 'present' || a.status === 'late').length;
-          statistics.teacher.attendanceToday = myStudents.length > 0 
-            ? Math.round((presentCount / myStudents.length) * 100) 
+          statistics.teacher.attendanceToday = myStudents.length > 0
+            ? Math.round((presentCount / myStudents.length) * 100)
             : 0;
         }
       } catch (attendanceError) {
@@ -136,7 +136,7 @@ router.get('/dashboard', protect, async(req, res) => {
     } else if (user.role === 'student') {
       const studentFees = await Fee.find({ student: user._id, tenantId: tenantId });
       const pendingFeeCount = studentFees.filter(f => f.status === 'pending' || f.status === 'overdue').length;
-      
+
       statistics.student = {
         profileComplete: user.isActive ? 'Complete' : 'Incomplete',
         pendingFees: pendingFeeCount,
@@ -181,7 +181,7 @@ router.get('/dashboard', protect, async(req, res) => {
         date.setMonth(date.getMonth() - i);
         const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
         const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-        
+
         months.push(date.toLocaleDateString('en-US', { month: 'short' }));
         const count = await User.countDocuments({
           role: 'student',
@@ -207,6 +207,76 @@ router.get('/dashboard', protect, async(req, res) => {
       success: false,
       message: 'Server error while fetching dashboard statistics',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// @desc    Get recent activities
+// @route   GET /api/reports/activities
+// @access  Private
+router.get('/activities', protect, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const limit = parseInt(req.query.limit) || 10;
+
+    // Arrays to hold different types of activities
+    let activities = [];
+
+    // 1. Get recent student enrollments
+    const recentStudents = await User.find({
+      tenantId: tenantId,
+      role: 'student'
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('_id name fullName firstName lastName createdAt');
+
+    const studentActivities = recentStudents.map(student => ({
+      id: `student-${student._id}`,
+      type: 'student',
+      status: 'success',
+      message: `New student enrolled: ${student.fullName || student.name || 'Unknown'}`,
+      date: student.createdAt,
+      studentName: student.fullName || student.name
+    }));
+
+    activities = [...activities, ...studentActivities];
+
+    // 2. Get recent fee payments
+    const recentFees = await Fee.find({
+      tenantId: tenantId,
+      status: 'paid'
+    })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .populate('student', 'name fullName');
+
+    const feeActivities = recentFees.map(fee => ({
+      id: `fee-${fee._id}`,
+      type: 'fee',
+      status: 'success',
+      message: `Fee payment of ₹${fee.amount || 0} received`,
+      date: fee.updatedAt || fee.createdAt,
+      studentName: fee.student ? (fee.student.fullName || fee.student.name) : 'Unknown'
+    }));
+
+    activities = [...activities, ...feeActivities];
+
+    // 3. Sort combined activities by date descending
+    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // 4. Apply limit
+    const finalActivities = activities.slice(0, limit);
+
+    res.json({
+      success: true,
+      data: finalActivities
+    });
+  } catch (error) {
+    console.error('Get recent activities error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching activities'
     });
   }
 });
