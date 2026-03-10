@@ -12,9 +12,25 @@ const userSchema = new mongoose.Schema({
 
   name: {
     type: String,
-    required: [true, 'Name is required'],
+    required: false, // Make optional since we use fullName mostly
     trim: true,
     maxlength: [50, 'Name cannot exceed 50 characters']
+  },
+  fullName: {
+    type: String,
+    trim: true
+  },
+  firstName: {
+    type: String,
+    trim: true
+  },
+  middleName: {
+    type: String,
+    trim: true
+  },
+  lastName: {
+    type: String,
+    trim: true
   },
   email: {
     type: String,
@@ -37,7 +53,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
     validate: {
-      validator: function(v) {
+      validator: function (v) {
         // Only validate if phone is provided
         if (!v || v.trim() === '') return true;
         return /^[\+]?[1-9][\d]{5,15}$/.test(v);
@@ -99,9 +115,58 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  section: {
+    type: String,
+    trim: true
+  },
   classId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Class'
+  },
+  sectionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Section'
+  },
+  academicYear: {
+    type: String,
+    trim: true
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other'],
+    trim: true
+  },
+  bloodGroup: {
+    type: String,
+    trim: true
+  },
+  category: {
+    type: String,
+    trim: true
+  },
+  religion: {
+    type: String,
+    trim: true
+  },
+  penNumber: {
+    type: String,
+    trim: true
+  },
+  udiseCode: {
+    type: String,
+    trim: true
+  },
+  subDepartment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SubDepartment'
+  },
+  driverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Driver'
+  },
+  transportMode: {
+    type: String,
+    trim: true
   },
   admissionDate: {
     type: Date
@@ -128,7 +193,7 @@ userSchema.index({ role: 1, tenantId: 1 });
 userSchema.index({ tenantId: 1 });
 
 // Hash password before saving
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -143,12 +208,12 @@ userSchema.pre('save', async function(next) {
 // Note: Admission number and student ID generation moved to routes for proper async handling
 
 // Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Get user without sensitive data
-userSchema.methods.toJSON = function() {
+userSchema.methods.toJSON = function () {
   const user = this.toObject();
   delete user.password;
   return user;

@@ -11,6 +11,8 @@ import { exportPDF } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 import { useSettings } from '../contexts/SettingsContext'
 
+const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')
+
 const Students = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -806,17 +808,21 @@ const Students = () => {
                     <td>
                       {student.photo ? (
                         <img
-                          src={student.photo}
+                          src={student.photo.startsWith('http') ? student.photo : `${SERVER_URL}${student.photo}`}
                           alt={student.fullName}
                           className="h-10 w-10 rounded-full object-cover"
+                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
                         />
-                      ) : (
-                        <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-semibold text-white">
-                            {student.fullName?.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                      )}
+                      ) : null}
+
+                      <div
+                        className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center"
+                        style={{ display: student.photo ? 'none' : 'flex' }}
+                      >
+                        <span className="text-sm font-semibold text-white">
+                          {student.fullName?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                      </div>
                     </td>
                     <td>
                       <div>
