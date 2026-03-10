@@ -47,16 +47,18 @@ exports.validateStudent = [
     .withMessage('Name must be between 2 and 50 characters'),
 
   body('email')
+    .optional({ checkFalsy: true })
     .isEmail()
     .normalizeEmail()
     .withMessage('Please provide a valid email'),
 
   body('password')
+    .optional({ checkFalsy: true })
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters long'),
 
   body('phone')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .matches(/^[\+]?([1-9]{1})([\d]{5,15})$/)
     .withMessage('Please provide a valid phone number (e.g., +919876543210 or 9876543210)'),
@@ -67,24 +69,13 @@ exports.validateStudent = [
     .withMessage('Class is required'),
 
   body('rollNumber')
-    .trim()
-    .notEmpty()
-    .withMessage('Roll number is required'),
+    .optional({ checkFalsy: true })
+    .trim(),
 
   body('admissionDate')
+    .optional({ checkFalsy: true })
     .isISO8601()
-    .withMessage('Please provide a valid admission date'),
-
-  body('guardianName')
-    .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('Guardian name must be between 2 and 50 characters'),
-
-  body('guardianPhone')
-    .optional()
-    .trim()
-    .matches(/^[\+]?([1-9]{1})([\d]{5,15})$/)
-    .withMessage('Please provide a valid guardian phone number')
+    .withMessage('Please provide a valid admission date')
 ];
 
 // Fee validation rules
