@@ -44,7 +44,10 @@ const Sidebar = ({ isOpen, onClose }) => {
     return raw.startsWith('http') ? raw : `${SERVER_URL}${raw}`
   })()
 
-  const initials = user?.name?.charAt(0)?.toUpperCase() || '?'
+  const displayName = user?.fullName || user?.name || ''
+  const initials = displayName
+    ? displayName.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : '?'
 
   // Define menu items based on user role
   const getMenuItems = () => {
@@ -176,7 +179,7 @@ const Sidebar = ({ isOpen, onClose }) => {
               </span>
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
+              <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
               <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
             </div>
           </button>

@@ -5,6 +5,8 @@ const Tenant = require('../models/Tenant');
 const { protect, generateToken, sendTokenResponse } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { getTenantFromRequest } = require('../middleware/tenant');
+const upload = require('../middleware/upload');
+const cloudinaryService = require('../services/cloudinaryService');
 
 const router = express.Router();
 
@@ -437,6 +439,63 @@ router.put('/password', protect, [
     res.status(500).json({
       success: false,
       message: 'Server error during password change'
+    });
+  }
+});
+
+// @desc    Upload profile photo
+// @route   POST /api/auth/upload-photo
+// @access  Private
+router.post('/upload-photo', protect, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No photo file provided' });
+    }
+
+    const tenantId = req.user.tenantId ? req.user.tenantId.toString() : 'general';
+
+    // Upload to Cloudinary under learnovo/<tenantId>/avatars/
+    const result = await cloudinaryService.uploadFromMulter(req.file, {
+      tenantId,
+      folder: 'avatars',
+      subPath: `${req.user._id}`,
+      transformation: {
+        width: 400,
+        height: 400,
+        crop: 'fill',
+        gravity: 'face',
+        quality: 'auto:good'
+      }
+    });
+
+    // Save the Cloudinary URL into the user's avatar field
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { avatar: result.secure_url },
+      { new: true }
+    );
+
+    // Persist to cached localStorage on next /me fetch
+    res.json({
+      success: true,
+      message: 'Profile photo updated successfully',
+      avatar: result.secure_url,
+      photo: result.secure_url,  // alias for frontend compatibility
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        avatar: updatedUser.avatar,
+        photo: updatedUser.avatar
+      }
+    });
+  } catch (error) {
+    console.error('Upload photo error:', error.name, error.message);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error while uploading photo'
     });
   }
 });
