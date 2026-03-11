@@ -6,15 +6,17 @@ const Tenant = require('../models/Tenant');
 
 // Test database setup
 const setupTestDB = () => {
-  beforeAll(async() => {
-    // Connect to test database
-    await mongoose.connect(process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/learnovo_test', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+  beforeAll(async () => {
+    // Connect to test database only if not already connected
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/learnovo_test', {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+      });
+    }
   });
 
-  beforeEach(async() => {
+  beforeEach(async () => {
     // Clear all collections before each test
     await Promise.all([
       User.deleteMany({}),
@@ -22,14 +24,14 @@ const setupTestDB = () => {
     ]);
   });
 
-  afterAll(async() => {
+  afterAll(async () => {
     // Close database connection
     await mongoose.connection.close();
   });
 };
 
 // Helper functions for tests
-const createTestTenant = async(overrides = {}) => {
+const createTestTenant = async (overrides = {}) => {
   const defaultTenant = {
     schoolName: 'Test School',
     email: 'test@school.com',
@@ -46,7 +48,7 @@ const createTestTenant = async(overrides = {}) => {
   return await Tenant.create(defaultTenant);
 };
 
-const createTestUser = async(tenantId, overrides = {}) => {
+const createTestUser = async (tenantId, overrides = {}) => {
   const defaultUser = {
     tenantId,
     name: 'Test User',
@@ -59,7 +61,7 @@ const createTestUser = async(tenantId, overrides = {}) => {
   return await User.create(defaultUser);
 };
 
-const getAuthToken = async(user) => {
+const getAuthToken = async (user) => {
   const jwt = require('jsonwebtoken');
   return jwt.sign(
     {

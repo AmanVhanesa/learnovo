@@ -9,10 +9,10 @@ const logger = {
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
       level: 'info',
-      requestId: meta.requestId,
-      route: meta.route,
-      tenantId: meta.tenantId,
-      userEmail: meta.userEmail,
+      requestId: meta?.requestId,
+      route: meta?.route,
+      tenantId: meta?.tenantId,
+      userEmail: meta?.userEmail,
       message,
       ...meta
     }));
@@ -22,10 +22,10 @@ const logger = {
     console.error(JSON.stringify({
       timestamp: new Date().toISOString(),
       level: 'error',
-      requestId: meta.requestId,
-      route: meta.route,
-      tenantId: meta.tenantId,
-      userEmail: meta.userEmail,
+      requestId: meta?.requestId,
+      route: meta?.route,
+      tenantId: meta?.tenantId,
+      userEmail: meta?.userEmail,
       message,
       error: error?.message,
       stack: error?.stack,
@@ -37,10 +37,10 @@ const logger = {
     console.warn(JSON.stringify({
       timestamp: new Date().toISOString(),
       level: 'warn',
-      requestId: meta.requestId,
-      route: meta.route,
-      tenantId: meta.tenantId,
-      userEmail: meta.userEmail,
+      requestId: meta?.requestId,
+      route: meta?.route,
+      tenantId: meta?.tenantId,
+      userEmail: meta?.userEmail,
       message,
       ...meta
     }));
@@ -165,7 +165,7 @@ const formatErrorResponse = (error, req) => {
     errorResponse.error = error.message;
     errorResponse.errorName = error.name;
     errorResponse.errorCode = error.code;
-    
+
     // Include validation errors if present
     if (error.errors && typeof error.errors === 'object' && Object.keys(error.errors).length > 0) {
       errorResponse.validationErrors = Object.keys(error.errors).map(key => ({
@@ -175,7 +175,7 @@ const formatErrorResponse = (error, req) => {
         value: error.errors[key].value
       }));
     }
-    
+
     // Include duplicate key info if present
     if (error.keyPattern || error.keyValue) {
       errorResponse.duplicateKey = {
@@ -183,7 +183,7 @@ const formatErrorResponse = (error, req) => {
         value: error.keyValue
       };
     }
-    
+
     // Include stack trace in development
     if (error.stack) {
       errorResponse.stack = error.stack.split('\n').slice(0, 15).join('\n');

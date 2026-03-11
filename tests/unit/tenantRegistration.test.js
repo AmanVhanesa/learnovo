@@ -6,11 +6,13 @@ setupTestDB();
 
 describe('Tenant Registration API', () => {
   describe('POST /api/tenants/register', () => {
-    it('should register a new tenant successfully', async() => {
+    it('should register a new tenant successfully', async () => {
       const response = await request(app)
         .post('/api/tenants/register')
-        .send(validRegistrationData)
-        .expect(201);
+        .send(validRegistrationData);
+
+      if (response.status !== 201) console.error('Registration validation failed:', response.body);
+      expect(response.status).toBe(201);
 
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe('School registered successfully');
@@ -30,7 +32,7 @@ describe('Tenant Registration API', () => {
       expect(response.body.data.user.role).toBe('admin');
     });
 
-    it('should return 400 for invalid registration data', async() => {
+    it('should return 400 for invalid registration data', async () => {
       const response = await request(app)
         .post('/api/tenants/register')
         .send(invalidRegistrationData)
@@ -50,7 +52,7 @@ describe('Tenant Registration API', () => {
       expect(errorFields).toContain('subdomain');
     });
 
-    it('should return 409 for duplicate school data', async() => {
+    it('should return 409 for duplicate school data', async () => {
       // First registration
       await request(app)
         .post('/api/tenants/register')
@@ -68,7 +70,7 @@ describe('Tenant Registration API', () => {
       expect(response.body.requestId).toBeDefined();
     });
 
-    it('should return 409 for duplicate email only', async() => {
+    it('should return 409 for duplicate email only', async () => {
       // First registration
       await request(app)
         .post('/api/tenants/register')
@@ -92,7 +94,7 @@ describe('Tenant Registration API', () => {
       expect(response.body.message).toBe('School with that name or email already exists.');
     });
 
-    it('should return 409 for duplicate school code only', async() => {
+    it('should return 409 for duplicate school code only', async () => {
       // First registration
       await request(app)
         .post('/api/tenants/register')
@@ -116,7 +118,7 @@ describe('Tenant Registration API', () => {
       expect(response.body.message).toBe('School with that name or email already exists.');
     });
 
-    it('should return 409 for duplicate subdomain only', async() => {
+    it('should return 409 for duplicate subdomain only', async () => {
       // First registration
       await request(app)
         .post('/api/tenants/register')
@@ -140,7 +142,7 @@ describe('Tenant Registration API', () => {
       expect(response.body.message).toBe('School with that name or email already exists.');
     });
 
-    it('should handle server errors gracefully', async() => {
+    it('should handle server errors gracefully', async () => {
       // Mock a database error by using invalid ObjectId
       const invalidData = {
         ...validRegistrationData,
@@ -158,7 +160,7 @@ describe('Tenant Registration API', () => {
       expect(response.body.requestId).toBeDefined();
     });
 
-    it('should include request ID in all responses', async() => {
+    it('should include request ID in all responses', async () => {
       const response = await request(app)
         .post('/api/tenants/register')
         .send(validRegistrationData)
@@ -169,7 +171,7 @@ describe('Tenant Registration API', () => {
       expect(response.body.requestId.length).toBeGreaterThan(0);
     });
 
-    it('should create tenant with correct subscription defaults', async() => {
+    it('should create tenant with correct subscription defaults', async () => {
       const response = await request(app)
         .post('/api/tenants/register')
         .send(validRegistrationData)
