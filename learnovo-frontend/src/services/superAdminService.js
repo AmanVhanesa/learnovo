@@ -22,6 +22,23 @@ superAdminClient.interceptors.request.use(
     (error) => Promise.reject(error)
 )
 
+// Response interceptor to handle token expiration (401)
+superAdminClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            // Token expired or invalid
+            localStorage.removeItem('superAdminToken')
+            localStorage.removeItem('superAdminUser')
+            // Avoid redirect loop if already on login page
+            if (window.location.pathname !== '/super-admin-login') {
+                window.location.href = '/super-admin-login'
+            }
+        }
+        return Promise.reject(error)
+    }
+)
+
 export const superAdminService = {
     // Auth
     login: async (credentials) => {
