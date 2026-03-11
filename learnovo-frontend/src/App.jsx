@@ -105,9 +105,22 @@ function App() {
                     <Route path="employees/:id" element={<EmployeeDetail />} />
                     <Route path="teachers" element={<Teachers />} />
                     {/* Academics Module */}
-                    <Route path="academics" element={<Academics />} />
-                    <Route path="classes" element={<Classes />} />
-                    <Route path="classes/:id" element={<ClassDetail />} />
+                    {/* Academics Module */}
+                    <Route path="academics" element={
+                      <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                        <Academics />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="classes" element={
+                      <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                        <Classes />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="classes/:id" element={
+                      <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                        <ClassDetail />
+                      </ProtectedRoute>
+                    } />
 
                     {/* Finance Module */}
                     <Route path="fees-finance" element={<FeesFinance />} />

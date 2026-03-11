@@ -56,7 +56,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Students', href: '/app/students', icon: Users, roles: ['admin', 'teacher', 'parent'] },
       { name: 'Student Lists', href: '/app/student-lists', icon: List, roles: ['admin', 'teacher'] },
       { name: 'Employees', href: '/app/employees', icon: UserPlus, roles: ['admin'] },
-      { name: 'Academics', href: '/app/academics', icon: School, roles: ['admin', 'teacher', 'student'] },
+      { name: 'Academics', href: '/app/academics', icon: School, roles: ['admin', 'teacher'] },
       { name: 'My Fees', href: '/app/student/fees', icon: CreditCard, roles: ['student', 'parent'] },
       { name: 'Fees & Finance', href: '/app/fees-finance', icon: CreditCard, roles: ['admin'] },
       { name: 'Payroll', href: '/app/payroll', icon: Wallet, roles: ['admin'] },
