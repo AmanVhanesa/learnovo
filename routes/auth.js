@@ -197,7 +197,7 @@ router.post('/login', [
         });
       }
     } else if (schoolCode) {
-      tenant = await Tenant.findOne({ schoolCode: schoolCode.toLowerCase(), isActive: true });
+      tenant = await Tenant.findOne({ schoolCode: schoolCode.toLowerCase(), isActive: { $ne: false } });
       if (!tenant) {
         return res.status(404).json({ success: false, message: 'School not found or inactive' });
       }
@@ -240,7 +240,7 @@ router.post('/login', [
     }
 
     // Check if active
-    if (!user.isActive) {
+    if (user.isActive === false) {
       return res.status(401).json({ success: false, message: 'Account has been deactivated' });
     }
 
