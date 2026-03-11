@@ -14,6 +14,10 @@ const Counter = require('../models/Counter')
  */
 const seedAttendanceData = async () => {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Seed script cannot run in production!');
+    }
+
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/learnovo', {
       useNewUrlParser: true,
@@ -24,7 +28,7 @@ const seedAttendanceData = async () => {
     // Find demo tenant
     const Tenant = require('../models/Tenant')
     const demoTenant = await Tenant.findOne({ schoolCode: 'demo' })
-    
+
     if (!demoTenant) {
       console.error('❌ Demo tenant not found. Please run the demo setup first.')
       process.exit(1)
@@ -33,9 +37,9 @@ const seedAttendanceData = async () => {
     console.log('📦 Found demo tenant:', demoTenant.schoolCode)
 
     // Find or create demo teacher
-    let demoTeacher = await User.findOne({ 
+    let demoTeacher = await User.findOne({
       email: 'sarah.wilson@learnovo.com',
-      tenantId: demoTenant._id 
+      tenantId: demoTenant._id
     })
 
     if (!demoTeacher) {

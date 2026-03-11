@@ -7,9 +7,17 @@ const Tenant = require('../models/Tenant');
 // Test database setup
 const setupTestDB = () => {
   beforeAll(async () => {
-    // Connect to test database only if not already connected
+    // If the server auto-connected to the production Atlas database, disconnect it immediately.
+    // We NEVER want tests running against the live cluster0.soajlb4.mongodb.net
+    if (mongoose.connection.readyState !== 0 && mongoose.connection.host &&
+      (mongoose.connection.host.includes('cluster0') || mongoose.connection.host.includes('mongodb.net'))) {
+      console.warn("⚠️ WARNING: Test suite detected connection to production cluster. Disconnecting...");
+      await mongoose.disconnect();
+    }
+
+    // Connect to test database only if not already connected (to a SAFE local test DB)
     if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/learnovo_test', {
+      await mongoose.connect(process.env.MONGODB_TEST_URI || 'mongodb://127.0.0.1:27017/learnovo_test', {
         useNewUrlParser: true,
         useUnifiedTopology: true
       });
@@ -17,6 +25,11 @@ const setupTestDB = () => {
   });
 
   beforeEach(async () => {
+    // FATAL GUARD: Prevent test suite from deleting production collections.
+    if (mongoose.connection.host && (mongoose.connection.host.includes('cluster0') || mongoose.connection.host.includes('mongodb.net'))) {
+      throw new Error(`CRITICAL: Attempted to run deleteMany on a production database host (${mongoose.connection.host}). Stopping tests immediately to prevent data loss.`);
+    }
+
     // Clear all collections before each test
     await Promise.all([
       User.deleteMany({}),

@@ -15,13 +15,17 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/learnovo'
   });
 
 // Seed demo data
-const seedDemoData = async() => {
+const seedDemoData = async () => {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Seed script cannot run in production!');
+    }
+
     console.log('🌱 Starting to seed demo data...');
 
     // Check if demo tenant exists
     let demoTenant = await Tenant.findOne({ schoolCode: 'demo' });
-    
+
     if (!demoTenant) {
       console.log('Creating Demo Tenant...');
       demoTenant = await Tenant.create({
@@ -46,11 +50,11 @@ const seedDemoData = async() => {
     }
 
     // Check if demo admin exists
-    let demoAdmin = await User.findOne({ 
+    let demoAdmin = await User.findOne({
       email: 'admin@learnovo.com',
-      tenantId: demoTenant._id 
+      tenantId: demoTenant._id
     });
-    
+
     if (!demoAdmin) {
       console.log('Creating Demo Admin user...');
       demoAdmin = await User.create({
