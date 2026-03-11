@@ -13,15 +13,19 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
 
-  const { login, isAuthenticated, isLoading: authLoading, error, clearError } = useAuth()
+  const { login, isAuthenticated, isLoading: authLoading, error, clearError, user } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
     if (isAuthenticated && !authLoading && !isLoading) {
-      navigate('/app/dashboard', { replace: true })
+      if (user?.role === 'student') {
+        navigate('/app/student/fees', { replace: true })
+      } else {
+        navigate('/app/dashboard', { replace: true })
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, authLoading, isLoading])
+  }, [isAuthenticated, authLoading, isLoading, user])
 
   useEffect(() => {
     const savedCredentials = localStorage.getItem('learnovo_remember_me')
@@ -65,7 +69,8 @@ const Login = () => {
       const result = await login(loginData)
       if (result && result.success) {
         setIsLoading(false)
-        setTimeout(() => navigate('/app/dashboard', { replace: true }), 300)
+        const targetRoute = result?.user?.role === 'student' ? '/app/student/fees' : '/app/dashboard'
+        setTimeout(() => navigate(targetRoute, { replace: true }), 300)
       } else {
         setIsLoading(false)
       }

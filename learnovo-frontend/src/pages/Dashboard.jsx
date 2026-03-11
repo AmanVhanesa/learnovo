@@ -490,9 +490,10 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Recent activities */}
-      {/* Recent activities */}
-      <RecentActivities activities={stats.recentActivities} isLoading={isLoading} />
+      {/* Recent activities - Hidden for students and parents */}
+      {['admin', 'teacher'].includes(user?.role) && (
+        <RecentActivities activities={stats.recentActivities} isLoading={isLoading} />
+      )}
     </div>
   )
 }
