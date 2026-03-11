@@ -168,14 +168,16 @@ async function ensureDemoTenant() {
 // @route   POST /api/auth/login
 // @access  Public
 router.post('/login', [
-  body('email').isEmail().withMessage('Please provide a valid email'),
+  body('email').notEmpty().withMessage('Please provide an email or admission number'),
   body('password').notEmpty().withMessage('Password is required'),
   body('schoolCode').optional().trim(),
   handleValidationErrors
 ], async (req, res) => {
   try {
     const { email, password, schoolCode } = req.body;
-    const emailLower = email.toLowerCase();
+    // 'email' field in request can be either an actual email or an admission number
+    const loginIdentifier = email.trim();
+    const emailLower = loginIdentifier.toLowerCase();
 
     // Determine if this is a demo login
     const demoEmails = ['admin@learnovo.com', 'sarah.wilson@learnovo.com', 'john.doe@learnovo.com', 'parent@learnovo.com'];
@@ -201,17 +203,24 @@ router.post('/login', [
       }
     }
 
-    // Find user
-    let userQuery = { email: emailLower };
+    // Find user by email or admissionNumber
+    const identifierQuery = {
+      $or: [
+        { email: emailLower },
+        { admissionNumber: { $regex: new RegExp(`^${loginIdentifier}$`, 'i') } }
+      ]
+    };
+
+    let userQuery = { ...identifierQuery };
     if (tenant) {
       userQuery.tenantId = tenant._id;
     }
 
     let user = await User.findOne(userQuery).select('+password').populate('tenantId');
 
-    // If not found and no tenant specified, try finding by email only
+    // If not found and no tenant specified, try finding by identifier only
     if (!user && !tenant) {
-      user = await User.findOne({ email: emailLower }).select('+password').populate('tenantId');
+      user = await User.findOne(identifierQuery).select('+password').populate('tenantId');
       if (user && user.tenantId) {
         tenant = typeof user.tenantId === 'object' ? user.tenantId : await Tenant.findById(user.tenantId);
       }
