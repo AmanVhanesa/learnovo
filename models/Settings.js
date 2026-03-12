@@ -62,6 +62,40 @@ const settingsSchema = new mongoose.Schema({
       max: new Date().getFullYear()
     }
   },
+  // Grading settings
+  grading: {
+    rules: [{
+      gradeName: String,
+      percentageFrom: Number,
+      percentageTo: Number,
+      status: { type: String, enum: ['PASS', 'FAIL'], default: 'PASS' },
+      order: Number
+    }],
+    isActive: { type: Boolean, default: true }
+  },
+  // Bank accounts
+  bankAccounts: [{
+    bankName: { type: String, required: true },
+    accountNumber: { type: String, required: true },
+    branch: String,
+    address: String,
+    instructions: String,
+    isDefault: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true }
+  }],
+  // Rules and Regulations
+  rulesAndRegulations: {
+    content: { type: String, default: '' },
+    version: { type: Number, default: 1 },
+    lastUpdatedAt: { type: Date, default: Date.now },
+    isActive: { type: Boolean, default: true }
+  },
+  // Account Preferences
+  account: {
+    timezone: { type: String, default: 'Asia/Kolkata' },
+    dateFormat: { type: String, default: 'DD/MM/YYYY' },
+    timeFormat: { type: String, enum: ['12h', '24h'], default: '12h' }
+  },
   // Currency Settings
   currency: {
     default: {

@@ -59,7 +59,7 @@ router.put('/', protect, authorize('admin'), async(req, res) => {
 
     // Build a flat $set object from the request body
     const setObj = {};
-    const allowedSections = ['institution', 'currency', 'academic', 'fees', 'notifications', 'system', 'theme', 'backup'];
+    const allowedSections = ['institution', 'currency', 'academic', 'fees', 'notifications', 'system', 'theme', 'backup', 'grading', 'bankAccounts', 'rulesAndRegulations', 'account'];
 
     for (const section of allowedSections) {
       if (!req.body[section]) continue;
