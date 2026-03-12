@@ -164,6 +164,24 @@ const Settings = () => {
           secondaryColor: form.theme.secondaryColor
         }
       }
+      if (form.grading) {
+        payload.grading = form.grading
+      }
+      if (form.bankAccounts) {
+        // Remove _id from array items just in case
+        payload.bankAccounts = form.bankAccounts.map(acc => {
+          const newAcc = { ...acc }
+          delete newAcc._id
+          return newAcc
+        })
+      }
+      if (form.rulesAndRegulations) {
+        payload.rulesAndRegulations = form.rulesAndRegulations
+      }
+      if (form.account) {
+        payload.account = form.account
+      }
+
 
       // Use the general PUT /api/settings endpoint for all saves
       const data = await settingsService.updateSettings(payload)
