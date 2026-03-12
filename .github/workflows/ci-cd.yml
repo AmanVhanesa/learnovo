@@ -169,13 +169,15 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: deployment-package
-      - name: Deploy to Production
+      - name: Trigger Render Deployment
         run: |
-          echo "🚀 Deploying artifact to production environment..."
+          echo "🚀 Triggering Render deployment via webhook..."
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "Error: RENDER_DEPLOY_HOOK_URL secret is not set."
+            echo "Please add your Render Deploy Hook URL to GitHub Repository Secrets!"
+            exit 1
+          fi
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
 
   notify:
     name: Notify Status
