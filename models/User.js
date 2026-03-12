@@ -12,7 +12,7 @@ const userSchema = new mongoose.Schema({
 
   name: {
     type: String,
-    required: false, // Make optional since we use fullName mostly
+    required: false,
     trim: true,
     maxlength: [50, 'Name cannot exceed 50 characters']
   },
@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    required: false, // Optional — employees can be created with phone only
     lowercase: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
@@ -46,7 +46,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'teacher', 'student', 'parent'],
+    enum: ['admin', 'teacher', 'student', 'parent', 'accountant', 'staff'],
     required: [true, 'Role is required']
   },
   phone: {
@@ -54,7 +54,6 @@ const userSchema = new mongoose.Schema({
     trim: true,
     validate: {
       validator: function (v) {
-        // Only validate if phone is provided
         if (!v || v.trim() === '') return true;
         return /^[\+]?[1-9][\d]{5,15}$/.test(v);
       },
@@ -66,6 +65,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  photo: {
+    type: String,
+    default: null
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -74,7 +77,88 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  // For teachers
+
+  // ── Employee-specific fields ──────────────────────────────────────
+  employeeId: {
+    type: String,
+    trim: true,
+    sparse: true
+  },
+  loginEnabled: {
+    type: Boolean,
+    default: false
+  },
+  forcePasswordChange: {
+    type: Boolean,
+    default: false
+  },
+  designation: {
+    type: String,
+    trim: true
+  },
+  department: {
+    type: String,
+    trim: true
+  },
+  salary: {
+    type: Number,
+    min: 0
+  },
+  leaveDeductionPerDay: {
+    type: Number,
+    min: 0
+  },
+  dateOfJoining: {
+    type: Date
+  },
+  fatherOrHusbandName: {
+    type: String,
+    trim: true
+  },
+  dateOfBirth: {
+    type: Date
+  },
+  nationalId: {
+    type: String,
+    trim: true
+  },
+  education: {
+    type: String,
+    trim: true
+  },
+  experience: {
+    type: Number,
+    min: 0
+  },
+  homeAddress: {
+    type: String,
+    trim: true
+  },
+  bankName: {
+    type: String,
+    trim: true
+  },
+  accountNumber: {
+    type: String,
+    trim: true
+  },
+  ifscCode: {
+    type: String,
+    trim: true
+  },
+  inactiveReason: {
+    type: String,
+    trim: true
+  },
+  inactivatedAt: {
+    type: Date
+  },
+  inactivatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+
+  // ── Teacher fields ────────────────────────────────────────────────
   subjects: [{
     type: String,
     trim: true
@@ -91,12 +175,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  // For parents
+
+  // ── Parent fields ─────────────────────────────────────────────────
   children: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
-  // For students
+
+  // ── Student fields ────────────────────────────────────────────────
   studentId: {
     type: String,
     sparse: true
@@ -187,7 +273,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Index for better performance
-userSchema.index({ email: 1, tenantId: 1 }, { unique: true }); // Email unique per tenant
+userSchema.index({ email: 1, tenantId: 1 }, { unique: true, sparse: true }); // Email unique per tenant, sparse allows null emails
 userSchema.index({ role: 1, tenantId: 1 });
 userSchema.index({ tenantId: 1 });
 userSchema.index({ tenantId: 1, admissionNumber: 1 });
