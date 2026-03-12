@@ -84,6 +84,49 @@ router.put('/', protect, authorize('admin'), validateSettings, async (req, res) 
   }
 });
 
+// @desc    Update admission settings
+// @route   PUT /api/settings/admission
+// @access  Private (Admin)
+router.put('/admission', protect, authorize('admin'), [
+  body('mode').optional().isIn(['AUTO', 'CUSTOM', 'DEFAULT']).withMessage('Invalid admission mode'),
+  body('prefix').optional().trim().isLength({ min: 1, max: 10 }).withMessage('Prefix must be between 1 and 10 characters'),
+  body('yearFormat').optional().isIn(['YY', 'YYYY']).withMessage('Invalid year format'),
+  body('counterPadding').optional().isInt({ min: 1, max: 10 }).withMessage('Counter padding must be between 1 and 10'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User tenant not found. Please login again.'
+      });
+    }
+
+    const settings = await Settings.getSettings(tenantId);
+
+    // Update admission settings
+    settings.admission = {
+      ...settings.admission,
+      ...req.body
+    };
+
+    await settings.save();
+
+    res.json({
+      success: true,
+      message: 'Admission settings updated successfully',
+      data: settings.admission
+    });
+  } catch (error) {
+    console.error('Update admission settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating admission settings'
+    });
+  }
+});
+
 // @desc    Update currency settings
 // @route   PUT /api/settings/currency
 // @access  Private (Admin)
@@ -324,40 +367,6 @@ router.put('/system', protect, authorize('admin'), [
     res.status(statusCode).json({
       success: false,
       message: error.message || 'Server error while updating system settings'
-    });
-  }
-});
-
-// @desc    Update admission settings
-// @route   PUT /api/settings/admission
-// @access  Private (Admin)
-router.put('/admission', protect, authorize('admin'), [
-  body('mode').optional().isIn(['AUTO', 'MANUAL']).withMessage('Invalid admission mode'),
-  body('prefix').optional().trim().isLength({ max: 10 }).withMessage('Prefix cannot exceed 10 characters'),
-  body('counterPadding').optional().isInt({ min: 1, max: 10 }).withMessage('Padding must be between 1 and 10'),
-  handleValidationErrors
-], async (req, res) => {
-  try {
-    const tenantId = getTenantId(req);
-    const settings = await Settings.getSettings(tenantId);
-
-    if (req.body.mode) settings.admission.mode = req.body.mode;
-    if (req.body.prefix !== undefined) settings.admission.prefix = req.body.prefix;
-    if (req.body.counterPadding !== undefined) settings.admission.counterPadding = req.body.counterPadding;
-    if (req.body.yearFormat) settings.admission.yearFormat = req.body.yearFormat;
-
-    await settings.save();
-
-    res.json({
-      success: true,
-      message: 'Admission settings updated successfully',
-      data: settings.admission
-    });
-  } catch (error) {
-    console.error('Update admission settings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while updating admission settings'
     });
   }
 });

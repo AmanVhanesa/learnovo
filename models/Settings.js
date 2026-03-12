@@ -42,6 +42,27 @@ const settingsSchema = new mongoose.Schema({
       max: new Date().getFullYear()
     }
   },
+  // Admission Settings
+  admission: {
+    mode: {
+      type: String,
+      enum: ['AUTO', 'CUSTOM', 'DEFAULT'],
+      default: 'DEFAULT'
+    },
+    prefix: {
+      type: String,
+      default: 'ADM'
+    },
+    yearFormat: {
+      type: String,
+      enum: ['YY', 'YYYY'],
+      default: 'YYYY'
+    },
+    counterPadding: {
+      type: Number,
+      default: 4
+    }
+  },
   // Currency Settings
   currency: {
     default: {
@@ -218,26 +239,6 @@ const settingsSchema = new mongoose.Schema({
       type: Number,
       default: 30, // days
       min: 7
-    }
-  },
-  // Admission Settings
-  admission: {
-    mode: {
-      type: String,
-      enum: ['AUTO', 'MANUAL'],
-      default: 'AUTO'
-    },
-    prefix: {
-      type: String,
-      default: ''
-    },
-    counterPadding: {
-      type: Number,
-      default: 4
-    },
-    yearFormat: {
-      type: String,
-      default: 'YYYY'
     }
   }
 }, {
