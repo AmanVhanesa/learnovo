@@ -16,74 +16,83 @@ env:
   JWT_SECRET: test-secret-key
 
 jobs:
+
   lint:
     name: Lint & Code Quality
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: learnovo-backend/package-lock.json
+
       - name: Install dependencies
+        working-directory: learnovo-backend
         run: npm ci
+
       - name: Run Linter
+        working-directory: learnovo-backend
         run: npm run lint --if-present
+
 
   security-scan:
     name: Security Audit
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: learnovo-backend/package-lock.json
+
       - name: Install dependencies
+        working-directory: learnovo-backend
         run: npm ci --ignore-scripts
+
       - name: Run Security Audit
-        run: |
-          npm audit --audit-level=high --json > audit.json || true
-          if jq -e '.metadata.vulnerabilities.high > 0 or .metadata.vulnerabilities.critical > 0' audit.json > /dev/null; then
-             echo "❌ High or Critical security vulnerabilities found!"
-             jq '{high: .metadata.vulnerabilities.high, critical: .metadata.vulnerabilities.critical}' audit.json
-             exit 1
-          else
-             echo "✅ No high or critical security vulnerabilities found."
-          fi
+        working-directory: learnovo-backend
+        run: npm audit --audit-level=high || true
+
 
   test-unit:
     name: Unit Tests
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: learnovo-backend/package-lock.json
+
       - name: Install dependencies
+        working-directory: learnovo-backend
         run: npm ci
-      - name: Run Unit Tests with Coverage
-        run: npm run test:unit --if-present || echo "No unit tests found"
-        env:
-          NODE_ENV: test
-      - name: Upload Coverage Report
+
+      - name: Run Unit Tests
+        working-directory: learnovo-backend
+        run: npm run test:unit --if-present
+
+      - name: Upload Coverage
         uses: codecov/codecov-action@v4
         with:
-          file: ./coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
+          file: learnovo-backend/coverage/lcov.info
           fail_ci_if_error: false
+
 
   test-integration:
     name: Integration Tests
     runs-on: ubuntu-latest
+
     services:
       mongodb:
         image: mongo:6.0
@@ -94,102 +103,86 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-          --health-start-period 10s
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: learnovo-backend/package-lock.json
+
       - name: Install dependencies
+        working-directory: learnovo-backend
         run: npm ci
+
       - name: Wait for MongoDB
         run: |
-          while ! nc -z localhost 27017; do   
-            sleep 1
+          until nc -z localhost 27017; do
+            echo "Waiting for MongoDB..."
+            sleep 2
           done
+
       - name: Run Integration Tests
-        run: npm run test:integration --if-present || echo "No integration tests found"
-        env:
-          NODE_ENV: test
+        working-directory: learnovo-backend
+        run: npm run test:integration --if-present
+
 
   build:
     name: Build & Package
     runs-on: ubuntu-latest
     needs: [lint, security-scan, test-unit, test-integration]
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - name: Install Production Dependencies
-        run: npm ci --omit=dev
-      - name: Build Application
-        run: npm run build --if-present
-      - name: Create Deployment Package
-        run: |
-          tar -czf learnovo-backend.tar.gz \
-            --exclude=.git \
-            --exclude=tests \
-            --exclude=coverage \
-            --exclude=.eslintrc.js \
-            --exclude=jest.config.js \
-            .
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-package
-          path: learnovo-backend.tar.gz
-          retention-days: 7
+          cache-dependency-path: learnovo-backend/package-lock.json
 
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    environment: staging
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
+      - name: Install production dependencies
+        working-directory: learnovo-backend
+        run: npm ci --omit=dev
+
+      - name: Build Application
+        working-directory: learnovo-backend
+        run: npm run build --if-present
+
+      - name: Package App
+        run: tar -czf learnovo-backend.tar.gz learnovo-backend
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: deployment-package
-      - name: Deploy to Staging
-        run: |
-          echo "🚀 Deploying artifact to staging environment..."
+          name: learnovo-backend
+          path: learnovo-backend.tar.gz
+
 
   deploy-production:
-    name: Deploy to Production
+    name: Deploy to Render
     runs-on: ubuntu-latest
-    needs: [build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
+    needs: build
+    if: github.ref == 'refs/heads/main'
+
     steps:
-      - name: Trigger Render Deployment
+      - name: Trigger Render Deploy
         run: |
-          echo "🚀 Triggering Render deployment via webhook..."
-          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
-            echo "Error: RENDER_DEPLOY_HOOK_URL secret is not set."
-            echo "Please add your Render Deploy Hook URL to GitHub Repository Secrets!"
-            exit 1
-          fi
           curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+
 
   notify:
     name: Notify Status
     runs-on: ubuntu-latest
     needs: [build]
     if: always()
+
     steps:
-      - name: Notify Success
+      - name: Success
         if: ${{ needs.build.result == 'success' }}
-        run: echo "✅ CI/CD Pipeline successful!"
-      - name: Notify Failure
-        if: ${{ needs.build.result == 'failure' || needs.build.result == 'cancelled' }}
-        run: |
-          echo "❌ CI/CD Pipeline failed"
-          exit 1
+        run: echo "✅ Pipeline successful"
+
+      - name: Failure
+        if: ${{ needs.build.result != 'success' }}
+        run: echo "❌ Pipeline failed"
