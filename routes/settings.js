@@ -61,17 +61,38 @@ router.put('/', protect, authorize('admin'), validateSettings, async (req, res) 
 
     const settings = await Settings.getSettings(tenantId);
 
-    // Only update known schema sections to avoid Mongoose errors
-    const allowedSections = ['institution', 'admission', 'currency', 'academic', 'fees', 'notifications', 'system'];
+    // Update institution fields individually to avoid Mongoose subdocument issues
+    if (req.body.institution) {
+      const inst = req.body.institution;
+      if (inst.name) settings.institution.name = inst.name;
+      if (inst.establishedYear) settings.institution.establishedYear = inst.establishedYear;
+      if (inst.logo !== undefined) settings.institution.logo = inst.logo;
+      if (inst.principalSignature !== undefined) settings.institution.principalSignature = inst.principalSignature;
+      if (inst.address && typeof inst.address === 'object') {
+        Object.assign(settings.institution.address, inst.address);
+      }
+      if (inst.contact && typeof inst.contact === 'object') {
+        Object.assign(settings.institution.contact, inst.contact);
+      }
+    }
 
-    for (const key of allowedSections) {
+    // Update currency
+    if (req.body.currency && typeof req.body.currency === 'object') {
+      const curr = req.body.currency;
+      if (curr.default) settings.currency.default = curr.default;
+      if (curr.symbol) settings.currency.symbol = curr.symbol;
+      if (curr.position) settings.currency.position = curr.position;
+      if (curr.decimalPlaces !== undefined) settings.currency.decimalPlaces = curr.decimalPlaces;
+      if (curr.thousandSeparator) settings.currency.thousandSeparator = curr.thousandSeparator;
+      if (curr.decimalSeparator) settings.currency.decimalSeparator = curr.decimalSeparator;
+    }
+
+    // Update other top-level sections via safe merge
+    const simpleSections = ['admission', 'academic', 'fees', 'notifications', 'system', 'theme'];
+    for (const key of simpleSections) {
       if (req.body[key] && typeof req.body[key] === 'object' && !Array.isArray(req.body[key])) {
-        // Deep merge for nested objects
-        if (settings[key] && typeof settings[key].toObject === 'function') {
-          const existing = settings[key].toObject();
-          settings[key] = { ...existing, ...req.body[key] };
-        } else if (settings[key]) {
-          settings[key] = { ...settings[key], ...req.body[key] };
+        if (settings[key]) {
+          settings.set(key, { ...settings[key].toObject?.() || settings[key], ...req.body[key] });
         }
       }
     }
@@ -84,10 +105,13 @@ router.put('/', protect, authorize('admin'), validateSettings, async (req, res) 
       data: settings
     });
   } catch (error) {
-    console.error('Update settings error:', error);
+    console.error('Update settings error:', error.message);
+    if (error.errors) {
+      console.error('Validation errors:', JSON.stringify(error.errors, null, 2));
+    }
     res.status(500).json({
       success: false,
-      message: 'Server error while updating settings'
+      message: error.message || 'Server error while updating settings'
     });
   }
 });
