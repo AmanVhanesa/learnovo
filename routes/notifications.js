@@ -11,16 +11,26 @@ const router = express.Router();
 // @access  Private
 router.get('/unread-count', protect, async (req, res) => {
   try {
-    const count = await Notification.getUnreadCount(req.user._id, req.user.tenantId);
-    res.json({
+    const userId = req.user._id;
+    const tenantId = req.user.tenantId;
+
+    // Check if models are properly registered
+    const NotificationModel = require('../models/Notification');
+
+    const count = await NotificationModel.getUnreadCount(userId, tenantId);
+
+    return res.json({
       success: true,
       data: { count }
     });
   } catch (error) {
-    console.error('Get unread notifications count error:', error);
-    res.status(500).json({
+    console.error(`[Notification Error] GET /unread-count - RequestID: ${req.requestId}`, error);
+
+    // Ensure we ALWAYS return valid JSON instead of letting connection close
+    return res.status(500).json({
       success: false,
-      message: 'Server error while fetching unread notification count'
+      message: 'Error fetching notification count',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

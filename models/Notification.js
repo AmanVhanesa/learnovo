@@ -175,7 +175,7 @@ notificationSchema.methods.softDelete = function () {
 
 // Static methods
 notificationSchema.statics.getUnreadCount = async function (userId, tenantId) {
-    const User = require('./User');
+    const User = mongoose.model('User');
     const user = await User.findById(userId).select('role').lean();
 
     const query = {
