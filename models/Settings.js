@@ -240,26 +240,6 @@ const settingsSchema = new mongoose.Schema({
       default: 30, // days
       min: 7
     }
-  },
-  // Admission Settings
-  admission: {
-    mode: {
-      type: String,
-      enum: ['AUTO', 'MANUAL'],
-      default: 'AUTO'
-    },
-    prefix: {
-      type: String,
-      default: ''
-    },
-    counterPadding: {
-      type: Number,
-      default: 4
-    },
-    yearFormat: {
-      type: String,
-      default: 'YYYY'
-    }
   }
 }, {
   timestamps: true
