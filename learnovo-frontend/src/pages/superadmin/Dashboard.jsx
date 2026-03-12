@@ -3,14 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import {
     School,
     CheckCircle2,
-    Clock,
     Ban,
     Users,
     IndianRupee,
     AlertTriangle,
     Eye,
-    MoreVertical,
-    RefreshCw
+    MoreVertical
 } from 'lucide-react'
 import { Line, Doughnut } from 'react-chartjs-2'
 import {
@@ -29,7 +27,6 @@ import ChartCard from '../../components/ChartCard'
 import { CardSkeleton, ChartSkeleton } from '../../components/LoadingSkeleton'
 import { superAdminService } from '../../services/superAdminService'
 import { useSettings } from '../../contexts/SettingsContext'
-import TenantSlideOver from '../../components/superadmin/TenantSlideOver'
 
 ChartJS.register(
     CategoryScale,
@@ -49,10 +46,6 @@ const SuperAdminDashboard = () => {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState(null)
 
-    // SlideOver state for Recent Registrations "View" buttons
-    const [selectedTenantId, setSelectedTenantId] = useState(null)
-    const [isSlideOverOpen, setIsSlideOverOpen] = useState(false)
-
     useEffect(() => {
         fetchDashboardData()
     }, [])
@@ -70,44 +63,64 @@ const SuperAdminDashboard = () => {
         } catch (err) {
             console.error('Error fetching dashboard data:', err)
             setError(err.response?.data?.message || err.message || 'Failed to connect to server')
+
+            // Setup mock data for UI building if backend endpoint is unavailable
+            if (process.env.NODE_ENV === 'development') {
+                console.log("Using fallback mock data for Super Admin Dashboard UI")
+                setStats({
+                    counts: {
+                        totalTenants: 45,
+                        activeTenants: 38,
+                        suspendedTenants: 2,
+                        totalStudents: 12450,
+                    },
+                    revenueEstimate: {
+                        monthly: 95000,
+                        annual: 1140000
+                    },
+                    planBreakdown: [
+                        { _id: 'free_trial', count: 12 },
+                        { _id: 'basic', count: 15 },
+                        { _id: 'premium', count: 10 },
+                        { _id: 'enterprise', count: 8 }
+                    ],
+                    registrationsTrend: {
+                        labels: ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'],
+                        data: [4, 6, 8, 12, 10, 5]
+                    },
+                    recentRegistrations: [
+                        { _id: '1', name: 'Springfield Academy', adminEmail: 'admin@springfield.edu', subscription: { plan: 'premium', status: 'active' }, createdAt: new Date(Date.now() - 86400000).toISOString() },
+                        { _id: '2', name: 'Lincoln High', adminEmail: 'admin@lincolnhigh.org', subscription: { plan: 'free_trial', status: 'trial' }, createdAt: new Date(Date.now() - 172800000).toISOString() },
+                        { _id: '3', name: 'Oakwood Elementary', adminEmail: 'admin@oakwood.edu', subscription: { plan: 'basic', status: 'active' }, createdAt: new Date(Date.now() - 259200000).toISOString() },
+                        { _id: '4', name: 'Westside High', adminEmail: 'admin@westside.edu', subscription: { plan: 'enterprise', status: 'suspended' }, createdAt: new Date(Date.now() - 432000000).toISOString() },
+                    ]
+                })
+            }
         } finally {
             setIsLoading(false)
         }
     }
 
-    const openTenantSlideOver = (tenantId) => {
-        setSelectedTenantId(tenantId)
-        setIsSlideOverOpen(true)
-    }
-
     const kpiCards = [
         {
             title: 'Total Schools',
-            value: stats?.totalTenants || 0,
+            value: stats?.counts?.totalTenants || 0,
             icon: School,
             color: 'text-indigo-600',
             bgColor: 'bg-indigo-100',
             onClick: () => navigate('/super-admin/schools')
         },
         {
-            title: 'Active Schools',
-            value: stats?.activeTenants || 0,
+            title: 'Active Tenants',
+            value: stats?.counts?.activeTenants || 0,
             icon: CheckCircle2,
             color: 'text-green-600',
             bgColor: 'bg-green-100',
             onClick: () => navigate('/super-admin/schools?status=active')
         },
         {
-            title: 'On Trial',
-            value: stats?.trialTenants || 0,
-            icon: Clock,
-            color: 'text-blue-600',
-            bgColor: 'bg-blue-100',
-            onClick: () => navigate('/super-admin/schools?status=trial')
-        },
-        {
-            title: 'Suspended',
-            value: stats?.suspendedTenants || 0,
+            title: 'Suspended Accounts',
+            value: stats?.counts?.suspendedTenants || 0,
             icon: Ban,
             color: 'text-red-600',
             bgColor: 'bg-red-100',
@@ -115,15 +128,15 @@ const SuperAdminDashboard = () => {
         },
         {
             title: 'Total Students',
-            value: (stats?.totalStudents || 0).toLocaleString(),
+            value: (stats?.counts?.totalStudents || 0).toLocaleString(),
             icon: Users,
-            color: 'text-purple-600',
-            bgColor: 'bg-purple-100',
+            color: 'text-blue-600',
+            bgColor: 'bg-blue-100',
             onClick: () => navigate('/super-admin/users?role=student')
         },
         {
             title: 'Monthly Revenue',
-            value: formatCurrency(stats?.revenue?.monthly || 0),
+            value: formatCurrency(stats?.revenueEstimate?.monthly || 0),
             icon: IndianRupee,
             color: 'text-teal-600',
             bgColor: 'bg-teal-100',
@@ -145,41 +158,34 @@ const SuperAdminDashboard = () => {
         ]
     }
 
-    // Plan info mapping — matches updated backend plan IDs
+    // Map the plan strings to their display names and colors
     const planInfo = {
-        free: { label: 'Free Trial', color: '#9CA3AF' },
-        basic: { label: 'Basic', color: '#3B82F6' },
-        pro: { label: 'Pro', color: '#8B5CF6' },
-        enterprise: { label: 'Enterprise', color: '#F59E0B' },
-        // Legacy keys for backwards compatibility
-        free_trial: { label: 'Free Trial', color: '#9CA3AF' },
-        premium: { label: 'Premium', color: '#8B5CF6' },
+        free_trial: { label: 'Free Trial', color: '#9CA3AF' }, // gray
+        basic: { label: 'Basic', color: '#3B82F6' }, // blue
+        premium: { label: 'Premium', color: '#8B5CF6' }, // purple
+        enterprise: { label: 'Enterprise', color: '#F59E0B' }, // gold
     }
 
     const getPlanChartData = () => {
-        const breakdown = stats?.planBreakdown
-        if (!breakdown) return { labels: [], datasets: [] }
+        if (!stats?.planBreakdown || !Array.isArray(stats.planBreakdown)) return { labels: [], datasets: [] }
 
-        // Accept both array [{_id, count}] and object {plan: count} formats
-        let items = []
-        if (Array.isArray(breakdown)) {
-            items = breakdown
-        } else if (typeof breakdown === 'object') {
-            items = Object.entries(breakdown).map(([_id, count]) => ({ _id, count }))
-        }
+        // Sort logic to maintain standard order
+        const order = ['free_trial', 'basic', 'premium', 'enterprise']
+        const sortedBreakdown = [...stats.planBreakdown].sort((a, b) => order.indexOf(a._id) - order.indexOf(b._id))
 
-        if (!items.length) return { labels: [], datasets: [] }
-
-        const order = ['free', 'basic', 'pro', 'enterprise', 'free_trial', 'premium']
-        const sorted = [...items].sort((a, b) => order.indexOf(a._id) - order.indexOf(b._id))
+        const labels = sortedBreakdown.map(item => planInfo[item._id]?.label || item._id)
+        const data = sortedBreakdown.map(item => item.count)
+        const bgColors = sortedBreakdown.map(item => planInfo[item._id]?.color || '#cbd5e1')
 
         return {
-            labels: sorted.map(item => planInfo[item._id]?.label || item._id),
-            datasets: [{
-                data: sorted.map(item => item.count),
-                backgroundColor: sorted.map(item => planInfo[item._id]?.color || '#cbd5e1'),
-                borderWidth: 0,
-            }]
+            labels,
+            datasets: [
+                {
+                    data,
+                    backgroundColor: bgColors,
+                    borderWidth: 0,
+                }
+            ]
         }
     }
 
@@ -219,17 +225,17 @@ const SuperAdminDashboard = () => {
                     </div>
                     <button
                         onClick={() => fetchDashboardData()}
-                        className="mt-2 text-sm text-red-600 hover:text-red-800 underline flex items-center gap-1"
+                        className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
                     >
-                        <RefreshCw className="h-3 w-3" /> Try again
+                        Try again
                     </button>
                 </div>
             )}
 
             {/* Stats grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {isLoading ? (
-                    [...Array(6)].map((_, i) => <CardSkeleton key={i} />)
+                    [...Array(5)].map((_, i) => <CardSkeleton key={i} />)
                 ) : (
                     kpiCards.map((stat, index) => (
                         <KpiCard
@@ -256,7 +262,7 @@ const SuperAdminDashboard = () => {
                         <ChartCard
                             title="New Registrations Trend"
                             onExport={() => { }}
-                            filterOptions={{}}
+                            filterOptions={{}} // No specific filters for super admin trend right now
                         >
                             {() => (
                                 <Line data={trendData} options={{
@@ -308,12 +314,24 @@ const SuperAdminDashboard = () => {
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">School Name</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin Email</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Plan</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Registered</th>
-                                    <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                        School Name
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                        Admin Email
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                        Plan
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                        Status
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                        Registered
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -322,16 +340,15 @@ const SuperAdminDashboard = () => {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center">
                                                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
-                                                    <span className="text-primary-700 font-bold text-xs">{(tenant.schoolName || 'S').charAt(0).toUpperCase()}</span>
+                                                    <span className="text-primary-700 font-bold text-xs">{(tenant.schoolName || tenant.organizationName || 'School').charAt(0).toUpperCase()}</span>
                                                 </div>
                                                 <div className="ml-3">
-                                                    <p className="text-sm font-medium text-gray-900">{tenant.schoolName || 'Unnamed School'}</p>
-                                                    <p className="text-xs text-gray-400">{tenant.schoolCode}</p>
+                                                    <p className="text-sm font-medium text-gray-900">{tenant.schoolName || tenant.organizationName || 'Unnamed School'}</p>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <p className="text-sm text-gray-600">{tenant.email || 'No email provided'}</p>
+                                            <p className="text-sm text-gray-600">{tenant.email || tenant.adminEmail || 'No email provided'}</p>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             {getPlanBadge(tenant.subscription?.plan)}
@@ -343,13 +360,18 @@ const SuperAdminDashboard = () => {
                                             {new Date(tenant.createdAt).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button
-                                                onClick={() => openTenantSlideOver(tenant._id)}
-                                                className="inline-flex items-center px-2.5 py-1.5 border border-primary-200 text-xs font-medium rounded text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
-                                            >
-                                                <Eye className="h-3.5 w-3.5 mr-1" />
-                                                View
-                                            </button>
+                                            <div className="flex justify-end items-center space-x-2">
+                                                <button
+                                                    onClick={() => { }} // Will open slide-over in full implementation
+                                                    className="inline-flex items-center px-2.5 py-1.5 border border-primary-200 text-xs font-medium rounded text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                                                >
+                                                    <Eye className="h-3.5 w-3.5 mr-1" />
+                                                    View
+                                                </button>
+                                                <button className="text-gray-400 hover:text-gray-600">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -358,14 +380,6 @@ const SuperAdminDashboard = () => {
                     )}
                 </div>
             </div>
-
-            {/* Tenant Slide Over */}
-            <TenantSlideOver
-                isOpen={isSlideOverOpen}
-                onClose={() => setIsSlideOverOpen(false)}
-                tenantId={selectedTenantId}
-                onUpdate={fetchDashboardData}
-            />
         </div>
     )
 }
