@@ -229,6 +229,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         className="input"
                                         value={form.salary}
                                         onChange={(e) => updateField('salary', e.target.value)}
+                                        onWheel={(e) => e.target.blur()}
                                         min="0"
                                         placeholder="0"
                                     />
@@ -241,6 +242,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         className="input"
                                         value={form.leaveDeductionPerDay}
                                         onChange={(e) => updateField('leaveDeductionPerDay', e.target.value)}
+                                        onWheel={(e) => e.target.blur()}
                                         min="0"
                                         step="0.01"
                                         placeholder="0"
@@ -377,6 +379,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         className="input"
                                         value={form.experience}
                                         onChange={(e) => updateField('experience', e.target.value)}
+                                        onWheel={(e) => e.target.blur()}
                                         min="0"
                                     />
                                 </div>
