@@ -62,13 +62,6 @@ const Settings = () => {
       default: 'INR',
       symbol: '₹',
       position: 'before'
-    },
-    admission: {
-      mode: 'AUTO',
-      prefix: '',
-      yearFormat: 'YYYY',
-      counterPadding: 4,
-      isLocked: false
     }
   })
 
@@ -133,33 +126,27 @@ const Settings = () => {
   }
 
   const handleSave = async (e) => {
-    e.preventDefault()
+    if (e) e.preventDefault()
+
     try {
       setIsSaving(true)
 
-      // Save admission settings separately if they exist
-      if (form.admission) {
-        const admissionPayload = {
-          mode: form.admission.mode,
-          prefix: form.admission.prefix,
-          counterPadding: form.admission.counterPadding
-        }
-        await settingsService.updateAdmissionSettings(admissionPayload)
+      // Build the payload — only send the relevant section to avoid overwriting other data
+      const payload = { ...form }
+
+      // Don't send logo/signature if null (preserve existing in database)
+      if (payload.institution && payload.institution.logo === null) {
+        delete payload.institution.logo
+      }
+      if (payload.institution && payload.institution.principalSignature === null) {
+        delete payload.institution.principalSignature
       }
 
-      // Save general settings
-      const generalForm = { ...form }
-      delete generalForm.admission
-
-      // Don't send logo if it's null (preserve existing logo in database)
-      if (generalForm.institution && generalForm.institution.logo === null) {
-        delete generalForm.institution.logo
-      }
-
-      const data = await settingsService.updateSettings(generalForm)
+      // Use the general PUT /api/settings endpoint for all saves
+      const data = await settingsService.updateSettings(payload)
 
       if (data.success) {
-        toast.success('Settings saved successfully!')
+        toast.success(`${tabs.find(t => t.id === activeTab)?.label || 'Settings'} saved successfully!`)
         loadSettings()
       } else {
         toast.error(data.message || 'Failed to save settings')

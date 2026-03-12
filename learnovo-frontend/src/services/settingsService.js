@@ -27,7 +27,7 @@ export const settingsService = {
     return response.data
   },
 
-  // Update system settings
+  // Update system settings (general)
   updateSettings: async (settingsData) => {
     const response = await api.put('/settings', settingsData)
     return response.data
