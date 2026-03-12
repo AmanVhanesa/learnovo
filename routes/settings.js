@@ -4,6 +4,8 @@ const Settings = require('../models/Settings');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors, validateSettings } = require('../middleware/validation');
 const { getSupportedCurrencies } = require('../utils/currency');
+const upload = require('../middleware/upload');
+const cloudinaryService = require('../services/cloudinaryService');
 
 const router = express.Router();
 
@@ -19,7 +21,7 @@ const getTenantId = (req) => {
 // @desc    Get system settings
 // @route   GET /api/settings
 // @access  Private
-router.get('/', protect, async(req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
@@ -28,7 +30,7 @@ router.get('/', protect, async(req, res) => {
         message: 'User tenant not found. Please login again.'
       });
     }
-    
+
     const settings = await Settings.getSettings(tenantId);
 
     res.json({
@@ -47,7 +49,7 @@ router.get('/', protect, async(req, res) => {
 // @desc    Update system settings
 // @route   PUT /api/settings
 // @access  Private (Admin)
-router.put('/', protect, authorize('admin'), validateSettings, async(req, res) => {
+router.put('/', protect, authorize('admin'), validateSettings, async (req, res) => {
   try {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
@@ -56,7 +58,7 @@ router.put('/', protect, authorize('admin'), validateSettings, async(req, res) =
         message: 'User tenant not found. Please login again.'
       });
     }
-    
+
     const settings = await Settings.getSettings(tenantId);
 
     // Update settings
@@ -82,15 +84,16 @@ router.put('/', protect, authorize('admin'), validateSettings, async(req, res) =
   }
 });
 
-// @desc    Update currency settings
-// @route   PUT /api/settings/currency
+// @desc    Update admission settings
+// @route   PUT /api/settings/admission
 // @access  Private (Admin)
-router.put('/currency', protect, authorize('admin'), [
-  body('currency').isLength({ min: 3, max: 3 }).isUppercase().withMessage('Currency must be a 3-letter uppercase code'),
-  body('symbol').trim().isLength({ min: 1, max: 5 }).withMessage('Currency symbol must be between 1 and 5 characters'),
-  body('position').isIn(['before', 'after']).withMessage('Currency position must be before or after'),
+router.put('/admission', protect, authorize('admin'), [
+  body('mode').optional().isIn(['AUTO', 'CUSTOM', 'DEFAULT']).withMessage('Invalid admission mode'),
+  body('prefix').optional().trim().isLength({ min: 1, max: 10 }).withMessage('Prefix must be between 1 and 10 characters'),
+  body('yearFormat').optional().isIn(['YY', 'YYYY']).withMessage('Invalid year format'),
+  body('counterPadding').optional().isInt({ min: 1, max: 10 }).withMessage('Counter padding must be between 1 and 10'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
@@ -99,7 +102,49 @@ router.put('/currency', protect, authorize('admin'), [
         message: 'User tenant not found. Please login again.'
       });
     }
-    
+
+    const settings = await Settings.getSettings(tenantId);
+
+    // Update admission settings
+    settings.admission = {
+      ...settings.admission,
+      ...req.body
+    };
+
+    await settings.save();
+
+    res.json({
+      success: true,
+      message: 'Admission settings updated successfully',
+      data: settings.admission
+    });
+  } catch (error) {
+    console.error('Update admission settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating admission settings'
+    });
+  }
+});
+
+// @desc    Update currency settings
+// @route   PUT /api/settings/currency
+// @access  Private (Admin)
+router.put('/currency', protect, authorize('admin'), [
+  body('currency').isLength({ min: 3, max: 3 }).isUppercase().withMessage('Currency must be a 3-letter uppercase code'),
+  body('symbol').trim().isLength({ min: 1, max: 5 }).withMessage('Currency symbol must be between 1 and 5 characters'),
+  body('position').isIn(['before', 'after']).withMessage('Currency position must be before or after'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User tenant not found. Please login again.'
+      });
+    }
+
     const { currency, symbol, position } = req.body;
 
     const settings = await Settings.getSettings(tenantId);
@@ -149,7 +194,7 @@ router.post('/classes', protect, authorize('admin'), [
   body('level').isInt({ min: 1, max: 20 }).withMessage('Class level must be between 1 and 20'),
   body('maxStudents').optional().isInt({ min: 1, max: 100 }).withMessage('Max students must be between 1 and 100'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { name, level, maxStudents = 40 } = req.body;
@@ -179,7 +224,7 @@ router.post('/subjects', protect, authorize('admin'), [
   body('name').trim().isLength({ min: 2, max: 50 }).withMessage('Subject name must be between 2 and 50 characters'),
   body('code').trim().isLength({ min: 2, max: 10 }).withMessage('Subject code must be between 2 and 10 characters'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { name, code } = req.body;
@@ -211,7 +256,7 @@ router.post('/fee-structure', protect, authorize('admin'), [
   body('amount').isNumeric().isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
   body('term').isIn(['1st_term', '2nd_term', '3rd_term', 'annual']).withMessage('Invalid term'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const { class: className, feeType, amount, term } = req.body;
@@ -242,7 +287,7 @@ router.put('/notifications', protect, authorize('admin'), [
   body('email.reminderDays').optional().isArray().withMessage('Reminder days must be an array'),
   body('sms.enabled').optional().isBoolean().withMessage('SMS enabled must be boolean'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const settings = await Settings.getSettings(tenantId);
@@ -284,7 +329,7 @@ router.put('/system', protect, authorize('admin'), [
   body('maxFileSize').optional().isInt({ min: 1048576 }).withMessage('Max file size must be at least 1MB'),
   body('sessionTimeout').optional().isInt({ min: 300 }).withMessage('Session timeout must be at least 5 minutes'),
   handleValidationErrors
-], async(req, res) => {
+], async (req, res) => {
   try {
     const tenantId = getTenantId(req);
     const settings = await Settings.getSettings(tenantId);
@@ -326,48 +371,59 @@ router.put('/system', protect, authorize('admin'), [
   }
 });
 
-// @desc    Update theme settings
-// @route   PUT /api/settings/theme
+// @desc    Upload school logo
+// @route   POST /api/settings/upload-logo
 // @access  Private (Admin)
-router.put('/theme', protect, authorize('admin'), [
-  body('primaryColor').optional().isHexColor().withMessage('Primary color must be a valid hex color'),
-  body('secondaryColor').optional().isHexColor().withMessage('Secondary color must be a valid hex color'),
-  handleValidationErrors
-], async(req, res) => {
+router.post('/upload-logo', protect, authorize('admin'), upload.single('logo'), async (req, res) => {
   try {
     const tenantId = getTenantId(req);
-    const settings = await Settings.getSettings(tenantId);
 
-    if (req.body.primaryColor) {
-      settings.theme.primaryColor = req.body.primaryColor;
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    if (req.body.secondaryColor) {
-      settings.theme.secondaryColor = req.body.secondaryColor;
-    }
-
-    if (req.body.logo) {
-      settings.theme.logo = req.body.logo;
-    }
-
-    if (req.body.favicon) {
-      settings.theme.favicon = req.body.favicon;
-    }
-
-    await settings.save();
+    const result = await cloudinaryService.uploadFromMulter(req.file, {
+      folder: 'settings',
+      subPath: tenantId.toString(),
+      publicId: `logo_${tenantId}`
+    });
 
     res.json({
       success: true,
-      message: 'Theme settings updated successfully',
-      data: settings.theme
+      message: 'Logo uploaded successfully',
+      data: { url: result.url }
     });
   } catch (error) {
-    console.error('Update theme settings error:', error);
-    const statusCode = error.message.includes('tenant not found') ? 400 : 500;
-    res.status(statusCode).json({
-      success: false,
-      message: error.message || 'Server error while updating theme settings'
+    console.error('Upload logo error:', error);
+    res.status(500).json({ success: false, message: 'Logo upload failed' });
+  }
+});
+
+// @desc    Upload principal signature
+// @route   POST /api/settings/upload-signature
+// @access  Private (Admin)
+router.post('/upload-signature', protect, authorize('admin'), upload.single('signature'), async (req, res) => {
+  try {
+    const tenantId = getTenantId(req);
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const result = await cloudinaryService.uploadFromMulter(req.file, {
+      folder: 'settings',
+      subPath: tenantId.toString(),
+      publicId: `signature_${tenantId}`
     });
+
+    res.json({
+      success: true,
+      message: 'Signature uploaded successfully',
+      data: { url: result.url }
+    });
+  } catch (error) {
+    console.error('Upload signature error:', error);
+    res.status(500).json({ success: false, message: 'Signature upload failed' });
   }
 });
 

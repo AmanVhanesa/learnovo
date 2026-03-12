@@ -1,112 +1,167 @@
 /**
  * Learnovo Subscription Plan Configuration
  *
- * Defines all plan tiers with their features and limits.
+ * Single source of truth for all plan tiers, prices, limits, and features.
  * Used by planGate middleware to enforce feature/limit access control.
+ *
+ * Plan IDs used in DB: free_trial | basic | pro | enterprise
+ * (Note: 'premium' is aliased to 'pro' for backward compatibility)
  */
 
 const PLANS = {
     free_trial: {
         name: 'Free Trial',
-        price: 0,
+        price: 0,             // INR per month
+        billingPeriod: '14 days',
         durationDays: 14,
         limits: {
-            students: 100,
-            teachers: 10
+            students: 50,
+            teachers: 5,
+            storage: 512 // MB
         },
         features: {
-            attendanceTracking: true, // basic only
+            // Core
+            coreAcademics: true,
+            attendanceTracking: true,
+            timetable: true,
+            homework: true,
+            notices: true,
+            // Grades / Exams
             grades: false,
+            exams: false,
+            resultCards: false,
+            // Finance
+            feesFinance: false,
+            feeReceipts: false,
+            // Communication
+            notifications: true,
+            // Analytics
+            basicReports: false,
             advancedAnalytics: false,
             customReports: false,
-            basicReports: false,
-            apiAccess: false,
+            // Integrations
             csvImport: false,
+            apiAccess: false,
+            customIntegrations: false,
+            // Support
             emailSupport: true,
             prioritySupport: false,
             phoneSupport: false,
-            dedicatedSupport: false,
-            customIntegrations: false,
-            onPremise: false,
-            slaGuarantee: false
+            dedicatedSupport: false
         }
     },
+
     basic: {
         name: 'Basic',
-        price: 29,
+        price: 2499,          // INR per month
+        billingPeriod: 'month',
         limits: {
             students: 500,
-            teachers: 25
+            teachers: 30,
+            storage: 5120 // MB
         },
         features: {
+            coreAcademics: true,
             attendanceTracking: true,
+            timetable: true,
+            homework: true,
+            notices: true,
             grades: true,
+            exams: true,
+            resultCards: true,
+            feesFinance: true,
+            feeReceipts: true,
+            notifications: true,
+            basicReports: true,
             advancedAnalytics: false,
             customReports: false,
-            basicReports: true,
-            apiAccess: false,
             csvImport: true,
-            emailSupport: true,
-            prioritySupport: true,
-            phoneSupport: false,
-            dedicatedSupport: false,
+            apiAccess: false,
             customIntegrations: false,
-            onPremise: false,
-            slaGuarantee: false
+            emailSupport: true,
+            prioritySupport: false,
+            phoneSupport: false,
+            dedicatedSupport: false
         }
     },
-    premium: {
-        name: 'Premium',
-        price: 79,
+
+    pro: {
+        name: 'Pro',
+        price: 5999,          // INR per month
+        billingPeriod: 'month',
         limits: {
             students: 2000,
-            teachers: 100
+            teachers: 100,
+            storage: 20480 // MB
         },
         features: {
+            coreAcademics: true,
             attendanceTracking: true,
+            timetable: true,
+            homework: true,
+            notices: true,
             grades: true,
+            exams: true,
+            resultCards: true,
+            feesFinance: true,
+            feeReceipts: true,
+            notifications: true,
+            basicReports: true,
             advancedAnalytics: true,
             customReports: true,
-            basicReports: true,
-            apiAccess: true,
             csvImport: true,
+            apiAccess: true,
+            customIntegrations: false,
             emailSupport: true,
             prioritySupport: true,
             phoneSupport: true,
-            dedicatedSupport: false,
-            customIntegrations: false,
-            onPremise: false,
-            slaGuarantee: false
+            dedicatedSupport: false
         }
     },
+
+    // Legacy alias – 'premium' maps to 'pro' config
+    premium: null, // resolved below
+
     enterprise: {
         name: 'Enterprise',
-        price: null, // custom pricing
+        price: null,          // Custom pricing
+        billingPeriod: 'year',
         limits: {
             students: Infinity,
-            teachers: Infinity
+            teachers: Infinity,
+            storage: Infinity
         },
         features: {
+            coreAcademics: true,
             attendanceTracking: true,
+            timetable: true,
+            homework: true,
+            notices: true,
             grades: true,
+            exams: true,
+            resultCards: true,
+            feesFinance: true,
+            feeReceipts: true,
+            notifications: true,
+            basicReports: true,
             advancedAnalytics: true,
             customReports: true,
-            basicReports: true,
-            apiAccess: true,
             csvImport: true,
+            apiAccess: true,
+            customIntegrations: true,
             emailSupport: true,
             prioritySupport: true,
             phoneSupport: true,
-            dedicatedSupport: true,
-            customIntegrations: true,
-            onPremise: true,
-            slaGuarantee: true
+            dedicatedSupport: true
         }
     }
 };
 
-// Order of plans from lowest to highest tier (used for upgrade message)
-const PLAN_TIER_ORDER = ['free_trial', 'basic', 'premium', 'enterprise'];
+// Resolve 'premium' alias to 'pro'
+PLANS.premium = { ...PLANS.pro, name: 'Premium' };
+
+// Plan tier order (lowest → highest)
+const PLAN_TIER_ORDER = ['free_trial', 'basic', 'pro', 'enterprise'];
 
 /**
  * Get plan configuration for a given plan name.
@@ -117,8 +172,7 @@ const getPlanConfig = (planName) => {
 };
 
 /**
- * Find the minimum plan name that has a specific feature enabled.
- * Used to generate meaningful upgrade messages.
+ * Find the minimum plan that has a specific feature enabled.
  */
 const getFeatureRequiredPlan = (featureName) => {
     for (const planName of PLAN_TIER_ORDER) {
@@ -127,7 +181,7 @@ const getFeatureRequiredPlan = (featureName) => {
             return planName;
         }
     }
-    return null; // Feature doesn't exist in any plan
+    return null;
 };
 
 /**

@@ -55,7 +55,7 @@ const superAdminAuth = async (req, res, next) => {
             });
         }
 
-        if (!superAdmin.isActive) {
+        if (superAdmin.isActive === false) {
             return res.status(403).json({
                 success: false,
                 message: 'Super admin account has been deactivated.',

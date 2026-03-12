@@ -68,7 +68,7 @@ router.post('/login', [
         }
 
         // Sign JWT with dedicated SUPER_ADMIN_JWT_SECRET
-        const secret = process.env.SUPER_ADMIN_JWT_SECRET || 'super-admin-secret-key-change-in-production';
+        const secret = process.env.SUPER_ADMIN_JWT_SECRET || 'super-admin-secret-key';
         const token = jwt.sign(
             {
                 id: superAdmin._id,
