@@ -395,4 +395,89 @@ router.put('/theme', protect, authorize('admin'), [
   }
 });
 
+// @desc    Upload institution logo
+// @route   POST /api/settings/upload-logo
+// @access  Private (Admin)
+const upload = require('../middleware/upload');
+const cloudinaryService = require('../services/cloudinaryService');
+
+router.post('/upload-logo', protect, authorize('admin'), upload.single('logo'), async(req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No logo file uploaded' });
+    }
+
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'User tenant not found.' });
+    }
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ success: false, message: 'File upload service not configured.' });
+    }
+
+    const result = await cloudinaryService.uploadSchoolLogo(req.file, tenantId.toString());
+
+    await Settings.findOneAndUpdate(
+      { tenantId },
+      { $set: { 'institution.logo': result.secure_url } }
+    );
+
+    res.json({
+      success: true,
+      message: 'Logo uploaded successfully',
+      data: { url: result.secure_url }
+    });
+  } catch (error) {
+    console.error('Upload logo error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error uploading logo' });
+  }
+});
+
+// @desc    Upload principal signature
+// @route   POST /api/settings/upload-signature
+// @access  Private (Admin)
+router.post('/upload-signature', protect, authorize('admin'), upload.single('signature'), async(req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No signature file uploaded' });
+    }
+
+    const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'User tenant not found.' });
+    }
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ success: false, message: 'File upload service not configured.' });
+    }
+
+    const result = await cloudinaryService.uploadFromMulter(req.file, {
+      tenantId: tenantId.toString(),
+      folder: 'school',
+      subPath: 'signatures',
+      transformation: {
+        width: 400,
+        height: 200,
+        crop: 'fit',
+        quality: 'auto:best'
+      }
+    });
+
+    await Settings.findOneAndUpdate(
+      { tenantId },
+      { $set: { 'institution.principalSignature': result.secure_url } }
+    );
+
+    res.json({
+      success: true,
+      message: 'Signature uploaded successfully',
+      data: { url: result.secure_url }
+    });
+  } catch (error) {
+    console.error('Upload signature error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error uploading signature' });
+  }
+});
+
 module.exports = router;
