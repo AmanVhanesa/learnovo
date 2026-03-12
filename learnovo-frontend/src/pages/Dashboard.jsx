@@ -289,7 +289,7 @@ const Dashboard = () => {
       {/* Welcome message */}
       <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          Welcome back, {user?.name}!
+          Welcome back, {user?.name || user?.fullName || user?.firstName || ''}!
         </h1>
         <div className="flex items-center gap-3 mt-2">
           {user?.admissionNumber && (
@@ -430,17 +430,7 @@ const Dashboard = () => {
                   )}
                 </ChartCard>
               </>
-            ) : (
-              <ChartCard
-                title="Student Enrollment Trend"
-                onExport={() => exportChartAsPNG('Student Enrollment Trend', enrollmentData)}
-                filterOptions={{ classOptions: [], teacherOptions: [], sectionOptions: [] }}
-              >
-                {() => (
-                  <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
-                )}
-              </ChartCard>
-            )}
+            ) : null}
           </>
         )}
       </div>
@@ -490,9 +480,10 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Recent activities */}
-      {/* Recent activities */}
-      <RecentActivities activities={stats.recentActivities} isLoading={isLoading} />
+      {/* Recent activities - Hidden for students and parents */}
+      {['admin', 'teacher'].includes(user?.role) && (
+        <RecentActivities activities={stats.recentActivities} isLoading={isLoading} />
+      )}
     </div>
   )
 }

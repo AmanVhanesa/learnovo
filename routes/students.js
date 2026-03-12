@@ -10,6 +10,7 @@ const SubDepartment = require('../models/SubDepartment');
 const { formatCurrencyWithSettings } = require('../utils/currency');
 const upload = require('../middleware/upload');
 const { parseCSV } = require('../utils/csvHandler');
+const { generateAdmissionNumber } = require('../utils/admissionUtils');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
@@ -163,41 +164,31 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     }
 
     // Get students
-    const students = await User.find(filter)
-      .select('-password')
-      .populate('subDepartment', 'name')
-      .populate('driverId', 'name phone')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    let students;
+    try {
+      students = await User.find(filter)
+        .select('-password')
+        .populate({ path: 'subDepartment', select: 'name', strictPopulate: false })
+        .populate({ path: 'driverId', select: 'name phone', strictPopulate: false })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+    } catch (populateError) {
+      // Populate failed (e.g. ref model not loaded) — retry without populates
+      console.error('GET /students populate error (retrying without populate):', populateError.name, populateError.message);
+      students = await User.find(filter)
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+    }
 
     // Get total count
     const total = await User.countDocuments(filter);
 
-    // Get fee summary for each student
-    const studentsWithFees = await Promise.all(
-      students.map(async (student) => {
-        const fees = await Fee.find({ student: student._id });
-        const totalFees = fees.reduce((sum, fee) => sum + fee.amount, 0);
-        const paidFees = fees.filter(fee => fee.status === 'paid').reduce((sum, fee) => sum + fee.amount, 0);
-        const pendingFees = fees.filter(fee => fee.status === 'pending').reduce((sum, fee) => sum + fee.amount, 0);
-        const overdueFees = fees.filter(fee => fee.status === 'overdue').reduce((sum, fee) => sum + fee.amount, 0);
-
-        return {
-          ...student.toJSON(),
-          feeSummary: {
-            total: await formatCurrencyWithSettings(totalFees),
-            paid: await formatCurrencyWithSettings(paidFees),
-            pending: await formatCurrencyWithSettings(pendingFees),
-            overdue: await formatCurrencyWithSettings(overdueFees)
-          }
-        };
-      })
-    );
-
     res.json({
       success: true,
-      data: studentsWithFees,
+      data: students,
       pagination: {
         current: page,
         pages: Math.ceil(total / limit),
@@ -205,10 +196,15 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       }
     });
   } catch (error) {
-    console.error('Get students error:', error);
+    console.error('GET /students error:', error.name, error.message);
+    console.error('GET /students stack:', error.stack);
     res.status(500).json({
       success: false,
-      message: 'Server error while fetching students'
+      message: 'Server error while fetching students',
+      ...(process.env.NODE_ENV !== 'production' && {
+        errorName: error.name,
+        errorMessage: error.message
+      })
     });
   }
 });
@@ -655,15 +651,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
         let admissionNumber = row.admissionNumber ? row.admissionNumber.toString().trim() : null;
 
         if (!admissionNumber) {
-          const settings = await Settings.getSettings(tenantId);
-          const { mode, prefix, yearFormat, counterPadding, startFrom } = settings.admission;
-
-          const currentYear = new Date().getFullYear().toString();
-          const yearStr = yearFormat === 'YY' ? currentYear.substring(2) : currentYear;
-          const effectivePrefix = mode === 'CUSTOM' ? (prefix || 'ADM') : 'ADM';
-
-          const sequence = await Counter.getNextSequence('admission', currentYear, tenantId);
-          admissionNumber = `${effectivePrefix}${yearStr}${String(sequence).padStart(counterPadding, '0')}`;
+          admissionNumber = await generateAdmissionNumber(tenantId);
         }
 
         // Prepare Guardians with auto-added honorifics
@@ -1382,14 +1370,14 @@ router.get('/:id', protect, canAccessStudent, async (req, res) => {
 // @desc    Create new student
 // @route   POST /api/students
 // @access  Private (Admin)
-router.post('/', protect, authorize('admin'), validateStudent, async (req, res) => {
+router.post('/', protect, authorize('admin'), validateStudent, handleValidationErrors, async (req, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
       return res.status(400).json({ success: false, message: 'User tenant not found.' });
     }
 
     const {
-      fullName, firstName, middleName, lastName, email, phone, password,
+      fullName, name, firstName, middleName, lastName, email, phone, password,
       class: studentClass, section, academicYear, rollNumber, admissionDate,
       guardians, address, avatar,
       penNumber, subDepartment, udiseCode, // Legacy fields
@@ -1442,15 +1430,7 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
     let admissionNumber = req.body.admissionNumber ? req.body.admissionNumber.trim() : null;
 
     if (!admissionNumber) {
-      const settings = await Settings.getSettings(tenantId);
-      const { mode, prefix, yearFormat, counterPadding } = settings.admission;
-
-      const currentYear = new Date().getFullYear().toString();
-      const yearStr = yearFormat === 'YY' ? currentYear.substring(2) : currentYear;
-      const effectivePrefix = mode === 'CUSTOM' ? (prefix || 'ADM') : 'ADM';
-
-      const sequence = await Counter.getNextSequence('admission', currentYear, tenantId);
-      admissionNumber = `${effectivePrefix}${yearStr}${String(sequence).padStart(counterPadding, '0')}`;
+      admissionNumber = await generateAdmissionNumber(tenantId);
     }
 
     // Look up sectionId if section name is provided
@@ -1485,8 +1465,12 @@ router.post('/', protect, authorize('admin'), validateStudent, async (req, res) 
       }
     }
 
+    // Support both fullName and name (since StudentForm.jsx renames fullName to name)
+    const finalName = fullName || name;
+
     const studentData = {
-      fullName: fullName ? fullName.trim() : undefined,
+      fullName: finalName ? finalName.trim() : undefined,
+      name: finalName ? finalName.trim() : undefined,
       firstName: firstName ? firstName.trim() : undefined,
       middleName: middleName ? middleName.trim() : undefined,
       lastName: lastName ? lastName.trim() : undefined,

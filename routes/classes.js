@@ -7,7 +7,7 @@ const User = require('../models/User');
 const Subject = require('../models/Subject');
 
 // Get all classes
-router.get('/', protect, async(req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const { academicYear, grade } = req.query;
     const filter = {};
@@ -28,7 +28,7 @@ router.get('/', protect, async(req, res) => {
 
     // Get student count for each class
     const classesWithCounts = await Promise.all(
-      classes.map(async(classItem) => {
+      classes.map(async (classItem) => {
         const studentCount = await User.countDocuments({
           classId: classItem._id,
           role: 'student'
@@ -54,7 +54,7 @@ router.get('/', protect, async(req, res) => {
 });
 
 // Get a specific class
-router.get('/:id', protect, async(req, res) => {
+router.get('/:id', protect, async (req, res) => {
   try {
     const classItem = await Class.findById(req.params.id)
       .populate('classTeacher', 'name email phone')
@@ -97,7 +97,7 @@ router.post('/', [
   body('grade').notEmpty().withMessage('Grade is required'),
   body('academicYear').notEmpty().withMessage('Academic year is required'),
   body('classTeacher').isMongoId().withMessage('Valid class teacher is required')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -171,7 +171,7 @@ router.put('/:id', [
   body('grade').optional().notEmpty().withMessage('Grade cannot be empty'),
   body('academicYear').optional().notEmpty().withMessage('Academic year cannot be empty'),
   body('classTeacher').optional().isMongoId().withMessage('Valid class teacher is required')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -223,7 +223,7 @@ router.put('/:id', [
 });
 
 // Delete a class
-router.delete('/:id', [protect, authorize('admin')], async(req, res) => {
+router.delete('/:id', [protect, authorize('admin')], async (req, res) => {
   try {
     // Check if class has students
     const studentCount = await User.countDocuments({
@@ -260,8 +260,30 @@ router.delete('/:id', [protect, authorize('admin')], async(req, res) => {
   }
 });
 
+// Get sections for a class
+router.get('/:id/sections', protect, async (req, res) => {
+  try {
+    const Section = require('../models/Section');
+    const sections = await Section.find({
+      classId: req.params.id,
+      tenantId: req.user.tenantId
+    }).sort({ name: 1 });
+
+    res.json({
+      success: true,
+      data: sections
+    });
+  } catch (error) {
+    console.error('Error fetching sections for class:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
 // Get students in a class
-router.get('/:id/students', protect, async(req, res) => {
+router.get('/:id/students', protect, async (req, res) => {
   try {
     const students = await User.find({
       classId: req.params.id,
@@ -287,7 +309,7 @@ router.post('/:id/students', [
   authorize('admin'),
   body('studentIds').isArray().withMessage('Student IDs must be an array'),
   body('studentIds.*').isMongoId().withMessage('Invalid student ID')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -331,7 +353,7 @@ router.post('/:id/students', [
 });
 
 // Get subjects and teachers for a class
-router.get('/:id/subjects', protect, async(req, res) => {
+router.get('/:id/subjects', protect, async (req, res) => {
   try {
     const classItem = await Class.findById(req.params.id)
       .populate('subjects.subject', 'name subjectCode')
@@ -363,7 +385,7 @@ router.post('/:id/subjects', [
   authorize('admin'),
   body('subjectId').isMongoId().withMessage('Valid subject ID is required'),
   body('teacherId').isMongoId().withMessage('Valid teacher ID is required')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -439,7 +461,7 @@ router.post('/:id/subjects', [
 });
 
 // Remove subject from class
-router.delete('/:id/subjects/:subjectId', [protect, authorize('admin')], async(req, res) => {
+router.delete('/:id/subjects/:subjectId', [protect, authorize('admin')], async (req, res) => {
   try {
     const { id, subjectId } = req.params;
 

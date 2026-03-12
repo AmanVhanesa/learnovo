@@ -14,8 +14,12 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/learnovo'
   .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Seed data
-const seedData = async() => {
+const seedData = async () => {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Seed script cannot run in production to prevent accidental data deletion!');
+    }
+
     console.log('🌱 Starting to seed data...');
 
     // Clear existing data

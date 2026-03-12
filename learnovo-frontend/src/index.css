@@ -234,11 +234,17 @@
   }
 
   .modal-overlay {
-    @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+    @apply fixed top-0 right-0 bottom-0 left-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999];
+    /* Ensure it covers the entire viewport ignoring safe areas */
+    height: 100vh;
+    height: 100dvh;
   }
 
   .modal-content {
-    @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto;
+    @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto overflow-hidden ring-0 outline-none border border-transparent;
+    /* Extra specific boundary enforcement for Safari/Mac to prevent ghost borders at top */
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    mask-image: radial-gradient(white, black);
   }
 
   .loading-spinner {

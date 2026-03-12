@@ -22,13 +22,13 @@ router.post('/register', [
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('schoolCode').isLength({ min: 3, max: 20 }).withMessage('School code must be 3-20 characters').matches(/^[a-zA-Z0-9]+$/).withMessage('School code must contain only letters and numbers'),
   body('subdomain').isLength({ min: 3, max: 20 }).withMessage('Subdomain must be 3-20 characters').matches(/^[a-z0-9-]+$/).withMessage('Subdomain must contain only lowercase letters, numbers, and hyphens'),
-  body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
+  body('phone').optional().matches(/^\+?[\d\s-]+$/).withMessage('Valid phone number required'),
   body('address').optional().isObject().withMessage('Address must be an object')
 ], async (req, res) => {
   // For development, skip transactions if MongoDB is not a replica set
   const useTransactions = process.env.NODE_ENV === 'production';
   const session = useTransactions ? await mongoose.startSession() : null;
-  
+
   try {
     // Validation
     const errors = validationResult(req);
@@ -78,7 +78,7 @@ router.post('/register', [
       if (session) {
         await session.abortTransaction();
       }
-      
+
       logger.warn('Tenant registration failed - duplicate data', null, {
         requestId: req.requestId,
         route: req.route?.path,
@@ -111,7 +111,7 @@ router.post('/register', [
       }
     };
 
-    const tenant = session 
+    const tenant = session
       ? await Tenant.create([tenantData], { session })
       : await Tenant.create(tenantData);
 
@@ -198,7 +198,7 @@ router.post('/register', [
     if (session) {
       await session.abortTransaction();
     }
-    
+
     logger.error('Tenant registration failed', error, {
       requestId: req.requestId,
       route: req.route?.path
@@ -216,7 +216,7 @@ router.post('/register', [
 // @desc    Get tenant information
 // @route   GET /api/tenants/info
 // @access  Private (Tenant Admin)
-router.get('/info', protect, getTenantFromRequest, validateTenantAccess, async(req, res) => {
+router.get('/info', protect, getTenantFromRequest, validateTenantAccess, async (req, res) => {
   try {
     const tenant = await Tenant.findById(req.tenant._id)
       .select('-__v')
@@ -240,10 +240,10 @@ router.get('/info', protect, getTenantFromRequest, validateTenantAccess, async(r
 // @access  Private (Tenant Admin)
 router.put('/info', protect, getTenantFromRequest, validateTenantAccess, [
   body('schoolName').optional().notEmpty().withMessage('School name cannot be empty'),
-  body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
+  body('phone').optional().matches(/^\+?[\d\s-]+$/).withMessage('Valid phone number required'),
   body('primaryColor').optional().isHexColor().withMessage('Valid hex color required'),
   body('secondaryColor').optional().isHexColor().withMessage('Valid hex color required')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -289,7 +289,7 @@ router.put('/info', protect, getTenantFromRequest, validateTenantAccess, [
 // @desc    Get tenant subscription details
 // @route   GET /api/tenants/subscription
 // @access  Private (Tenant Admin)
-router.get('/subscription', protect, getTenantFromRequest, validateTenantAccess, async(req, res) => {
+router.get('/subscription', protect, getTenantFromRequest, validateTenantAccess, async (req, res) => {
   try {
     const tenant = await Tenant.findById(req.tenant._id)
       .select('subscription schoolName schoolCode');
@@ -317,7 +317,7 @@ router.get('/subscription', protect, getTenantFromRequest, validateTenantAccess,
 router.put('/subscription', protect, getTenantFromRequest, validateTenantAccess, [
   body('plan').isIn(['free', 'basic', 'premium', 'enterprise']).withMessage('Invalid plan'),
   body('billingCycle').optional().isIn(['monthly', 'yearly']).withMessage('Invalid billing cycle')
-], async(req, res) => {
+], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -374,7 +374,7 @@ router.put('/subscription', protect, getTenantFromRequest, validateTenantAccess,
 // @desc    Check if school code/subdomain is available
 // @route   GET /api/tenants/check-availability
 // @access  Public
-router.get('/check-availability', async(req, res) => {
+router.get('/check-availability', async (req, res) => {
   try {
     const { schoolCode, subdomain, email } = req.query;
 
@@ -413,7 +413,7 @@ router.get('/check-availability', async(req, res) => {
 // @desc    Import CSV data (teachers or students)
 // @route   POST /api/tenants/:id/import/csv
 // @access  Private (Admin only)
-router.post('/:id/import/csv', protect, getTenantFromRequest, validateTenantAccess, async(req, res) => {
+router.post('/:id/import/csv', protect, getTenantFromRequest, validateTenantAccess, async (req, res) => {
   try {
     // Only admins can import data
     if (req.user.role !== 'admin') {
@@ -490,7 +490,7 @@ router.post('/:id/import/csv', protect, getTenantFromRequest, validateTenantAcce
 // @desc    Get CSV import template
 // @route   GET /api/tenants/:id/import/template
 // @access  Private (Admin only)
-router.get('/:id/import/template', protect, getTenantFromRequest, validateTenantAccess, async(req, res) => {
+router.get('/:id/import/template', protect, getTenantFromRequest, validateTenantAccess, async (req, res) => {
   try {
     // Only admins can access templates
     if (req.user.role !== 'admin') {

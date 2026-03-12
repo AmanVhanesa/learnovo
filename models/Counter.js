@@ -38,7 +38,7 @@ counterSchema.index({ name: 1, year: 1, tenantId: 1 })
  * Get next sequence number for a given counter and year
  * Creates counter if it doesn't exist
  */
-counterSchema.statics.getNextSequence = async function(name, year, tenantId = null) {
+counterSchema.statics.getNextSequence = async function (name, year, tenantId = null) {
   const filter = { name, year }
   if (tenantId) filter.tenantId = tenantId
 
@@ -68,4 +68,3 @@ counterSchema.statics.formatReceiptNumber = (sequence, year) => {
 }
 
 module.exports = mongoose.model('Counter', counterSchema)
-
