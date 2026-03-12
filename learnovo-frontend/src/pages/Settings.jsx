@@ -131,15 +131,38 @@ const Settings = () => {
     try {
       setIsSaving(true)
 
-      // Build the payload — only send the relevant section to avoid overwriting other data
-      const payload = { ...form }
+      // Build the payload — only send known settings sections, strip Mongoose metadata
+      const payload = {}
 
-      // Don't send logo/signature if null (preserve existing in database)
-      if (payload.institution && payload.institution.logo === null) {
-        delete payload.institution.logo
+      // Only include sections that exist in the backend schema
+      if (form.institution) {
+        payload.institution = {
+          name: form.institution.name,
+          address: form.institution.address ? { ...form.institution.address } : undefined,
+          contact: form.institution.contact ? { ...form.institution.contact } : undefined,
+          logo: form.institution.logo,
+          principalSignature: form.institution.principalSignature,
+          establishedYear: form.institution.establishedYear
+        }
+        // Strip _id from nested objects
+        if (payload.institution.address) delete payload.institution.address._id
+        if (payload.institution.contact) delete payload.institution.contact._id
+        // Don't send logo/signature if null (preserve existing in database)
+        if (payload.institution.logo === null) delete payload.institution.logo
+        if (payload.institution.principalSignature === null) delete payload.institution.principalSignature
       }
-      if (payload.institution && payload.institution.principalSignature === null) {
-        delete payload.institution.principalSignature
+      if (form.currency) {
+        payload.currency = {
+          default: form.currency.default,
+          symbol: form.currency.symbol,
+          position: form.currency.position
+        }
+      }
+      if (form.theme) {
+        payload.theme = {
+          primaryColor: form.theme.primaryColor,
+          secondaryColor: form.theme.secondaryColor
+        }
       }
 
       // Use the general PUT /api/settings endpoint for all saves
