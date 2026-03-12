@@ -44,10 +44,7 @@ router.get('/', protect, async(req, res) => {
   }
 });
 
-// @desc    Update system settings
-// @route   PUT /api/settings
-// @access  Private (Admin)
-router.put('/', protect, authorize('admin'), validateSettings, async(req, res) => {
+router.put('/', protect, authorize('admin'), async(req, res) => {
   try {
     const tenantId = req.user?.tenantId;
     if (!tenantId) {
@@ -57,27 +54,54 @@ router.put('/', protect, authorize('admin'), validateSettings, async(req, res) =
       });
     }
     
-    const settings = await Settings.getSettings(tenantId);
+    // Ensure settings document exists
+    await Settings.getSettings(tenantId);
 
-    // Update settings
-    Object.keys(req.body).forEach(key => {
-      if (settings[key] !== undefined) {
-        settings[key] = { ...settings[key], ...req.body[key] };
-      }
-    });
+    // Build a flat $set object from the request body
+    const setObj = {};
+    const allowedSections = ['institution', 'currency', 'academic', 'fees', 'notifications', 'system', 'theme', 'backup'];
 
-    await settings.save();
+    for (const section of allowedSections) {
+      if (!req.body[section]) continue;
+
+      const flatten = (obj, prefix) => {
+        for (const [key, value] of Object.entries(obj)) {
+          if (key === '_id' || key === '__v') continue; // skip Mongoose metadata
+          const path = `${prefix}.${key}`;
+          if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+            flatten(value, path);
+          } else {
+            setObj[path] = value;
+          }
+        }
+      };
+
+      flatten(req.body[section], section);
+    }
+
+    if (Object.keys(setObj).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid settings fields to update'
+      });
+    }
+
+    const updatedSettings = await Settings.findOneAndUpdate(
+      { tenantId },
+      { $set: setObj },
+      { new: true, runValidators: true }
+    );
 
     res.json({
       success: true,
       message: 'Settings updated successfully',
-      data: settings
+      data: updatedSettings
     });
   } catch (error) {
     console.error('Update settings error:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while updating settings'
+      message: error.message || 'Server error while updating settings'
     });
   }
 });

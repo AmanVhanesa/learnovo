@@ -16,6 +16,26 @@ const settingsSchema = new mongoose.Schema({
       required: [true, 'Institution name is required'],
       trim: true
     },
+    tagline: {
+      type: String,
+      trim: true
+    },
+    udiseCode: {
+      type: String,
+      trim: true
+    },
+    board: {
+      type: String,
+      trim: true
+    },
+    affiliationNumber: {
+      type: String,
+      trim: true
+    },
+    schoolCode: {
+      type: String,
+      trim: true
+    },
     address: {
       street: { type: String, trim: true },
       city: { type: String, trim: true },
@@ -29,6 +49,10 @@ const settingsSchema = new mongoose.Schema({
       website: { type: String, trim: true }
     },
     logo: {
+      type: String,
+      default: null
+    },
+    principalSignature: {
       type: String,
       default: null
     },
