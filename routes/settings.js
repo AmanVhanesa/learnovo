@@ -61,12 +61,20 @@ router.put('/', protect, authorize('admin'), validateSettings, async (req, res) 
 
     const settings = await Settings.getSettings(tenantId);
 
-    // Update settings
-    Object.keys(req.body).forEach(key => {
-      if (settings[key] !== undefined) {
-        settings[key] = { ...settings[key], ...req.body[key] };
+    // Only update known schema sections to avoid Mongoose errors
+    const allowedSections = ['institution', 'admission', 'currency', 'academic', 'fees', 'notifications', 'system'];
+
+    for (const key of allowedSections) {
+      if (req.body[key] && typeof req.body[key] === 'object' && !Array.isArray(req.body[key])) {
+        // Deep merge for nested objects
+        if (settings[key] && typeof settings[key].toObject === 'function') {
+          const existing = settings[key].toObject();
+          settings[key] = { ...existing, ...req.body[key] };
+        } else if (settings[key]) {
+          settings[key] = { ...settings[key], ...req.body[key] };
+        }
       }
-    });
+    }
 
     await settings.save();
 

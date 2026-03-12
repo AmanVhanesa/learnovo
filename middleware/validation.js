@@ -176,25 +176,30 @@ exports.validateAdmission = [
 // Settings validation rules
 exports.validateSettings = [
   body('institution.name')
+    .optional()
     .trim()
     .isLength({ min: 2, max: 100 })
     .withMessage('Institution name must be between 2 and 100 characters'),
 
   body('currency.default')
+    .optional()
     .isLength({ min: 3, max: 3 })
     .isUppercase()
     .withMessage('Currency must be a 3-letter uppercase code (e.g., INR, USD)'),
 
   body('currency.symbol')
+    .optional()
     .trim()
     .isLength({ min: 1, max: 5 })
     .withMessage('Currency symbol must be between 1 and 5 characters'),
 
   body('currency.position')
+    .optional()
     .isIn(['before', 'after'])
     .withMessage('Currency position must be before or after'),
 
   body('academic.currentYear')
+    .optional()
     .trim()
     .matches(/^\d{4}-\d{4}$/)
     .withMessage('Academic year must be in format YYYY-YYYY'),
@@ -207,7 +212,9 @@ exports.validateSettings = [
   body('fees.lateFeeGracePeriod')
     .optional()
     .isInt({ min: 0 })
-    .withMessage('Late fee grace period must be a positive integer')
+    .withMessage('Late fee grace period must be a positive integer'),
+
+  exports.handleValidationErrors
 ];
 
 // File upload validation
