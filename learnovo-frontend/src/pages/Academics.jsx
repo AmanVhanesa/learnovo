@@ -124,7 +124,7 @@ const AcademicsManagement = () => {
 
     const fetchTeachers = async () => {
         try {
-            const res = await employeesService.list({ limit: 1000 })
+            const res = await employeesService.list({ role: 'teacher', limit: 100 })
             console.log('Teachers API Response:', res)
             console.log('Teachers data:', res.data)
             setTeachers(res.data || [])
