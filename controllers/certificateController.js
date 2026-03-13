@@ -223,11 +223,28 @@ exports.generateCertificate = async (req, res) => {
         // 6. Generate PDF
         const doc = await pdfService.generateCertificate(finalData, template);
 
-        // 7. Stream Response
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=${type}_${student.admissionNumber}.pdf`);
+        // Buffer and stream to client + S3 (fire-and-forget)
+        const chunks = [];
+        doc.on('data', chunk => chunks.push(chunk));
+        doc.on('end', () => {
+            const pdfBuffer = Buffer.concat(chunks);
+            
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=${type}_${student.admissionNumber}.pdf`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+            res.end(pdfBuffer);
 
-        doc.pipe(res);
+            // Archival to S3 in background (non-blocking)
+            const { uploadBufferToS3, buildS3Key } = require('../utils/s3Upload');
+            const s3Key = buildS3Key('certificates', tenantId, `${type}_${student.admissionNumber}.pdf`);
+            uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf')
+                .catch(err => console.error(`Background S3 upload failed for certificate ${certNumber}:`, err.message));
+        });
+        
+        doc.on('error', (err) => {
+            console.error('PDF generation stream error:', err);
+            if (!res.headersSent) res.status(500).json({ message: 'Error generating certificate PDF' });
+        });
 
     } catch (error) {
         console.error(error);
@@ -265,10 +282,28 @@ exports.downloadCertificate = async (req, res) => {
         // Generate PDF from stored snapshot
         const doc = await pdfService.generateCertificate(cert.contentSnapshot, template);
 
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=${cert.type}_${cert.certificateNumber}.pdf`);
+        // Buffer and stream to client + S3 (fire-and-forget)
+        const chunks = [];
+        doc.on('data', chunk => chunks.push(chunk));
+        doc.on('end', () => {
+            const pdfBuffer = Buffer.concat(chunks);
+            
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=${cert.type}_${cert.certificateNumber}.pdf`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+            res.end(pdfBuffer);
 
-        doc.pipe(res);
+            // Archival to S3 in background
+            const { uploadBufferToS3, buildS3Key } = require('../utils/s3Upload');
+            const s3Key = buildS3Key('certificates', req.user.tenantId, `${cert.type}_${cert.certificateNumber}.pdf`);
+            uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf')
+                .catch(err => console.error(`Background S3 upload failed for certificate ${cert.certificateNumber}:`, err.message));
+        });
+
+        doc.on('error', (err) => {
+            console.error('PDF generation stream error:', err);
+            if (!res.headersSent) res.status(500).json({ message: 'Error downloading certificate PDF' });
+        });
 
     } catch (error) {
         console.error('Download error:', error);

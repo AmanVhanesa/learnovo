@@ -183,19 +183,34 @@ class StudentImportService {
 
     /**
      * Preview import - validate file without importing
+     * @param {Object|string} fileOrPath - Multer file object (with .buffer and .originalname) or file path string
+     * @param {string} tenantId
+     * @param {Object} options
      */
-    static async previewImport(filePath, tenantId, options = {}) {
+    static async previewImport(fileOrPath, tenantId, options = {}) {
         try {
-            // Parse file
-            const ext = filePath.toLowerCase();
             let rows;
 
-            if (ext.endsWith('.csv')) {
-                rows = await ImportExportService.parseCSV(filePath);
-            } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
-                rows = await ImportExportService.parseExcel(filePath);
+            if (typeof fileOrPath === 'string') {
+                // Legacy: file path on disk
+                const ext = fileOrPath.toLowerCase();
+                if (ext.endsWith('.csv')) {
+                    rows = await ImportExportService.parseCSV(fileOrPath);
+                } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+                    rows = await ImportExportService.parseExcel(fileOrPath);
+                } else {
+                    throw new Error('Unsupported file format');
+                }
             } else {
-                throw new Error('Unsupported file format');
+                // Memory buffer from multer memoryStorage
+                const ext = (fileOrPath.originalname || '').toLowerCase();
+                if (ext.endsWith('.csv')) {
+                    rows = await ImportExportService.parseCSVBuffer(fileOrPath.buffer);
+                } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+                    rows = await ImportExportService.parseExcelBuffer(fileOrPath.buffer);
+                } else {
+                    throw new Error('Unsupported file format');
+                }
             }
 
             if (rows.length === 0) {
@@ -358,13 +373,14 @@ class StudentImportService {
     }
 
     /**
-     * Execute import - actually create students
+     * Execute import — uses insertMany in chunks for performance
      */
     static async executeImport(validData, tenantId, options = {}) {
         const {
             updateExisting = false,
             skipErrors = true
         } = options;
+        const CHUNK_SIZE = 100;
 
         const results = {
             created: 0,
@@ -372,39 +388,34 @@ class StudentImportService {
             failed: 0,
             errors: []
         };
-        // Get class map for quick lookup
-        const classes = await Class.find({ tenantId, isActive: true }).lean();
-        const classMap = new Map();
-        classes.forEach(cls => {
-            classMap.set(cls.name.toLowerCase(), cls);
-        });
 
-        // Get section map
-        const sections = await Section.find({ tenantId, isActive: true }).lean();
+        // Pre-fetch class & section maps (single DB call each)
+        const [classes, sections] = await Promise.all([
+            Class.find({ tenantId, isActive: true }).lean(),
+            Section.find({ tenantId, isActive: true }).lean(),
+        ]);
+
+        const classMap = new Map();
+        classes.forEach(cls => classMap.set(cls.name.toLowerCase(), cls));
+
         const sectionMap = new Map();
         sections.forEach(sec => {
             const key = `${sec.classId}_${sec.name}`.toLowerCase();
             sectionMap.set(key, sec);
         });
 
-        // Process each student
+        // Phase 1: Prepare documents
+        const docs = [];
         for (const row of validData) {
             try {
-                // Resolve Class
                 const classDoc = classMap.get(row.currentClass.toLowerCase());
-                if (!classDoc) {
-                    throw new Error(`Class "${row.currentClass}" not found`);
-                }
+                if (!classDoc) throw new Error(`Class "${row.currentClass}" not found`);
 
-                // Resolve Section
                 const sectionKey = `${classDoc._id}_${row.currentSection}`.toLowerCase();
                 const sectionDoc = sectionMap.get(sectionKey);
-                if (!sectionDoc) {
-                    throw new Error(`Section "${row.currentSection}" not found in Class "${row.currentClass}"`);
-                }
+                if (!sectionDoc) throw new Error(`Section "${row.currentSection}" not found in Class "${row.currentClass}"`);
 
-                // Prepare student data
-                const studentData = {
+                docs.push({
                     tenantId,
                     role: 'student',
                     admissionNumber: row.admissionNumber,
@@ -413,12 +424,10 @@ class StudentImportService {
                     phone: row.phone || undefined,
                     dateOfBirth: row.dateOfBirth,
                     gender: row.gender,
-
-                    // Linked Class & Section
-                    class: row.currentClass,          // Display string
-                    classId: classDoc._id,            // Reference
-                    section: row.currentSection,      // Display string
-                    sectionId: sectionDoc._id,        // Reference
+                    class: row.currentClass,
+                    classId: classDoc._id,
+                    section: row.currentSection,
+                    sectionId: sectionDoc._id,
                     rollNumber: row.rollNumber || undefined,
                     admissionClass: row.admissionClass || undefined,
                     admissionSection: row.admissionSection || undefined,
@@ -435,23 +444,32 @@ class StudentImportService {
                     },
                     isActive: true,
                     password: this.generateDefaultPassword(row.admissionNumber)
-                };
-
-                // Create student
-                await User.create(studentData);
-                results.created++;
-
-            } catch (error) {
-                console.error('Error creating student:', error);
-                results.failed++;
-                results.errors.push({
-                    admissionNumber: row.admissionNumber,
-                    error: error.message
                 });
+            } catch (error) {
+                results.failed++;
+                results.errors.push({ admissionNumber: row.admissionNumber, error: error.message });
+            }
+        }
 
-                if (!skipErrors) {
-                    throw error;
+        // Phase 2: Bulk insert in chunks
+        for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+            const chunk = docs.slice(i, i + CHUNK_SIZE);
+            try {
+                const inserted = await User.insertMany(chunk, { ordered: false });
+                results.created += inserted.length;
+            } catch (error) {
+                if (error.insertedDocs) {
+                    results.created += error.insertedDocs.length;
                 }
+                const writeErrors = error.writeErrors || [];
+                writeErrors.forEach((we) => {
+                    results.failed++;
+                    results.errors.push({
+                        admissionNumber: chunk[we.index]?.admissionNumber || 'unknown',
+                        error: we.errmsg || we.message,
+                    });
+                });
+                if (!skipErrors && writeErrors.length > 0) throw error;
             }
         }
 

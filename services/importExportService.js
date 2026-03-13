@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { Readable } = require('stream');
 const csv = require('csv-parser');
 const { parse } = require('fast-csv');
 const { format } = require('fast-csv');
@@ -43,6 +44,36 @@ class ImportExportService {
     }
 
     /**
+     * Parse CSV from a Buffer (multer memory storage)
+     * @param {Buffer} buffer - File content as Buffer
+     * @param {Object} options - Parsing options
+     * @returns {Promise<Array>} Array of row objects
+     */
+    static async parseCSVBuffer(buffer, options = {}) {
+        return new Promise((resolve, reject) => {
+            const rows = [];
+            let rowNumber = 0;
+
+            Readable.from(buffer)
+                .pipe(csv({
+                    skipEmptyLines: true,
+                    trim: true,
+                    ...options
+                }))
+                .on('data', (row) => {
+                    rowNumber++;
+                    rows.push({ ...row, _rowNumber: rowNumber });
+                })
+                .on('error', (error) => {
+                    reject(error);
+                })
+                .on('end', () => {
+                    resolve(rows);
+                });
+        });
+    }
+
+    /**
      * Parse Excel file and return rows
      * @param {string} filePath - Path to Excel file
      * @param {Object} options - Parsing options
@@ -68,6 +99,33 @@ class ImportExportService {
             }));
         } catch (error) {
             throw new Error(`Failed to parse Excel file: ${error.message}`);
+        }
+    }
+
+    /**
+     * Parse Excel from a Buffer (multer memory storage)
+     * @param {Buffer} buffer - File content as Buffer
+     * @param {Object} options - Parsing options
+     * @returns {Promise<Array>} Array of row objects
+     */
+    static async parseExcelBuffer(buffer, options = {}) {
+        try {
+            const workbook = xlsx.read(buffer, { type: 'buffer' });
+            const sheetName = options.sheetName || workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+
+            const rows = xlsx.utils.sheet_to_json(worksheet, {
+                raw: false,
+                defval: '',
+                ...options
+            });
+
+            return rows.map((row, index) => ({
+                ...row,
+                _rowNumber: index + 2
+            }));
+        } catch (error) {
+            throw new Error(`Failed to parse Excel buffer: ${error.message}`);
         }
     }
 

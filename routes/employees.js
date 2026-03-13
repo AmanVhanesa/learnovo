@@ -14,15 +14,14 @@ const router = express.Router();
 // @access  Private (Admin, Teacher)
 router.get('/', protect, authorize('admin', 'teacher'), [
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-    query('limit').optional().isInt({ min: 1, max: 2000 }).withMessage('Limit must be between 1 and 2000'),
+    query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
     query('role').optional().trim().notEmpty().withMessage('Role filter cannot be empty'),
     query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
     handleValidationErrors
 ], async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
-        const skip = (page - 1) * limit;
+        const { parsePagination, paginatedResponse } = require('../utils/pagination');
+        const { page, limit, skip } = parsePagination(req.query);
 
         // Build filter for employees (non-student, non-parent roles)
         const filter = {
@@ -55,25 +54,18 @@ router.get('/', protect, authorize('admin', 'teacher'), [
             ];
         }
 
-        // Get employees
-        const employees = await User.find(filter)
-            .select('-password')
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
+        // Get employees + count in parallel
+        const [employees, total] = await Promise.all([
+            User.find(filter)
+                .select('-password')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            User.countDocuments(filter),
+        ]);
 
-        // Get total count
-        const total = await User.countDocuments(filter);
-
-        res.json({
-            success: true,
-            data: employees,
-            pagination: {
-                current: page,
-                pages: Math.ceil(total / limit),
-                total
-            }
-        });
+        res.json(paginatedResponse(employees, total, page, limit));
     } catch (error) {
         console.error('Get employees error:', error);
         res.status(500).json({
@@ -543,7 +535,7 @@ router.put('/:id/disable-login', protect, authorize('admin'), async (req, res) =
 // IMPORT/EXPORT ROUTES
 // ============================================================================
 
-const { uploadSingleFile, deleteFile } = require('../middleware/fileUpload');
+const { uploadSingleFile } = require('../middleware/fileUpload');
 const EmployeeImportService = require('../services/employeeImportService');
 const ImportExportService = require('../services/importExportService');
 
@@ -571,12 +563,11 @@ router.post('/import/preview', protect, authorize('admin'), (req, res) => {
             if (err) return res.status(400).json({ success: false, message: err.message });
             if (!req.file) return res.status(400).json({ success: false, message: 'Please upload a file' });
 
-            const result = await EmployeeImportService.previewImport(req.file.path, req.user.tenantId);
-            result.uploadedFile = req.file.filename;
+            const result = await EmployeeImportService.previewImport(req.file, req.user.tenantId);
+            result.uploadedFile = req.file.originalname;
             res.json(result);
         } catch (error) {
             console.error('Preview import error:', error);
-            if (req.file) await deleteFile(req.file.path).catch(console.error);
             res.status(500).json({ success: false, message: error.message });
         }
     });

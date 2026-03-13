@@ -24,7 +24,7 @@ const router = express.Router();
 // @access  Private (Admin, Teacher)
 router.get('/', protect, authorize('admin', 'teacher'), [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 2000 }).withMessage('Limit must be between 1 and 2000'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('class').optional().trim().notEmpty().withMessage('Class filter cannot be empty'),
   query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
   handleValidationErrors
@@ -33,9 +33,8 @@ router.get('/', protect, authorize('admin', 'teacher'), [
   console.log('req.query:', req.query);
   console.log('req.originalUrl:', req.originalUrl);
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const { parsePagination, paginatedResponse } = require('../utils/pagination');
+    const { page, limit, skip } = parsePagination(req.query);
 
     // Build filter
     const filter = { role: 'student' };
@@ -172,7 +171,8 @@ router.get('/', protect, authorize('admin', 'teacher'), [
         .populate({ path: 'driverId', select: 'name phone', strictPopulate: false })
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .lean();
     } catch (populateError) {
       // Populate failed (e.g. ref model not loaded) — retry without populates
       console.error('GET /students populate error (retrying without populate):', populateError.name, populateError.message);
@@ -180,21 +180,13 @@ router.get('/', protect, authorize('admin', 'teacher'), [
         .select('-password')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .lean();
     }
 
-    // Get total count
     const total = await User.countDocuments(filter);
 
-    res.json({
-      success: true,
-      data: students,
-      pagination: {
-        current: page,
-        pages: Math.ceil(total / limit),
-        total
-      }
-    });
+    res.json(paginatedResponse(students, total, page, limit));
   } catch (error) {
     console.error('GET /students error:', error.name, error.message);
     console.error('GET /students stack:', error.stack);
@@ -330,10 +322,7 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
 
     const rows = await parseCSV(req.file);
 
-    // Clean up file immediately after parsing (only if file exists on disk)
-    if (req.file.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    // No local file cleanup needed — file is in memory buffer only
 
     if (!rows || rows.length === 0) {
       return res.status(400).json({ success: false, message: 'CSV file is empty' });
@@ -571,7 +560,7 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
   } catch (error) {
     console.error('Import preview error:', error);
     console.error('Error stack:', error.stack);
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    // No local file cleanup needed — file is in memory buffer only
     res.status(500).json({
       success: false,
       message: error.message || 'Server error during preview',
@@ -2266,7 +2255,7 @@ router.post('/promote', protect, authorize('admin'), async (req, res) => {
 // IMPORT/EXPORT ROUTES (New Enhanced Version)
 // ============================================================================
 
-const { uploadSingleFile, deleteFile } = require('../middleware/fileUpload');
+const { uploadSingleFile } = require('../middleware/fileUpload');
 const StudentImportService = require('../services/studentImportService');
 const ImportExportService = require('../services/importExportService');
 
@@ -2310,22 +2299,16 @@ router.post('/import/preview', protect, authorize('admin'), (req, res) => {
       }
 
       const result = await StudentImportService.previewImport(
-        req.file.path,
+        req.file,
         req.user.tenantId
       );
 
-      // Store file path in session or temp storage for execute step
-      // For now, we'll include it in the response
-      result.uploadedFile = req.file.filename;
+      // Store file info for execute step
+      result.uploadedFile = req.file.originalname;
 
       res.json(result);
     } catch (error) {
       console.error('Preview import error:', error);
-
-      // Clean up uploaded file
-      if (req.file) {
-        await deleteFile(req.file.path).catch(console.error);
-      }
 
       res.status(500).json({
         success: false,
