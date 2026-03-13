@@ -138,6 +138,11 @@ const Settings = () => {
       if (form.institution) {
         payload.institution = {
           name: form.institution.name,
+          tagline: form.institution.tagline,
+          udiseCode: form.institution.udiseCode,
+          board: form.institution.board,
+          affiliationNumber: form.institution.affiliationNumber,
+          schoolCode: form.institution.schoolCode,
           address: form.institution.address ? { ...form.institution.address } : undefined,
           contact: form.institution.contact ? { ...form.institution.contact } : undefined,
           logo: form.institution.logo,
