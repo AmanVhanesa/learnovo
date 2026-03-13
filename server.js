@@ -92,12 +92,8 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Static files - serve uploads with CORS headers
-app.use('/uploads', (req, res, next) => {
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  next();
-}, express.static('uploads'));
+// Static files - uploads/ directory no longer used (S3 + Cloudinary)
+// Images served from Cloudinary, documents from S3 pre-signed URLs
 
 // Database connection
 const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
@@ -106,11 +102,20 @@ if (!mongoUri) {
   process.exit(1);
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 mongoose.connect(mongoUri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  autoIndex: !isProduction, // indexes managed via utils/indexes.js in prod
 })
-  .then(() => console.log('MongoDB connected'))
+  .then(async () => {
+    console.log('MongoDB connected');
+    // Create indexes in the background (non-blocking)
+    const { ensureIndexes } = require('./utils/indexes');
+    ensureIndexes().catch((e) => console.error('[indexes] bg error:', e.message));
+  })
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Root/health endpoints
@@ -176,7 +181,17 @@ app.get('/health', async (req, res) => {
 });
 
 app.get('/healthz', (req, res) => {
-  res.json({ success: true, status: 'ok', requestId: req.requestId });
+  res.status(200).json({ status: 'ok' });
+});
+
+// ── Request timeout middleware (15 s) ───────────────────────────────────────
+app.use((req, res, next) => {
+  req.setTimeout(15000, () => {
+    if (!res.headersSent) {
+      res.status(408).json({ success: false, message: 'Request timed out' });
+    }
+  });
+  next();
 });
 
 // Routes

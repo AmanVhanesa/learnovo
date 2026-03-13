@@ -1,7 +1,11 @@
 const Tenant = require('../models/Tenant');
+const cache = require('../utils/cache');
 
-// Middleware to extract tenant from subdomain or school code
-const getTenantFromRequest = async(req, res, next) => {
+/**
+ * Middleware to extract tenant from subdomain, school code, or JWT.
+ * Tenant documents are cached for 10 minutes to avoid repeated DB lookups.
+ */
+const getTenantFromRequest = async (req, res, next) => {
   try {
     let tenant = null;
 
@@ -10,25 +14,19 @@ const getTenantFromRequest = async(req, res, next) => {
     if (host && host.includes('.')) {
       const subdomain = host.split('.')[0];
       if (subdomain !== 'www' && subdomain !== 'localhost') {
-        tenant = await Tenant.findOne({
-          subdomain: subdomain,
-          isActive: true
-        });
+        tenant = await getCachedTenant({ subdomain, isActive: true }, `tenant:sub:${subdomain}`);
       }
     }
 
     // Method 2: Extract from school code in request body/query
     if (!tenant && (req.body.schoolCode || req.query.schoolCode)) {
       const schoolCode = req.body.schoolCode || req.query.schoolCode;
-      tenant = await Tenant.findOne({
-        schoolCode: schoolCode,
-        isActive: true
-      });
+      tenant = await getCachedTenant({ schoolCode, isActive: true }, `tenant:code:${schoolCode}`);
     }
 
     // Method 3: Extract from JWT token (if user is already authenticated)
     if (!tenant && req.user && req.user.tenantId) {
-      tenant = await Tenant.findById(req.user.tenantId);
+      tenant = await getCachedTenant({ _id: req.user.tenantId }, `tenant:id:${req.user.tenantId}`);
     }
 
     if (!tenant) {
@@ -39,7 +37,7 @@ const getTenantFromRequest = async(req, res, next) => {
     }
 
     // Check subscription status
-    if (tenant.subscription.status === 'suspended') {
+    if (tenant.subscription && tenant.subscription.status === 'suspended') {
       return res.status(403).json({
         success: false,
         message: 'School subscription is suspended. Please contact support.'
@@ -47,7 +45,7 @@ const getTenantFromRequest = async(req, res, next) => {
     }
 
     // Check trial expiry
-    if (tenant.subscription.status === 'trial' && new Date() > tenant.subscription.trialEndsAt) {
+    if (tenant.subscription && tenant.subscription.status === 'trial' && new Date() > tenant.subscription.trialEndsAt) {
       return res.status(403).json({
         success: false,
         message: 'Trial period has expired. Please upgrade your subscription.'
@@ -65,6 +63,18 @@ const getTenantFromRequest = async(req, res, next) => {
   }
 };
 
+/**
+ * Look up tenant with a cache layer (TTL 10 min).
+ * Uses .lean() for speed since middleware only reads the document.
+ */
+async function getCachedTenant(filter, cacheKey) {
+  return cache.getOrSet(
+    cacheKey,
+    () => Tenant.findOne(filter).lean(),
+    600 // 10 minutes
+  );
+}
+
 // Middleware to ensure user belongs to the correct tenant
 const validateTenantAccess = (req, res, next) => {
   if (!req.user || !req.tenant) {
@@ -80,7 +90,8 @@ const validateTenantAccess = (req, res, next) => {
   }
 
   // Check if user belongs to the tenant
-  if (req.user.tenantId.toString() !== req.tenant._id.toString()) {
+  const tenantId = req.tenant._id ? req.tenant._id.toString() : req.tenant.toString();
+  if (req.user.tenantId.toString() !== tenantId) {
     return res.status(403).json({
       success: false,
       message: 'Access denied: You do not belong to this school'

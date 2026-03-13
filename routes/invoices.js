@@ -1079,6 +1079,12 @@ router.get('/payments/:id/receipt/pdf', protect, async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.setHeader('Content-Length', pdfBuffer.length);
         res.end(pdfBuffer);
+        
+        // Archival to S3 in background
+        const { uploadBufferToS3, buildS3Key } = require('../utils/s3Upload');
+        const s3Key = buildS3Key('receipts', tenantId, filename);
+        uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf')
+            .catch(err => console.error(`Background S3 upload failed for receipt ${filename}:`, err.message));
 
     } catch (error) {
         console.error('Receipt PDF error:', error);

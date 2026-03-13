@@ -4,6 +4,35 @@ const path = require('path');
 const axios = require('axios');
 
 /**
+ * Fetch an image (from URL or local fallback) and return a Buffer/Path.
+ */
+async function fetchImage(imagePath) {
+    if (!imagePath) return null;
+    try {
+        if (imagePath.startsWith('http')) {
+            const response = await axios.get(imagePath, { responseType: 'arraybuffer', timeout: 5000 });
+            return response.data;
+        } else {
+            let localPath = imagePath;
+            if (localPath.startsWith('/')) localPath = path.join(process.cwd(), localPath);
+            if (fs.existsSync(localPath)) return localPath;
+            
+            localPath = path.resolve(process.cwd(), imagePath);
+            if (fs.existsSync(localPath)) return localPath;
+            
+            localPath = path.join(process.cwd(), 'uploads', path.basename(imagePath));
+            if (fs.existsSync(localPath)) return localPath;
+            
+            console.warn(`Image file not found at: ${imagePath} or resolved paths`);
+            return null;
+        }
+    } catch (err) {
+        console.warn(`Failed to load image from ${imagePath}:`, err.message);
+        return null;
+    }
+}
+
+/**
  * Service to generate PDF certificates
  */
 const pdfService = {
@@ -26,95 +55,11 @@ const pdfService = {
                 doc.info['Title'] = `${template.type} - ${data.studentName}`;
                 doc.info['Author'] = data.schoolName;
 
-                // --- Helper Functions ---
-
-                // Load logo if available
-                // Load logo if available
-                let logoImage = null;
-                if (data.schoolLogo) {
-                    try {
-                        if (data.schoolLogo.startsWith('http')) {
-                            // Remote URL
-                            const response = await axios.get(data.schoolLogo, { responseType: 'arraybuffer' });
-                            logoImage = response.data;
-                        } else {
-                            // Local File Path
-                            // Try absolute path first
-                            let logoPath = data.schoolLogo;
-                            if (fs.existsSync(logoPath)) {
-                                logoImage = logoPath;
-                            } else {
-                                // Try resolving relative to project root
-                                logoPath = path.resolve(process.cwd(), data.schoolLogo);
-                                if (fs.existsSync(logoPath)) {
-                                    logoImage = logoPath;
-                                } else {
-                                    // Try resolving relative to 'public' or 'uploads' if path is just filename
-                                    // Common case: 'uploads/logo.png' -> /app/uploads/logo.png
-                                    logoPath = path.join(process.cwd(), 'uploads', path.basename(data.schoolLogo));
-                                    if (fs.existsSync(logoPath)) {
-                                        logoImage = logoPath;
-                                    } else {
-                                        console.warn(`Logo file not found at: ${data.schoolLogo} or resolved paths`);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (err) {
-                        console.warn('Failed to load logo:', err.message);
-                    }
-                }
-
-                // Load principal signature if available
-                let signatureImage = null;
-                console.log('PDF Service - Principal Signature URL:', data.principalSignature);
-
-                if (data.principalSignature) {
-                    try {
-                        if (data.principalSignature.startsWith('http')) {
-                            // Remote URL (Cloudinary)
-                            console.log('Loading signature from URL:', data.principalSignature);
-                            const response = await axios.get(data.principalSignature, { responseType: 'arraybuffer' });
-                            signatureImage = response.data;
-                            console.log('Signature loaded successfully from URL');
-                        } else {
-                            // Local File Path
-                            let signaturePath = data.principalSignature;
-
-                            // If path starts with /, it's relative to project root
-                            if (signaturePath.startsWith('/')) {
-                                signaturePath = path.join(process.cwd(), signaturePath);
-                            }
-
-                            console.log('Trying signature path:', signaturePath);
-
-                            if (fs.existsSync(signaturePath)) {
-                                signatureImage = signaturePath;
-                                console.log('Signature file found at:', signaturePath);
-                            } else {
-                                // Try resolving relative to project root
-                                signaturePath = path.resolve(process.cwd(), data.principalSignature);
-                                if (fs.existsSync(signaturePath)) {
-                                    signatureImage = signaturePath;
-                                    console.log('Signature file found at:', signaturePath);
-                                } else {
-                                    // Try just the basename in uploads folder
-                                    signaturePath = path.join(process.cwd(), 'uploads', path.basename(data.principalSignature));
-                                    if (fs.existsSync(signaturePath)) {
-                                        signatureImage = signaturePath;
-                                        console.log('Signature file found at:', signaturePath);
-                                    } else {
-                                        console.warn(`Signature file not found at: ${data.principalSignature} or resolved paths`);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (err) {
-                        console.warn('Failed to load signature:', err.message);
-                    }
-                } else {
-                    console.log('No principal signature provided in data');
-                }
+                // --- Fetch Images in Parallel ---
+                const [logoImage, signatureImage] = await Promise.all([
+                    fetchImage(data.schoolLogo),
+                    fetchImage(data.principalSignature)
+                ]);
 
                 // --- Layout Logic ---
 

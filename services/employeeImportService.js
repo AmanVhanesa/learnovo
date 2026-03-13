@@ -140,18 +140,34 @@ class EmployeeImportService {
 
     /**
      * Preview import
+     * @param {Object|string} fileOrPath - Multer file object (with .buffer and .originalname) or file path string
+     * @param {string} tenantId
+     * @param {Object} options
      */
-    static async previewImport(filePath, tenantId, options = {}) {
+    static async previewImport(fileOrPath, tenantId, options = {}) {
         try {
-            const ext = filePath.toLowerCase();
             let rows;
 
-            if (ext.endsWith('.csv')) {
-                rows = await ImportExportService.parseCSV(filePath);
-            } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
-                rows = await ImportExportService.parseExcel(filePath);
+            if (typeof fileOrPath === 'string') {
+                // Legacy: file path on disk
+                const ext = fileOrPath.toLowerCase();
+                if (ext.endsWith('.csv')) {
+                    rows = await ImportExportService.parseCSV(fileOrPath);
+                } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+                    rows = await ImportExportService.parseExcel(fileOrPath);
+                } else {
+                    throw new Error('Unsupported file format');
+                }
             } else {
-                throw new Error('Unsupported file format');
+                // Memory buffer from multer memoryStorage
+                const ext = (fileOrPath.originalname || '').toLowerCase();
+                if (ext.endsWith('.csv')) {
+                    rows = await ImportExportService.parseCSVBuffer(fileOrPath.buffer);
+                } else if (ext.endsWith('.xlsx') || ext.endsWith('.xls')) {
+                    rows = await ImportExportService.parseExcelBuffer(fileOrPath.buffer);
+                } else {
+                    throw new Error('Unsupported file format');
+                }
             }
 
             if (rows.length === 0) {
@@ -264,10 +280,11 @@ class EmployeeImportService {
     }
 
     /**
-     * Execute import
+     * Execute import — uses insertMany in chunks for performance
      */
     static async executeImport(validData, tenantId, options = {}) {
         const { skipErrors = true } = options;
+        const CHUNK_SIZE = 100;
 
         const results = {
             created: 0,
@@ -276,9 +293,11 @@ class EmployeeImportService {
             errors: []
         };
 
+        // Prepare all employee documents first
+        const docs = [];
         for (const row of validData) {
             try {
-                const employeeData = {
+                docs.push({
                     tenantId,
                     role: row.role,
                     employeeId: row.employeeId,
@@ -300,22 +319,33 @@ class EmployeeImportService {
                     emergencyPhone: row.emergencyPhone || undefined,
                     isActive: true,
                     password: this.generateDefaultPassword(row.employeeId)
-                };
-
-                await User.create(employeeData);
-                results.created++;
-
-            } catch (error) {
-                console.error('Error creating employee:', error);
-                results.failed++;
-                results.errors.push({
-                    employeeId: row.employeeId,
-                    error: error.message
                 });
+            } catch (error) {
+                results.failed++;
+                results.errors.push({ employeeId: row.employeeId, error: error.message });
+            }
+        }
 
-                if (!skipErrors) {
-                    throw error;
+        // Insert in chunks of CHUNK_SIZE
+        for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+            const chunk = docs.slice(i, i + CHUNK_SIZE);
+            try {
+                const inserted = await User.insertMany(chunk, { ordered: false });
+                results.created += inserted.length;
+            } catch (error) {
+                // insertMany with ordered:false continues past errors
+                if (error.insertedDocs) {
+                    results.created += error.insertedDocs.length;
                 }
+                const writeErrors = error.writeErrors || [];
+                writeErrors.forEach((we) => {
+                    results.failed++;
+                    results.errors.push({
+                        employeeId: chunk[we.index]?.employeeId || 'unknown',
+                        error: we.errmsg || we.message,
+                    });
+                });
+                if (!skipErrors && writeErrors.length > 0) throw error;
             }
         }
 
