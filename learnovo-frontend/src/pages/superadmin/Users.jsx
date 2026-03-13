@@ -42,9 +42,9 @@ const SuperAdminUsers = () => {
             // Fallback data for UI dev
             if (process.env.NODE_ENV === 'development') {
                 setUsers([
-                    { _id: '1', name: 'John Doe', email: 'john@springfield.edu', role: 'admin', tenantId: { name: 'Springfield Academy' }, isActive: true, createdAt: new Date(Date.now() - 86400000).toISOString() },
-                    { _id: '2', name: 'Sarah Wilson', email: 'sarah@lincolnhigh.org', role: 'teacher', tenantId: { name: 'Lincoln High' }, isActive: true, createdAt: new Date(Date.now() - 172800000).toISOString() },
-                    { _id: '3', name: 'Mike Johnson', email: 'mike@oakwood.edu', role: 'student', tenantId: { name: 'Oakwood Elementary' }, isActive: false, createdAt: new Date(Date.now() - 259200000).toISOString() },
+                    { _id: '1', name: 'John Doe', email: 'john@springfield.edu', role: 'admin', tenantId: { schoolName: 'Springfield Academy' }, isActive: true, createdAt: new Date(Date.now() - 86400000).toISOString() },
+                    { _id: '2', name: 'Sarah Wilson', email: 'sarah@lincolnhigh.org', role: 'teacher', tenantId: { schoolName: 'Lincoln High' }, isActive: true, createdAt: new Date(Date.now() - 172800000).toISOString() },
+                    { _id: '3', name: 'Mike Johnson', email: 'mike@oakwood.edu', role: 'student', tenantId: { schoolName: 'Oakwood Elementary' }, isActive: false, createdAt: new Date(Date.now() - 259200000).toISOString() },
                 ])
                 setTotalPages(1)
             }
@@ -244,7 +244,7 @@ const SuperAdminUsers = () => {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm text-gray-900 font-medium">
-                                                {user.tenantId?.name || 'N/A'}
+                                                {user.tenantId?.schoolName || 'N/A'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
