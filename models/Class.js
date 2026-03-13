@@ -26,8 +26,7 @@ const classSchema = new mongoose.Schema({
   },
   classTeacher: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'Class teacher is required']
+    ref: 'User'
   },
   subjects: [{
     subject: {
