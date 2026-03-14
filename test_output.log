@@ -1,0 +1,928 @@
+
+> learnovo-backend@1.0.0 test
+> jest --runInBand
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+  console.log
+    {"timestamp":"2026-03-12T17:04:36.083Z","level":"info","message":"Email service initialized","host":"smtp.gmail.com","port":587}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:36.733Z","level":"info","message":"Reconciliation Job scheduled to run every 5 minutes"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.114Z","level":"info","requestId":"648609e5-0697-4893-b7b0-af903bdf0e23","route":"/:id/import/csv","tenantId":"69b2f224d342509d05090c9d","message":"Starting CSV import","type":"teachers","recordCount":2,"adminEmail":"test@user.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.115Z","level":"info","tenantId":"69b2f224d342509d05090c9d","message":"Starting teacher import","adminEmail":"test@user.com","recordCount":2}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.397Z","level":"info","message":"Email queued","emailId":1773335077397.9146,"to":"john.doe@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.399Z","level":"info","tenantId":"69b2f224d342509d05090c9d","message":"Teacher created successfully","teacherId":"69b2f225d342509d05090d60","email":"john.doe@school.com","row":2}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.679Z","level":"info","message":"Email queued","emailId":1773335077679.001,"to":"jane.smith@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.680Z","level":"info","tenantId":"69b2f224d342509d05090c9d","message":"Teacher created successfully","teacherId":"69b2f225d342509d05090d69","email":"jane.smith@school.com","row":3}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.680Z","level":"info","tenantId":"69b2f224d342509d05090c9d","message":"Teacher import completed","adminEmail":"test@user.com","results":{"created":2,"skipped":0,"errors":[]}}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.972Z","level":"info","requestId":"2859804e-87b5-4a67-ac29-b783afc670ae","route":"/:id/import/csv","tenantId":"69b2f225d342509d05090d6d","message":"Starting CSV import","type":"students","recordCount":2,"adminEmail":"test@user.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:37.972Z","level":"info","tenantId":"69b2f225d342509d05090d6d","message":"Starting student import","adminEmail":"test@user.com","recordCount":2}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:38.252Z","level":"info","message":"Email queued","emailId":1773335078252.5461,"to":"alice.johnson@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:38.252Z","level":"info","tenantId":"69b2f225d342509d05090d6d","message":"Student created successfully","studentId":"69b2f225d342509d05090d75","email":"alice.johnson@school.com","row":2}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:38.541Z","level":"info","message":"Email queued","emailId":1773335078541.3145,"to":"bob.wilson@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:38.542Z","level":"info","tenantId":"69b2f225d342509d05090d6d","message":"Student created successfully","studentId":"69b2f226d342509d05090d78","email":"bob.wilson@school.com","row":3}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:38.542Z","level":"info","tenantId":"69b2f225d342509d05090d6d","message":"Student import completed","adminEmail":"test@user.com","results":{"created":2,"skipped":0,"errors":[]}}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:38.827Z","level":"info","requestId":"965ee309-c78d-4c24-b7c9-1f58c6d3ebf5","route":"/:id/import/csv","tenantId":"69b2f226d342509d05090d7c","message":"Starting CSV import","type":"teachers","recordCount":1,"adminEmail":"test@user.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:38.828Z","level":"info","tenantId":"69b2f226d342509d05090d7c","message":"Starting teacher import","adminEmail":"test@user.com","recordCount":1}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:39.106Z","level":"warn","message":"Email send failed, retrying","emailId":1773335077397.9146,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a07341ed1sm3298381b3a.33 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.108Z","level":"info","message":"Email queued","emailId":1773335079108.265,"to":"john.doe@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.109Z","level":"info","tenantId":"69b2f226d342509d05090d7c","message":"Teacher created successfully","teacherId":"69b2f226d342509d05090d84","email":"john.doe@school.com","row":2}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.109Z","level":"info","tenantId":"69b2f226d342509d05090d7c","message":"Teacher import completed","adminEmail":"test@user.com","results":{"created":1,"skipped":0,"errors":[]}}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.114Z","level":"info","requestId":"711b802d-c71d-4ac9-b868-bfecb420ad0d","route":"/:id/import/csv","tenantId":"69b2f226d342509d05090d7c","message":"Starting CSV import","type":"teachers","recordCount":2,"adminEmail":"test@user.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.115Z","level":"info","tenantId":"69b2f226d342509d05090d7c","message":"Starting teacher import","adminEmail":"test@user.com","recordCount":2}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.400Z","level":"info","message":"Email queued","emailId":1773335079400.8616,"to":"jane.smith@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.400Z","level":"info","tenantId":"69b2f226d342509d05090d7c","message":"Teacher created successfully","teacherId":"69b2f227d342509d05090d8b","email":"jane.smith@school.com","row":3}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.401Z","level":"info","tenantId":"69b2f226d342509d05090d7c","message":"Teacher import completed","adminEmail":"test@user.com","results":{"created":1,"skipped":1,"errors":[{"row":2,"error":"Teacher with email john.doe@school.com already exists"}]}}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.693Z","level":"info","requestId":"6cab5a88-3b28-498d-8936-0561e2e4a23a","route":"/:id/import/csv","tenantId":"69b2f227d342509d05090d8f","message":"Starting CSV import","type":"students","recordCount":1,"adminEmail":"test@user.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.693Z","level":"info","tenantId":"69b2f227d342509d05090d8f","message":"Starting student import","adminEmail":"test@user.com","recordCount":1}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.977Z","level":"info","message":"Email queued","emailId":1773335079977.1184,"to":"alice.johnson@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.978Z","level":"info","tenantId":"69b2f227d342509d05090d8f","message":"Student created successfully","studentId":"69b2f227d342509d05090d97","email":"alice.johnson@school.com","row":2}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.978Z","level":"info","tenantId":"69b2f227d342509d05090d8f","message":"Student import completed","adminEmail":"test@user.com","results":{"created":1,"skipped":0,"errors":[]}}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.982Z","level":"info","requestId":"e19859eb-9d05-4064-a743-c0475606c797","route":"/:id/import/csv","tenantId":"69b2f227d342509d05090d8f","message":"Starting CSV import","type":"students","recordCount":2,"adminEmail":"test@user.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:39.983Z","level":"info","tenantId":"69b2f227d342509d05090d8f","message":"Starting student import","adminEmail":"test@user.com","recordCount":2}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:40.268Z","level":"info","message":"Email queued","emailId":1773335080268.9429,"to":"bob.wilson@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:40.269Z","level":"info","tenantId":"69b2f227d342509d05090d8f","message":"Student created successfully","studentId":"69b2f227d342509d05090d9e","email":"bob.wilson@school.com","row":3}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:40.269Z","level":"info","tenantId":"69b2f227d342509d05090d8f","message":"Student import completed","adminEmail":"test@user.com","results":{"created":1,"skipped":1,"errors":[{"row":2,"error":"Student with email alice.johnson@school.com or roll number STU001 already exists"}]}}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:40.945Z","level":"warn","message":"Email send failed, retrying","emailId":1773335077679.001,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials 41be03b00d2f7-c73cdf0f587sm5950125a12.4 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:41.690Z","level":"info","requestId":"295c8505-550b-472e-8550-e8752e9ae5b9","route":"/:id/import/csv","tenantId":"69b2f229d342509d05090dbf","message":"Starting CSV import","type":"teachers","recordCount":1,"adminEmail":"test@user.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:41.691Z","level":"info","tenantId":"69b2f229d342509d05090dbf","message":"Starting teacher import","adminEmail":"test@user.com","recordCount":1}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:41.691Z","level":"info","tenantId":"69b2f229d342509d05090dbf","message":"Teacher import completed","adminEmail":"test@user.com","results":{"created":0,"skipped":1,"errors":[{"row":2,"error":"Missing required fields: name and email are required"}]}}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:42.755Z","level":"warn","message":"Email send failed, retrying","emailId":1773335078252.5461,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae378930sm59900155ad.85 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+PASS tests/integration/csvImport.test.js (7.378 s)
+  CSV Import API
+    POST /api/tenants/:id/import/csv
+      ✓ should import teachers successfully (920 ms)
+      ✓ should import students successfully (859 ms)
+      ✓ should skip duplicate teachers (859 ms)
+      ✓ should skip duplicate students (868 ms)
+      ✓ should return 400 for invalid type (287 ms)
+      ✓ should return 400 for missing data (283 ms)
+      ✓ should return 403 for non-admin users (564 ms)
+      ✓ should handle validation errors gracefully (286 ms)
+    GET /api/tenants/:id/import/template
+      ✓ should return teacher template (285 ms)
+      ✓ should return student template (289 ms)
+      ✓ should return 400 for invalid type (284 ms)
+      ✓ should return 403 for non-admin users (564 ms)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:43.207Z","level":"info","message":"Email service initialized","host":"smtp.gmail.com","port":587}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:43.436Z","level":"info","message":"Reconciliation Job scheduled to run every 5 minutes"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:43.461Z","level":"info","requestId":"1588390f-3f70-4809-ad06-4dfc2b2283bd","route":"/register","message":"Starting tenant registration","schoolName":"New Test School","email":"newtest@school.com","schoolCode":"newtest001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:43.761Z","level":"info","requestId":"1588390f-3f70-4809-ad06-4dfc2b2283bd","route":"/register","tenantId":"69b2f22b2f4f8c906f6bc27e","message":"Tenant registration successful","userId":"69b2f22b2f4f8c906f6bc29b","schoolName":"New Test School","email":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:43.762Z","level":"info","message":"Email queued","emailId":1773335083762.4753,"to":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:43.773Z","level":"warn","requestId":"5ba31547-531f-4cf7-9e08-c64f4ec9629a","route":"/register","message":"Registration validation failed","errors":[{"type":"field","value":"","msg":"School name is required","path":"schoolName","location":"body"},{"type":"field","value":"","msg":"Invalid value","path":"schoolName","location":"body"},{"type":"field","value":"invalid-email","msg":"Valid email is required","path":"email","location":"body"},{"type":"field","value":"123","msg":"Password must be at least 6 characters","path":"password","location":"body"},{"type":"field","value":"ab","msg":"School code must be 3-20 characters","path":"schoolCode","location":"body"},{"type":"field","value":"ab","msg":"Subdomain must be 3-20 characters","path":"subdomain","location":"body"}]}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at warn (routes/tenants.js:36:14)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at next (node_modules/express/lib/router/route.js:149:13)
+      at middleware (node_modules/express-validator/lib/middlewares/check.js:16:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:43.778Z","level":"info","requestId":"3ddef58f-b86f-4ea3-92eb-8cf82df6d667","route":"/register","message":"Starting tenant registration","schoolName":"New Test School","email":"newtest@school.com","schoolCode":"newtest001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.076Z","level":"info","requestId":"3ddef58f-b86f-4ea3-92eb-8cf82df6d667","route":"/register","tenantId":"69b2f22b2f4f8c906f6bc30a","message":"Tenant registration successful","userId":"69b2f22b2f4f8c906f6bc30c","schoolName":"New Test School","email":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.077Z","level":"info","message":"Email queued","emailId":1773335084077.7964,"to":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.079Z","level":"info","requestId":"546bef96-c82e-442f-a55d-ea295ad7e737","route":"/register","message":"Starting tenant registration","schoolName":"New Test School","email":"newtest@school.com","schoolCode":"newtest001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:44.082Z","level":"warn","requestId":"546bef96-c82e-442f-a55d-ea295ad7e737","route":"/register","message":"Tenant registration failed - duplicate data","existingTenant":{"schoolCode":"newtest001","subdomain":"new-test-school","email":"newtest@school.com"}}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at warn (routes/tenants.js:82:14)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.086Z","level":"info","requestId":"2f8023f4-7e03-4d78-9b51-4c0cdc1e2b35","route":"/register","message":"Starting tenant registration","schoolName":"New Test School","email":"newtest@school.com","schoolCode":"newtest001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.399Z","level":"info","requestId":"2f8023f4-7e03-4d78-9b51-4c0cdc1e2b35","route":"/register","tenantId":"69b2f22c2f4f8c906f6bc312","message":"Tenant registration successful","userId":"69b2f22c2f4f8c906f6bc314","schoolName":"New Test School","email":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.399Z","level":"info","message":"Email queued","emailId":1773335084399.6633,"to":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.401Z","level":"info","requestId":"1655fed4-bd02-4c8e-a86d-df9572276f19","route":"/register","message":"Starting tenant registration","schoolName":"Different School","email":"newtest@school.com","schoolCode":"diff001","subdomain":"different-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:44.403Z","level":"warn","requestId":"1655fed4-bd02-4c8e-a86d-df9572276f19","route":"/register","message":"Tenant registration failed - duplicate data","existingTenant":{"schoolCode":"newtest001","subdomain":"new-test-school","email":"newtest@school.com"}}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at warn (routes/tenants.js:82:14)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.406Z","level":"info","requestId":"907f7c37-136e-426b-bf21-798da75f5e6c","route":"/register","message":"Starting tenant registration","schoolName":"New Test School","email":"newtest@school.com","schoolCode":"newtest001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.715Z","level":"info","requestId":"907f7c37-136e-426b-bf21-798da75f5e6c","route":"/register","tenantId":"69b2f22c2f4f8c906f6bc31a","message":"Tenant registration successful","userId":"69b2f22c2f4f8c906f6bc31c","schoolName":"New Test School","email":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.716Z","level":"info","message":"Email queued","emailId":1773335084716.2822,"to":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.718Z","level":"info","requestId":"d7dd69e7-fb08-412c-901b-34fac0243a13","route":"/register","message":"Starting tenant registration","schoolName":"Different School","email":"different@school.com","schoolCode":"newtest001","subdomain":"different-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:44.719Z","level":"warn","requestId":"d7dd69e7-fb08-412c-901b-34fac0243a13","route":"/register","message":"Tenant registration failed - duplicate data","existingTenant":{"schoolCode":"newtest001","subdomain":"new-test-school","email":"newtest@school.com"}}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at warn (routes/tenants.js:82:14)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:44.722Z","level":"info","requestId":"12f092c3-f344-43b4-8e0a-0c09bd6f482d","route":"/register","message":"Starting tenant registration","schoolName":"New Test School","email":"newtest@school.com","schoolCode":"newtest001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:44.827Z","level":"warn","message":"Email send failed, retrying","emailId":1773335078541.3145,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a07340422sm3374721b3a.30 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.020Z","level":"info","requestId":"12f092c3-f344-43b4-8e0a-0c09bd6f482d","route":"/register","tenantId":"69b2f22c2f4f8c906f6bc322","message":"Tenant registration successful","userId":"69b2f22c2f4f8c906f6bc324","schoolName":"New Test School","email":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.021Z","level":"info","message":"Email queued","emailId":1773335085021.939,"to":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.022Z","level":"info","requestId":"a344eaa8-8016-4158-9d7e-be4e7f2152be","route":"/register","message":"Starting tenant registration","schoolName":"Different School","email":"different@school.com","schoolCode":"diff001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:45.024Z","level":"warn","requestId":"a344eaa8-8016-4158-9d7e-be4e7f2152be","route":"/register","message":"Tenant registration failed - duplicate data","existingTenant":{"schoolCode":"newtest001","subdomain":"new-test-school","email":"newtest@school.com"}}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at warn (routes/tenants.js:82:14)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:45.027Z","level":"warn","requestId":"2ea140f6-0887-41bb-894a-9db325b1360a","route":"/register","message":"Registration validation failed","errors":[{"type":"field","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","msg":"School code must be 3-20 characters","path":"schoolCode","location":"body"}]}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at warn (routes/tenants.js:36:14)
+      at Layer.handle [as handle_request] (node_modules/express/lib/router/layer.js:95:5)
+      at next (node_modules/express/lib/router/route.js:149:13)
+      at middleware (node_modules/express-validator/lib/middlewares/check.js:16:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.029Z","level":"info","requestId":"7f1c6b46-4d7a-4dde-bc4e-09079b1c4c8c","route":"/register","message":"Starting tenant registration","schoolName":"New Test School","email":"newtest@school.com","schoolCode":"newtest001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.312Z","level":"info","requestId":"7f1c6b46-4d7a-4dde-bc4e-09079b1c4c8c","route":"/register","tenantId":"69b2f22d2f4f8c906f6bc32c","message":"Tenant registration successful","userId":"69b2f22d2f4f8c906f6bc32e","schoolName":"New Test School","email":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.312Z","level":"info","message":"Email queued","emailId":1773335085312.5742,"to":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.315Z","level":"info","requestId":"a1a0bfcd-3d30-463d-b63f-1781e62e18b9","route":"/register","message":"Starting tenant registration","schoolName":"New Test School","email":"newtest@school.com","schoolCode":"newtest001","subdomain":"new-test-school"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:45.596Z","level":"warn","message":"Email send failed, retrying","emailId":1773335083762.4753,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials 98e67ed59e1d1-35a02ffdfb7sm7760633a91.14 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.598Z","level":"info","requestId":"a1a0bfcd-3d30-463d-b63f-1781e62e18b9","route":"/register","tenantId":"69b2f22d2f4f8c906f6bc333","message":"Tenant registration successful","userId":"69b2f22d2f4f8c906f6bc335","schoolName":"New Test School","email":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+  console.log
+    {"timestamp":"2026-03-12T17:04:45.598Z","level":"info","message":"Email queued","emailId":1773335085598.479,"to":"newtest@school.com"}
+
+      at Object.log [as info] (middleware/errorHandler.js:10:13)
+
+PASS tests/unit/tenantRegistration.test.js
+  Tenant Registration API
+    POST /api/tenants/register
+      ✓ should register a new tenant successfully (325 ms)
+      ✓ should return 400 for invalid registration data (8 ms)
+      ✓ should return 409 for duplicate school data (308 ms)
+      ✓ should return 409 for duplicate email only (320 ms)
+      ✓ should return 409 for duplicate school code only (317 ms)
+      ✓ should return 409 for duplicate subdomain only (305 ms)
+      ✓ should handle server errors gracefully (2 ms)
+      ✓ should include request ID in all responses (286 ms)
+      ✓ should create tenant with correct subscription defaults (286 ms)
+
+  console.log
+    PDF Service - Principal Signature URL: undefined
+
+      at log (services/pdfService.js:70:25)
+
+  console.log
+    No principal signature provided in data
+
+      at log (services/pdfService.js:116:29)
+
+  console.log
+    Rendering signature section. Signature image available: false
+
+      at log (services/pdfService.js:217:25)
+
+  console.log
+    No signature image available to render
+
+      at log (services/pdfService.js:238:29)
+
+  console.log
+    PDF Service - Principal Signature URL: undefined
+
+      at log (services/pdfService.js:70:25)
+
+  console.log
+    No principal signature provided in data
+
+      at log (services/pdfService.js:116:29)
+
+  console.log
+    Rendering signature section. Signature image available: false
+
+      at log (services/pdfService.js:217:25)
+
+  console.log
+    No signature image available to render
+
+      at log (services/pdfService.js:238:29)
+
+PASS tests/unit/pdfService.test.js
+  PDF Service
+    ✓ should generate a Bonafide Certificate stream (15 ms)
+    ✓ should generate a TC stream (10 ms)
+
+Test Suites: 3 passed, 3 total
+Tests:       23 passed, 23 total
+Snapshots:   0 total
+Time:        9.959 s, estimated 10 s
+Ran all test suites.
+  console.warn
+    {"timestamp":"2026-03-12T17:04:46.419Z","level":"warn","message":"Email send failed, retrying","emailId":1773335079108.265,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a07340422sm3374785b3a.30 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+Jest did not exit one second after the test run has completed.
+
+'This usually means that there are asynchronous operations that weren't stopped in your tests. Consider running Jest with `--detectOpenHandles` to troubleshoot this issue.
+  console.warn
+    {"timestamp":"2026-03-12T17:04:47.060Z","level":"warn","message":"Email send failed, retrying","emailId":1773335084077.7964,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae247cbesm66686805ad.29 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:47.890Z","level":"warn","message":"Email send failed, retrying","emailId":1773335079400.8616,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae24aaf9sm86948865ad.32 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:48.393Z","level":"warn","message":"Email send failed, retrying","emailId":1773335084399.6633,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae24aab9sm61932125ad.30 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:49.257Z","level":"warn","message":"Email send failed, retrying","emailId":1773335079977.1184,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aec09e123dsm28113315ad.46 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:50.026Z","level":"warn","message":"Email send failed, retrying","emailId":1773335084716.2822,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a15b44f61sm669172b3a.7 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:50.854Z","level":"warn","message":"Email send failed, retrying","emailId":1773335080268.9429,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aec877fc1csm10883025ad.47 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:51.370Z","level":"warn","message":"Email send failed, retrying","emailId":1773335085021.939,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae246751sm61099325ad.23 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:52.312Z","level":"warn","message":"Email send failed, retrying","emailId":1773335077397.9146,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a0725facbsm3545679b3a.20 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:52.829Z","level":"warn","message":"Email send failed, retrying","emailId":1773335085312.5742,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aecaf25cc1sm882325ad.48 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:53.693Z","level":"warn","message":"Email send failed, retrying","emailId":1773335077679.001,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a0727c40esm3388322b3a.26 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:54.212Z","level":"warn","message":"Email send failed, retrying","emailId":1773335085598.479,"attempts":1,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aecb67dee0sm17555ad.45 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:55.061Z","level":"warn","message":"Email send failed, retrying","emailId":1773335078252.5461,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae260ea3sm62557165ad.39 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:55.586Z","level":"warn","message":"Email send failed, retrying","emailId":1773335083762.4753,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae2228easm61829465ad.3 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:56.546Z","level":"warn","message":"Email send failed, retrying","emailId":1773335078541.3145,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials 98e67ed59e1d1-35a02ffe078sm6267636a91.13 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:57.015Z","level":"warn","message":"Email send failed, retrying","emailId":1773335084077.7964,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a13a2f112sm1705133b3a.12 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:57.936Z","level":"warn","message":"Email send failed, retrying","emailId":1773335079108.265,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials 41be03b00d2f7-c73cdf24baasm5629720a12.8 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:58.382Z","level":"warn","message":"Email send failed, retrying","emailId":1773335084399.6633,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae2228f5sm60844455ad.16 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:59.414Z","level":"warn","message":"Email send failed, retrying","emailId":1773335079400.8616,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae222ee8sm62470635ad.5 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:04:59.758Z","level":"warn","message":"Email send failed, retrying","emailId":1773335084716.2822,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a07384b27sm3490242b3a.53 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:05:00.775Z","level":"warn","message":"Email send failed, retrying","emailId":1773335079977.1184,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials 41be03b00d2f7-c73cdf92ff3sm5804381a12.17 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:05:01.217Z","level":"warn","message":"Email send failed, retrying","emailId":1773335085021.939,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d2e1a72fcca58-82a07268aebsm3730215b3a.23 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:05:02.135Z","level":"warn","message":"Email send failed, retrying","emailId":1773335080268.9429,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae222dddsm83667145ad.19 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:05:02.574Z","level":"warn","message":"Email send failed, retrying","emailId":1773335085312.5742,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2aeae34de20sm59843935ad.60 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
+  console.warn
+    {"timestamp":"2026-03-12T17:05:04.152Z","level":"warn","message":"Email send failed, retrying","emailId":1773335085598.479,"attempts":2,"error":"Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to\n535 5.7.8  https://support.google.com/mail/?p=BadCredentials 98e67ed59e1d1-35a02fca40bsm8208202a91.10 - gsmtp"}
+
+      49 |         ...meta
+      50 |       };
+    > 51 |       console.warn(JSON.stringify(obj));
+         |               ^
+      52 |     } catch (e) {
+      53 |       console.error("CRASH IN WARN", e.message, "message:", message, "meta:", meta);
+      54 |       // fallback
+
+      at Object.warn (middleware/errorHandler.js:51:15)
+      at EmailService.warn [as processQueue] (services/emailService.js:90:18)
+
