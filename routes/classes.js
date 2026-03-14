@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
@@ -27,18 +26,15 @@ router.get('/', protect, async (req, res) => {
       .populate('subjects.teacher', 'name email')
       .sort({ grade: 1, name: 1 });
 
-    // Get sections and student count for each class
-    const Section = require('../models/Section');
-    const classesWithData = await Promise.all(
+    // Get student count for each class
+    const classesWithCounts = await Promise.all(
       classes.map(async (classItem) => {
-        const [sections, studentCount] = await Promise.all([
-          Section.find({ classId: classItem._id, tenantId: req.user.tenantId }).populate('sectionTeacher', 'name email'),
-          User.countDocuments({ classId: classItem._id, role: 'student' })
-        ]);
-        
+        const studentCount = await User.countDocuments({
+          classId: classItem._id,
+          role: 'student'
+        });
         return {
           ...classItem.toObject(),
-          sections,
           studentCount
         };
       })
@@ -46,7 +42,7 @@ router.get('/', protect, async (req, res) => {
 
     res.json({
       success: true,
-      data: classesWithData
+      data: classesWithCounts
     });
   } catch (error) {
     console.error('Error fetching classes:', error);
@@ -100,13 +96,7 @@ router.post('/', [
   body('name').notEmpty().withMessage('Class name is required'),
   body('grade').notEmpty().withMessage('Grade is required'),
   body('academicYear').notEmpty().withMessage('Academic year is required'),
-  body('classTeacher').optional().custom((value) => {
-    if (value && !require('mongoose').Types.ObjectId.isValid(value)) {
-      throw new Error('Invalid class teacher ID');
-    }
-    return true;
-  }),
-  body('sections').optional().isArray().withMessage('Sections must be an array')
+  body('classTeacher').isMongoId().withMessage('Valid class teacher is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -118,8 +108,7 @@ router.post('/', [
       });
     }
 
-    const { name, grade, academicYear, classTeacher, sections } = req.body;
-    const tenantId = req.user.tenantId;
+    const { name, grade, academicYear, classTeacher } = req.body;
 
     // Ensure tenantId is available
     if (!req.user || !req.user.tenantId) {
@@ -129,44 +118,24 @@ router.post('/', [
       });
     }
 
-    // Default classTeacher logic
-    let effectiveClassTeacher = classTeacher;
-    if (!effectiveClassTeacher && sections && sections.length > 0) {
-      // Use teacher of the first section if available
-      const firstSectionTeacher = sections[0].sectionTeacher;
-      if (firstSectionTeacher && require('mongoose').Types.ObjectId.isValid(firstSectionTeacher)) {
-        effectiveClassTeacher = firstSectionTeacher;
-      }
+    // Check if class teacher exists and is a teacher
+    const teacher = await User.findById(classTeacher);
+    if (!teacher || teacher.role !== 'teacher') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid class teacher'
+      });
     }
 
-    // If still no teacher, we can leave it null since we made it optional in model
     const newClass = new Class({
-      tenantId,
+      tenantId: req.user.tenantId,
       name,
       grade,
       academicYear,
-      classTeacher: effectiveClassTeacher || undefined
+      classTeacher
     });
 
     await newClass.save();
-
-    // Handle sections creation
-    if (sections && Array.isArray(sections)) {
-      const Section = require('../models/Section');
-      const sectionDocs = sections.map(sec => ({
-        tenantId,
-        classId: newClass._id,
-        name: sec.name.trim().toUpperCase(),
-        sectionTeacher: (sec.sectionTeacher && require('mongoose').Types.ObjectId.isValid(sec.sectionTeacher)) 
-          ? sec.sectionTeacher 
-          : undefined,
-        createdBy: req.user._id
-      }));
-      
-      if (sectionDocs.length > 0) {
-        await Section.insertMany(sectionDocs);
-      }
-    }
 
     const populatedClass = await Class.findById(newClass._id)
       .populate('classTeacher', 'name email');
@@ -178,9 +147,18 @@ router.post('/', [
     });
   } catch (error) {
     console.error('Error creating class:', error);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      keyPattern: error.keyPattern,
+      keyValue: error.keyValue,
+      errors: error.errors
+    });
     res.status(500).json({
       success: false,
-      message: error.message || 'Server error'
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -192,13 +170,7 @@ router.put('/:id', [
   body('name').optional().notEmpty().withMessage('Class name cannot be empty'),
   body('grade').optional().notEmpty().withMessage('Grade cannot be empty'),
   body('academicYear').optional().notEmpty().withMessage('Academic year cannot be empty'),
-  body('classTeacher').optional().custom((value) => {
-    if (value && !require('mongoose').Types.ObjectId.isValid(value)) {
-      throw new Error('Invalid class teacher ID');
-    }
-    return true;
-  }),
-  body('sections').optional().isArray().withMessage('Sections must be an array')
+  body('classTeacher').optional().isMongoId().withMessage('Valid class teacher is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -210,21 +182,22 @@ router.put('/:id', [
       });
     }
 
-    const { name, grade, academicYear, classTeacher, sections } = req.body;
-    const tenantId = req.user.tenantId;
+    const { name, grade, academicYear, classTeacher } = req.body;
 
-    // Default classTeacher logic if not provided and sections are provided
-    let effectiveClassTeacher = classTeacher;
-    if (!effectiveClassTeacher && sections && sections.length > 0) {
-      const firstSectionTeacher = sections[0].sectionTeacher;
-      if (firstSectionTeacher && require('mongoose').Types.ObjectId.isValid(firstSectionTeacher)) {
-        effectiveClassTeacher = firstSectionTeacher;
+    // Check if class teacher exists and is a teacher (if provided)
+    if (classTeacher) {
+      const teacher = await User.findById(classTeacher);
+      if (!teacher || teacher.role !== 'teacher') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid class teacher'
+        });
       }
     }
 
     const updatedClass = await Class.findByIdAndUpdate(
       req.params.id,
-      { name, grade, academicYear, classTeacher: effectiveClassTeacher },
+      { name, grade, academicYear, classTeacher },
       { new: true, runValidators: true }
     ).populate('classTeacher', 'name email');
 
@@ -233,41 +206,6 @@ router.put('/:id', [
         success: false,
         message: 'Class not found'
       });
-    }
-
-    // Handle sections sync
-    if (sections && Array.isArray(sections)) {
-      const Section = require('../models/Section');
-      
-      // Get existing sections to identify which ones to remove/update
-      const existingSections = await Section.find({ classId: updatedClass._id, tenantId });
-      const existingIds = existingSections.map(s => s._id.toString());
-      const incomingIds = sections.filter(s => s._id).map(s => s._id.toString());
-      
-      // Remove sections not in incoming list
-      await Section.deleteMany({
-        classId: updatedClass._id,
-        tenantId,
-        _id: { $in: existingIds.filter(id => !incomingIds.includes(id)) }
-      });
-      
-      // Update/Create incoming sections
-      for (const sec of sections) {
-        const sectionData = {
-          name: sec.name.trim().toUpperCase(),
-          sectionTeacher: (sec.sectionTeacher && require('mongoose').Types.ObjectId.isValid(sec.sectionTeacher)) 
-            ? sec.sectionTeacher 
-            : undefined,
-          tenantId,
-          classId: updatedClass._id
-        };
-        
-        if (sec._id && require('mongoose').Types.ObjectId.isValid(sec._id)) {
-          await Section.findByIdAndUpdate(sec._id, sectionData);
-        } else {
-          await Section.create({ ...sectionData, createdBy: req.user._id });
-        }
-      }
     }
 
     res.json({
@@ -279,7 +217,7 @@ router.put('/:id', [
     console.error('Error updating class:', error);
     res.status(500).json({
       success: false,
-      message: error.message || 'Server error'
+      message: 'Server error'
     });
   }
 });
