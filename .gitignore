@@ -1,1 +1,6 @@
 node_modules/
+config.env
+.env
+*.env.local
+test_output.log
+uploads/
