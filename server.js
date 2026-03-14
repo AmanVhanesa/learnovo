@@ -31,62 +31,52 @@ const app = express();
 // Request ID middleware (must be first)
 app.use(requestIdMiddleware);
 
-// Security middleware
+// ── CORS configuration (MUST come before helmet and all other middleware) ───
+const allowedOrigins = [
+  'https://learnovoapp.vercel.app',
+  ...(process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+    : []),
+  // Local development origins
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, same-origin)
+    if (!origin) return callback(null, true);
+    // Allow if origin is in the allowed list
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    // In development, allow any localhost
+    if (process.env.NODE_ENV !== 'production' &&
+        (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+      return callback(null, true);
+    }
+    console.warn(`CORS blocked origin: ${origin}. Allowed:`, allowedOrigins);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['X-Request-ID'],
+  maxAge: 86400, // Cache preflight for 24 hours
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+};
+
+// Handle preflight OPTIONS for ALL routes before anything else
+app.options('*', cors(corsOptions));
+// Apply CORS to all requests
+app.use(cors(corsOptions));
+
+// Security middleware (AFTER CORS so headers aren't stripped)
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 app.use(compression());
-
-// Rate limiting (DISABLED for troubleshooting)
-// if (process.env.NODE_ENV === 'production') {
-//   const limiter = rateLimit({
-//     windowMs: 15 * 60 * 1000,
-//     limit: 10000, // Increased
-//     standardHeaders: true,
-//     legacyHeaders: false
-//   });
-//   app.use(limiter);
-// }
-
-// CORS configuration
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : (process.env.NODE_ENV === 'production'
-    ? []
-    : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173']);
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests, or same-origin)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    // In development, be more permissive
-    if (process.env.NODE_ENV !== 'production') {
-      // Allow localhost on any port
-      if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('0.0.0.0')) {
-        return callback(null, true);
-      }
-    }
-
-    // Check against allowed origins list
-    // TEMPORARY FIX: Allow all for troubleshooting connection
-    callback(null, true);
-    /*
-    if (allowedOrigins.length === 0 || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.warn(`CORS blocked origin: ${origin}. Allowed:`, allowedOrigins);
-      callback(new Error('Not allowed by CORS'));
-    }
-    */
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['X-Request-ID']
-}));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
