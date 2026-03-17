@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { Eye, EyeOff } from 'lucide-react'
 
 const Login = () => {
@@ -14,6 +15,8 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false)
 
   const { login, isAuthenticated, isLoading: authLoading, error, clearError, user } = useAuth()
+  const { theme } = useTheme()
+  const isDark = theme?.mode === 'dark'
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -108,12 +111,12 @@ const Login = () => {
         {/* Logo top-left */}
         <div className="flex items-center gap-3 relative z-10">
           <img src="/logo-icon.png" alt="Learnovo" className="h-10 w-10 object-contain drop-shadow-md" />
-          <span className="text-2xl font-bold tracking-tight">Learnovo</span>
+          <span className="text-2xl font-bold tracking-tight text-white">Learnovo</span>
         </div>
 
         {/* Center tagline */}
         <div className="relative z-10">
-          <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-4">
+          <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-4 text-white">
             Manage your<br />school smarter.
           </h1>
           <p className="text-white/75 text-lg leading-relaxed max-w-sm">
@@ -137,32 +140,32 @@ const Login = () => {
 
       {/* ── RIGHT FORM PANEL ── */}
       <div
-        className="flex-1 flex flex-col justify-center items-center px-6 py-12 sm:px-12"
-        style={{ background: 'linear-gradient(150deg, #f8fffd 0%, #f0faf8 40%, #eaf6f6 100%)' }}
+        className="flex-1 flex flex-col justify-center items-center px-4 sm:px-6 md:px-12 py-8 sm:py-12"
+        style={isDark ? { background: '#000000' } : { background: 'linear-gradient(150deg, #f8fffd 0%, #f0faf8 40%, #eaf6f6 100%)' }}
       >
 
         {/* Mobile-only logo */}
         <div className="flex lg:hidden items-center gap-2 mb-8">
           <img src="/logo-icon.png" alt="Learnovo" className="h-9 w-9 object-contain" />
-          <span className="text-xl font-bold text-gray-900">Learnovo</span>
+          <span className="text-xl font-bold text-gray-900 dark:text-white">Learnovo</span>
         </div>
 
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-[400px]">
 
           {/* Card wrapper */}
-          <div className="bg-white rounded-2xl shadow-lg shadow-teal-100/60 border border-white/80 px-8 py-8">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-lg shadow-teal-100/60 dark:shadow-black/20 border border-white/80 dark:border-[#38383A] px-5 sm:px-8 py-6 sm:py-8">
 
             {/* Heading */}
             <div className="mb-7">
-              <h2 className="text-3xl font-bold text-gray-900 mb-1">Welcome back</h2>
-              <p className="text-gray-400 text-sm">Sign in to your school account</p>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">Welcome back</h2>
+              <p className="text-gray-400 dark:text-[#8E8E93] text-sm">Sign in to your school account</p>
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
 
               {/* School Code */}
               <div>
-                <label htmlFor="schoolCode" className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="schoolCode" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">
                   School Code
                 </label>
                 <input
@@ -178,7 +181,7 @@ const Login = () => {
 
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">
                   Email or Admission Number
                 </label>
                 <input
@@ -192,14 +195,14 @@ const Login = () => {
                   className="input"
                   placeholder="Enter email or admission number"
                 />
-                <p className="mt-1.5 text-xs text-gray-400">
+                <p className="mt-1.5 text-xs text-gray-400 dark:text-[#636366]">
                   Students can login with their admission number if email is unavailable.
                 </p>
               </div>
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">
                   Password
                 </label>
                 <div className="relative">
@@ -216,7 +219,7 @@ const Login = () => {
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-[#636366] hover:text-gray-600 dark:hover:text-white transition-colors"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -232,17 +235,17 @@ const Login = () => {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded cursor-pointer"
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-[#38383A] dark:bg-[#1C1C1E] rounded cursor-pointer"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600 cursor-pointer">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600 dark:text-[#8E8E93] cursor-pointer">
                   Remember my email and school code
                 </label>
               </div>
 
               {/* Error */}
               {error && (
-                <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
-                  <p className="text-sm font-medium text-red-700">{error}</p>
+                <div className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-4 py-3">
+                  <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
                 </div>
               )}
 
@@ -250,7 +253,7 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 rounded-xl text-base font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                className="w-full py-3 rounded-xl text-base font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 dark:hover:shadow-teal-900/40 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
                 style={{ background: 'linear-gradient(135deg, #1a9090 0%, #0d7070 60%, #0a5f5f 100%)' }}
               >
                 {isLoading ? (
@@ -266,20 +269,20 @@ const Login = () => {
           <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-100" />
+                <div className="w-full border-t border-gray-200 dark:border-[#38383A]" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-white px-3 text-gray-400 uppercase tracking-wider font-medium">Demo Access</span>
+                <span className="bg-white dark:bg-[#000000] px-3 text-gray-400 dark:text-[#636366] uppercase tracking-wider font-medium">Demo Access</span>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-4 gap-2">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
               {['admin', 'teacher', 'student', 'parent'].map((role) => (
                 <button
                   key={role}
                   type="button"
                   onClick={() => handleDemoLogin(role)}
-                  className="text-xs py-2 px-1 rounded-lg border border-gray-200 text-gray-500 font-medium capitalize hover:border-teal-300 hover:text-teal-700 hover:bg-teal-50 transition-all duration-150"
+                  className="text-xs py-2 px-1 rounded-lg border border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] font-medium capitalize hover:border-teal-300 dark:hover:border-teal-700 hover:text-teal-700 dark:hover:text-[#3EC4B1] hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-all duration-150"
                 >
                   {role}
                 </button>

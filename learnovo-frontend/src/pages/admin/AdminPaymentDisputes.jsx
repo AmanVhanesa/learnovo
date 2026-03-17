@@ -52,10 +52,10 @@ const AdminPaymentDisputes = () => {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-8 animate-fade-in text-gray-900">
+        <div className="p-6 max-w-7xl mx-auto space-y-8 animate-fade-in text-gray-900 dark:text-white">
             <div>
                 <h1 className="text-3xl font-bold">Payment Disputes & Alerts</h1>
-                <p className="text-gray-500 mt-2">Manage student payment claims and monitor stuck transactions.</p>
+                <p className="text-gray-500 dark:text-[#8E8E93] mt-2">Manage student payment claims and monitor stuck transactions.</p>
             </div>
 
             {isLoading ? (
@@ -64,31 +64,31 @@ const AdminPaymentDisputes = () => {
                 <>
                     {/* Stuck Payments Warning Section */}
                     {stuckPayments.length > 0 && (
-                        <div className="bg-red-50 border border-red-200 rounded-xl overflow-hidden shadow-sm">
-                            <div className="bg-red-100 p-4 border-b border-red-200 flex gap-3 items-center">
-                                <AlertCircle className="h-5 w-5 text-red-700" />
-                                <h2 className="font-bold text-red-900">System Alert: Payments Stuck Processing (&gt;1hr)</h2>
+                        <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40 rounded-xl overflow-hidden shadow-sm">
+                            <div className="bg-red-100 dark:bg-red-900/20 p-4 border-b border-red-200 dark:border-red-800/40 flex gap-3 items-center">
+                                <AlertCircle className="h-5 w-5 text-red-700 dark:text-red-400" />
+                                <h2 className="font-bold text-red-900 dark:text-red-300">System Alert: Payments Stuck Processing (&gt;1hr)</h2>
                                 <span className="ml-auto bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{stuckPayments.length} limits</span>
                             </div>
                             <div className="p-0">
-                                <table className="w-full text-left text-sm bg-white">
-                                    <thead className="text-red-800 bg-red-50/50">
+                                <table className="w-full text-left text-sm bg-white dark:bg-[#1C1C1E]">
+                                    <thead className="text-red-800 dark:text-red-400 bg-red-50/50 dark:bg-red-900/10">
                                         <tr>
-                                            <th className="px-6 py-3 border-b border-red-100">Student</th>
-                                            <th className="px-6 py-3 border-b border-red-100">Invoice ID</th>
-                                            <th className="px-6 py-3 border-b border-red-100">Attempt ID</th>
-                                            <th className="px-6 py-3 border-b border-red-100">Amount</th>
-                                            <th className="px-6 py-3 border-b border-red-100">Started</th>
+                                            <th className="px-6 py-3 border-b border-red-100 dark:border-red-800/30">Student</th>
+                                            <th className="px-6 py-3 border-b border-red-100 dark:border-red-800/30">Invoice ID</th>
+                                            <th className="px-6 py-3 border-b border-red-100 dark:border-red-800/30">Attempt ID</th>
+                                            <th className="px-6 py-3 border-b border-red-100 dark:border-red-800/30">Amount</th>
+                                            <th className="px-6 py-3 border-b border-red-100 dark:border-red-800/30">Started</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-red-100">
+                                    <tbody className="divide-y divide-red-100 dark:divide-red-800/30">
                                         {stuckPayments.map(p => (
-                                            <tr key={p._id} className="hover:bg-red-50/20">
-                                                <td className="px-6 py-3 font-medium">{p.studentId?.fullName}</td>
-                                                <td className="px-6 py-3 font-mono text-xs">{p.invoiceId?.invoiceNumber}</td>
-                                                <td className="px-6 py-3 font-mono text-xs text-gray-500">{p._id}</td>
-                                                <td className="px-6 py-3 font-medium text-red-700">₹{p.amount}</td>
-                                                <td className="px-6 py-3 text-red-600 flex items-center gap-1">
+                                            <tr key={p._id} className="hover:bg-red-50/20 dark:hover:bg-red-900/10">
+                                                <td className="px-6 py-3 font-medium text-gray-900 dark:text-white">{p.studentId?.fullName}</td>
+                                                <td className="px-6 py-3 font-mono text-xs text-gray-700 dark:text-[#8E8E93]">{p.invoiceId?.invoiceNumber}</td>
+                                                <td className="px-6 py-3 font-mono text-xs text-gray-500 dark:text-[#8E8E93]">{p._id}</td>
+                                                <td className="px-6 py-3 font-medium text-red-700 dark:text-red-400">₹{p.amount}</td>
+                                                <td className="px-6 py-3 text-red-600 dark:text-red-400 flex items-center gap-1">
                                                     <Clock className="w-3 h-3" />
                                                     {new Date(p.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </td>
@@ -101,13 +101,13 @@ const AdminPaymentDisputes = () => {
                     )}
 
                     {/* Active Disputes Section */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                            <h2 className="text-lg font-bold">Active Student Claims</h2>
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden">
+                        <div className="p-5 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center bg-gray-50/50 dark:bg-[#2C2C2E]">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Active Student Claims</h2>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm whitespace-nowrap">
-                                <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-200">
+                                <thead className="bg-gray-50 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] font-medium border-b border-gray-200 dark:border-[#38383A]">
                                     <tr>
                                         <th className="px-6 py-4">Date</th>
                                         <th className="px-6 py-4">Student</th>
@@ -117,22 +117,22 @@ const AdminPaymentDisputes = () => {
                                         <th className="px-6 py-4 text-right">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
                                     {disputes.length === 0 && (
-                                        <tr><td colSpan="6" className="px-6 py-10 text-center text-gray-500">No active disputes to review.</td></tr>
+                                        <tr><td colSpan="6" className="px-6 py-10 text-center text-gray-500 dark:text-[#8E8E93]">No active disputes to review.</td></tr>
                                     )}
                                     {disputes.map(dispute => (
-                                        <tr key={dispute._id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4">{new Date(dispute.createdAt).toLocaleDateString()}</td>
+                                        <tr key={dispute._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
+                                            <td className="px-6 py-4 text-gray-700 dark:text-[#8E8E93]">{new Date(dispute.createdAt).toLocaleDateString()}</td>
                                             <td className="px-6 py-4">
-                                                <p className="font-medium text-gray-900">{dispute.studentId?.fullName}</p>
-                                                <p className="text-xs text-gray-500">{dispute.studentId?.email}</p>
+                                                <p className="font-medium text-gray-900 dark:text-white">{dispute.studentId?.fullName}</p>
+                                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{dispute.studentId?.email}</p>
                                             </td>
-                                            <td className="px-6 py-4 font-mono text-xs">{dispute.transactionId || dispute.bankReferenceNumber}</td>
-                                            <td className="px-6 py-4 font-medium text-orange-600">₹{dispute.amount}</td>
+                                            <td className="px-6 py-4 font-mono text-xs text-gray-600 dark:text-[#8E8E93]">{dispute.transactionId || dispute.bankReferenceNumber}</td>
+                                            <td className="px-6 py-4 font-medium text-orange-600 dark:text-orange-400">₹{dispute.amount}</td>
                                             <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded text-xs font-semibold ${dispute.invoiceId?.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                    dispute.invoiceId?.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-gray-100'
+                                                <span className={`px-2 py-1 rounded text-xs font-semibold ${dispute.invoiceId?.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                                                    dispute.invoiceId?.status === 'Paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-100 dark:bg-[#2C2C2E] dark:text-[#8E8E93]'
                                                     }`}>
                                                     {dispute.invoiceId?.status || 'Unknown'}
                                                 </span>
@@ -140,7 +140,7 @@ const AdminPaymentDisputes = () => {
                                             <td className="px-6 py-4 text-right">
                                                 <button
                                                     onClick={() => setResolveModal({ isOpen: true, dispute })}
-                                                    className="px-4 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+                                                    className="px-4 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors"
                                                 >
                                                     Review & Resolve
                                                 </button>
@@ -156,56 +156,56 @@ const AdminPaymentDisputes = () => {
 
             {/* RESOLVE MODAL */}
             {resolveModal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in text-gray-900">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-                        <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                            <h2 className="text-xl font-bold">Resolve Dispute Claim</h2>
-                            <button onClick={() => setResolveModal({ isOpen: false, dispute: null })} className="p-2 hover:bg-gray-200 rounded-full">
-                                <XCircle className="h-5 w-5 text-gray-500" />
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in text-gray-900 dark:text-white">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Resolve Dispute Claim</h2>
+                            <button onClick={() => setResolveModal({ isOpen: false, dispute: null })} className="p-2 hover:bg-gray-200 dark:hover:bg-[#2C2C2E] rounded-full">
+                                <XCircle className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-5 bg-gray-50/30">
+                        <div className="p-6 space-y-5 bg-gray-50/30 dark:bg-[#2C2C2E]/30">
                             <div>
-                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Student's Explanation</h3>
-                                <p className="text-sm p-4 bg-white border border-gray-200 rounded-xl italic">"{resolveModal.dispute.studentNote}"</p>
+                                <h3 className="text-xs font-bold text-gray-500 dark:text-[#8E8E93] uppercase tracking-widest mb-1">Student's Explanation</h3>
+                                <p className="text-sm p-4 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl italic text-gray-700 dark:text-[#8E8E93]">"{resolveModal.dispute.studentNote}"</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div className="p-3 bg-white border border-gray-100 rounded-lg">
-                                    <span className="text-gray-500 block mb-1">Claimed Amount</span>
-                                    <span className="font-bold text-lg">₹{resolveModal.dispute.amount}</span>
+                                <div className="p-3 bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-lg">
+                                    <span className="text-gray-500 dark:text-[#8E8E93] block mb-1">Claimed Amount</span>
+                                    <span className="font-bold text-lg text-gray-900 dark:text-white">₹{resolveModal.dispute.amount}</span>
                                 </div>
-                                <div className="p-3 bg-white border border-gray-100 rounded-lg">
-                                    <span className="text-gray-500 block mb-1">Invoice Total</span>
-                                    <span className="font-bold text-lg">₹{resolveModal.dispute.invoiceId?.totalAmount}</span>
+                                <div className="p-3 bg-white dark:bg-[#1C1C1E] border border-gray-100 dark:border-[#38383A] rounded-lg">
+                                    <span className="text-gray-500 dark:text-[#8E8E93] block mb-1">Invoice Total</span>
+                                    <span className="font-bold text-lg text-gray-900 dark:text-white">₹{resolveModal.dispute.invoiceId?.totalAmount}</span>
                                 </div>
                             </div>
                         </div>
 
-                        <form onSubmit={handleResolve} className="p-6 border-t border-gray-100 space-y-4">
+                        <form onSubmit={handleResolve} className="p-6 border-t border-gray-100 dark:border-[#38383A] space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Resolution Action *</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Resolution Action *</label>
                                 <div className="flex gap-4">
-                                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 border rounded-xl cursor-pointer transition-colors ${resolveForm.action === 'APPROVE' ? 'bg-green-50 border-green-500 text-green-700' : 'hover:bg-gray-50 border-gray-200 text-gray-600'}`}>
+                                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 border rounded-xl cursor-pointer transition-colors ${resolveForm.action === 'APPROVE' ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-700 dark:text-green-400' : 'hover:bg-gray-50 dark:hover:bg-[#2C2C2E] border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93]'}`}>
                                         <input type="radio" name="action" value="APPROVE" className="hidden" checked={resolveForm.action === 'APPROVE'} onChange={(e) => setResolveForm({ ...resolveForm, action: 'APPROVE' })} />
                                         <CheckCircle className="h-5 w-5" />
                                         <span className="font-bold">Approve Claim</span>
                                     </label>
-                                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 border rounded-xl cursor-pointer transition-colors ${resolveForm.action === 'REJECT' ? 'bg-red-50 border-red-500 text-red-700' : 'hover:bg-gray-50 border-gray-200 text-gray-600'}`}>
+                                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 border rounded-xl cursor-pointer transition-colors ${resolveForm.action === 'REJECT' ? 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-700 dark:text-red-400' : 'hover:bg-gray-50 dark:hover:bg-[#2C2C2E] border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93]'}`}>
                                         <input type="radio" name="action" value="REJECT" className="hidden" checked={resolveForm.action === 'REJECT'} onChange={(e) => setResolveForm({ ...resolveForm, action: 'REJECT' })} />
                                         <XCircle className="h-5 w-5" />
                                         <span className="font-bold">Reject Claim</span>
                                     </label>
                                 </div>
-                                {resolveForm.action === 'APPROVE' && <p className="text-xs text-green-600 mt-2">Approving this will instantly mark the invoice as Paid matching the attempt amount.</p>}
+                                {resolveForm.action === 'APPROVE' && <p className="text-xs text-green-600 dark:text-green-400 mt-2">Approving this will instantly mark the invoice as Paid matching the attempt amount.</p>}
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Admin Response Note *</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Admin Response Note *</label>
                                 <textarea
                                     required rows="3"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow bg-white dark:bg-[#1C1C1E] dark:text-white"
                                     placeholder="e.g. Verified with bank statement matching UTR."
                                     value={resolveForm.note}
                                     onChange={(e) => setResolveForm({ ...resolveForm, note: e.target.value })}
@@ -213,7 +213,7 @@ const AdminPaymentDisputes = () => {
                             </div>
 
                             <div className="pt-2 flex justify-end gap-3">
-                                <button type="button" onClick={() => setResolveModal({ isOpen: false, dispute: null })} className="px-4 py-2 font-medium text-gray-600 hover:bg-gray-100 rounded-xl">Cancel</button>
+                                <button type="button" onClick={() => setResolveModal({ isOpen: false, dispute: null })} className="px-4 py-2 font-medium text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-xl">Cancel</button>
                                 <button type="submit" disabled={isSubmitting} className="px-6 py-2 font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm disabled:opacity-50">
                                     {isSubmitting ? 'Saving...' : 'Confirm Resolution'}
                                 </button>

@@ -164,7 +164,7 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                             placeholder="Search students..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                         />
                     </div>
                 </div>
@@ -173,7 +173,7 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                 <select
                     value={subDepartmentFilter}
                     onChange={(e) => setSubDepartmentFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                    className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white text-sm"
                 >
                     <option value="">All Sub-Depts</option>
                     {subDepartments.map(sd => (
@@ -183,7 +183,7 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                 <select
                     value={driverFilter}
                     onChange={(e) => setDriverFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                    className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white text-sm"
                 >
                     <option value="">All Drivers</option>
                     {drivers.map(d => (
@@ -193,7 +193,7 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                 <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                    className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white text-sm"
                 >
                     <option value="all">All Status</option>
                     <option value="active">Active</option>
@@ -202,7 +202,7 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                 <button
                     onClick={handleExport}
                     disabled={exporting}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] text-sm"
                 >
                     <Download className="w-4 h-4" />
                     {exporting ? 'Exporting...' : 'Export List'}
@@ -220,13 +220,13 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                 loading ? (
                     <div className="text-center py-12">
                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                        <p className="mt-2 text-gray-600">Loading assignments...</p>
+                        <p className="mt-2 text-gray-600 dark:text-[#8E8E93]">Loading assignments...</p>
                     </div>
                 ) : assignments.length === 0 ? (
                     <div className="text-center py-12">
                         <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No student assignments found</h3>
-                        <p className="text-gray-600 mb-4">Get started by assigning students to routes</p>
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No student assignments found</h3>
+                        <p className="text-gray-600 dark:text-[#8E8E93] mb-4">Get started by assigning students to routes</p>
                         <button
                             onClick={handleAddAssignment}
                             className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -237,37 +237,37 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                        <table className="min-w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
+                            <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stop</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transport Type</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monthly Fee</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Student</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Route</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Stop</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Transport Type</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Monthly Fee</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Status</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
                                 {assignments.map((assignment) => (
-                                    <tr key={assignment._id} className="hover:bg-gray-50">
+                                    <tr key={assignment._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div>
-                                                <div className="text-sm font-medium text-gray-900">
+                                                <div className="text-sm font-medium text-gray-900 dark:text-white">
                                                     {assignment.student?.name || 'Unknown'}
                                                 </div>
-                                                <div className="text-sm text-gray-500">
+                                                <div className="text-sm text-gray-500 dark:text-[#8E8E93]">
                                                     {assignment.student?.admissionNumber || 'N/A'}
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">
+                                            <div className="text-sm text-gray-900 dark:text-white">
                                                 {assignment.route?.routeName || 'N/A'}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                             {assignment.stop}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -275,7 +275,7 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                                                 {assignment.transportType}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                             ₹{assignment.monthlyFee}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -372,12 +372,12 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                         {assignment ? 'Edit Student Assignment' : 'Assign Student to Route'}
                     </h2>
-                    <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
+                    <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600 dark:text-[#8E8E93]">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -385,14 +385,14 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                 <form onSubmit={handleSubmit} className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Student *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Student *</label>
                             <select
                                 name="student"
                                 value={formData.student}
                                 onChange={handleChange}
                                 required
                                 disabled={!!assignment}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white disabled:bg-gray-100 dark:disabled:bg-[#2C2C2E]"
                             >
                                 <option value="">Select Student</option>
                                 {students.map(student => (
@@ -404,13 +404,13 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Route *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Route *</label>
                             <select
                                 name="route"
                                 value={formData.route}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="">Select Route</option>
                                 {routes.map(route => (
@@ -423,13 +423,13 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
 
                         {selectedRoute && selectedRoute.stops && (
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Stop *</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Stop *</label>
                                 <select
                                     name="stop"
                                     value={formData.stop}
                                     onChange={handleChange}
                                     required
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                                 >
                                     <option value="">Select Stop</option>
                                     {selectedRoute.stops.map((stop, index) => (
@@ -442,13 +442,13 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                         )}
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Transport Type *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Transport Type *</label>
                             <select
                                 name="transportType"
                                 value={formData.transportType}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="Both">Both (Pickup & Drop)</option>
                                 <option value="Pickup Only">Pickup Only</option>
@@ -457,7 +457,7 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Academic Year *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Academic Year *</label>
                             <input
                                 type="text"
                                 name="academicYear"
@@ -465,12 +465,12 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                                 onChange={handleChange}
                                 required
                                 placeholder="e.g., 2024"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Monthly Fee *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Monthly Fee *</label>
                             <input
                                 type="number"
                                 name="monthlyFee"
@@ -479,19 +479,19 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                                 required
                                 min="0"
                                 placeholder="₹"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Start Date *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Start Date *</label>
                             <input
                                 type="date"
                                 name="startDate"
                                 value={formData.startDate}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
                     </div>
@@ -501,7 +501,7 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                         <button
                             type="button"
                             onClick={() => onClose(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                            className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
                         >
                             Cancel
                         </button>

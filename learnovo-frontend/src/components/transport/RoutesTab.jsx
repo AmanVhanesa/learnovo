@@ -99,7 +99,7 @@ const RoutesTab = ({ onStatsUpdate }) => {
                             placeholder="Search routes..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                         />
                     </div>
                 </div>
@@ -107,7 +107,7 @@ const RoutesTab = ({ onStatsUpdate }) => {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                     >
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
@@ -127,13 +127,13 @@ const RoutesTab = ({ onStatsUpdate }) => {
             {loading ? (
                 <div className="text-center py-12">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                    <p className="mt-2 text-gray-600">Loading routes...</p>
+                    <p className="mt-2 text-gray-600 dark:text-[#8E8E93]">Loading routes...</p>
                 </div>
             ) : routes.length === 0 ? (
                 <div className="text-center py-12">
                     <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No routes found</h3>
-                    <p className="text-gray-600 mb-4">Get started by adding your first route</p>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No routes found</h3>
+                    <p className="text-gray-600 dark:text-[#8E8E93] mb-4">Get started by adding your first route</p>
                     <button
                         onClick={handleAddRoute}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -144,45 +144,45 @@ const RoutesTab = ({ onStatsUpdate }) => {
                 </div>
             ) : (
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <table className="min-w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
+                        <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stops</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Driver</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fee</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Route</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Stops</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Vehicle</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Driver</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Fee</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
                             {routes.map((route) => (
-                                <tr key={route._id} className="hover:bg-gray-50">
+                                <tr key={route._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div>
-                                            <div className="text-sm font-medium text-gray-900">{route.routeName}</div>
-                                            <div className="text-sm text-gray-500">{route.routeId}</div>
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white">{route.routeName}</div>
+                                            <div className="text-sm text-gray-500 dark:text-[#8E8E93]">{route.routeId}</div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                         {route.stops?.length || 0} stops
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {route.assignedVehicle ? (
-                                            <div className="text-sm text-gray-900">{route.assignedVehicle.vehicleNumber}</div>
+                                            <div className="text-sm text-gray-900 dark:text-white">{route.assignedVehicle.vehicleNumber}</div>
                                         ) : (
-                                            <span className="text-sm text-gray-500">Not assigned</span>
+                                            <span className="text-sm text-gray-500 dark:text-[#8E8E93]">Not assigned</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {route.assignedDriver ? (
-                                            <div className="text-sm text-gray-900">{route.assignedDriver.name}</div>
+                                            <div className="text-sm text-gray-900 dark:text-white">{route.assignedDriver.name}</div>
                                         ) : (
-                                            <span className="text-sm text-gray-500">Not assigned</span>
+                                            <span className="text-sm text-gray-500 dark:text-[#8E8E93]">Not assigned</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                         ₹{route.monthlyFee}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
@@ -297,12 +297,12 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                         {route ? 'Edit Route' : 'Add New Route'}
                     </h2>
-                    <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
+                    <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600 dark:text-[#8E8E93]">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -311,11 +311,11 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Route Information */}
                         <div className="md:col-span-2">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">Route Information</h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Route Information</h3>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Route Name *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Route Name *</label>
                             <input
                                 type="text"
                                 name="routeName"
@@ -323,12 +323,12 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                                 onChange={handleChange}
                                 required
                                 placeholder="e.g., Route A - City Center"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Monthly Fee *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Monthly Fee *</label>
                             <input
                                 type="number"
                                 name="monthlyFee"
@@ -337,12 +337,12 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                                 required
                                 min="0"
                                 placeholder="₹"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Distance (km)</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Distance (km)</label>
                             <input
                                 type="number"
                                 name="distance"
@@ -350,29 +350,29 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                                 onChange={handleChange}
                                 min="0"
                                 step="0.1"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Duration (minutes)</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Estimated Duration (minutes)</label>
                             <input
                                 type="number"
                                 name="estimatedDuration"
                                 value={formData.estimatedDuration}
                                 onChange={handleChange}
                                 min="0"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Vehicle</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Assigned Vehicle</label>
                             <select
                                 name="assignedVehicle"
                                 value={formData.assignedVehicle}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="">No Vehicle Assigned</option>
                                 {vehicles.map(vehicle => (
@@ -384,12 +384,12 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Driver</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Assigned Driver</label>
                             <select
                                 name="assignedDriver"
                                 value={formData.assignedDriver}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="">No Driver Assigned</option>
                                 {drivers.map(driver => (
@@ -403,7 +403,7 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                         {/* Stops */}
                         <div className="md:col-span-2 mt-4">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-medium text-gray-900">Route Stops (minimum 2)</h3>
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Route Stops (minimum 2)</h3>
                                 <button
                                     type="button"
                                     onClick={addStop}
@@ -416,7 +416,7 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                         </div>
 
                         {formData.stops.map((stop, index) => (
-                            <div key={index} className="md:col-span-2 border border-gray-200 rounded-lg p-4 relative">
+                            <div key={index} className="md:col-span-2 border border-gray-200 dark:border-[#38383A] rounded-lg p-4 relative">
                                 <div className="absolute top-2 right-2">
                                     {formData.stops.length > 2 && (
                                         <button
@@ -430,7 +430,7 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                                             Stop {index + 1} Name *
                                         </label>
                                         <input
@@ -439,35 +439,35 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                                             onChange={(e) => handleStopChange(index, 'stopName', e.target.value)}
                                             required
                                             placeholder="e.g., Main Square"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Landmark</label>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Landmark</label>
                                         <input
                                             type="text"
                                             value={stop.landmark}
                                             onChange={(e) => handleStopChange(index, 'landmark', e.target.value)}
                                             placeholder="e.g., Near City Mall"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Pickup Time</label>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Pickup Time</label>
                                         <input
                                             type="time"
                                             value={stop.pickupTime}
                                             onChange={(e) => handleStopChange(index, 'pickupTime', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Drop Time</label>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Drop Time</label>
                                         <input
                                             type="time"
                                             value={stop.dropTime}
                                             onChange={(e) => handleStopChange(index, 'dropTime', e.target.value)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                                         />
                                     </div>
                                 </div>
@@ -480,7 +480,7 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
                         <button
                             type="button"
                             onClick={() => onClose(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                            className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
                         >
                             Cancel
                         </button>

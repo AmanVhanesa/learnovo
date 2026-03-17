@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Menu, Search, LogOut, Settings, ChevronDown } from 'lucide-react'
+import { Menu, Search, LogOut, Settings, ChevronDown, Sun, Moon } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
+import { useUserDisplay } from '../hooks/useUserDisplay'
+import { useClickOutside } from '../hooks/useClickOutside'
 import NotificationBell from './NotificationBell'
-
-const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')
+import UserAvatar from './UserAvatar'
 
 const PAGE_TITLES = {
   '/app/dashboard': 'Dashboard',
@@ -24,18 +26,33 @@ const PAGE_TITLES = {
   '/app/transport': 'Transport',
   '/app/communication': 'Communication',
   '/app/certificates': 'Certificates',
+  '/app/certificates/generate': 'Certificates > Generate',
+  '/app/certificates/templates': 'Certificates > Templates',
   '/app/payroll': 'Payroll',
+  '/app/assignments': 'Assignments',
+  '/app/expenses': 'Expenses',
 }
 
 const Header = ({ onToggleSidebar }) => {
   const { user, logout } = useAuth()
+  const { theme, toggleMode } = useTheme()
+  const { photoUrl, displayName, initials, role } = useUserDisplay()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
   const dropdownRef = useRef(null)
 
+  useClickOutside(dropdownRef, useCallback(() => setProfileOpen(false), []))
+
   const pageTitle = PAGE_TITLES[location.pathname] || 'Dashboard'
+
+  // Clear search when navigating away from search page
+  useEffect(() => {
+    if (!location.pathname.includes('/search')) {
+      setSearchQuery('')
+    }
+  }, [location.pathname])
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -49,55 +66,48 @@ const Header = ({ onToggleSidebar }) => {
     navigate('/login')
   }
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setProfileOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const photoUrl = (user?.avatar || user?.photo)
-    ? ((user.avatar || user.photo).startsWith('http') ? (user.avatar || user.photo) : `${SERVER_URL}${user.avatar || user.photo}`)
-    : null
-
-  const displayName = user?.fullName || user?.name || ''
-  const initials = displayName.charAt(0)?.toUpperCase() || '?'
-
   return (
-    <header className="bg-white shadow-sm border-b border-gray-200">
+    <header className="bg-white/95 dark:bg-[#000000] backdrop-blur-xl border-b border-gray-100 dark:border-[#38383A]">
       <div className="flex items-center justify-between h-16 px-6">
         {/* Left: hamburger + page title */}
         <div className="flex items-center">
           <button
             onClick={onToggleSidebar}
-            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
+            className="lg:hidden p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] dark:hover:text-white focus:outline-none"
           >
-            <Menu className="h-6 w-6" />
+            <Menu className="h-5 w-5" />
           </button>
-          <div className="ml-4">
-            <h1 className="text-xl font-semibold text-gray-900">{pageTitle}</h1>
+          <div className="ml-3 lg:ml-0">
+            <h1 className="text-lg font-semibold text-gray-800 dark:text-white tracking-tight">{pageTitle}</h1>
           </div>
         </div>
 
         {/* Right: search + notifications + profile */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-2">
+          {/* Search bar */}
           <form onSubmit={handleSearch} className="hidden md:block">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-gray-400" />
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400 group-focus-within:text-primary-500 transition-colors" />
               </div>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                placeholder="Search students, fees, homework..."
+                className="block w-64 lg:w-72 pl-10 pr-4 py-2 border-0 rounded-xl bg-gray-100 dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] placeholder-gray-400 dark:placeholder-[#636366] text-gray-900 dark:text-white text-sm focus:outline-none focus:bg-white dark:bg-[#1C1C1E] focus:ring-2 focus:ring-primary-500 dark:focus:bg-[#2C2C2E] dark:focus:ring-[#3EC4B1] transition-all duration-200"
+                placeholder="Search..."
               />
             </div>
           </form>
+
+          {/* Dark/Light mode toggle */}
+          <button
+            onClick={toggleMode}
+            className="p-2 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-[#8E8E93] dark:hover:text-white dark:hover:bg-[#2C2C2E] transition-colors focus:outline-none"
+            aria-label={theme.mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme.mode === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
 
           <NotificationBell />
 
@@ -105,64 +115,39 @@ const Header = ({ onToggleSidebar }) => {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setProfileOpen(o => !o)}
-              className="flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-100 transition-colors focus:outline-none"
+              className="flex items-center gap-2.5 py-1.5 px-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-all duration-200 focus:outline-none"
             >
-              {/* Avatar — always visible on ALL screen sizes */}
-              <div className="h-9 w-9 rounded-full overflow-hidden bg-primary-500 flex-shrink-0 flex items-center justify-center">
-                {photoUrl ? (
-                  <img
-                    src={photoUrl}
-                    alt={user?.name}
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      e.target.style.display = 'none'
-                      e.target.parentElement.querySelector('span').style.display = 'flex'
-                    }}
-                  />
-                ) : null}
-                <span
-                  className="text-sm font-medium text-white items-center justify-center"
-                  style={{ display: photoUrl ? 'none' : 'flex' }}
-                >
-                  {initials}
-                </span>
-              </div>
-              {/* Name + role — only on md and above */}
+              <UserAvatar photoUrl={photoUrl} initials={initials} alt={user?.name} size="sm" />
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium text-gray-900 leading-tight">{displayName}</p>
-                <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                <p className="text-sm font-semibold text-gray-800 dark:text-white leading-tight">{displayName}</p>
+                <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] capitalize">{role}</p>
               </div>
-              <ChevronDown className={`h-4 w-4 text-gray-400 hidden md:block transition-transform ${profileOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`h-3.5 w-3.5 text-gray-400 hidden md:block transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1rem)] bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
-                <div className="px-4 py-3 border-b border-gray-100">
+              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1rem)] bg-white/95 dark:bg-[#2C2C2E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-black/[0.04] dark:ring-[#48484A] py-1 z-50 animate-slide-down">
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#38383A]">
                   <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0">
-                      {photoUrl ? (
-                        <img src={photoUrl} alt={user?.name} className="h-full w-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
-                      ) : null}
-                      <span className="text-sm font-semibold text-white" style={{ display: photoUrl ? 'none' : 'flex' }}>{initials}</span>
-                    </div>
+                    <UserAvatar photoUrl={photoUrl} initials={initials} alt={user?.name} size="lg" />
                     <div className="overflow-hidden">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
-                      <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{displayName}</p>
+                      <p className="text-xs text-gray-500 dark:text-[#8E8E93] capitalize">{role}</p>
                     </div>
                   </div>
                 </div>
 
                 <button
                   onClick={() => { navigate('/app/profile'); setProfileOpen(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-[#3A3A3C] transition-colors"
                 >
-                  <Settings className="h-4 w-4 text-gray-400" />
+                  <Settings className="h-4 w-4 text-gray-400 dark:text-[#636366]" />
                   Edit Profile
                 </button>
 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
                   Sign out

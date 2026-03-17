@@ -1,84 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Bell } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
-import notificationsService from '../services/notificationsService';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const NotificationBell = () => {
-    const [unreadCount, setUnreadCount] = useState(0);
+    const { unreadCount } = useNotifications();
     const [isOpen, setIsOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const bellRef = useRef(null);
 
-    // Fetch unread count on mount and every 30 seconds
-    useEffect(() => {
-        fetchUnreadCount();
-        const interval = setInterval(fetchUnreadCount, 30000); // Poll every 30 seconds
-        return () => clearInterval(interval);
-    }, []);
-
-    const fetchUnreadCount = async () => {
-        try {
-            setIsLoading(true);
-            const response = await notificationsService.getUnreadCount();
-            if (response.success) {
-                setUnreadCount(response.data?.count ?? response.count ?? 0);
-            }
-        } catch (error) {
-            // Silently ignore 404 (route not deployed yet) or network errors
-            // to avoid polluting the console on older deploys
-            if (error?.response?.status !== 404) {
-                console.error('Error fetching unread count:', error);
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-
-    const handleToggle = (e) => {
+    const handleToggle = useCallback((e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log('Notification bell clicked! Current state:', isOpen);
-        setIsOpen(!isOpen);
-    };
+        setIsOpen(prev => !prev);
+    }, []);
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         setIsOpen(false);
-    };
-
-    const handleNotificationRead = () => {
-        // Refresh unread count when a notification is marked as read
-        fetchUnreadCount();
-    };
+    }, []);
 
     return (
-        <div className="relative z-50">
-            {/* Bell Icon Button */}
+        <div className="relative" ref={bellRef}>
             <button
                 onClick={handleToggle}
                 type="button"
-                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors duration-200 cursor-pointer"
-                aria-label="Notifications"
-                style={{ pointerEvents: 'auto' }}
+                className={`relative p-2 rounded-xl transition-all duration-200 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
+                    isOpen
+                        ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
+                        : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E]'
+                }`}
+                aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
             >
                 <Bell className="h-5 w-5" />
 
-                {/* Unread Badge */}
+                {/* Unread badge */}
                 {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center pointer-events-none">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span className="relative inline-flex items-center justify-center rounded-full h-4 w-4 bg-red-500 text-[10px] font-semibold text-white">
-                            {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
+                    <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-dark-card pointer-events-none tabular-nums">
+                        {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                 )}
             </button>
 
-            {/* Dropdown */}
             {isOpen && (
-                <NotificationDropdown
-                    onClose={handleClose}
-                    onNotificationRead={handleNotificationRead}
-                />
+                <NotificationDropdown onClose={handleClose} bellRef={bellRef} />
             )}
         </div>
     );

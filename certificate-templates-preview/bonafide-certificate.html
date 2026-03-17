@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bonafide Certificate - {{student_name}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  @page { size: A4 portrait; margin: 0; }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 794px;
+    height: 1123px;
+    font-family: 'Inter', sans-serif;
+    color: #1C1C2E;
+    background: #FAFBFF;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    width: 794px;
+    height: 1123px;
+    position: relative;
+    overflow: hidden;
+    background: #FAFBFF;
+  }
+
+  /* ── PREMIUM BORDER SYSTEM ── */
+  .border-frame-1 {
+    position: absolute; inset: 8px;
+    border: 3px solid #1A2E5A;
+    border-radius: 12px;
+    pointer-events: none; z-index: 2;
+  }
+  .border-frame-2 {
+    position: absolute; inset: 14px;
+    border: 1.5px solid #C9A84C;
+    pointer-events: none; z-index: 2;
+  }
+  .border-frame-3 {
+    position: absolute; inset: 18px;
+    border: 0.5px solid #1A2E5A;
+    pointer-events: none; z-index: 2;
+    opacity: 0.3;
+  }
+
+  /* Gold accent dots along the middle border */
+  .border-frame-2::before {
+    content: '';
+    position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; background: #C9A84C; border-radius: 50%;
+  }
+  .border-frame-2::after {
+    content: '';
+    position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; background: #C9A84C; border-radius: 50%;
+  }
+
+  /* Side accent dots */
+  .side-dot-left, .side-dot-right {
+    position: absolute; width: 5px; height: 5px;
+    background: #C9A84C; border-radius: 50%;
+    z-index: 3; pointer-events: none;
+  }
+  .side-dot-left { left: 11.5px; top: 50%; transform: translateY(-50%); }
+  .side-dot-right { right: 11.5px; top: 50%; transform: translateY(-50%); }
+
+  /* ── ORNATE CORNERS ── */
+  .corner { position: absolute; width: 70px; height: 70px; z-index: 3; pointer-events: none; }
+  .corner svg { width: 100%; height: 100%; }
+  .corner-tl { top: 5px; left: 5px; }
+  .corner-tr { top: 5px; right: 5px; transform: scaleX(-1); }
+  .corner-bl { bottom: 5px; left: 5px; transform: scaleY(-1); }
+  .corner-br { bottom: 5px; right: 5px; transform: scale(-1,-1); }
+
+  /* ── WATERMARK ── */
+  .watermark {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%) rotate(-35deg);
+    font-family: 'Playfair Display', serif; font-size: 72px; font-weight: 700;
+    color: rgba(26,46,90,0.035); letter-spacing: 18px;
+    white-space: nowrap; z-index: 1; pointer-events: none; text-transform: uppercase;
+  }
+
+  /* ── CONTENT WRAPPER (flex column inside borders) ── */
+  .content-wrap {
+    position: absolute;
+    top: 22px; left: 22px; right: 22px; bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    z-index: 4;
+    overflow: hidden;
+  }
+
+  /* ── HEADER BAND ── */
+  .header-band {
+    width: 100%;
+    min-height: 178px;
+    background: linear-gradient(135deg, #0F1F3D 0%, #1A2E5A 55%, #243F7A 100%);
+    display: flex;
+    align-items: center;
+    padding: 22px 36px 18px 36px;
+    position: relative;
+    flex-shrink: 0;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .header-band::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, transparent 0%, #C9A84C 15%, #E8D48B 50%, #C9A84C 85%, transparent 100%);
+  }
+
+  .header-band::before {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.015) 20px, rgba(255,255,255,0.015) 22px);
+    pointer-events: none;
+  }
+
+  .school-logo-wrap {
+    width: 86px; height: 86px; border-radius: 50%;
+    border: 3px solid rgba(201,168,76,0.6); overflow: hidden; flex-shrink: 0;
+    background: rgba(255,255,255,0.12); display: flex;
+    align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  }
+
+  .school-logo-wrap img { width: 74px; height: 74px; object-fit: contain; border-radius: 50%; }
+
+  .school-info { flex: 1; text-align: center; padding: 0 16px; }
+
+  .school-name {
+    font-family: 'Playfair Display', serif; font-size: 25px; font-weight: 700;
+    color: #FFFFFF; letter-spacing: 1.5px; line-height: 1.2;
+    text-transform: uppercase; text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+
+  .school-address { font-size: 10.5px; color: rgba(255,255,255,0.85); margin-top: 12px; line-height: 1.5; }
+  .school-contacts { font-size: 9.5px; color: rgba(255,255,255,0.7); margin-top: 3px; }
+
+  .school-codes { display: flex; justify-content: center; gap: 18px; margin-top: 7px; }
+  .school-code-item { font-size: 8.5px; color: rgba(255,255,255,0.6); letter-spacing: 0.5px; text-transform: uppercase; font-weight: 500; }
+  .school-code-item span { color: #E8D48B; font-weight: 600; }
+
+  /* ── CERTIFICATE TITLE ── */
+  .title-section { text-align: center; padding: 28px 40px 0; flex-shrink: 0; }
+
+  .cert-title {
+    font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700;
+    color: #1A2E5A; letter-spacing: 6px; text-transform: uppercase;
+    position: relative; display: inline-block; padding-bottom: 10px;
+  }
+
+  .cert-title::after {
+    content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 200px; height: 2px;
+    background: linear-gradient(90deg, transparent, #C9A84C, transparent);
+  }
+
+  .title-ornament { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 8px; }
+  .title-ornament .line { width: 60px; height: 1px; background: linear-gradient(90deg, transparent, #C9A84C); }
+  .title-ornament .line:last-child { background: linear-gradient(90deg, #C9A84C, transparent); }
+  .title-ornament .diamond { width: 8px; height: 8px; background: #C9A84C; transform: rotate(45deg); flex-shrink: 0; }
+
+  /* ── CERT NUMBER ROW ── */
+  .cert-number-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 34px 0; flex-shrink: 0;
+  }
+
+  .cert-number-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #F0F4FF; border: 1px solid #DDE3F0; border-radius: 20px;
+    padding: 5px 14px; font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 500; color: #1A2E5A; letter-spacing: 0.5px;
+  }
+
+  .cert-number-badge .hash { color: #C9A84C; font-weight: 700; font-size: 12px; }
+
+  .cert-date { font-size: 10.5px; color: #6B7280; font-weight: 500; }
+  .cert-date span { color: #1C1C2E; font-weight: 600; }
+
+  /* ── BODY ── */
+  .body-section { padding: 22px 34px 0; flex-shrink: 0; }
+
+  .to-whom {
+    font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600;
+    color: #1A2E5A; text-align: center; letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 22px; position: relative;
+  }
+
+  .to-whom::after {
+    content: ''; display: block; width: 50px; height: 1.5px;
+    background: #C9A84C; margin: 8px auto 0;
+  }
+
+  .declaration-text { font-size: 13.5px; line-height: 1.95; color: #2D2D3F; text-align: justify; }
+
+  .declaration-text .highlight {
+    font-weight: 700; color: #1A2E5A; font-size: 14px;
+    border-bottom: 1.5px solid rgba(201,168,76,0.4);
+  }
+
+  .details-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 28px;
+    margin-top: 22px; padding: 16px 22px;
+    background: linear-gradient(135deg, #F7F9FC 0%, #F0F4FF 100%);
+    border-radius: 10px; border: 1px solid #E8ECF4;
+  }
+
+  .detail-item { display: flex; flex-direction: column; gap: 2px; }
+  .detail-label { font-size: 8.5px; font-weight: 600; color: #8891A5; text-transform: uppercase; letter-spacing: 1px; }
+  .detail-value { font-size: 13px; font-weight: 600; color: #1A2E5A; }
+
+  /* ── PURPOSE ── */
+  .purpose-section { padding: 16px 34px 0; flex-shrink: 0; }
+  .purpose-text { font-size: 12.5px; color: #4B5563; line-height: 1.75; text-align: justify; }
+  .purpose-text .highlight { font-weight: 700; color: #1A2E5A; }
+
+  /* ── QR ROW ── */
+  .verification-row { display: flex; justify-content: flex-end; padding: 14px 34px 0; flex-shrink: 0; }
+
+  .qr-block {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: #F7F9FC;
+    border: 1px solid #E8ECF4; border-radius: 8px;
+  }
+
+  .qr-placeholder {
+    width: 50px; height: 50px; background: #1A2E5A; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .qr-placeholder::after { content: 'QR'; font-size: 10px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+
+  .qr-text { font-size: 8px; color: #8891A5; line-height: 1.4; font-weight: 500; }
+  .qr-text strong { display: block; color: #1A2E5A; font-size: 8.5px; }
+
+  /* ── SPACER (pushes footer to bottom) ── */
+  .flex-spacer { flex: 1; min-height: 8px; }
+
+  /* ── FOOTER ── */
+  .footer-section { flex-shrink: 0; }
+
+  .footer-meta-row {
+    display: flex; justify-content: space-between;
+    padding: 0 38px 8px;
+    font-size: 10px; color: #6B7280; font-style: italic;
+  }
+
+  .signature-area {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 42px 10px; height: 100px;
+  }
+
+  .sig-block { text-align: center; width: 155px; }
+
+  .sig-img { height: 40px; margin: 0 auto 4px; object-fit: contain; }
+
+  .sig-line { width: 130px; height: 1.5px; background: #1A2E5A; margin: 0 auto 5px; }
+
+  .sig-name { font-size: 11px; font-weight: 700; color: #1A2E5A; letter-spacing: 0.3px; }
+
+  .seal-block { text-align: center; width: 110px; }
+
+  .seal-circle {
+    width: 72px; height: 72px; border: 2px dashed #C9A84C;
+    border-radius: 50%; margin: 0 auto 4px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .seal-text {
+    font-size: 7.5px; color: #C9A84C; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.5px; line-height: 1.3; text-align: center;
+  }
+
+  .footer-gradient {
+    height: 38px; width: 100%;
+    background: linear-gradient(135deg, #0F1F3D 0%, #1A2E5A 55%, #243F7A 100%);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .footer-gradient::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent 0%, #C9A84C 15%, #E8D48B 50%, #C9A84C 85%, transparent 100%);
+  }
+
+  .footer-gradient-text {
+    font-size: 7.5px; color: rgba(255,255,255,0.5);
+    letter-spacing: 3px; text-transform: uppercase; font-weight: 500;
+  }
+
+  @media print {
+    html, body { width: 210mm; height: 297mm; }
+    .page { width: 210mm; height: 297mm; page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Premium Border System -->
+  <div class="border-frame-1"></div>
+  <div class="border-frame-2"></div>
+  <div class="border-frame-3"></div>
+  <div class="side-dot-left"></div>
+  <div class="side-dot-right"></div>
+
+  <!-- Ornate Filigree Corners -->
+  <div class="corner corner-tl"><svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 66V14C4 8.477 8.477 4 14 4H66" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 60V18C10 13.582 13.582 10 18 10H60" stroke="#1A2E5A" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="4" cy="4" r="3" fill="#C9A84C"/>
+    <circle cx="4" cy="4" r="1.5" fill="#1A2E5A"/>
+    <!-- Scroll flourish -->
+    <path d="M4 42C4 42 8 38 12 38C16 38 16 44 12 44C8 44 8 38 12 34" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M42 4C42 4 38 8 38 12C38 16 44 16 44 12C44 8 38 8 34 12" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <!-- Inner scroll detail -->
+    <path d="M4 26C6 24 10 24 10 28C10 32 4 30 4 26Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <path d="M26 4C24 6 24 10 28 10C32 10 30 4 26 4Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <!-- Diamond accent -->
+    <rect x="14" y="11" width="4" height="4" transform="rotate(45 16 13)" fill="#C9A84C" opacity="0.4"/>
+  </svg></div>
+  <div class="corner corner-tr"><svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 66V14C4 8.477 8.477 4 14 4H66" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 60V18C10 13.582 13.582 10 18 10H60" stroke="#1A2E5A" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="4" cy="4" r="3" fill="#C9A84C"/>
+    <circle cx="4" cy="4" r="1.5" fill="#1A2E5A"/>
+    <path d="M4 42C4 42 8 38 12 38C16 38 16 44 12 44C8 44 8 38 12 34" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M42 4C42 4 38 8 38 12C38 16 44 16 44 12C44 8 38 8 34 12" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M4 26C6 24 10 24 10 28C10 32 4 30 4 26Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <path d="M26 4C24 6 24 10 28 10C32 10 30 4 26 4Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <rect x="14" y="11" width="4" height="4" transform="rotate(45 16 13)" fill="#C9A84C" opacity="0.4"/>
+  </svg></div>
+  <div class="corner corner-bl"><svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 66V14C4 8.477 8.477 4 14 4H66" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 60V18C10 13.582 13.582 10 18 10H60" stroke="#1A2E5A" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="4" cy="4" r="3" fill="#C9A84C"/>
+    <circle cx="4" cy="4" r="1.5" fill="#1A2E5A"/>
+    <path d="M4 42C4 42 8 38 12 38C16 38 16 44 12 44C8 44 8 38 12 34" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M42 4C42 4 38 8 38 12C38 16 44 16 44 12C44 8 38 8 34 12" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M4 26C6 24 10 24 10 28C10 32 4 30 4 26Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <path d="M26 4C24 6 24 10 28 10C32 10 30 4 26 4Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <rect x="14" y="11" width="4" height="4" transform="rotate(45 16 13)" fill="#C9A84C" opacity="0.4"/>
+  </svg></div>
+  <div class="corner corner-br"><svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 66V14C4 8.477 8.477 4 14 4H66" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 60V18C10 13.582 13.582 10 18 10H60" stroke="#1A2E5A" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="4" cy="4" r="3" fill="#C9A84C"/>
+    <circle cx="4" cy="4" r="1.5" fill="#1A2E5A"/>
+    <path d="M4 42C4 42 8 38 12 38C16 38 16 44 12 44C8 44 8 38 12 34" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M42 4C42 4 38 8 38 12C38 16 44 16 44 12C44 8 38 8 34 12" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M4 26C6 24 10 24 10 28C10 32 4 30 4 26Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <path d="M26 4C24 6 24 10 28 10C32 10 30 4 26 4Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <rect x="14" y="11" width="4" height="4" transform="rotate(45 16 13)" fill="#C9A84C" opacity="0.4"/>
+  </svg></div>
+
+  <!-- Watermark -->
+  <div class="watermark">BONAFIDE</div>
+
+  <!-- ═══ ALL CONTENT INSIDE FLEX WRAPPER ═══ -->
+  <div class="content-wrap">
+
+    <!-- HEADER -->
+    <div class="header-band">
+      <div class="school-logo-wrap">
+        <!-- LOGO_PLACEHOLDER -->
+      </div>
+      <div class="school-info">
+        <div class="school-name">{{school_name}}</div>
+        <div class="school-address">{{school_address}}</div>
+        <div class="school-contacts">Phone: {{school_phone}} &nbsp;|&nbsp; Email: {{school_email}}</div>
+        <div class="school-codes">
+          <div class="school-code-item">Affiliation No: <span>{{affiliation_no}}</span></div>
+          <div class="school-code-item">School Code: <span>{{school_code}}</span></div>
+          <div class="school-code-item">UDISE: <span>{{udise_no}}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TITLE -->
+    <div class="title-section">
+      <div class="cert-title">Bonafide Certificate</div>
+      <div class="title-ornament">
+        <div class="line"></div><div class="diamond"></div><div class="line"></div>
+      </div>
+    </div>
+
+    <!-- CERT NUMBER & DATE -->
+    <div class="cert-number-row">
+      <div class="cert-number-badge"><span class="hash">#</span> {{certificate_number}}</div>
+      <div class="cert-date">Date of Issue: <span>{{issue_date}}</span></div>
+    </div>
+
+    <!-- BODY -->
+    <div class="body-section">
+      <div class="to-whom">To Whom It May Concern</div>
+      <p class="declaration-text">
+        This is to certify that <span class="highlight">{{student_name}}</span>,
+        Son/Daughter of Shri <span class="highlight">{{father_name}}</span>
+        and Smt. <span class="highlight">{{mother_name}}</span>,
+        is a bonafide student of this institution. He/She is currently studying in
+        Class <span class="highlight">{{class}} ({{section}})</span>
+        for the Academic Session <span class="highlight">{{academic_year}}</span>.
+        His/Her date of birth as per our school records is
+        <span class="highlight">{{dob}}</span>.
+      </p>
+
+      <div class="details-grid">
+        <div class="detail-item">
+          <span class="detail-label">Student Name</span>
+          <span class="detail-value">{{student_name}}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Admission Number</span>
+          <span class="detail-value">{{admission_no}}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Father's Name</span>
+          <span class="detail-value">{{father_name}}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Mother's Name</span>
+          <span class="detail-value">{{mother_name}}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Class &amp; Section</span>
+          <span class="detail-value">{{class}} - {{section}}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Date of Birth</span>
+          <span class="detail-value">{{dob}}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Academic Session</span>
+          <span class="detail-value">{{academic_year}}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Board / Affiliation</span>
+          <span class="detail-value">{{school_board}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- PURPOSE -->
+    <div class="purpose-section">
+      <p class="purpose-text">
+        This certificate is issued on the request of the student/parent for the purpose of
+        <span class="highlight">{{purpose}}</span>.
+        No fees are due from the student at the time of issue of this certificate.
+      </p>
+    </div>
+
+    <!-- SPACER — pushes footer to bottom -->
+    <div class="flex-spacer"></div>
+
+    <!-- FOOTER -->
+    <div class="footer-section">
+      <div class="footer-meta-row">
+        <span>Place: {{place}}</span>
+      </div>
+
+      <div class="signature-area">
+        <div class="sig-block">
+          <div class="sig-line"></div>
+          <div class="sig-name">Class Teacher</div>
+        </div>
+        <div class="seal-block">
+          <div class="seal-circle">
+            <div class="seal-text">Official<br/>Seal</div>
+          </div>
+        </div>
+        <div class="sig-block">
+          <!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->
+          <div class="sig-line"></div>
+          <div class="sig-name">Principal</div>
+        </div>
+      </div>
+
+      <div class="footer-gradient">
+        <span class="footer-gradient-text">Powered by Learnovo &mdash; School Management System</span>
+      </div>
+    </div>
+
+  </div><!-- /content-wrap -->
+</div>
+</body>
+</html>

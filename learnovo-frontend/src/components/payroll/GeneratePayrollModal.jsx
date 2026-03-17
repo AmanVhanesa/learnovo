@@ -72,28 +72,28 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="p-6 border-b border-gray-200">
-                    <h2 className="text-2xl font-bold text-gray-800">Generate Monthly Payroll</h2>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <div className="p-6 border-b border-gray-200 dark:border-[#38383A]">
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Generate Monthly Payroll</h2>
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6">
                     {error && (
-                        <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                        <div className="mb-4 p-3 bg-red-100 dark:bg-red-500/10 border border-red-400 dark:border-red-500/30 text-red-700 dark:text-red-400 rounded">
                             {error}
                         </div>
                     )}
 
                     <div className="grid grid-cols-2 gap-4 mb-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                                 Month
                             </label>
                             <select
                                 value={formData.month}
                                 onChange={(e) => setFormData({ ...formData, month: parseInt(e.target.value) })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#1C1C1E] dark:text-white"
                                 required
                             >
                                 {monthNames.map((month, index) => (
@@ -103,7 +103,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                                 Year
                             </label>
                             <input
@@ -112,7 +112,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                 onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
                                 min="2000"
                                 max="2100"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                 required
                             />
                         </div>
@@ -124,44 +124,44 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                 type="checkbox"
                                 checked={formData.overwrite}
                                 onChange={(e) => setFormData({ ...formData, overwrite: e.target.checked })}
-                                className="mr-2"
+                                className="mr-2 dark:bg-[#1C1C1E] dark:border-[#38383A]"
                             />
-                            <span className="text-sm text-gray-700">
+                            <span className="text-sm text-gray-700 dark:text-white">
                                 Overwrite existing payroll records for this period
                             </span>
                         </label>
                     </div>
 
-                    <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                        <h3 className="font-semibold text-gray-800 mb-3">Preview</h3>
+                    <div className="bg-gray-50 dark:bg-[#2C2C2E] p-4 rounded-lg mb-6">
+                        <h3 className="font-semibold text-gray-800 dark:text-white mb-3">Preview</h3>
 
                         {previewLoading ? (
-                            <p className="text-gray-600">Loading employees...</p>
+                            <p className="text-gray-600 dark:text-[#8E8E93]">Loading employees...</p>
                         ) : (
                             <>
                                 <div className="grid grid-cols-2 gap-4 mb-3">
                                     <div>
-                                        <p className="text-sm text-gray-600">Total Employees</p>
-                                        <p className="text-2xl font-bold text-gray-800">{employees.length}</p>
+                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Total Employees</p>
+                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{employees.length}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-600">Total Salary Amount</p>
-                                        <p className="text-2xl font-bold text-green-600">₹{totalSalary.toLocaleString('en-IN')}</p>
+                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Total Salary Amount</p>
+                                        <p className="text-2xl font-bold text-green-600 dark:text-emerald-400">₹{totalSalary.toLocaleString('en-IN')}</p>
                                     </div>
                                 </div>
 
                                 {employees.length > 0 && (
                                     <div className="max-h-40 overflow-y-auto">
-                                        <p className="text-xs text-gray-500 mb-2">Employees to be included:</p>
-                                        <ul className="text-sm text-gray-700 space-y-1">
+                                        <p className="text-xs text-gray-500 dark:text-[#636366] mb-2">Employees to be included:</p>
+                                        <ul className="text-sm text-gray-700 dark:text-[#8E8E93] space-y-1">
                                             {employees.slice(0, 10).map(emp => (
                                                 <li key={emp._id} className="flex justify-between">
                                                     <span>{emp.name} ({emp.employeeId})</span>
-                                                    <span className="font-semibold">₹{emp.salary?.toLocaleString('en-IN')}</span>
+                                                    <span className="font-semibold dark:text-white">₹{emp.salary?.toLocaleString('en-IN')}</span>
                                                 </li>
                                             ))}
                                             {employees.length > 10 && (
-                                                <li className="text-gray-500 italic">...and {employees.length - 10} more</li>
+                                                <li className="text-gray-500 dark:text-[#636366] italic">...and {employees.length - 10} more</li>
                                             )}
                                         </ul>
                                     </div>
@@ -174,14 +174,14 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition"
+                            className="px-4 py-2 text-gray-700 dark:text-[#8E8E93] bg-gray-200 dark:bg-[#2C2C2E] rounded-md hover:bg-gray-300 dark:hover:bg-[#38383A] transition"
                             disabled={loading}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 dark:disabled:bg-[#38383A]"
                             disabled={loading || employees.length === 0}
                         >
                             {loading ? 'Generating...' : 'Generate Payroll'}

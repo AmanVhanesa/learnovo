@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { studentsService } from '../../services/studentsService';
+import { sortStudentsByRelevance } from '../../utils/searchRelevance';
 
 const StudentSearchDropdown = ({ onSelect }) => {
     const [query, setQuery] = useState('');
@@ -29,9 +30,9 @@ const StudentSearchDropdown = ({ onSelect }) => {
 
             setIsLoading(true);
             try {
-                const response = await studentsService.list({ search: query, limit: 10 });
+                const response = await studentsService.list({ search: query, limit: 20 });
                 if (response.success) {
-                    setResults(response.data);
+                    setResults(sortStudentsByRelevance(response.data, query));
                     setIsOpen(true);
                 }
             } catch (error) {
@@ -56,19 +57,19 @@ const StudentSearchDropdown = ({ onSelect }) => {
 
     return (
         <div className="relative mb-4" ref={dropdownRef}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                 Search & Add Student
             </label>
             <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-4 w-4 text-gray-400" />
+                    <Search className="h-4 w-4 text-gray-400 dark:text-[#636366]" />
                 </div>
                 <input
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search by name or admission number..."
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                     onFocus={() => {
                         if (results.length > 0) setIsOpen(true);
                     }}
@@ -81,22 +82,22 @@ const StudentSearchDropdown = ({ onSelect }) => {
             </div>
 
             {isOpen && results.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 overflow-auto ring-1 ring-black ring-opacity-5">
+                <div className="absolute z-10 mt-1 w-full bg-white dark:bg-[#1C1C1E] shadow-lg max-h-60 rounded-md py-1 overflow-auto ring-1 ring-black ring-opacity-5">
                     {results.map((student) => (
                         <button
                             key={student._id}
                             type="button"
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-primary-50 focus:outline-none focus:bg-primary-50 transition-colors"
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-[#8E8E93] hover:bg-primary-50 dark:hover:bg-[#2C2C2E] focus:outline-none focus:bg-primary-50 dark:focus:bg-[#2C2C2E] transition-colors"
                             onClick={() => handleSelect(student)}
                         >
                             <div className="flex justify-between items-center">
                                 <div className="flex flex-col">
-                                    <span className="font-medium text-gray-900">{student.fullName || student.name}</span>
-                                    <span className="text-xs text-gray-500">
+                                    <span className="font-medium text-gray-900 dark:text-white">{student.fullName || student.name}</span>
+                                    <span className="text-xs text-gray-500 dark:text-[#8E8E93]">
                                         {student.class || '-'} {student.section ? `(${student.section})` : ''}
                                     </span>
                                 </div>
-                                <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                <span className="text-xs font-mono bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] px-2 py-1 rounded">
                                     {student.admissionNumber || 'N/A'}
                                 </span>
                             </div>
@@ -108,7 +109,7 @@ const StudentSearchDropdown = ({ onSelect }) => {
 
             {
                 isOpen && query.trim() && !isLoading && results.length === 0 && (
-                    <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md py-4 px-4 text-sm text-center text-gray-500 ring-1 ring-black ring-opacity-5">
+                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-[#1C1C1E] shadow-lg rounded-md py-4 px-4 text-sm text-center text-gray-500 dark:text-[#8E8E93] ring-1 ring-black ring-opacity-5">
                         No students found matching "{query}"
                     </div>
                 )

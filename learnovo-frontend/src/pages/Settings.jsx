@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Settings as SettingsIcon, Save, Loader } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { settingsService } from '../services/settingsService'
@@ -13,128 +14,87 @@ import RulesRegulationsSection from '../components/settings/RulesRegulationsSect
 import ThemeLanguageSection from '../components/settings/ThemeLanguageSection'
 import AccountSettingsSection from '../components/settings/AccountSettingsSection'
 import SubDepartmentsSection from '../components/settings/SubDepartmentsSection'
+import BackupRestoreSection from '../components/settings/BackupRestoreSection'
+
+const DEFAULT_FORM = {
+  institution: {
+    name: '',
+    tagline: '',
+    address: { street: '', city: '', state: '', pincode: '', country: 'India' },
+    contact: { phone: '', email: '', website: '' },
+    logo: null
+  },
+  grading: { rules: [], isActive: true },
+  bankAccounts: [],
+  rulesAndRegulations: { content: '', version: 1, isActive: true },
+  theme: { mode: 'light', language: 'en' },
+  account: { timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', timeFormat: '12h' },
+  currency: { default: 'INR', symbol: '\u20B9', position: 'before' }
+}
 
 const Settings = () => {
   const { tenant } = useAuth()
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState('institute')
-  const [form, setForm] = useState({
-    institution: {
-      name: '',
-      tagline: '',
-      address: {
-        street: '',
-        city: '',
-        state: '',
-        pincode: '',
-        country: 'India'
-      },
-      contact: {
-        phone: '',
-        email: '',
-        website: ''
-      },
-      logo: null
-    },
-    grading: {
-      rules: [],
-      isActive: true
-    },
-    bankAccounts: [],
-    rulesAndRegulations: {
-      content: '',
-      version: 1,
-      isActive: true
-    },
-    theme: {
-      mode: 'light',
-      primaryColor: '#3EC4B1',
-      secondaryColor: '#2355A6',
-      language: 'en'
-    },
-    account: {
-      timezone: 'Asia/Kolkata',
-      dateFormat: 'DD/MM/YYYY',
-      timeFormat: '12h'
-    },
-    currency: {
-      default: 'INR',
-      symbol: '₹',
-      position: 'before'
-    }
-  })
+  const [form, setForm] = useState(DEFAULT_FORM)
 
   const tabs = [
-    { id: 'institute', label: 'Institute Profile', icon: '🏫' },
-    { id: 'subdepartments', label: 'Sub Departments', icon: '🏢' },
-    { id: 'grading', label: 'Marks Grading', icon: '📊' },
-    { id: 'banks', label: 'Bank Accounts', icon: '🏦' },
-    { id: 'rules', label: 'Rules & Regulations', icon: '📜' },
-    { id: 'theme', label: 'Theme & Language', icon: '🎨' },
-    { id: 'account', label: 'Account Settings', icon: '⚙️' }
+    { id: 'institute', label: 'Institute Profile', icon: '\uD83C\uDFEB' },
+    { id: 'subdepartments', label: 'Sub Departments', icon: '\uD83C\uDFE2' },
+    { id: 'grading', label: 'Marks Grading', icon: '\uD83D\uDCCA' },
+    { id: 'banks', label: 'Bank Accounts', icon: '\uD83C\uDFE6' },
+    { id: 'rules', label: 'Rules & Regulations', icon: '\uD83D\uDCDC' },
+    { id: 'theme', label: 'Theme & Language', icon: '\uD83C\uDFA8' },
+    { id: 'account', label: 'Account Settings', icon: '\u2699\uFE0F' },
+    { id: 'backup', label: 'Backup & Restore', icon: '\uD83D\uDCBE' }
   ]
 
+  const { data: settingsData, isLoading } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => settingsService.getSettings(),
+  })
+
+  // Sync fetched settings into form state (onSuccess was removed in React Query v5)
   useEffect(() => {
-    loadSettings()
-  }, [])
+    if (!settingsData) return
 
-  const loadSettings = async () => {
-    try {
-      setIsLoading(true)
-      const data = await settingsService.getSettings()
-
-      if (data.success && data.data) {
-        setForm(prevForm => ({
-          ...prevForm,
-          ...data.data,
-          // Ensure nested objects exist
-          institution: { ...prevForm.institution, ...data.data.institution },
-          grading: { ...prevForm.grading, ...data.data.grading },
-          theme: { ...prevForm.theme, ...data.data.theme },
-          account: { ...prevForm.account, ...data.data.account },
-          currency: { ...prevForm.currency, ...data.data.currency }
-        }))
-      } else if (tenant) {
-        // Initialize from tenant data
-        setForm(prevForm => ({
-          ...prevForm,
-          institution: {
-            ...prevForm.institution,
-            name: tenant.schoolName || '',
-            address: {
-              street: tenant.address?.street || '',
-              city: tenant.address?.city || '',
-              state: tenant.address?.state || '',
-              pincode: tenant.address?.zipCode || '',
-              country: tenant.address?.country || 'India'
-            },
-            contact: {
-              phone: tenant.phone || '',
-              email: tenant.email || '',
-              website: ''
-            }
+    if (settingsData.success && settingsData.data) {
+      setForm(prevForm => ({
+        ...prevForm,
+        ...settingsData.data,
+        institution: { ...prevForm.institution, ...settingsData.data.institution },
+        grading: { ...prevForm.grading, ...settingsData.data.grading },
+        theme: { ...prevForm.theme, ...settingsData.data.theme },
+        account: { ...prevForm.account, ...settingsData.data.account },
+        currency: { ...prevForm.currency, ...settingsData.data.currency }
+      }))
+    } else if (tenant) {
+      setForm(prevForm => ({
+        ...prevForm,
+        institution: {
+          ...prevForm.institution,
+          name: tenant.schoolName || '',
+          address: {
+            street: tenant.address?.street || '',
+            city: tenant.address?.city || '',
+            state: tenant.address?.state || '',
+            pincode: tenant.address?.zipCode || '',
+            country: tenant.address?.country || 'India'
+          },
+          contact: {
+            phone: tenant.phone || '',
+            email: tenant.email || '',
+            website: ''
           }
-        }))
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error)
-      toast.error('Failed to load settings')
-    } finally {
-      setIsLoading(false)
+        }
+      }))
     }
-  }
+  }, [settingsData, tenant])
 
-  const handleSave = async (e) => {
-    if (e) e.preventDefault()
-
-    try {
-      setIsSaving(true)
-
-      // Build the payload — only send known settings sections, strip Mongoose metadata
+  const saveMutation = useMutation({
+    mutationFn: async () => {
       const payload = {}
 
-      // Only include sections that exist in the backend schema
       if (form.institution) {
         payload.institution = {
           name: form.institution.name,
@@ -149,85 +109,68 @@ const Settings = () => {
           principalSignature: form.institution.principalSignature,
           establishedYear: form.institution.establishedYear
         }
-        // Strip _id from nested objects
         if (payload.institution.address) delete payload.institution.address._id
         if (payload.institution.contact) delete payload.institution.contact._id
-        // Don't send logo/signature if null (preserve existing in database)
         if (payload.institution.logo === null) delete payload.institution.logo
         if (payload.institution.principalSignature === null) delete payload.institution.principalSignature
       }
       if (form.currency) {
-        payload.currency = {
-          default: form.currency.default,
-          symbol: form.currency.symbol,
-          position: form.currency.position
-        }
+        payload.currency = { default: form.currency.default, symbol: form.currency.symbol, position: form.currency.position }
       }
       if (form.theme) {
-        payload.theme = {
-          primaryColor: form.theme.primaryColor,
-          secondaryColor: form.theme.secondaryColor
-        }
+        payload.theme = { mode: form.theme.mode || 'light', language: form.theme.language || 'en' }
       }
-      if (form.grading) {
-        payload.grading = form.grading
-      }
+      if (form.grading) payload.grading = form.grading
       if (form.bankAccounts) {
-        // Remove _id from array items just in case
         payload.bankAccounts = form.bankAccounts.map(acc => {
           const newAcc = { ...acc }
           delete newAcc._id
           return newAcc
         })
       }
-      if (form.rulesAndRegulations) {
-        payload.rulesAndRegulations = form.rulesAndRegulations
-      }
-      if (form.account) {
-        payload.account = form.account
-      }
+      if (form.rulesAndRegulations) payload.rulesAndRegulations = form.rulesAndRegulations
+      if (form.account) payload.account = form.account
 
-
-      // Use the general PUT /api/settings endpoint for all saves
-      const data = await settingsService.updateSettings(payload)
-
+      return await settingsService.updateSettings(payload)
+    },
+    onSuccess: (data) => {
       if (data.success) {
         toast.success(`${tabs.find(t => t.id === activeTab)?.label || 'Settings'} saved successfully!`)
-        loadSettings()
+        queryClient.invalidateQueries({ queryKey: ['settings'] })
       } else {
         toast.error(data.message || 'Failed to save settings')
       }
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Error saving settings:', error)
       toast.error(error.response?.data?.message || 'Failed to save settings')
-    } finally {
-      setIsSaving(false)
     }
+  })
+
+  const handleSave = (e) => {
+    if (e) e.preventDefault()
+    saveMutation.mutate()
   }
 
   const updateField = (path, value) => {
-    const keys = path.split('.')
-    const newForm = { ...form }
-    let current = newForm
-
-    for (let i = 0; i < keys.length - 1; i++) {
-      if (!current[keys[i]]) {
-        current[keys[i]] = {}
+    setForm(prevForm => {
+      const keys = path.split('.')
+      const newForm = JSON.parse(JSON.stringify(prevForm))
+      let current = newForm
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) current[keys[i]] = {}
+        current = current[keys[i]]
       }
-      current = current[keys[i]]
-    }
-
-    current[keys[keys.length - 1]] = value
-    setForm(newForm)
+      current[keys[keys.length - 1]] = value
+      return newForm
+    })
   }
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-
     const formData = new FormData()
     formData.append('logo', file)
-
     try {
       const data = await settingsService.uploadLogo(formData)
       if (data.success) {
@@ -245,10 +188,8 @@ const Settings = () => {
   const handleSignatureUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-
     const formData = new FormData()
     formData.append('signature', file)
-
     try {
       const data = await settingsService.uploadSignature(formData)
       if (data.success) {
@@ -274,36 +215,36 @@ const Settings = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">General Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage your school's configuration and preferences</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">General Settings</h1>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Manage your school's configuration and preferences</p>
         </div>
         <button
-          className="btn btn-primary"
+          className="btn btn-primary w-full sm:w-auto"
           onClick={handleSave}
-          disabled={isSaving}
+          disabled={saveMutation.isPending}
         >
           <Save className="h-4 w-4 mr-2" />
-          {isSaving ? 'Saving...' : 'Save Changes'}
+          {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto">
+      <div className="border-b border-gray-200 dark:border-[#38383A]">
+        <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+                'whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0',
                 activeTab === tab.id
                   ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300'
               )}
             >
-              <span className="mr-2">{tab.icon}</span>
+              <span className="mr-1 sm:mr-2">{tab.icon}</span>
               {tab.label}
             </button>
           ))}
@@ -312,7 +253,7 @@ const Settings = () => {
 
       {/* Tab Content */}
       <form onSubmit={handleSave}>
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-lg shadow-sm p-4 sm:p-6">
           {activeTab === 'institute' && (
             <InstituteProfileSection
               form={form}
@@ -354,6 +295,9 @@ const Settings = () => {
               form={form}
               updateField={updateField}
             />
+          )}
+          {activeTab === 'backup' && (
+            <BackupRestoreSection />
           )}
         </div>
       </form>

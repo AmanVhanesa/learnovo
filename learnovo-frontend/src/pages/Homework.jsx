@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Calendar, BookOpen, Clock, CheckCircle, XCircle, Eye, Edit, Trash2, Filter } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import homeworkService from '../services/homeworkService';
@@ -11,14 +12,9 @@ import toast from 'react-hot-toast';
 
 const Homework = () => {
     const { user } = useAuth();
+    const queryClient = useQueryClient();
     const isTeacher = user?.role === 'teacher' || user?.role === 'admin';
     const isStudent = user?.role === 'student';
-
-    // Data state
-    const [homework, setHomework] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [classes, setClasses] = useState([]);
-    const [subjects, setSubjects] = useState([]);
 
     // Filter state
     const [searchQuery, setSearchQuery] = useState('');
@@ -34,66 +30,71 @@ const Homework = () => {
     const [selectedHomework, setSelectedHomework] = useState(null);
     const [editingHomework, setEditingHomework] = useState(null);
 
-    useEffect(() => {
-        fetchHomework();
-        fetchFilterOptions();
-    }, [subjectFilter, classFilter, statusFilter]);
+    // Fetch filter options (classes + subjects)
+    const { data: classes = [] } = useQuery({
+        queryKey: ['homework-classes'],
+        queryFn: async () => {
+            const res = await classesService.list();
+            return res.success ? (res.data || []) : [];
+        },
+    });
 
-    const fetchFilterOptions = async () => {
-        try {
-            const [classesRes, subjectsRes] = await Promise.all([
-                classesService.list(),
-                subjectsService.list()
-            ]);
+    const { data: subjects = [] } = useQuery({
+        queryKey: ['homework-subjects'],
+        queryFn: async () => {
+            const res = await subjectsService.list();
+            return res.success ? (res.data || []) : [];
+        },
+    });
 
-            if (classesRes.success) setClasses(classesRes.data || []);
-            if (subjectsRes.success) setSubjects(subjectsRes.data || []);
-        } catch (error) {
-            console.error('Error fetching filter options:', error);
-        }
-    };
-
-    const fetchHomework = async () => {
-        try {
-            setIsLoading(true);
-            const filters = {
-                subject: subjectFilter,
-                class: classFilter
-            };
-
+    // Fetch homework list
+    const { data: rawHomework = [], isLoading } = useQuery({
+        queryKey: ['homework', subjectFilter, classFilter],
+        queryFn: async () => {
+            const filters = { subject: subjectFilter, class: classFilter };
             const response = await homeworkService.getHomeworkList(filters);
-            if (response.success) {
-                let homeworkData = response.data || [];
+            return response.success ? (response.data || []) : [];
+        },
+    });
 
-                // For students, filter by status if selected
-                if (isStudent && statusFilter) {
-                    homeworkData = homeworkData.filter(hw => {
-                        if (statusFilter === 'pending') {
-                            return !hw.mySubmission || hw.mySubmission.status === 'pending';
-                        } else if (statusFilter === 'submitted') {
-                            return hw.mySubmission && hw.mySubmission.status !== 'pending';
-                        }
-                        return true;
-                    });
+    // Client-side filtering for status and search
+    const homework = useMemo(() => {
+        let data = rawHomework;
+
+        // For students, filter by status if selected
+        if (isStudent && statusFilter) {
+            data = data.filter(hw => {
+                if (statusFilter === 'pending') {
+                    return !hw.mySubmission || hw.mySubmission.status === 'pending';
+                } else if (statusFilter === 'submitted') {
+                    return hw.mySubmission && hw.mySubmission.status !== 'pending';
                 }
-
-                // Apply search filter
-                if (searchQuery) {
-                    homeworkData = homeworkData.filter(hw =>
-                        hw.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        hw.description.toLowerCase().includes(searchQuery.toLowerCase())
-                    );
-                }
-
-                setHomework(homeworkData);
-            }
-        } catch (error) {
-            console.error('Error fetching homework:', error);
-            toast.error('Failed to load homework');
-        } finally {
-            setIsLoading(false);
+                return true;
+            });
         }
-    };
+
+        // Apply search filter
+        if (searchQuery) {
+            data = data.filter(hw =>
+                hw.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                hw.description.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+        }
+
+        return data;
+    }, [rawHomework, isStudent, statusFilter, searchQuery]);
+
+    // Delete mutation
+    const deleteMutation = useMutation({
+        mutationFn: (id) => homeworkService.deleteHomework(id),
+        onSuccess: () => {
+            toast.success('Homework deleted successfully');
+            queryClient.invalidateQueries({ queryKey: ['homework'] });
+        },
+        onError: () => {
+            toast.error('Failed to delete homework');
+        },
+    });
 
     const handleCreateHomework = () => {
         setEditingHomework(null);
@@ -107,14 +108,7 @@ const Homework = () => {
 
     const handleDeleteHomework = async (id) => {
         if (!window.confirm('Are you sure you want to delete this homework?')) return;
-
-        try {
-            await homeworkService.deleteHomework(id);
-            toast.success('Homework deleted successfully');
-            fetchHomework();
-        } catch (error) {
-            toast.error('Failed to delete homework');
-        }
+        deleteMutation.mutate(id);
     };
 
     const handleViewDetails = (hw) => {
@@ -130,13 +124,13 @@ const Homework = () => {
     const handleFormSuccess = () => {
         setShowCreateModal(false);
         setEditingHomework(null);
-        fetchHomework();
+        queryClient.invalidateQueries({ queryKey: ['homework'] });
     };
 
     const handleSubmissionSuccess = () => {
         setShowSubmissionModal(false);
         setSelectedHomework(null);
-        fetchHomework();
+        queryClient.invalidateQueries({ queryKey: ['homework'] });
     };
 
     const getStatusBadge = (hw) => {
@@ -146,13 +140,13 @@ const Homework = () => {
         const isOverdue = new Date(hw.dueDate) < new Date() && (!submission || submission.status === 'pending');
 
         if (isOverdue) {
-            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Overdue</span>;
+            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400">Overdue</span>;
         } else if (submission?.status === 'reviewed') {
-            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Reviewed</span>;
+            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400">Reviewed</span>;
         } else if (submission?.status === 'submitted') {
-            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">Submitted</span>;
+            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400">Submitted</span>;
         } else {
-            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pending</span>;
+            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400">Pending</span>;
         }
     };
 
@@ -169,10 +163,10 @@ const Homework = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                         {isTeacher ? 'Homework Management' : 'My Homework'}
                     </h1>
-                    <p className="text-gray-600 mt-1">
+                    <p className="text-gray-600 dark:text-[#8E8E93] mt-1">
                         {isTeacher
                             ? 'Create and manage homework assignments for your classes'
                             : 'View and submit your homework assignments'}
@@ -181,7 +175,7 @@ const Homework = () => {
                 {isTeacher && (
                     <button
                         onClick={handleCreateHomework}
-                        className="btn btn-primary flex items-center gap-2"
+                        className="btn btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
                     >
                         <Plus className="h-5 w-5" />
                         Create Homework
@@ -190,7 +184,7 @@ const Homework = () => {
             </div>
 
             {/* Filters */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
+            <div className="card p-4">
                 <div className="flex flex-col lg:flex-row gap-4">
                     {/* Search */}
                     <div className="flex-1">
@@ -201,7 +195,7 @@ const Homework = () => {
                                 placeholder="Search homework..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
                     </div>
@@ -221,7 +215,7 @@ const Homework = () => {
                         <select
                             value={subjectFilter}
                             onChange={(e) => setSubjectFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                         >
                             <option value="">All Subjects</option>
                             {subjects.map((subject) => (
@@ -236,7 +230,7 @@ const Homework = () => {
                             <select
                                 value={classFilter}
                                 onChange={(e) => setClassFilter(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="">All Classes</option>
                                 {classes.map((cls) => (
@@ -252,7 +246,7 @@ const Homework = () => {
                             <select
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="">All Status</option>
                                 <option value="pending">Pending</option>
@@ -269,52 +263,52 @@ const Homework = () => {
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
                 </div>
             ) : homework.length === 0 ? (
-                <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                    <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No homework found</h3>
-                    <p className="text-gray-600">
+                <div className="card p-12 text-center">
+                    <BookOpen className="h-12 w-12 text-gray-400 dark:text-[#636366] mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No homework found</h3>
+                    <p className="text-gray-600 dark:text-[#8E8E93]">
                         {isTeacher
                             ? 'Create your first homework assignment to get started'
                             : 'No homework assignments available at the moment'}
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {homework.map((hw) => (
                         <div
                             key={hw._id}
-                            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+                            className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm border border-gray-200 dark:border-[#38383A] p-4 sm:p-6 hover:shadow-md transition-shadow"
                         >
                             {/* Header */}
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex-1">
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{hw.title}</h3>
-                                    <p className="text-sm text-gray-600">{hw.subject?.name}</p>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{hw.title}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-[#8E8E93]">{hw.subject?.name}</p>
                                 </div>
                                 {getStatusBadge(hw)}
                             </div>
 
                             {/* Description */}
-                            <p className="text-gray-700 text-sm mb-4 line-clamp-2">{hw.description}</p>
+                            <p className="text-gray-700 dark:text-[#8E8E93] text-sm mb-4 line-clamp-2">{hw.description}</p>
 
                             {/* Meta Info */}
                             <div className="space-y-2 mb-4">
                                 {isTeacher && (
-                                    <div className="flex items-center text-sm text-gray-600">
+                                    <div className="flex items-center text-sm text-gray-600 dark:text-[#8E8E93]">
                                         <BookOpen className="h-4 w-4 mr-2" />
                                         {hw.class?.name} {hw.section?.name && `- ${hw.section.name}`}
                                     </div>
                                 )}
-                                <div className="flex items-center text-sm text-gray-600">
+                                <div className="flex items-center text-sm text-gray-600 dark:text-[#8E8E93]">
                                     <Calendar className="h-4 w-4 mr-2" />
                                     Assigned: {formatDate(hw.assignedDate)}
                                 </div>
-                                <div className="flex items-center text-sm text-gray-600">
+                                <div className="flex items-center text-sm text-gray-600 dark:text-[#8E8E93]">
                                     <Clock className="h-4 w-4 mr-2" />
                                     Due: {formatDate(hw.dueDate)}
                                 </div>
                                 {isTeacher && hw.submissionStats && (
-                                    <div className="flex items-center text-sm text-gray-600">
+                                    <div className="flex items-center text-sm text-gray-600 dark:text-[#8E8E93]">
                                         <CheckCircle className="h-4 w-4 mr-2" />
                                         {hw.submissionStats.submitted}/{hw.submissionStats.total} submitted
                                     </div>
@@ -340,7 +334,7 @@ const Homework = () => {
                                         </button>
                                         <button
                                             onClick={() => handleDeleteHomework(hw._id)}
-                                            className="btn btn-sm btn-outline text-red-600 hover:bg-red-50 flex items-center justify-center gap-1"
+                                            className="btn btn-sm btn-outline text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center justify-center gap-1"
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </button>
@@ -389,7 +383,7 @@ const Homework = () => {
                         setShowDetailsModal(false);
                         setSelectedHomework(null);
                     }}
-                    onRefresh={fetchHomework}
+                    onRefresh={() => queryClient.invalidateQueries({ queryKey: ['homework'] })}
                 />
             )}
 

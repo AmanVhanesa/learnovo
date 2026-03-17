@@ -94,13 +94,13 @@ const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-xl font-semibold text-gray-900">Select Export Columns</h2>
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A]">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Select Export Columns</h2>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
                     >
                         <X className="h-6 w-6" />
                     </button>
@@ -110,29 +110,29 @@ const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
                     {/* Presets */}
                     <div className="mb-6">
-                        <h3 className="text-sm font-medium text-gray-900 mb-3">Quick Presets</h3>
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Quick Presets</h3>
                         <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={() => applyPreset('basic')}
-                                className="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 transition-colors"
+                                className="px-3 py-1.5 text-sm bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 rounded-md hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
                             >
                                 Basic Details
                             </button>
                             <button
                                 onClick={() => applyPreset('contact')}
-                                className="px-3 py-1.5 text-sm bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 transition-colors"
+                                className="px-3 py-1.5 text-sm bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 rounded-md hover:bg-purple-100 dark:hover:bg-purple-500/20 transition-colors"
                             >
                                 Contact Info Only
                             </button>
                             <button
                                 onClick={selectAll}
-                                className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                                className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] rounded-md hover:bg-gray-200 dark:hover:bg-[#38383A] transition-colors"
                             >
                                 Select All
                             </button>
                             <button
                                 onClick={deselectAll}
-                                className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                                className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] rounded-md hover:bg-gray-200 dark:hover:bg-[#38383A] transition-colors"
                             >
                                 Deselect All
                             </button>
@@ -142,26 +142,26 @@ const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
                     {/* Field Selection */}
                     <div className="space-y-6">
                         {Object.entries(fieldCategories).map(([categoryKey, category]) => (
-                            <div key={categoryKey} className="border rounded-lg p-4">
-                                <h3 className="text-sm font-semibold text-gray-900 mb-3">{category.label}</h3>
+                            <div key={categoryKey} className="border border-gray-200 dark:border-[#38383A] rounded-lg p-4">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{category.label}</h3>
                                 <div className="grid grid-cols-2 gap-3">
                                     {Object.entries(category.fields).map(([fieldKey, fieldLabel]) => (
                                         <label
                                             key={fieldKey}
-                                            className="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors"
+                                            className="flex items-center cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2C2C2E] p-2 rounded transition-colors"
                                         >
                                             <div className="relative flex items-center">
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedFields.includes(fieldKey)}
                                                     onChange={() => toggleField(fieldKey)}
-                                                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-[#38383A] rounded"
                                                 />
                                                 {selectedFields.includes(fieldKey) && (
                                                     <Check className="h-3 w-3 text-white absolute left-0.5 pointer-events-none" />
                                                 )}
                                             </div>
-                                            <span className="ml-2 text-sm text-gray-700">{fieldLabel}</span>
+                                            <span className="ml-2 text-sm text-gray-700 dark:text-white">{fieldLabel}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -170,18 +170,18 @@ const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
                     </div>
 
                     {/* Selected Count */}
-                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-                        <p className="text-sm text-blue-900">
+                    <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-md">
+                        <p className="text-sm text-blue-900 dark:text-blue-400">
                             <span className="font-semibold">{selectedFields.length}</span> column{selectedFields.length !== 1 ? 's' : ''} selected
                         </p>
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+                <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E]">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                        className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#8E8E93] bg-white dark:bg-[#1C1C1E] border border-gray-300 dark:border-[#38383A] rounded-md hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
                     >
                         Cancel
                     </button>

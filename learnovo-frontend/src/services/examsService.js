@@ -42,6 +42,16 @@ export const examsService = {
         return res.data
     },
 
+    publishResults: async (examId, isPublished) => {
+        const res = await api.put(`/exams/${examId}/results/publish`, { isPublished })
+        return res.data
+    },
+
+    getMyResults: async () => {
+        const res = await api.get('/exams/my-results')
+        return res.data
+    },
+
     getResultCard: async (studentId, filters = {}) => {
         const params = new URLSearchParams()
         if (filters.examSeries) params.append('examSeries', filters.examSeries)

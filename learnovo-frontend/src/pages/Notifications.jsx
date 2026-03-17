@@ -1,294 +1,366 @@
 import React, { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCircle, X, AlertTriangle, Info, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext'
+import {
+  Bell, CheckCircle2, X, AlertTriangle, Info,
+  ChevronLeft, ChevronRight, CheckCheck, Trash2,
+  Sparkles, ArrowRight, Filter
+} from 'lucide-react'
+import { useNotifications } from '../contexts/NotificationContext'
 import notificationsService from '../services/notificationsService'
 
+const TYPE_CONFIG = {
+  success: {
+    icon: CheckCircle2,
+    iconColor: 'text-emerald-500',
+    bg: 'bg-emerald-50 dark:bg-emerald-500/10',
+    ring: 'ring-emerald-100 dark:ring-emerald-500/20',
+    accent: 'border-l-emerald-500',
+  },
+  warning: {
+    icon: AlertTriangle,
+    iconColor: 'text-amber-500',
+    bg: 'bg-amber-50 dark:bg-amber-500/10',
+    ring: 'ring-amber-100 dark:ring-amber-500/20',
+    accent: 'border-l-amber-500',
+  },
+  error: {
+    icon: AlertTriangle,
+    iconColor: 'text-red-500',
+    bg: 'bg-red-50 dark:bg-red-500/10',
+    ring: 'ring-red-100 dark:ring-red-500/20',
+    accent: 'border-l-red-500',
+  },
+  info: {
+    icon: Info,
+    iconColor: 'text-blue-500',
+    bg: 'bg-blue-50 dark:bg-blue-500/10',
+    ring: 'ring-blue-100 dark:ring-blue-500/20',
+    accent: 'border-l-blue-500',
+  },
+}
+
+const FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'read', label: 'Read' },
+]
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'Unknown'
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return 'Invalid Date'
+  const now = new Date()
+  const diff = now - date
+  const seconds = Math.floor(diff / 1000)
+  if (seconds < 60) return 'Just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min${minutes !== 1 ? 's' : ''} ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} day${days !== 1 ? 's' : ''} ago`
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 const Notifications = () => {
-  const { user } = useAuth()
   const navigate = useNavigate()
-  const [notifications, setNotifications] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [filter, setFilter] = useState('all') // 'all', 'unread', 'read'
-  const [categoryFilter, setCategoryFilter] = useState(null)
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 1 })
+  const queryClient = useQueryClient()
+  const { unreadCount, markAsRead: ctxMarkAsRead, markAllAsRead: ctxMarkAllAsRead, refresh } = useNotifications()
+  const [filter, setFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const limit = 20
 
   useEffect(() => {
-    fetchNotifications()
-  }, [filter, categoryFilter, pagination.page])
+    refresh()
+  }, [refresh])
 
-  const fetchNotifications = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      // Convert filter to isRead parameter
+  const { data: queryData, isLoading, error } = useQuery({
+    queryKey: ['notifications', filter, page, limit],
+    queryFn: async () => {
       let isReadParam = 'all'
-      if (filter === 'unread') {
-        isReadParam = false
-      } else if (filter === 'read') {
-        isReadParam = true
-      }
+      if (filter === 'unread') isReadParam = false
+      else if (filter === 'read') isReadParam = true
 
       const response = await notificationsService.getNotifications({
-        page: pagination.page,
-        limit: pagination.limit,
-        isRead: isReadParam,
-        category: categoryFilter
+        page,
+        limit,
+        isRead: isReadParam
       })
 
-      console.log('Notifications API response:', response)
-
       if (response && response.success) {
-        setNotifications(response.data || [])
-        if (response.pagination) {
-          setPagination(response.pagination)
+        return {
+          notifications: response.data || [],
+          pagination: response.pagination || { page: 1, limit: 20, total: 0, pages: 1 }
         }
-      } else {
-        setNotifications([])
-        setError('Failed to load notifications')
       }
-    } catch (error) {
-      console.error('Error fetching notifications:', error)
-      setError(error?.response?.data?.message || error?.message || 'Failed to load notifications. Please try again.')
-      setNotifications([])
-      // Reset pagination on error
-      setPagination({ page: 1, limit: 20, total: 0, pages: 1 })
-    } finally {
-      setIsLoading(false)
+      throw new Error('Failed to load notifications')
+    },
+  })
+
+  const notifications = queryData?.notifications || []
+  const pagination = queryData?.pagination || { page: 1, limit: 20, total: 0, pages: 1 }
+  const errorMessage = error?.response?.data?.message || error?.message || (error ? 'Failed to load notifications. Please try again.' : null)
+
+  const deleteMutation = useMutation({
+    mutationFn: (notificationId) => notificationsService.deleteNotification(notificationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      refresh()
+    },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
     }
-  }
+  })
 
   const handleNotificationClick = async (notification) => {
-    try {
-      // Mark as read if unread
-      if (!notification.isRead) {
-        await notificationsService.markAsRead(notification._id)
-        // Update local state
-        setNotifications(prev =>
-          prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n)
-        )
-      }
-
-      // Navigate to action URL if exists
-      if (notification.actionUrl) {
-        navigate(notification.actionUrl)
-      }
-    } catch (error) {
-      console.error('Error handling notification click:', error)
+    if (!notification.isRead) {
+      // Optimistically update the cache
+      queryClient.setQueryData(['notifications', filter, page, limit], (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          notifications: old.notifications.map(n =>
+            n._id === notification._id ? { ...n, isRead: true } : n
+          )
+        }
+      })
+      ctxMarkAsRead(notification._id)
+    }
+    if (notification.actionUrl) {
+      navigate(notification.actionUrl)
     }
   }
 
   const markAllAsRead = async () => {
+    // Optimistically update
+    queryClient.setQueryData(['notifications', filter, page, limit], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        notifications: old.notifications.map(n => ({ ...n, isRead: true }))
+      }
+    })
     try {
-      await notificationsService.markAllAsRead()
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
-    } catch (error) {
-      console.error('Error marking all as read:', error)
+      await ctxMarkAllAsRead()
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    } catch {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
     }
   }
 
   const deleteNotification = async (notificationId, event) => {
-    event.stopPropagation() // Prevent notification click
-    try {
-      await notificationsService.deleteNotification(notificationId)
-      setNotifications(prev => prev.filter(n => n._id !== notificationId))
-    } catch (error) {
-      console.error('Error deleting notification:', error)
-    }
+    event.stopPropagation()
+    // Optimistically remove from cache
+    const wasUnread = notifications.find(n => n._id === notificationId && !n.isRead)
+    queryClient.setQueryData(['notifications', filter, page, limit], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        notifications: old.notifications.filter(n => n._id !== notificationId)
+      }
+    })
+    deleteMutation.mutate(notificationId)
   }
 
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case 'success':
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-yellow-500" />
-      case 'error':
-        return <AlertTriangle className="h-5 w-5 text-red-500" />
-      default:
-        return <Bell className="h-5 w-5 text-blue-500" />
-    }
-  }
-
-  const getNotificationBgColor = (type) => {
-    switch (type) {
-      case 'success':
-        return 'bg-green-50 border-green-200'
-      case 'warning':
-        return 'bg-yellow-50 border-yellow-200'
-      case 'error':
-        return 'bg-red-50 border-red-200'
-      default:
-        return 'bg-blue-50 border-blue-200'
-    }
-  }
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Unknown';
-
-    const date = new Date(dateString);
-
-    // Check if date is valid
-    if (isNaN(date.getTime())) {
-      console.error('Invalid date:', dateString);
-      return 'Invalid Date';
-    }
-
-    const now = new Date();
-    const diff = now - date;
-
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} minutes ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} hours ago`;
-    if (diff < 604800000) return `${Math.floor(diff / 86400000)} days ago`;
-    return date.toLocaleDateString();
-  }
-
-  const unreadCount = notifications.filter(n => !n.isRead).length
+  const getConfig = (type) => TYPE_CONFIG[type] || TYPE_CONFIG.info
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="loading-spinner"></div>
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <div className="loading-spinner" />
+        <p className="text-sm text-gray-400 dark:text-[#636366]">Loading notifications...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 max-w-4xl mx-auto">
+
+      {/* Page Header */}
+      <div className="page-header">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-          {unreadCount > 0 && (
-            <p className="text-sm text-gray-500 mt-1">
-              {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
-            </p>
-          )}
+          <h1 className="page-title flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
+              <Bell className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+            </div>
+            Notifications
+          </h1>
+          <p className="page-subtitle mt-1">
+            {unreadCount > 0
+              ? <>{unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}</>
+              : 'You\'re all caught up'
+            }
+          </p>
         </div>
         {unreadCount > 0 && (
           <button
             onClick={markAllAsRead}
-            className="btn btn-secondary text-sm"
+            className="btn btn-outline btn-sm flex items-center gap-2"
           >
+            <CheckCheck className="h-4 w-4" />
             Mark all as read
           </button>
         )}
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
-          <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-            <p className="text-sm text-red-600">{error}</p>
+      {/* Error */}
+      {errorMessage && (
+        <div className="card p-4 border-l-4 border-l-red-500">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">{errorMessage}</p>
+              <button
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['notifications'] })}
+                className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
+              >
+                Try again
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => fetchNotifications()}
-            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-          >
-            Try again
-          </button>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${filter === 'all'
-              ? 'bg-primary-100 text-primary-700'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilter('unread')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${filter === 'unread'
-              ? 'bg-primary-100 text-primary-700'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-          >
-            Unread
-          </button>
-          <button
-            onClick={() => setFilter('read')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${filter === 'read'
-              ? 'bg-primary-100 text-primary-700'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-          >
-            Read
-          </button>
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 text-gray-400 dark:text-[#636366]">
+          <Filter className="h-4 w-4" />
+        </div>
+        <div className="tab-nav">
+          {FILTERS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => {
+                setFilter(f.key)
+                setPage(1)
+              }}
+              className={`tab-item ${filter === f.key ? 'tab-item-active' : ''}`}
+            >
+              {f.label}
+              {f.key === 'unread' && unreadCount > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-md bg-red-500/10 text-[10px] font-bold text-red-600 dark:text-red-400 tabular-nums">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Notifications List */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="card overflow-hidden">
         {notifications.length === 0 ? (
-          <div className="text-center py-12">
-            <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">
+          <div className="flex flex-col items-center justify-center py-16 px-6">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-[#2C2C2E] flex items-center justify-center mb-5">
+              <Sparkles className="h-8 w-8 text-gray-300 dark:text-[#636366]" />
+            </div>
+            <p className="text-base font-medium text-gray-500 dark:text-[#8E8E93]">
               {filter === 'unread'
                 ? 'No unread notifications'
                 : filter === 'read'
                   ? 'No read notifications'
                   : 'No notifications yet'}
             </p>
+            <p className="text-sm text-gray-400 dark:text-[#636366] mt-1.5">
+              {filter === 'unread'
+                ? 'Great job staying on top of things!'
+                : 'Notifications will appear here when there\'s something new'}
+            </p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {notifications.map((notification) => (
-              <div
-                key={notification._id}
-                onClick={() => handleNotificationClick(notification)}
-                className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${!notification.isRead ? 'bg-gray-50' : ''
-                  }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3 flex-1">
-                    <div className={`p-2 rounded-lg ${getNotificationBgColor(notification.type)}`}>
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h3 className={`text-sm font-medium ${!notification.isRead ? 'text-gray-900' : 'text-gray-600'}`}>
-                          {notification.title}
-                        </h3>
-                        {!notification.isRead && (
-                          <span className="ml-2 h-2 w-2 bg-primary-500 rounded-full"></span>
+          <div>
+            {notifications.map((notification, index) => {
+              const config = getConfig(notification.type)
+              const Icon = config.icon
+              const isUnread = !notification.isRead
+
+              return (
+                <div
+                  key={notification._id}
+                  onClick={() => handleNotificationClick(notification)}
+                  className={`group relative flex items-start gap-3 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 cursor-pointer transition-all duration-150
+                    ${isUnread
+                      ? 'bg-primary-50/30 dark:bg-primary-500/[0.03] border-l-[3px] border-l-primary-500'
+                      : 'border-l-[3px] border-l-transparent hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/60'
+                    }
+                    ${index < notifications.length - 1 ? 'border-b border-gray-100/80 dark:border-[#2C2C2E]' : ''}
+                  `}
+                >
+                  {/* Icon */}
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-xl ${config.bg} ring-1 ${config.ring} flex items-center justify-center mt-0.5`}>
+                    <Icon className={`h-[18px] w-[18px] ${config.iconColor}`} />
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className={`text-sm leading-snug ${isUnread ? 'font-semibold text-gray-900 dark:text-white' : 'font-medium text-gray-600 dark:text-[#8E8E93]'}`}>
+                        {notification.title}
+                      </h3>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[11px] text-gray-400 dark:text-[#636366] tabular-nums whitespace-nowrap">
+                          {formatDate(notification.createdAt)}
+                        </span>
+                        {isUnread && (
+                          <span className="h-2 w-2 rounded-full bg-primary-500 flex-shrink-0" />
                         )}
                       </div>
-                      <p className={`mt-1 text-sm ${!notification.isRead ? 'text-gray-700' : 'text-gray-500'}`}>
-                        {notification.message}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-400">
-                        {formatDate(notification.createdAt)}
-                      </p>
                     </div>
+                    <p className={`mt-1 text-[13px] leading-relaxed line-clamp-2 ${isUnread ? 'text-gray-600 dark:text-[#8E8E93]' : 'text-gray-400 dark:text-[#636366]'}`}>
+                      {notification.message}
+                    </p>
+                    {notification.actionLabel && (
+                      <span className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-primary-600 dark:text-primary-400 group-hover:underline">
+                        {notification.actionLabel}
+                        <ArrowRight className="h-3 w-3" />
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-2 ml-4">
-                    <button
-                      onClick={(e) => deleteNotification(notification._id, e)}
-                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                      title="Delete"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
+
+                  {/* Delete button */}
+                  <button
+                    onClick={(e) => deleteNotification(notification._id, e)}
+                    className="flex-shrink-0 p-2 rounded-lg text-gray-300 dark:text-[#636366] opacity-0 group-hover:opacity-100 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                    title="Delete notification"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 card px-4 sm:px-5 py-3.5">
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] tabular-nums">
+            Page <span className="font-medium text-gray-700 dark:text-[#8E8E93]">{pagination.page}</span> of{' '}
+            <span className="font-medium text-gray-700 dark:text-[#8E8E93]">{pagination.pages}</span>
+            <span className="text-gray-400 dark:text-[#636366] ml-1">({pagination.total} total)</span>
+          </p>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="btn btn-outline btn-sm !px-2.5"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={page >= pagination.pages}
+              className="btn btn-outline btn-sm !px-2.5"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 export default Notifications
-

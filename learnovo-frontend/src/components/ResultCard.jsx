@@ -5,8 +5,7 @@ import { examsService } from '../services/examsService';
 import { settingsService } from '../services/settingsService';
 import toast from 'react-hot-toast';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-const SERVER_URL = API_BASE.replace(/\/api\/?$/, '');
+import { SERVER_URL } from '../constants/config';
 
 const getSignatureUrl = (url) => {
     if (!url) return null;
@@ -14,7 +13,7 @@ const getSignatureUrl = (url) => {
     return encodeURI(full);
 };
 
-const SERIES_OPTIONS = ['Unit Test', 'Midterm', 'Final', 'Annual', 'Custom'];
+const SERIES_OPTIONS = ['Unit Test', 'Midterm', 'Final', 'Custom'];
 
 /* ─────────────────────────────────────────────────────────
    Minimal grade helpers — monochrome-first, just a tint
@@ -283,22 +282,22 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
 
     return ReactDOM.createPortal(
         <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-4 max-h-[92vh] flex flex-col">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-xl shadow-2xl w-full max-w-4xl sm:mx-4 h-full sm:h-auto sm:max-h-[92vh] flex flex-col">
 
                 {/* ── Modal Header ── */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-[#38383A] shrink-0 gap-2">
                     <div className="flex items-center gap-2.5">
-                        <FileText className="h-5 w-5 text-primary-600 shrink-0" />
+                        <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400 shrink-0" />
                         <div>
-                            <h3 className="text-base font-semibold text-gray-900 leading-tight">Student Report Card</h3>
+                            <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white leading-tight">Student Report Card</h3>
                             {(student?.fullName || student?.name || studentName) && (
-                                <p className="text-xs text-gray-400 mt-0.5">{student?.fullName || student?.name || studentName}</p>
+                                <p className="text-xs text-gray-400 dark:text-[#636366] mt-0.5 truncate">{student?.fullName || student?.name || studentName}</p>
                             )}
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                         <div className="flex items-center gap-1.5">
-                            <label className="text-xs text-gray-500 font-medium whitespace-nowrap">Exam Series:</label>
+                            <label className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium whitespace-nowrap">Exam Series:</label>
                             <select
                                 className="input w-32 text-sm h-9"
                                 value={filterSeries}
@@ -317,25 +316,25 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                             {printing ? 'Opening…' : 'Print / PDF'}
                         </button>
                         <button
-                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
                             onClick={onClose}
                         >
-                            <X className="h-5 w-5 text-gray-500" />
+                            <X className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
                         </button>
                     </div>
                 </div>
 
                 {/* ── Scrollable Body ── */}
-                <div className="overflow-y-auto flex-1 bg-gray-100 p-4">
+                <div className="overflow-y-auto flex-1 bg-gray-100 dark:bg-[#000000] p-4">
 
                     {/* Loading */}
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-[#636366]">
                             <div className="loading-spinner mb-3" />
                             <p className="text-sm">Loading result card…</p>
                         </div>
                     ) : !subjects.length ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-400 dark:text-[#636366]">
                             <FileText className="h-10 w-10 mb-3 opacity-40" />
                             <p className="font-medium">No results found</p>
                             <p className="text-sm mt-1 text-center px-8">
@@ -347,56 +346,56 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                     ) : (
 
                         /* ══ Certificate Card ══ */
-                        <div className="bg-white border border-gray-800 shadow-xl max-w-3xl mx-auto rounded-2xl overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+                        <div className="bg-white dark:bg-[#1C1C1E] border border-gray-800 dark:border-[#38383A] shadow-xl max-w-3xl mx-auto rounded-2xl overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
                             {/* Load Playfair Display from Google Fonts */}
                             <link rel="preconnect" href="https://fonts.googleapis.com" />
                             <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
                             <div>
 
                                 {/* ── Certificate Header ── */}
-                                <div className="flex items-center gap-6 px-7 py-5 border-b-2 border-gray-800">
+                                <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 px-4 sm:px-7 py-4 sm:py-5 border-b-2 border-gray-800 dark:border-[#38383A]">
                                     {/* Logo — bigger */}
                                     <div className="shrink-0">
                                         {schoolInfo.logo
                                             ? <img src={schoolInfo.logo} alt="Logo" className="w-24 h-24 object-contain" />
-                                            : <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-3xl font-black text-slate-500">{(schoolInfo.name || 'S')[0]}</div>
+                                            : <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-[#2C2C2E] flex items-center justify-center text-3xl font-black text-slate-500 dark:text-[#8E8E93]">{(schoolInfo.name || 'S')[0]}</div>
                                         }
                                     </div>
                                     {/* School info */}
                                     <div className="flex-1 text-center">
-                                        <h1 className="text-2xl font-black tracking-tight text-slate-900 leading-tight" style={{ fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.02em' }}>{schoolInfo.name}</h1>
-                                        {schoolInfo.address && <p className="text-[11px] text-slate-500 mt-1">{schoolInfo.address}</p>}
-                                        {schoolInfo.phone && <p className="text-[11px] text-slate-400 mt-0.5">Phone: {schoolInfo.phone}{schoolInfo.email && `  ·  Email: ${schoolInfo.email}`}</p>}
-                                        {schoolInfo.board && <p className="text-[11px] text-slate-400 mt-0.5">{schoolInfo.board}{schoolInfo.affiliation && ` · Affil: ${schoolInfo.affiliation}`}{schoolInfo.udise && ` · UDISE: ${schoolInfo.udise}`}</p>}
-                                        <div className="inline-block mt-2 px-3 py-0.5 border border-slate-800 text-[10px] font-bold tracking-[.15em] uppercase text-slate-800">
+                                        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white leading-tight" style={{ fontFamily: "'Inter', system-ui, sans-serif", letterSpacing: '-0.02em' }}>{schoolInfo.name}</h1>
+                                        {schoolInfo.address && <p className="text-[11px] text-slate-500 dark:text-[#8E8E93] mt-1">{schoolInfo.address}</p>}
+                                        {schoolInfo.phone && <p className="text-[11px] text-slate-400 dark:text-[#636366] mt-0.5">Phone: {schoolInfo.phone}{schoolInfo.email && `  ·  Email: ${schoolInfo.email}`}</p>}
+                                        {schoolInfo.board && <p className="text-[11px] text-slate-400 dark:text-[#636366] mt-0.5">{schoolInfo.board}{schoolInfo.affiliation && ` · Affil: ${schoolInfo.affiliation}`}{schoolInfo.udise && ` · UDISE: ${schoolInfo.udise}`}</p>}
+                                        <div className="inline-block mt-2 px-3 py-0.5 border border-slate-800 dark:border-[#8E8E93] text-[10px] font-bold tracking-[.15em] uppercase text-slate-800 dark:text-[#8E8E93]">
                                             Student Report Card{filterSeries ? ` — ${filterSeries}` : ''}
                                         </div>
                                     </div>
-                                    <div className="shrink-0 text-right text-[10px] text-slate-400 leading-relaxed">Date<br />{issueDate}</div>
+                                    <div className="shrink-0 text-right text-[10px] text-slate-400 dark:text-[#636366] leading-relaxed">Date<br />{issueDate}</div>
                                 </div>
 
                                 {/* ── Student Info Strip (clean, no color) ── */}
-                                <div className="grid grid-cols-4 border-b border-gray-200">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-gray-200 dark:border-[#38383A]">
                                     {[
                                         { label: 'Student Name', value: student?.fullName || student?.name || studentName || '—', serif: true },
                                         { label: 'Adm. Number', value: student?.admissionNumber || '—' },
                                         { label: 'Class / Section', value: `${student?.class || subjects[0]?.class || '—'}${(student?.section || subjects[0]?.section) ? ' — ' + (student?.section || subjects[0]?.section) : ''}` },
                                         { label: 'Roll Number', value: student?.rollNumber || '—' },
                                     ].map((c, i) => (
-                                        <div key={c.label} className={`px-5 py-3 ${i < 3 ? 'border-r border-gray-200' : ''}`}>
-                                            <p className="text-[9.5px] font-semibold uppercase tracking-[.1em] text-slate-400">{c.label}</p>
-                                            <p className="mt-1 text-sm font-bold text-slate-900" style={c.serif ? { fontFamily: "'Inter', system-ui, sans-serif", fontSize: '15px', fontWeight: 700 } : {}}>{c.value}</p>
+                                        <div key={c.label} className={`px-5 py-3 ${i < 3 ? 'border-r border-gray-200 dark:border-[#38383A]' : ''}`}>
+                                            <p className="text-[9.5px] font-semibold uppercase tracking-[.1em] text-slate-400 dark:text-[#636366]">{c.label}</p>
+                                            <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white" style={c.serif ? { fontFamily: "'Inter', system-ui, sans-serif", fontSize: '15px', fontWeight: 700 } : {}}>{c.value}</p>
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* ── Marks Table ── */}
-                                <div className="px-7 py-4">
-                                    <p className="text-[9.5px] font-bold uppercase tracking-[.12em] text-slate-400 mb-3">Subject-wise Performance</p>
-                                    <div className="overflow-x-auto border border-gray-200 rounded-xl overflow-hidden">
+                                <div className="px-3 sm:px-7 py-4">
+                                    <p className="text-[9.5px] font-bold uppercase tracking-[.12em] text-slate-400 dark:text-[#636366] mb-3">Subject-wise Performance</p>
+                                    <div className="overflow-x-auto border border-gray-200 dark:border-[#38383A] rounded-xl overflow-hidden">
                                         <table className="w-full text-sm">
                                             <thead>
-                                                <tr className="bg-slate-50 text-[9.5px] font-bold uppercase tracking-wide text-slate-500 border-b-2 border-slate-200">
+                                                <tr className="bg-slate-50 dark:bg-[#2C2C2E] text-[9.5px] font-bold uppercase tracking-wide text-slate-500 dark:text-[#8E8E93] border-b-2 border-slate-200 dark:border-[#38383A]">
                                                     {['Subject', 'Exam', 'Max', 'Obtained', '%', 'Grade', 'Result', 'Remarks'].map((h, i) => (
                                                         <th key={h} className={`px-3 py-2.5 ${i >= 2 && i <= 6 ? 'text-center' : 'text-left'}`}>{h}</th>
                                                     ))}
@@ -404,22 +403,22 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                             </thead>
                                             <tbody>
                                                 {subjects.map((s, i) => (
-                                                    <tr key={s.examId} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                                                        <td className="px-3 py-2.5 font-semibold text-slate-900">{s.subject}</td>
+                                                    <tr key={s.examId} className={`border-b border-gray-100 dark:border-[#38383A] ${i % 2 === 0 ? 'bg-white dark:bg-[#1C1C1E]' : 'bg-slate-50/40 dark:bg-[#2C2C2E]/40'}`}>
+                                                        <td className="px-3 py-2.5 font-semibold text-slate-900 dark:text-white">{s.subject}</td>
                                                         <td className="px-3 py-2.5">
-                                                            <div className="text-xs font-medium text-slate-700">{s.examName}</div>
-                                                            <div className="text-xs text-slate-400">{new Date(s.date).toLocaleDateString('en-IN')}</div>
+                                                            <div className="text-xs font-medium text-slate-700 dark:text-[#8E8E93]">{s.examName}</div>
+                                                            <div className="text-xs text-slate-400 dark:text-[#636366]">{new Date(s.date).toLocaleDateString('en-IN')}</div>
                                                         </td>
-                                                        <td className="px-3 py-2.5 text-center text-slate-500">{s.totalMarks}</td>
-                                                        <td className="px-3 py-2.5 text-center font-bold text-slate-900 text-base">{s.marksObtained}</td>
-                                                        <td className="px-3 py-2.5 text-center text-slate-600">{s.percentage}%</td>
+                                                        <td className="px-3 py-2.5 text-center text-slate-500 dark:text-[#8E8E93]">{s.totalMarks}</td>
+                                                        <td className="px-3 py-2.5 text-center font-bold text-slate-900 dark:text-white text-base">{s.marksObtained}</td>
+                                                        <td className="px-3 py-2.5 text-center text-slate-600 dark:text-[#8E8E93]">{s.percentage}%</td>
                                                         <td className="px-3 py-2.5 text-center">
                                                             <span style={{ background: GRADE_BG(s.grade), color: GRADE_COLOR(s.grade) }} className="inline-block px-2 py-0.5 text-xs font-bold tracking-wide">{s.grade}</span>
                                                         </td>
                                                         <td className="px-3 py-2.5 text-center">
-                                                            <span className={`text-xs font-semibold ${s.isPassed ? 'text-emerald-700' : 'text-red-600'}`}>{s.isPassed ? '✓ Pass' : '✗ Fail'}</span>
+                                                            <span className={`text-xs font-semibold ${s.isPassed ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{s.isPassed ? '✓ Pass' : '✗ Fail'}</span>
                                                         </td>
-                                                        <td className="px-3 py-2.5 text-xs text-slate-400 italic">{s.remarks || '—'}</td>
+                                                        <td className="px-3 py-2.5 text-xs text-slate-400 dark:text-[#636366] italic">{s.remarks || '—'}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -438,45 +437,45 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                             </tfoot>
                                         </table>
                                     </div>
-                                    <div className="mt-2 flex gap-4 text-xs text-slate-400">
-                                        <span>Total Subjects: <strong className="text-slate-600">{summary.totalSubjects}</strong></span>
-                                        <span>Passed: <strong className="text-emerald-700">{summary.passCount}</strong></span>
-                                        {summary.failCount > 0 && <span>Failed: <strong className="text-red-600">{summary.failCount}</strong></span>}
+                                    <div className="mt-2 flex gap-4 text-xs text-slate-400 dark:text-[#636366]">
+                                        <span>Total Subjects: <strong className="text-slate-600 dark:text-[#8E8E93]">{summary.totalSubjects}</strong></span>
+                                        <span>Passed: <strong className="text-emerald-700 dark:text-emerald-400">{summary.passCount}</strong></span>
+                                        {summary.failCount > 0 && <span>Failed: <strong className="text-red-600 dark:text-red-400">{summary.failCount}</strong></span>}
                                     </div>
                                 </div>
 
                                 {/* ── Result Footer — minimal ── */}
                                 <div className="mx-7 mb-6 flex items-center gap-4 py-4">
-                                    <div className="flex-1 h-px bg-gray-200" />
+                                    <div className="flex-1 h-px bg-gray-200 dark:bg-[#38383A]" />
                                     <div className="text-center px-2">
-                                        <p className="text-xs font-semibold tracking-[.14em] uppercase text-slate-700">
+                                        <p className="text-xs font-semibold tracking-[.14em] uppercase text-slate-700 dark:text-[#8E8E93]">
                                             {summary.overallPassed ? passTitle : failTitle}
                                         </p>
-                                        <p className="text-[9.5px] tracking-[.08em] uppercase text-slate-400 mt-0.5">
+                                        <p className="text-[9.5px] tracking-[.08em] uppercase text-slate-400 dark:text-[#636366] mt-0.5">
                                             {summary.overallPassed ? passSub : failSub}
                                         </p>
                                     </div>
-                                    <div className="flex-1 h-px bg-gray-200" />
+                                    <div className="flex-1 h-px bg-gray-200 dark:bg-[#38383A]" />
                                 </div>
 
                                 {/* ── Signatures ── */}
-                                <div className="border-t border-dashed border-gray-300 mx-7 pt-5 mb-6 grid grid-cols-2 gap-12 text-center items-end">
+                                <div className="border-t border-dashed border-gray-300 dark:border-[#38383A] mx-3 sm:mx-7 pt-5 mb-6 grid grid-cols-2 gap-4 sm:gap-12 text-center items-end">
                                     <div>
                                         <div className="h-10" />
-                                        <div className="border-b border-gray-400 mb-2 max-w-[200px] mx-auto" />
-                                        <p className="text-xs font-semibold text-slate-700">Class Teacher</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">Signature &amp; Seal</p>
+                                        <div className="border-b border-gray-400 dark:border-[#636366] mb-2 max-w-[200px] mx-auto" />
+                                        <p className="text-xs font-semibold text-slate-700 dark:text-[#8E8E93]">Class Teacher</p>
+                                        <p className="text-[10px] text-slate-400 dark:text-[#636366] mt-0.5">Signature &amp; Seal</p>
                                     </div>
                                     <div className="flex flex-col items-center">
                                         {schoolInfo.principalSignature
                                             ? <img src={getSignatureUrl(schoolInfo.principalSignature)} alt="Principal Signature" className="h-10 w-28 object-contain" />
                                             : <div className="h-10" />}
-                                        <div className="w-full border-b border-gray-400 mb-2 max-w-[200px] mx-auto" />
-                                        <p className="text-xs font-semibold text-slate-700 w-full text-center">Principal</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5 w-full text-center">Signature &amp; Seal</p>
+                                        <div className="w-full border-b border-gray-400 dark:border-[#636366] mb-2 max-w-[200px] mx-auto" />
+                                        <p className="text-xs font-semibold text-slate-700 dark:text-[#8E8E93] w-full text-center">Principal</p>
+                                        <p className="text-[10px] text-slate-400 dark:text-[#636366] mt-0.5 w-full text-center">Signature &amp; Seal</p>
                                     </div>
                                 </div>
-                                <p className="text-center text-[10px] text-slate-300 pb-5 italic px-7">This is a computer-generated report card issued by {schoolInfo.name}.</p>
+                                <p className="text-center text-[10px] text-slate-300 dark:text-[#636366] pb-5 italic px-7">This is a computer-generated report card issued by {schoolInfo.name}.</p>
 
                             </div>
                         </div>
@@ -488,5 +487,3 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
 };
 
 export default ResultCard;
-
-

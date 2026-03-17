@@ -44,6 +44,9 @@ export const invoicesService = {
     if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
     if (filters.startDate) params.append('startDate', filters.startDate)
     if (filters.endDate) params.append('endDate', filters.endDate)
+    if (filters.page) params.append('page', filters.page)
+    if (filters.limit) params.append('limit', filters.limit)
+    if (filters.search) params.append('search', filters.search)
 
     const url = `/invoices${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)
@@ -61,7 +64,7 @@ export const invoicesService = {
   },
 
   generateBulk: async (data) => {
-    const res = await api.post('/invoices/generate-bulk', data)
+    const res = await api.post('/invoices/generate-bulk', data, { timeout: 120000 })
     return res.data
   },
 
@@ -82,6 +85,29 @@ export const invoicesService = {
 
   delete: async (id) => {
     const res = await api.delete(`/invoices/${id}`)
+    return res.data
+  }
+}
+
+// Discounts & Waivers
+export const discountsService = {
+  applyDiscount: async (invoiceId, data) => {
+    const res = await api.post(`/invoices/${invoiceId}/discount`, data)
+    return res.data
+  },
+
+  removeDiscount: async (invoiceId) => {
+    const res = await api.delete(`/invoices/${invoiceId}/discount`)
+    return res.data
+  },
+
+  listDiscounts: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.studentId) params.append('studentId', filters.studentId)
+    if (filters.classId) params.append('classId', filters.classId)
+
+    const url = `/fees/discounts${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url)
     return res.data
   }
 }
@@ -124,6 +150,46 @@ export const paymentsService = {
 
   getReceipt: async (id) => {
     const res = await api.get(`/invoices/payments/${id}/receipt`)
+    return res.data
+  }
+}
+
+// Refunds
+export const refundsService = {
+  initiate: async (data) => {
+    const res = await api.post('/refunds', data)
+    return res.data
+  },
+
+  list: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.studentId) params.append('studentId', filters.studentId)
+    if (filters.status) params.append('status', filters.status)
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
+
+    const url = `/refunds${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url)
+    return res.data
+  },
+
+  get: async (id) => {
+    const res = await api.get(`/refunds/${id}`)
+    return res.data
+  },
+
+  approve: async (id) => {
+    const res = await api.post(`/refunds/${id}/approve`)
+    return res.data
+  },
+
+  reject: async (id, reason) => {
+    const res = await api.post(`/refunds/${id}/reject`, { reason })
+    return res.data
+  },
+
+  process: async (id, data) => {
+    const res = await api.post(`/refunds/${id}/process`, data)
     return res.data
   }
 }
@@ -216,7 +282,9 @@ export const feesService = {
 export default {
   feeStructures: feeStructuresService,
   invoices: invoicesService,
+  discounts: discountsService,
   payments: paymentsService,
+  refunds: refundsService,
   reports: feesReportsService,
   fees: feesService
 }

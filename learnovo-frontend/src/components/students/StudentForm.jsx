@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera } from 'lucide-react'
+import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2 } from 'lucide-react'
 import api from '../../services/authService'
 import transportService from '../../services/transportService'
+import { SERVER_URL } from '../../constants/config'
+
+const currentYear = new Date().getFullYear()
+const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
 
 const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     const [activeSection, setActiveSection] = useState(0)
@@ -20,7 +24,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         classId: student?.classId?._id || student?.classId || '',
         class: student?.class || '',
         section: student?.section || '',
-        academicYear: student?.academicYear || '2025-2026',
+        academicYear: student?.academicYear || defaultAcademicYear,
         rollNumber: student?.rollNumber || '',
         admissionDate: student?.admissionDate ? student.admissionDate.substring(0, 10) : '',
         admissionNumber: student?.admissionNumber || '',
@@ -224,23 +228,23 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
     return (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-            <div className="modal-content max-w-4xl p-0">
+            <div className="modal-content max-w-4xl p-0 max-h-[100vh] sm:max-h-[90vh] h-full sm:h-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-4 sm:p-6">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
                         {student ? 'Edit Student' : 'Add New Student'}
                     </h3>
                     <button
                         onClick={onCancel}
-                        className="p-2 rounded-md hover:bg-gray-100"
+                        className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#2C2C2E]"
                     >
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
                 {/* Section Tabs */}
-                <div className="border-b border-gray-200 px-6">
-                    <nav className="-mb-px flex space-x-6 overflow-x-auto">
+                <div className="border-b border-gray-200 dark:border-[#38383A] px-4 sm:px-6">
+                    <nav className="-mb-px flex space-x-4 sm:space-x-6 overflow-x-auto whitespace-nowrap">
                         {sections.map((section) => {
                             const Icon = section.icon
                             return (
@@ -249,7 +253,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     onClick={() => setActiveSection(section.id)}
                                     className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${activeSection === section.id
                                         ? 'border-primary-500 text-primary-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300'
                                         }`}
                                 >
                                     <Icon className="h-4 w-4" />
@@ -261,7 +265,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 </div>
 
                 {/* Form Content */}
-                <form onSubmit={handleSubmit} className="p-6">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6">
                     <div className="max-h-[60vh] overflow-y-auto">
                         {/* Section 0: Student Info */}
                         {activeSection === 0 && (
@@ -271,19 +275,19 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     <div className="relative flex-shrink-0">
                                         {form.photo ? (
                                             <img
-                                                src={form.photo}
+                                                src={form.photo.startsWith('data:') || form.photo.startsWith('http') ? form.photo : `${SERVER_URL}${form.photo}`}
                                                 alt="Student"
-                                                className="h-24 w-24 rounded-full object-cover border-2 border-gray-200"
+                                                className="h-24 w-24 rounded-full object-cover border-2 border-gray-200 dark:border-[#38383A]"
                                             />
                                         ) : (
-                                            <div className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center">
-                                                <User className="h-12 w-12 text-gray-400" />
+                                            <div className="h-24 w-24 rounded-full bg-gray-200 dark:bg-[#2C2C2E] flex items-center justify-center">
+                                                <User className="h-12 w-12 text-gray-400 dark:text-[#636366]" />
                                             </div>
                                         )}
                                     </div>
                                     <div className="flex-1">
-                                        <p className="text-sm font-medium text-gray-900 mb-1">Student Photo</p>
-                                        <p className="text-xs text-gray-500 mb-3">Upload a clear photo (JPG, PNG)</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">Student Photo</p>
+                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mb-3">Upload a clear photo (JPG, PNG)</p>
                                         {/* Two separate buttons for universal Android/iPad compatibility */}
                                         <div className="flex flex-wrap gap-2">
                                             <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium cursor-pointer hover:bg-primary-700 active:scale-95 transition-all">
@@ -323,7 +327,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                         required
                                         placeholder="Enter full name"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Enter the complete name as it should appear on records</p>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Enter the complete name as it should appear on records</p>
                                 </div>
 
                                 {/* Contact & Login */}
@@ -369,16 +373,16 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                     onChange={(e) => updateField('createLogin', e.target.checked)}
                                                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                                                 />
-                                                <span className="text-sm text-gray-700">Create login credentials</span>
+                                                <span className="text-sm text-gray-700 dark:text-white">Create login credentials</span>
                                             </label>
                                         </div>
                                     </div>
                                 )}
 
                                 {/* Academic Info */}
-                                <div className="border-t border-gray-100 pt-4">
-                                    <h4 className="text-sm font-semibold text-gray-900 mb-4">Academic Information</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div className="border-t border-gray-100 dark:border-[#38383A] pt-4">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Academic Information</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                                         <div>
                                             <label className="label">Academic Year *</label>
                                             <input
@@ -439,7 +443,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 ))}
                                             </select>
                                             {!form.class && (
-                                                <p className="text-xs text-gray-500 mt-1">Please select a class first</p>
+                                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Please select a class first</p>
                                             )}
                                         </div>
                                         <div>
@@ -465,7 +469,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             <div>
                                                 <label className="label">Admission Number</label>
                                                 <input
-                                                    className="input bg-gray-50"
+                                                    className="input bg-gray-50 dark:bg-[#2C2C2E]"
                                                     value={form.admissionNumber}
                                                     readOnly
                                                 />
@@ -473,7 +477,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                                         <div>
                                             <label className="label">Sub Department</label>
                                             <select
@@ -514,7 +518,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                         <div>
                                             <label className="label">UDISE Code (School)</label>
                                             <input
-                                                className="input bg-gray-50"
+                                                className="input bg-gray-50 dark:bg-[#2C2C2E]"
                                                 value={student?.udiseCode || 'Inherited'}
                                                 readOnly
                                             />
@@ -551,7 +555,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                     <div>
                                         <label className="label">Blood Group</label>
                                         <select
@@ -613,7 +617,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 onChange={(e) => updateField('isOrphan', e.target.checked)}
                                                 className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                                             />
-                                            <span className="text-sm text-gray-700">Orphan Status</span>
+                                            <span className="text-sm text-gray-700 dark:text-white">Orphan Status</span>
                                         </label>
                                     </div>
                                 </div>
@@ -669,11 +673,24 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                         {activeSection === 3 && (
                             <div className="space-y-6">
                                 {form.guardians.map((guardian, index) => (
-                                    <div key={index} className="border border-gray-200 rounded-lg p-4">
+                                    <div key={index} className="border border-gray-200 dark:border-[#38383A] rounded-lg p-4">
                                         <div className="flex items-center justify-between mb-4">
-                                            <h4 className="text-sm font-semibold text-gray-900">
+                                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
                                                 {guardian.isPrimary ? 'Primary Guardian' : 'Secondary Guardian'}
                                             </h4>
+                                            {!guardian.isPrimary && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setForm(prev => ({
+                                                        ...prev,
+                                                        guardians: prev.guardians.filter((_, i) => i !== index)
+                                                    }))}
+                                                    className="text-red-500 hover:text-red-700 text-xs flex items-center gap-1"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                    Remove
+                                                </button>
+                                            )}
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -743,7 +760,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     </button>
                                 )}
 
-                                <div className="border-t border-gray-100 pt-4">
+                                <div className="border-t border-gray-100 dark:border-[#38383A] pt-4">
                                     <label className="label">Address</label>
                                     <textarea
                                         className="input"
@@ -796,13 +813,13 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex items-center justify-between gap-4 pt-6 border-t border-gray-200 mt-6">
+                    <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 pt-6 border-t border-gray-200 dark:border-[#38383A] mt-6">
                         <div className="flex gap-2">
                             {activeSection > 0 && (
                                 <button
                                     type="button"
                                     onClick={() => setActiveSection(activeSection - 1)}
-                                    className="btn btn-outline"
+                                    className="btn btn-outline w-full sm:w-auto"
                                 >
                                     Previous
                                 </button>
@@ -812,7 +829,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                             <button
                                 type="button"
                                 onClick={onCancel}
-                                className="btn btn-ghost"
+                                className="btn btn-ghost w-full sm:w-auto"
                             >
                                 Cancel
                             </button>
@@ -820,14 +837,14 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                 <button
                                     type="button"
                                     onClick={() => setActiveSection(activeSection + 1)}
-                                    className="btn btn-primary"
+                                    className="btn btn-primary w-full sm:w-auto"
                                 >
                                     Next
                                 </button>
                             ) : (
                                 <button
                                     type="submit"
-                                    className="btn btn-primary"
+                                    className="btn btn-primary w-full sm:w-auto"
                                     disabled={isLoading}
                                 >
                                     {isLoading ? 'Saving...' : student ? 'Update Student' : 'Add Student'}

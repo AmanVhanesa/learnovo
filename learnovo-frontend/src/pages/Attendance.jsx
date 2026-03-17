@@ -1,495 +1,238 @@
-import React, { useState, useEffect } from 'react'
-import { Calendar, Users, CheckCircle, XCircle, Clock, Download, Filter, X, Copy, AlertTriangle } from 'lucide-react'
+import React, { useState, lazy, Suspense } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import {
+  Calendar, Users, CheckCircle, XCircle, Clock, AlertTriangle,
+  ClipboardList, BarChart3, TrendingUp, Settings, UserCheck
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { attendanceService } from '../services/attendanceService'
 import toast from 'react-hot-toast'
 
-const Attendance = () => {
-  const { user } = useAuth()
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
-  const [selectedClass, setSelectedClass] = useState(null)
-  const [classes, setClasses] = useState([])
-  const [attendance, setAttendance] = useState({})
-  const [students, setStudents] = useState([])
-  const [filteredStudents, setFilteredStudents] = useState([])
-  const [searchTerm, setSearchTerm] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [showReportModal, setShowReportModal] = useState(false)
+// ── Lazy-loaded tab content (each is the existing standalone page) ───────────
+const AttendanceDashboard = lazy(() => import('./attendance/AttendanceDashboard'))
+const MarkStudentAttendance = lazy(() => import('./attendance/MarkStudentAttendance'))
+const MarkEmployeeAttendance = lazy(() => import('./attendance/MarkEmployeeAttendance'))
+const Absentees = lazy(() => import('./attendance/Absentees'))
+const MonthlyReport = lazy(() => import('./attendance/MonthlyReport'))
+const Analytics = lazy(() => import('./attendance/Analytics'))
+const Holidays = lazy(() => import('./attendance/Holidays'))
+const AttendanceSettings = lazy(() => import('./attendance/AttendanceSettings'))
 
-  useEffect(() => {
-    fetchTeacherClasses()
-  }, [])
+const TabLoader = () => (
+  <div className="flex items-center justify-center h-48">
+    <div className="loading-spinner" />
+  </div>
+)
 
-  useEffect(() => {
-    if (selectedClass) {
-      fetchStudents()
-      fetchExistingAttendance()
-    }
-  }, [selectedClass, selectedDate])
+// ── Student / Parent read-only view ─────────────────────────────────────────
+const StudentAttendanceView = () => {
+  const { data: attendanceData, isLoading } = useQuery({
+    queryKey: ['my-attendance'],
+    queryFn: async () => {
+      const res = await attendanceService.getAttendanceReport({})
+      return res.data || res || { summary: null, records: [] }
+    },
+  })
 
-  // Filter students based on search term
-  useEffect(() => {
-    if (searchTerm.trim() === '') {
-      setFilteredStudents(students)
-    } else {
-      const filtered = students.filter(student =>
-        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (student.admissionNumber || student.admission_number || '').toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      setFilteredStudents(filtered)
-    }
-  }, [students, searchTerm])
-
-  const fetchTeacherClasses = async () => {
-    try {
-      setIsLoading(true)
-      const response = await attendanceService.getTeacherClasses()
-
-      if (response?.data && response.data.length > 0) {
-        setClasses(response.data)
-        setSelectedClass(response.data[0])
-      } else {
-        // No classes found - could be empty database or no assignments
-        setClasses([])
-      }
-    } catch (error) {
-      console.error('Error fetching classes:', error)
-      // Don't show error toast, just set empty classes
-      setClasses([])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchStudents = async () => {
-    if (!selectedClass?._id) return
-
-    try {
-      setIsLoading(true)
-      const response = await attendanceService.getStudentsByClass(selectedClass._id)
-
-      if (response?.data?.students && response.data.students.length > 0) {
-        setStudents(response.data.students)
-
-        // Initialize attendance with all present by default
-        const initialAttendance = {}
-        response.data.students.forEach(student => {
-          initialAttendance[student._id] = 'present'
-        })
-        setAttendance(initialAttendance)
-      } else {
-        toast('No students enrolled in this class')
-        setStudents([])
-      }
-    } catch (error) {
-      console.error('Error fetching students:', error)
-      toast.error('Failed to load students')
-      setStudents([])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchExistingAttendance = async () => {
-    if (!selectedClass?._id || !selectedDate) return
-
-    try {
-      const response = await attendanceService.getAttendance({
-        classId: selectedClass._id,
-        date: selectedDate,
-        subject: selectedClass.subjects?.[0]?.name || 'General'
-      })
-
-      if (response?.data?.attendanceRecords) {
-        const existingAttendance = {}
-        response.data.attendanceRecords.forEach(record => {
-          existingAttendance[record.studentId._id || record.studentId] = record.status
-        })
-        setAttendance(existingAttendance)
-        toast.success('Loaded existing attendance')
-      }
-    } catch (error) {
-      // No existing attendance, that's fine
-      console.log('No existing attendance for this date')
-    }
-  }
-
-  const updateAttendanceStatus = (studentId, status) => {
-    setAttendance(prev => ({
-      ...prev,
-      [studentId]: status
-    }))
-  }
-
-  const markAllAs = (status) => {
-    const newAttendance = {}
-    students.forEach(student => {
-      newAttendance[student._id] = status
-    })
-    setAttendance(newAttendance)
-    toast.success(`Marked all students as ${status}`)
-  }
-
-  const saveAttendance = async () => {
-    if (!selectedClass || students.length === 0) {
-      toast.error('Please select a class with students')
-      return
-    }
-
-    try {
-      setIsSaving(true)
-
-      const attendanceRecords = students.map(student => ({
-        studentId: student._id,
-        admissionNumber: student.admissionNumber || student.admission_number,
-        status: attendance[student._id] || 'present'
-      }))
-
-      const response = await attendanceService.saveAttendance({
-        classId: selectedClass._id,
-        date: selectedDate,
-        subject: selectedClass.subjects?.[0]?.name || 'General',
-        attendanceRecords
-      })
-
-      toast.success('Attendance saved successfully!')
-    } catch (error) {
-      console.error('Error saving attendance:', error)
-      toast.error(error.response?.data?.message || 'Failed to save attendance')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'present':
-        return <CheckCircle className="h-5 w-5 text-green-600" />
-      case 'absent':
-        return <XCircle className="h-5 w-5 text-red-600" />
-      case 'late':
-        return <Clock className="h-5 w-5 text-yellow-600" />
-      default:
-        return <CheckCircle className="h-5 w-5 text-green-600" />
-    }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'present':
-        return 'bg-green-100 text-green-800'
-      case 'absent':
-        return 'bg-red-100 text-red-800'
-      case 'late':
-        return 'bg-yellow-100 text-yellow-800'
-      default:
-        return 'bg-green-100 text-green-800'
-    }
-  }
-
-  // Show loading state
-  if (isLoading && classes.length === 0) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
+        <div className="loading-spinner" />
       </div>
     )
   }
 
-  // Show empty state if no classes
-  if (classes.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <AlertTriangle className="h-16 w-16 text-gray-400 mb-4" />
-        <p className="text-xl text-gray-600 mb-2">No Classes Available</p>
-        <p className="text-gray-500 mb-4">
-          {user?.role === 'admin'
-            ? 'Please create classes first before marking attendance.'
-            : 'Please contact the administrator to create classes and assign you to them.'}
-        </p>
-        {user?.role === 'admin' && (
-          <a
-            href="/app/classes"
-            className="btn btn-primary"
-          >
-            Go to Classes & Sections
-          </a>
-        )}
-      </div>
-    )
-  }
-
-  // Show empty state if no students
-  if (selectedClass && students.length === 0 && !isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <Users className="h-16 w-16 text-gray-400 mb-4" />
-        <p className="text-xl text-gray-600 mb-2">No Students Enrolled</p>
-        <p className="text-gray-500">This class has no students yet.</p>
-      </div>
-    )
-  }
+  const summary = attendanceData?.summary
+  const records = attendanceData?.records || []
+  const totalDays = summary?.totalDays || 0
+  const presentDays = summary?.present || 0
+  const absentDays = summary?.absent || 0
+  const lateDays = summary?.late || 0
+  const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Attendance Management</h1>
-        <div className="flex space-x-3">
-          <button
-            className="btn btn-outline"
-            onClick={() => setShowReportModal(true)}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Generate Report
-          </button>
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">My Attendance</h1>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="card p-4 sm:p-5 text-center">
+          <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-green-500 mx-auto mb-2" />
+          <p className="text-2xl sm:text-3xl font-bold text-green-700 dark:text-green-400">{presentDays}</p>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93]">Days Present</p>
+        </div>
+        <div className="card p-4 sm:p-5 text-center">
+          <XCircle className="h-6 w-6 sm:h-8 sm:w-8 text-red-500 mx-auto mb-2" />
+          <p className="text-2xl sm:text-3xl font-bold text-red-700 dark:text-red-400">{absentDays}</p>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93]">Days Absent</p>
+        </div>
+        <div className="card p-4 sm:p-5 text-center">
+          <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-500 mx-auto mb-2" />
+          <p className="text-2xl sm:text-3xl font-bold text-yellow-700 dark:text-yellow-400">{lateDays}</p>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93]">Days Late</p>
+        </div>
+        <div className="card p-4 sm:p-5 text-center">
+          <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-blue-500 mx-auto mb-2" />
+          <p className="text-2xl sm:text-3xl font-bold text-blue-700 dark:text-blue-400">{attendanceRate}%</p>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93]">Attendance Rate</p>
         </div>
       </div>
 
-      {/* Date and Class Selection */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Date
-            </label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
-              className="input"
+      {/* Attendance Rate Bar */}
+      {totalDays > 0 && (
+        <div className="card p-4 sm:p-5">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-[#8E8E93]">Overall Attendance</span>
+            <span className={`text-sm font-bold ${attendanceRate >= 75 ? 'text-green-600' : attendanceRate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+              {attendanceRate}%
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-[#2C2C2E] rounded-full h-3">
+            <div
+              className={`h-3 rounded-full transition-all ${attendanceRate >= 75 ? 'bg-green-500' : attendanceRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+              style={{ width: `${attendanceRate}%` }}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Class
-            </label>
-            <select
-              value={selectedClass?._id || ''}
-              onChange={(e) => {
-                const cls = classes.find(c => c._id === e.target.value)
-                setSelectedClass(cls)
-              }}
-              className="input"
-            >
-              <option value="">Choose a class</option>
-              {classes.map(cls => (
-                <option key={cls._id} value={cls._id}>
-                  {cls.name} - {cls.subjects?.[0]?.name || 'General'}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={saveAttendance}
-              disabled={!selectedClass || isLoading || isSaving || students.length === 0}
-              className="btn btn-primary w-full"
-            >
-              {isSaving ? 'Saving...' : 'Save Attendance'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Attendance List */}
-      {selectedClass && students.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">
-              Attendance for {selectedClass.name} - {selectedDate}
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Click on the status buttons to mark attendance
+          {attendanceRate < 75 && (
+            <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Your attendance is below the required 75% minimum.
             </p>
-
-            {/* Search and Bulk Actions */}
-            <div className="mt-4 flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Search by name or admission number..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input w-full"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => markAllAs('present')}
-                  className="btn btn-sm bg-green-100 text-green-700 hover:bg-green-200"
-                  title="Mark all as present"
-                >
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  All Present
-                </button>
-                <button
-                  onClick={() => markAllAs('absent')}
-                  className="btn btn-sm bg-red-100 text-red-700 hover:bg-red-200"
-                  title="Mark all as absent"
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  All Absent
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {filteredStudents.length === 0 ? (
-                <div className="px-6 py-8 text-center text-gray-500">
-                  No students found matching "{searchTerm}"
-                </div>
-              ) : (
-                filteredStudents.map((student) => (
-                  <div key={student._id} className="px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex-shrink-0">
-                        <div className="h-10 w-10 bg-gray-300 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-700">
-                            {student.name.charAt(0)}
-                          </span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{student.name}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-gray-500">
-                            <span className="font-mono font-semibold text-teal-600">
-                              {student.admissionNumber || student.admission_number || 'N/A'}
-                            </span>
-                          </p>
-                          {student.admissionNumber && (
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(student.admissionNumber || student.admission_number)
-                                toast.success('Admission number copied!')
-                              }}
-                              className="text-gray-400 hover:text-teal-600 transition-colors"
-                              title="Copy admission number"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => updateAttendanceStatus(student._id, 'present')}
-                        className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${attendance[student._id] === 'present'
-                          ? 'bg-green-100 text-green-800 border-2 border-green-300'
-                          : 'bg-gray-100 text-gray-600 hover:bg-green-50'
-                          }`}
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        <span>Present</span>
-                      </button>
-                      <button
-                        onClick={() => updateAttendanceStatus(student._id, 'late')}
-                        className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${attendance[student._id] === 'late'
-                          ? 'bg-yellow-100 text-yellow-800 border-2 border-yellow-300'
-                          : 'bg-gray-100 text-gray-600 hover:bg-yellow-50'
-                          }`}
-                      >
-                        <Clock className="h-4 w-4" />
-                        <span>Late</span>
-                      </button>
-                      <button
-                        onClick={() => updateAttendanceStatus(student._id, 'absent')}
-                        className={`px-3 py-1 rounded-full text-sm font-medium flex items-center space-x-1 ${attendance[student._id] === 'absent'
-                          ? 'bg-red-100 text-red-800 border-2 border-red-300'
-                          : 'bg-gray-100 text-gray-600 hover:bg-red-50'
-                          }`}
-                      >
-                        <XCircle className="h-4 w-4" />
-                        <span>Absent</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
           )}
         </div>
       )}
 
-      {/* Attendance Summary */}
-      {selectedClass && students.length > 0 && attendance && (
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Attendance Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">
-                {students.filter(s => attendance[s._id] === 'present').length}
-              </div>
-              <div className="text-sm text-green-600">Present</div>
-            </div>
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-600">
-                {students.filter(s => attendance[s._id] === 'late').length}
-              </div>
-              <div className="text-sm text-yellow-600">Late</div>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-2xl font-bold text-red-600">
-                {students.filter(s => attendance[s._id] === 'absent').length}
-              </div>
-              <div className="text-sm text-red-600">Absent</div>
-            </div>
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">
-                {students.length > 0
-                  ? ((students.filter(s => attendance[s._id] === 'present').length / students.length) * 100).toFixed(1)
-                  : 0}%
-              </div>
-              <div className="text-sm text-blue-600">Attendance Rate</div>
-            </div>
-          </div>
+      {/* Recent Attendance Records */}
+      <div className="card overflow-hidden">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-[#38383A]">
+          <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">Attendance History</h3>
         </div>
-      )}
-
-      {/* Report Generation Modal */}
-      {showReportModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-content p-6">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Generate Attendance Report</h3>
-              <button
-                className="p-2 rounded-md hover:bg-gray-100"
-                onClick={() => setShowReportModal(false)}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                Attendance report feature is coming soon. For now, you can view attendance history in the attendance table above.
-              </p>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => setShowReportModal(false)}
-                >
-                  Close
-                </button>
+        {records.length > 0 ? (
+          <div className="divide-y divide-gray-100 dark:divide-dark-border">
+            {records.map((record, idx) => (
+              <div key={idx} className="px-4 sm:px-6 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {new Date(record.date).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                  </p>
+                  {record.subject && <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{record.subject}</p>}
+                </div>
+                <span className={`px-3 py-1 text-xs font-semibold rounded-full capitalize ${
+                  record.status === 'present' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' :
+                  record.status === 'absent' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
+                  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400'
+                }`}>
+                  {record.status}
+                </span>
               </div>
-            </div>
+            ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="px-6 py-10 text-center text-gray-500 dark:text-[#8E8E93]">No attendance records found.</div>
+        )}
+      </div>
     </div>
   )
+}
+
+// ── Admin / Teacher tabbed view ─────────────────────────────────────────────
+const ADMIN_TABS = [
+  { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
+  { id: 'markStudents', label: 'Mark Students', icon: ClipboardList },
+  { id: 'markStaff', label: 'Mark Staff', icon: UserCheck },
+  { id: 'absentees', label: 'Absentees', icon: XCircle },
+  { id: 'report', label: 'Monthly Report', icon: Calendar },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'holidays', label: 'Holidays', icon: Calendar },
+  { id: 'settings', label: 'Settings', icon: Settings },
+]
+
+const TEACHER_TABS = [
+  { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
+  { id: 'markStudents', label: 'Mark Students', icon: ClipboardList },
+  { id: 'absentees', label: 'Absentees', icon: XCircle },
+  { id: 'report', label: 'Monthly Report', icon: Calendar },
+]
+
+const AdminTeacherAttendance = () => {
+  const { user } = useAuth()
+  const [activeTab, setActiveTab] = useState('dashboard')
+
+  const tabs = user?.role === 'admin' ? ADMIN_TABS : TEACHER_TABS
+
+  const renderTab = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return <AttendanceDashboard />
+      case 'markStudents':
+        return <MarkStudentAttendance />
+      case 'markStaff':
+        return <MarkEmployeeAttendance />
+      case 'absentees':
+        return <Absentees />
+      case 'report':
+        return <MonthlyReport />
+      case 'analytics':
+        return <Analytics />
+      case 'holidays':
+        return <Holidays />
+      case 'settings':
+        return <AttendanceSettings />
+      default:
+        return <AttendanceDashboard />
+    }
+  }
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Attendance</h1>
+        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
+          Manage student and staff attendance
+        </p>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto">
+        <nav className="-mb-px flex space-x-4 sm:space-x-8 whitespace-nowrap">
+          {tabs.map((tab) => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.id
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                    : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300 dark:hover:border-[#38383A]'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </button>
+            )
+          })}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <Suspense fallback={<TabLoader />}>
+        {renderTab()}
+      </Suspense>
+    </div>
+  )
+}
+
+// ── Main component: role-based rendering ────────────────────────────────────
+const Attendance = () => {
+  const { user } = useAuth()
+
+  if (user?.role === 'student' || user?.role === 'parent') {
+    return <StudentAttendanceView />
+  }
+
+  return <AdminTeacherAttendance />
 }
 
 export default Attendance

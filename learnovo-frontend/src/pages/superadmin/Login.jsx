@@ -68,7 +68,7 @@ const SuperAdminLogin = () => {
 
                 {/* Center tagline for Super Admin */}
                 <div className="relative z-10">
-                    <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-4">
+                    <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-4 text-white">
                         Platform<br />Command Center
                     </h1>
                     <p className="text-white/75 text-lg leading-relaxed max-w-sm">
@@ -90,17 +90,17 @@ const SuperAdminLogin = () => {
 
             {/* ── RIGHT FORM PANEL ── */}
             <div
-                className="flex-1 flex flex-col justify-center items-center px-6 py-12 sm:px-12"
+                className="flex-1 flex flex-col justify-center items-center px-6 py-12 sm:px-12 dark:bg-[#000000]"
                 style={{ background: 'linear-gradient(150deg, #f8fffd 0%, #f0faf8 40%, #eaf6f6 100%)' }}
             >
                 <div className="flex lg:hidden items-center gap-2 mb-8">
                     <img src="/logo-icon.png" alt="Learnovo" className="h-9 w-9 object-contain" />
-                    <span className="text-xl font-bold text-gray-900">Learnovo</span>
+                    <span className="text-xl font-bold text-gray-900 dark:text-white">Learnovo</span>
                 </div>
 
                 <div className="w-full max-w-md">
                     {/* Card wrapper */}
-                    <div className="bg-white rounded-2xl shadow-lg shadow-teal-100/60 border border-white/80 px-8 py-8 relative">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-lg shadow-teal-100/60 dark:shadow-none border border-white/80 dark:border-[#38383A] px-8 py-8 relative">
 
                         {/* Super Admin Badge */}
                         <div className="absolute -top-3 right-6 bg-red-100 border border-red-200 text-red-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-sm">
@@ -109,14 +109,14 @@ const SuperAdminLogin = () => {
 
                         {/* Heading */}
                         <div className="mb-7">
-                            <h2 className="text-3xl font-bold text-gray-900 mb-1">Welcome back</h2>
-                            <p className="text-gray-400 text-sm">Sign in to the platform portal</p>
+                            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">Welcome back</h2>
+                            <p className="text-gray-400 dark:text-[#8E8E93] text-sm">Sign in to the platform portal</p>
                         </div>
 
                         <form className="space-y-5" onSubmit={handleSubmit}>
                             {/* Email */}
                             <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">
                                     Admin Email
                                 </label>
                                 <input
@@ -134,7 +134,7 @@ const SuperAdminLogin = () => {
 
                             {/* Password */}
                             <div>
-                                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">
                                     Password
                                 </label>
                                 <div className="relative">
@@ -161,8 +161,8 @@ const SuperAdminLogin = () => {
 
                             {/* Error */}
                             {error && (
-                                <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3">
-                                    <p className="text-sm font-medium text-red-700">{error}</p>
+                                <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 px-4 py-3">
+                                    <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
                                 </div>
                             )}
 

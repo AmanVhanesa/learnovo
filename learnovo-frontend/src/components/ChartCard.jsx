@@ -8,9 +8,9 @@ const ChartCard = ({ title, children, onExport, filterOptions = {} }) => {
   const [teacherValue, setTeacherValue] = useState('all')
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+    <div className="card p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 sm:mb-5">
+        <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
         <ChartFilters
           range={range}
           setRange={setRange}
@@ -26,7 +26,7 @@ const ChartCard = ({ title, children, onExport, filterOptions = {} }) => {
           onExport={onExport}
         />
       </div>
-      <div className="mt-4 h-64">
+      <div className="h-52 sm:h-64">
         {typeof children === 'function' ? children({ range, classValue, sectionValue, teacherValue }) : children}
       </div>
     </div>
@@ -34,5 +34,3 @@ const ChartCard = ({ title, children, onExport, filterOptions = {} }) => {
 }
 
 export default ChartCard
-
-

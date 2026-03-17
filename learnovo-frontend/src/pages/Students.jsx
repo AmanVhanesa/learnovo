@@ -1,27 +1,50 @@
-import React, { useState, useEffect } from 'react'
-import { Plus, Search, Eye, Power, PowerOff, Upload, Trash2, X, CheckSquare, Square, TrendingUp } from 'lucide-react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
+import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import StudentForm from '../components/students/StudentForm'
 import ImportModal from '../components/ImportModal'
-import ExportButton from '../components/ExportButton'
 import DeactivateStudentModal from '../components/students/DeactivateStudentModal'
-import { exportPDF } from '../utils/exportHelpers'
+import { exportPDF, exportExcel } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 import { useSettings } from '../contexts/SettingsContext'
 
-const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')
+import { SERVER_URL } from '../constants/config'
+
+const StudentPhotoCell = ({ student }) => {
+  const [imgFailed, setImgFailed] = React.useState(false)
+  const photoUrl = student.photo
+    ? (student.photo.startsWith('http') ? student.photo : `${SERVER_URL}${student.photo}`)
+    : null
+
+  if (photoUrl && !imgFailed) {
+    return (
+      <img
+        src={photoUrl}
+        alt={student.fullName}
+        className="h-10 w-10 rounded-full object-cover"
+        onError={() => setImgFailed(true)}
+      />
+    )
+  }
+
+  return (
+    <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center">
+      <span className="text-sm font-semibold text-white">
+        {student.fullName?.charAt(0).toUpperCase() || 'U'}
+      </span>
+    </div>
+  )
+}
 
 const Students = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { settings } = useSettings()
 
-  // Data state
-  const [students, setStudents] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const queryClient = useQueryClient()
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('')
@@ -30,7 +53,6 @@ const Students = () => {
   const [yearFilter, setYearFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('') // active/inactive
   const [driverFilter, setDriverFilter] = useState('')
-  const [filterOptions, setFilterOptions] = useState({ classes: [], sections: [], academicYears: [], drivers: [] })
 
   // UI state
   const [showForm, setShowForm] = useState(false)
@@ -39,10 +61,8 @@ const Students = () => {
   const [editingStudent, setEditingStudent] = useState(null)
   const [studentToDeactivate, setStudentToDeactivate] = useState(null)
   const [selectedStudents, setSelectedStudents] = useState([])
-  const [showBulkActions, setShowBulkActions] = useState(false)
-  const [isDeactivating, setIsDeactivating] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
-  const [selectedFormat, setSelectedFormat] = useState('csv')
+  const [selectedFormat, setSelectedFormat] = useState('pdf')
 
   // Export column selection — keys must match backend fieldDefinitions
   const ALL_EXPORT_FIELDS = [
@@ -78,34 +98,41 @@ const Students = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(100)
-  const [totalStudents, setTotalStudents] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
+
+  // Debounced search
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const searchTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
+    }, 400)
+    return () => clearTimeout(searchTimerRef.current)
+  }, [searchQuery])
 
   useEffect(() => {
     setCurrentPage(1) // reset to page 1 on filter change
-  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter])
+    setSelectedStudents([]) // clear selection on filter change
+  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter])
 
-  useEffect(() => {
-    fetchStudents()
-    fetchFilterOptions()
-  }, [searchQuery, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage])
-
-  const fetchFilterOptions = async () => {
-    try {
+  // Fetch filter options once on mount
+  const { data: filterOptions = { classes: [], sections: [], academicYears: [], drivers: [] } } = useQuery({
+    queryKey: ['students-filters'],
+    queryFn: async () => {
       const response = await studentsService.getFilters()
-      if (response.success) {
-        setFilterOptions(response.data)
-      }
-    } catch (error) {
-      console.error('Error fetching filter options:', error)
-    }
-  }
+      if (response.success) return response.data
+      return { classes: [], sections: [], academicYears: [], drivers: [] }
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
-  const fetchStudents = async () => {
-    try {
-      setIsLoading(true)
+  // Fetch students with React Query
+  const { data: studentsResponse, isLoading } = useQuery({
+    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage],
+    queryFn: async () => {
       const filters = {
-        search: searchQuery,
+        search: debouncedSearch,
         class: classFilter,
         section: sectionFilter,
         academicYear: yearFilter,
@@ -114,22 +141,19 @@ const Students = () => {
         page: currentPage,
         limit: perPage
       }
-
       const response = await studentsService.list(filters)
-      const studentsData = response?.data || []
-      setStudents(Array.isArray(studentsData) ? studentsData : [])
-      if (response?.pagination) {
-        setTotalStudents(response.pagination.total || 0)
-        setTotalPages(response.pagination.pages || 1)
-      }
-    } catch (error) {
-      console.error('Error fetching students:', error)
-      toast.error('Failed to load students')
-      setStudents([])
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      return response
+    },
+    placeholderData: (prev) => prev,
+  })
+
+  const students = useMemo(() => {
+    const studentsData = studentsResponse?.data || []
+    return Array.isArray(studentsData) ? studentsData : []
+  }, [studentsResponse])
+
+  const totalStudents = studentsResponse?.pagination?.total || 0
+  const totalPages = studentsResponse?.pagination?.pages || 1
 
   const handleAddStudent = () => {
     setEditingStudent(null)
@@ -145,140 +169,158 @@ const Students = () => {
     navigate(`/app/students/${student._id}`)
   }
 
-  const handleSaveStudent = async (formData) => {
-    try {
-      setIsSaving(true)
-
+  const saveMutation = useMutation({
+    mutationFn: async (formData) => {
       if (editingStudent) {
         await studentsService.update(editingStudent._id, formData)
-        toast.success('Student updated successfully')
+        return { isEdit: true }
       } else {
         const response = await studentsService.create(formData)
+        return { isEdit: false, response }
+      }
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      if (result.isEdit) {
+        toast.success('Student updated successfully')
+      } else {
         toast.success('Student added successfully')
-
-        // Show credentials if returned
-        if (response?.data?.credentials) {
-          toast.success(`Login: ${response.data.credentials.email} / ${response.data.credentials.password}`, {
+        if (result.response?.data?.credentials) {
+          toast.success(`Login: ${result.response.data.credentials.email} / ${result.response.data.credentials.password}`, {
             duration: 10000
           })
         }
       }
-
       setShowForm(false)
-      fetchStudents()
-    } catch (error) {
-      console.error('Save student error:', error)
+    },
+    onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to save student')
-    } finally {
-      setIsSaving(false)
-    }
+    },
+  })
+
+  const handleSaveStudent = (formData) => {
+    saveMutation.mutate(formData)
   }
 
-  const handleToggleStatus = async (student) => {
+  const reactivateMutation = useMutation({
+    mutationFn: (studentId) => studentsService.reactivate(studentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      toast.success('Student reactivated successfully')
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to reactivate student')
+    },
+  })
+
+  const handleToggleStatus = (student) => {
     if (student.isActive) {
-      // Show deactivate modal
       setStudentToDeactivate(student)
       setShowDeactivateModal(true)
     } else {
-      // Reactivate directly with confirmation
       if (window.confirm(`Reactivate ${student.fullName || student.name}?`)) {
-        try {
-          await studentsService.reactivate(student._id)
-          toast.success('Student reactivated successfully')
-          fetchStudents()
-        } catch (error) {
-          console.error('Reactivate error:', error)
-          toast.error(error.response?.data?.message || 'Failed to reactivate student')
-        }
+        reactivateMutation.mutate(student._id)
       }
     }
   }
 
-  const handleDeleteStudent = async (student) => {
+  const deleteMutation = useMutation({
+    mutationFn: (studentId) => studentsService.remove(studentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      toast.success('Student deleted successfully')
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to delete student')
+    },
+  })
+
+  const handleDeleteStudent = (student) => {
     if (window.confirm(`Are you sure you want to permanently delete ${student.fullName || student.name}? This action cannot be undone.`)) {
-      try {
-        await studentsService.remove(student._id)
-        toast.success('Student deleted successfully')
-        fetchStudents()
-      } catch (error) {
-        console.error('Delete error:', error)
-        toast.error(error.response?.data?.message || 'Failed to delete student')
-      }
+      deleteMutation.mutate(student._id)
     }
   }
 
-  const handleDeactivateConfirm = async (formData) => {
-    try {
-      setIsDeactivating(true)
-      await studentsService.deactivate(studentToDeactivate._id, formData)
+  const deactivateMutation = useMutation({
+    mutationFn: ({ studentId, formData }) => studentsService.deactivate(studentId, formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success('Student deactivated successfully')
       setShowDeactivateModal(false)
       setStudentToDeactivate(null)
-      fetchStudents()
-    } catch (error) {
-      console.error('Deactivate error:', error)
+    },
+    onError: (error) => {
       toast.error(error.response?.data?.message || 'Failed to deactivate student')
-    } finally {
-      setIsDeactivating(false)
-    }
+    },
+  })
+
+  const handleDeactivateConfirm = (formData) => {
+    deactivateMutation.mutate({ studentId: studentToDeactivate._id, formData })
   }
 
-  const handleBulkActivate = async () => {
-    if (selectedStudents.length === 0) {
-      toast.error('Please select students first')
-      return
-    }
-
-    try {
-      await studentsService.bulkActivate(selectedStudents)
+  const bulkActivateMutation = useMutation({
+    mutationFn: (ids) => studentsService.bulkActivate(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success(`${selectedStudents.length} students activated`)
       setSelectedStudents([])
-      fetchStudents()
-    } catch (error) {
-      console.error('Bulk activate error:', error)
+    },
+    onError: () => {
       toast.error('Failed to activate students')
-    }
-  }
+    },
+  })
 
-  const handleBulkDeactivate = async () => {
+  const handleBulkActivate = () => {
     if (selectedStudents.length === 0) {
       toast.error('Please select students first')
       return
     }
+    bulkActivateMutation.mutate(selectedStudents)
+  }
 
-    const reason = prompt('Reason for bulk deactivation:')
-    if (!reason) return
-
-    try {
-      await studentsService.bulkDeactivate(selectedStudents, reason)
+  const bulkDeactivateMutation = useMutation({
+    mutationFn: ({ ids, reason }) => studentsService.bulkDeactivate(ids, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success(`${selectedStudents.length} students deactivated`)
       setSelectedStudents([])
-      fetchStudents()
-    } catch (error) {
-      console.error('Bulk deactivate error:', error)
+    },
+    onError: () => {
       toast.error('Failed to deactivate students')
-    }
-  }
+    },
+  })
 
-  const handleBulkDelete = async () => {
+  const handleBulkDeactivate = () => {
     if (selectedStudents.length === 0) {
       toast.error('Please select students first')
       return
     }
+    const reason = prompt('Reason for bulk deactivation:')
+    if (!reason) return
+    bulkDeactivateMutation.mutate({ ids: selectedStudents, reason })
+  }
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids) => studentsService.bulkDelete(ids),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      toast.success(result.message || `${selectedStudents.length} students deleted`)
+      setSelectedStudents([])
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to delete students')
+    },
+  })
+
+  const handleBulkDelete = () => {
+    if (selectedStudents.length === 0) {
+      toast.error('Please select students first')
+      return
+    }
     if (!window.confirm(`Are you sure you want to PERMANENTLY DELETE ${selectedStudents.length} student(s)? This cannot be undone.`)) {
       return
     }
-
-    try {
-      const result = await studentsService.bulkDelete(selectedStudents)
-      toast.success(result.message || `${selectedStudents.length} students deleted`)
-      setSelectedStudents([])
-      fetchStudents()
-    } catch (error) {
-      console.error('Bulk delete error:', error)
-      toast.error(error.response?.data?.message || 'Failed to delete students')
-    }
+    bulkDeleteMutation.mutate(selectedStudents)
   }
 
   const handleSelectAll = (e) => {
@@ -307,7 +349,7 @@ const Students = () => {
     if (sectionFilter) params.set('section', sectionFilter)
     if (yearFilter) params.set('academicYear', yearFilter)
     if (statusFilter) params.set('status', statusFilter)
-    if (searchQuery) params.set('search', searchQuery)
+    if (debouncedSearch) params.set('search', debouncedSearch)
     if (driverFilter) params.set('driverId', driverFilter)
     if (selectedExportFields.length > 0) {
       params.set('fields', selectedExportFields.join(','))
@@ -316,23 +358,24 @@ const Students = () => {
     const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
     const dateStr = new Date().toISOString().split('T')[0]
 
-    if (selectedFormat === 'pdf') {
-      // PDF: fetch data as JSON then generate client-side
-      try {
-        toast.loading('Generating PDF…', { id: 'pdf-export' })
-        const res = await fetch(`${base}/students/export?${params.toString()}&format=json&token=${token}`)
-        const json = await res.json()
-        if (!json.success) throw new Error(json.message)
+    const exportId = `${selectedFormat}-export`
+    try {
+      toast.loading(`Generating ${selectedFormat.toUpperCase()}…`, { id: exportId })
+      const res = await fetch(`${base}/students/export?${params.toString()}&format=json&token=${token}`)
+      const json = await res.json()
+      if (!json.success) throw new Error(json.message)
+
+      if (selectedFormat === 'pdf') {
         await exportPDF(`students_export_${dateStr}.pdf`, json.headers, json.rows, settings?.institution)
-        toast.success('PDF downloaded!', { id: 'pdf-export' })
-      } catch (err) {
-        console.error('PDF export error:', err)
-        toast.error('Failed to generate PDF', { id: 'pdf-export' })
+      } else {
+        // Excel: build rows array with headers as first row
+        const excelRows = [json.headers, ...json.rows]
+        exportExcel(`students_export_${dateStr}.xlsx`, excelRows, 'Students')
       }
-    } else {
-      // CSV / Excel / TXT: let backend stream the file
-      params.set('format', selectedFormat)
-      window.open(`${base}/students/export?${params.toString()}&token=${token}`, '_blank')
+      toast.success(`${selectedFormat.toUpperCase()} downloaded!`, { id: exportId })
+    } catch (err) {
+      console.error(`${selectedFormat} export error:`, err)
+      toast.error(`Failed to generate ${selectedFormat.toUpperCase()}`, { id: exportId })
     }
 
     setShowExportModal(false)
@@ -361,28 +404,31 @@ const Students = () => {
   //   )
   // }
 
+  // O(1) lookup for checked state — avoids O(n) Array.includes per table row
+  const selectedSet = useMemo(() => new Set(selectedStudents), [selectedStudents])
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Students</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {students.length} student{students.length !== 1 ? 's' : ''} found
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Students</h1>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
+            {totalStudents} student{totalStudents !== 1 ? 's' : ''} found
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {user?.role === 'admin' && (
             <>
               <button
-                className="btn btn-outline text-gray-700"
+                className="btn btn-outline text-gray-700 dark:text-[#8E8E93]"
                 onClick={() => navigate('/app/students/bulk-promote')}
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Bulk Promote
               </button>
               <button
-                className="btn btn-outline text-gray-700"
+                className="btn btn-outline text-gray-700 dark:text-[#8E8E93]"
                 onClick={() => setShowImportModal(true)}
               >
                 <Upload className="h-4 w-4 mr-2" />
@@ -398,10 +444,10 @@ const Students = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4">
         {/* Search Bar */}
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
           <input
             type="text"
             placeholder="Search by name, admission number, roll number..."
@@ -413,14 +459,14 @@ const Students = () => {
 
         {/* Filter Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Filters:</span>
+          <span className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Filters:</span>
 
           {/* Class Filter */}
           <div className="relative">
             <select
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
-              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
               <option value="">Class</option>
               {filterOptions.classes.map(cls => (
@@ -428,7 +474,7 @@ const Students = () => {
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
@@ -439,7 +485,7 @@ const Students = () => {
             <select
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
               <option value="">Section</option>
               {filterOptions.sections.map(sec => (
@@ -447,7 +493,7 @@ const Students = () => {
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
@@ -458,7 +504,7 @@ const Students = () => {
             <select
               value={yearFilter}
               onChange={(e) => setYearFilter(e.target.value)}
-              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
               <option value="">Year</option>
               {filterOptions.academicYears.map(year => (
@@ -466,7 +512,7 @@ const Students = () => {
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
@@ -477,14 +523,14 @@ const Students = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
               <option value="">Status</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
@@ -496,7 +542,7 @@ const Students = () => {
               <select
                 value={driverFilter}
                 onChange={(e) => setDriverFilter(e.target.value)}
-                className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+                className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
               >
                 <option value="">Driver</option>
                 {filterOptions.drivers.map(driver => (
@@ -504,7 +550,7 @@ const Students = () => {
                 ))}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
@@ -515,7 +561,7 @@ const Students = () => {
           {(searchQuery || classFilter || sectionFilter || yearFilter || statusFilter || driverFilter) && (
             <button
               onClick={clearFilters}
-              className="h-8 px-3 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-all"
+              className="h-8 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-md transition-all"
             >
               Clear all
             </button>
@@ -537,10 +583,10 @@ const Students = () => {
         {/* ── Export Options Modal ── */}
         {showExportModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
               <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-                <h3 className="text-base font-semibold text-gray-900">Export Options</h3>
-                <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-gray-600">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Export Options</h3>
+                <button onClick={() => setShowExportModal(false)} className="text-gray-400 hover:text-gray-600 dark:text-[#8E8E93]">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -549,7 +595,7 @@ const Students = () => {
               <div className="flex-1 overflow-y-auto">
                 {/* Active filters summary */}
                 <div className="px-6 pt-4">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Active Filters (applied to export)</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide mb-2">Active Filters (applied to export)</p>
                   <div className="flex flex-wrap gap-1.5 mb-4">
                     {!classFilter && !sectionFilter && !yearFilter && !statusFilter && !driverFilter && !searchQuery && (
                       <span className="text-xs text-gray-400 italic">None — will export all students</span>
@@ -565,13 +611,11 @@ const Students = () => {
 
                 {/* Format selection */}
                 <div className="px-6 pb-4">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Export Format</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide mb-2">Export Format</p>
                   <div className="flex gap-2 mb-4">
                     {[
-                      { id: 'csv', label: '📄 CSV', desc: 'Spreadsheet-compatible' },
-                      { id: 'excel', label: '📊 Excel', desc: '.xlsx file' },
-                      { id: 'pdf', label: '🖨️ PDF', desc: 'Print-ready' },
-                      { id: 'txt', label: '📝 TXT', desc: 'Tab-delimited text' },
+                      { id: 'pdf', label: 'PDF', desc: 'Print-ready document' },
+                      { id: 'excel', label: 'Excel', desc: '.xlsx spreadsheet' },
                     ].map(fmt => (
                       <button
                         key={fmt.id}
@@ -579,7 +623,7 @@ const Students = () => {
                         title={fmt.desc}
                         className={`flex-1 py-2 text-xs font-semibold rounded-lg border-2 transition-all ${selectedFormat === fmt.id
                           ? 'border-primary-500 bg-primary-50 text-primary-700'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                          : 'border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] hover:border-gray-300 dark:border-[#38383A] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
                           }`}
                       >
                         {fmt.label}
@@ -591,7 +635,7 @@ const Students = () => {
                 {/* Column selection */}
                 <div className="px-6 pb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Select Columns</p>
+                    <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Select Columns</p>
                     <div className="flex gap-2">
                       <button onClick={() => setSelectedExportFields(ALL_EXPORT_FIELDS.map(f => f.key))} className="text-xs text-primary-600 hover:underline">All</button>
                       <span className="text-gray-300">|</span>
@@ -610,7 +654,7 @@ const Students = () => {
                       <button
                         key={preset.label}
                         onClick={() => setSelectedExportFields(preset.fields)}
-                        className="px-2.5 py-1 text-xs font-medium border border-gray-200 rounded-full hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                        className="px-2.5 py-1 text-xs font-medium border border-gray-200 dark:border-[#38383A] rounded-full hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 transition-colors"
                       >
                         {preset.label}
                       </button>
@@ -619,26 +663,26 @@ const Students = () => {
 
                   <div className="grid grid-cols-2 gap-1 max-h-52 overflow-y-auto pr-1">
                     {ALL_EXPORT_FIELDS.map(field => (
-                      <label key={field.key} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50">
+                      <label key={field.key} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
                         <input
                           type="checkbox"
                           checked={selectedExportFields.includes(field.key)}
                           onChange={() => toggleExportField(field.key)}
                           className="h-3.5 w-3.5 text-primary-600 rounded"
                         />
-                        <span className="text-sm text-gray-700">{field.label}</span>
+                        <span className="text-sm text-gray-700 dark:text-[#8E8E93]">{field.label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
               </div>
 
-              <div className="shrink-0 flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
-                <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100">Cancel</button>
+              <div className="shrink-0 flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 dark:bg-[#000000] rounded-b-xl">
+                <button onClick={() => setShowExportModal(false)} className="btn btn-ghost">Cancel</button>
                 <button
                   onClick={handleDoExport}
                   disabled={selectedExportFields.length === 0}
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-primary"
                 >
                   Export {selectedExportFields.length} Column{selectedExportFields.length !== 1 ? 's' : ''} as {selectedFormat.toUpperCase()}
                 </button>
@@ -649,9 +693,9 @@ const Students = () => {
 
         {/* Active Filters Display */}
         {(classFilter || sectionFilter || yearFilter || statusFilter || driverFilter) && (
-          <div className="mt-3 pt-3 border-t border-gray-200">
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-[#38383A]">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-gray-500">Active filters:</span>
+              <span className="text-xs text-gray-500 dark:text-[#8E8E93]">Active filters:</span>
               {classFilter && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
                   Class: {classFilter}
@@ -723,23 +767,23 @@ const Students = () => {
 
         {/* Bulk Actions */}
         {selectedStudents.length > 0 && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-900">
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
               {selectedStudents.length} student{selectedStudents.length !== 1 ? 's' : ''} selected
             </span>
-            <div className="flex gap-2">
-              <button onClick={handleBulkActivate} className="btn btn-sm btn-outline">
+            <div className="flex flex-wrap gap-2">
+              <button onClick={handleBulkActivate} className="btn btn-sm btn-outline w-full sm:w-auto">
                 <Power className="h-4 w-4 mr-1" />
                 Activate
               </button>
-              <button onClick={handleBulkDeactivate} className="btn btn-sm btn-outline">
+              <button onClick={handleBulkDeactivate} className="btn btn-sm btn-outline w-full sm:w-auto">
                 <PowerOff className="h-4 w-4 mr-1" />
                 Deactivate
               </button>
               {user?.role === 'admin' && (
                 <button
                   onClick={handleBulkDelete}
-                  className="btn btn-sm bg-red-600 text-white hover:bg-red-700 border-red-600"
+                  className="btn btn-sm bg-red-600 text-white hover:bg-red-700 border-red-600 w-full sm:w-auto"
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   Delete Selected
@@ -751,9 +795,9 @@ const Students = () => {
       </div>
 
       {/* Students Table */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="table">
+          <table className="table min-w-[700px]">
             <thead>
               <tr>
                 <th className="w-12">
@@ -761,7 +805,7 @@ const Students = () => {
                     type="checkbox"
                     checked={selectedStudents.length === students.length && students.length > 0}
                     onChange={handleSelectAll}
-                    className="rounded border-gray-300"
+                    className="rounded border-gray-300 dark:border-[#38383A]"
                   />
                 </th>
                 <th>Admission No.</th>
@@ -785,7 +829,7 @@ const Students = () => {
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="text-center py-12 text-gray-500">
+                  <td colSpan="9" className="text-center py-12 text-gray-500 dark:text-[#8E8E93]">
                     No students found
                   </td>
                 </tr>
@@ -795,9 +839,9 @@ const Students = () => {
                     <td>
                       <input
                         type="checkbox"
-                        checked={selectedStudents.includes(student._id)}
+                        checked={selectedSet.has(student._id)}
                         onChange={() => handleSelectStudent(student._id)}
-                        className="rounded border-gray-300"
+                        className="rounded border-gray-300 dark:border-[#38383A]"
                       />
                     </td>
                     <td>
@@ -806,38 +850,22 @@ const Students = () => {
                       </span>
                     </td>
                     <td>
-                      {student.photo ? (
-                        <img
-                          src={student.photo.startsWith('http') ? student.photo : `${SERVER_URL}${student.photo}`}
-                          alt={student.fullName}
-                          className="h-10 w-10 rounded-full object-cover"
-                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
-                        />
-                      ) : null}
-
-                      <div
-                        className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center"
-                        style={{ display: student.photo ? 'none' : 'flex' }}
-                      >
-                        <span className="text-sm font-semibold text-white">
-                          {student.fullName?.charAt(0).toUpperCase() || 'U'}
-                        </span>
-                      </div>
+                      <StudentPhotoCell student={student} />
                     </td>
                     <td>
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{student.fullName}</div>
-                        <div className="text-sm text-gray-500">{student.guardians?.[0]?.name}</div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{student.fullName}</div>
+                        <div className="text-sm text-gray-500 dark:text-[#8E8E93]">{student.guardians?.[0]?.name}</div>
                       </div>
                     </td>
-                    <td className="text-sm text-gray-900">{student.rollNumber || '-'}</td>
-                    <td className="text-sm text-gray-900">{student.class || '-'}</td>
-                    <td className="text-sm text-gray-900">{student.section || '-'}</td>
+                    <td className="text-sm text-gray-900 dark:text-white">{student.rollNumber || '-'}</td>
+                    <td className="text-sm text-gray-900 dark:text-white">{student.class || '-'}</td>
+                    <td className="text-sm text-gray-900 dark:text-white">{student.section || '-'}</td>
                     <td>
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${student.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
                           }`}
                       >
                         {student.isActive ? 'Active' : 'Inactive'}
@@ -847,7 +875,7 @@ const Students = () => {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleViewStudent(student)}
-                          className="p-1 text-gray-400 hover:text-blue-600"
+                          className="btn-icon hover:text-blue-600"
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
@@ -855,15 +883,22 @@ const Students = () => {
                         {user?.role === 'admin' && (
                           <>
                             <button
+                              onClick={() => handleEditStudent(student)}
+                              className="btn-icon hover:text-teal-600"
+                              title="Edit Student"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            <button
                               onClick={() => handleToggleStatus(student)}
-                              className={`p-1 text-gray-400 hover:${student.isActive ? 'text-orange-500' : 'text-green-600'}`}
+                              className={student.isActive ? 'p-1 text-gray-400 hover:text-orange-500' : 'p-1 text-gray-400 hover:text-green-600'}
                               title={student.isActive ? 'Deactivate' : 'Activate'}
                             >
                               {student.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
                             </button>
                             <button
                               onClick={() => handleDeleteStudent(student)}
-                              className="p-1 text-gray-400 hover:text-red-600"
+                              className="btn-icon hover:text-red-600"
                               title="Delete Permanently"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -882,15 +917,15 @@ const Students = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between px-1">
-          <div className="flex items-center gap-3 text-sm text-gray-600">
+        <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-1">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-[#8E8E93]">
             <span>
               Showing {((currentPage - 1) * perPage) + 1}–{Math.min(currentPage * perPage, totalStudents)} of <strong>{totalStudents}</strong> students
             </span>
             <select
               value={perPage}
               onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1); }}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
+              className="border border-gray-300 dark:border-[#38383A] rounded px-2 py-1 text-sm"
             >
               <option value={50}>50 / page</option>
               <option value={100}>100 / page</option>
@@ -902,17 +937,17 @@ const Students = () => {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn btn-sm btn-ghost"
             >
               ← Previous
             </button>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 dark:text-[#8E8E93]">
               Page {currentPage} of {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="btn btn-sm btn-ghost"
             >
               Next →
             </button>
@@ -926,7 +961,7 @@ const Students = () => {
           student={editingStudent}
           onSave={handleSaveStudent}
           onCancel={() => setShowForm(false)}
-          isLoading={isSaving}
+          isLoading={saveMutation.isPending}
         />
       )}
 
@@ -942,8 +977,8 @@ const Students = () => {
           executeUrl="/students/import/execute"
           onSuccess={(result) => {
             setShowImportModal(false)
-            fetchStudents()
-            toast.success(`Successfully imported ${result.created} students`)
+            queryClient.invalidateQueries({ queryKey: ['students'] })
+            toast.success(`Successfully imported ${result.success || result.created || 0} students`)
           }}
         />
       )}
@@ -957,7 +992,7 @@ const Students = () => {
             setShowDeactivateModal(false)
             setStudentToDeactivate(null)
           }}
-          isLoading={isDeactivating}
+          isLoading={deactivateMutation.isPending}
         />
       )}
     </div>

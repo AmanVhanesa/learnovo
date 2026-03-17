@@ -202,29 +202,29 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-                    <h2 className="text-2xl font-bold text-gray-900">
+                <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                         {isEditing ? 'Edit Homework' : 'Create Homework'}
                     </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
                     {/* Title */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                             Title <span className="text-red-500">*</span>
                         </label>
                         <input
                             type="text"
                             value={formData.title}
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                             placeholder="Enter homework title"
                             required
                         />
@@ -232,14 +232,14 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
                     {/* Description */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                             Description <span className="text-red-500">*</span>
                         </label>
                         <textarea
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             rows={4}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                             placeholder="Enter homework description and instructions"
                             required
                         />
@@ -249,13 +249,13 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Subject */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                                 Subject <span className="text-red-500">*</span>
                             </label>
                             <select
                                 value={formData.subject}
                                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                                 required
                             >
                                 <option value="">Select Subject</option>
@@ -269,7 +269,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
                         {/* Grade */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                                 Grade <span className="text-red-500">*</span>
                             </label>
                             <select
@@ -278,7 +278,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                                     restoringRef.current = false; // user changed grade manually
                                     setSelectedGrade(e.target.value);
                                 }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                                 required
                             >
                                 <option value="">Select Grade</option>
@@ -292,13 +292,13 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
                         {/* Section */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                                 Section <span className="text-red-500">*</span>
                             </label>
                             <select
                                 value={formData.section}
                                 onChange={(e) => handleSectionChange(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                                 disabled={!selectedGrade}
                                 required
                             >
@@ -315,26 +315,26 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                     {/* Dates */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                                 Assigned Date <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="date"
                                 value={formData.assignedDate}
                                 onChange={(e) => setFormData({ ...formData, assignedDate: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                                 Due Date <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="date"
                                 value={formData.dueDate}
                                 onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                                 min={formData.assignedDate}
                                 required
                             />
@@ -343,13 +343,13 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
                     {/* File Upload */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                             Attachments (Images & Files)
                         </label>
 
-                        <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:border-primary-500 transition-colors">
-                            <Upload className="h-5 w-5 text-gray-400 mr-2" />
-                            <span className="text-sm text-gray-600">Click to upload images or files</span>
+                        <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-[#38383A] rounded-md cursor-pointer hover:border-primary-500 transition-colors">
+                            <Upload className="h-5 w-5 text-gray-400 dark:text-[#636366] mr-2" />
+                            <span className="text-sm text-gray-600 dark:text-[#8E8E93]">Click to upload images or files</span>
                             <input
                                 type="file"
                                 multiple
@@ -358,17 +358,17 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                                 className="hidden"
                             />
                         </label>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
                             Supported: JPG, PNG, GIF, PDF, DOC, DOCX (Max 5MB each)
                         </p>
 
                         {/* Existing Attachments */}
                         {existingAttachments.length > 0 && (
                             <div className="mt-4">
-                                <p className="text-sm font-medium text-gray-700 mb-2">Existing Attachments:</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Existing Attachments:</p>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                     {existingAttachments.map((attachment, index) => (
-                                        <div key={index} className="relative group border border-gray-200 rounded-md p-2">
+                                        <div key={index} className="relative group border border-gray-200 dark:border-[#38383A] rounded-md p-2">
                                             {isImage(attachment.fileType) ? (
                                                 <img
                                                     src={attachment.fileUrl}
@@ -376,11 +376,11 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                                                     className="w-full h-24 object-cover rounded"
                                                 />
                                             ) : (
-                                                <div className="flex items-center justify-center h-24 bg-gray-100 rounded">
-                                                    <File className="h-8 w-8 text-gray-400" />
+                                                <div className="flex items-center justify-center h-24 bg-gray-100 dark:bg-[#2C2C2E] rounded">
+                                                    <File className="h-8 w-8 text-gray-400 dark:text-[#636366]" />
                                                 </div>
                                             )}
-                                            <p className="text-xs text-gray-600 mt-1 truncate">{attachment.fileName}</p>
+                                            <p className="text-xs text-gray-600 dark:text-[#8E8E93] mt-1 truncate">{attachment.fileName}</p>
                                             <button
                                                 type="button"
                                                 onClick={() => removeExistingAttachment(index)}
@@ -397,10 +397,10 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                         {/* New Files Preview */}
                         {files.length > 0 && (
                             <div className="mt-4">
-                                <p className="text-sm font-medium text-gray-700 mb-2">New Files:</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">New Files:</p>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                     {files.map((file, index) => (
-                                        <div key={index} className="relative group border border-gray-200 rounded-md p-2">
+                                        <div key={index} className="relative group border border-gray-200 dark:border-[#38383A] rounded-md p-2">
                                             {file.type.startsWith('image/') ? (
                                                 <img
                                                     src={URL.createObjectURL(file)}
@@ -408,11 +408,11 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                                                     className="w-full h-24 object-cover rounded"
                                                 />
                                             ) : (
-                                                <div className="flex items-center justify-center h-24 bg-gray-100 rounded">
-                                                    <File className="h-8 w-8 text-gray-400" />
+                                                <div className="flex items-center justify-center h-24 bg-gray-100 dark:bg-[#2C2C2E] rounded">
+                                                    <File className="h-8 w-8 text-gray-400 dark:text-[#636366]" />
                                                 </div>
                                             )}
-                                            <p className="text-xs text-gray-600 mt-1 truncate">{file.name}</p>
+                                            <p className="text-xs text-gray-600 dark:text-[#8E8E93] mt-1 truncate">{file.name}</p>
                                             <button
                                                 type="button"
                                                 onClick={() => removeFile(index)}
@@ -428,18 +428,18 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-[#38383A]">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="btn btn-outline"
+                            className="btn btn-outline w-full sm:w-auto"
                             disabled={isLoading}
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="btn btn-primary"
+                            className="btn btn-primary w-full sm:w-auto"
                             disabled={isLoading}
                         >
                             {isLoading ? 'Saving...' : isEditing ? 'Update Homework' : 'Create Homework'}

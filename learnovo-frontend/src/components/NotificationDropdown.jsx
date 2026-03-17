@@ -1,236 +1,239 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle, X, AlertTriangle, Info } from 'lucide-react';
-import notificationsService from '../services/notificationsService';
+import {
+    Bell, CheckCheck, X, AlertTriangle, Info,
+    CheckCircle2, ArrowRight, Sparkles
+} from 'lucide-react';
+import { useNotifications } from '../contexts/NotificationContext';
 
-const NotificationDropdown = ({ onClose, onNotificationRead }) => {
-    const [notifications, setNotifications] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+const TYPE_CONFIG = {
+    success: {
+        icon: CheckCircle2,
+        iconColor: 'text-emerald-500',
+        bg: 'bg-emerald-50 dark:bg-emerald-500/10',
+        ring: 'ring-emerald-100 dark:ring-emerald-500/20',
+        dot: 'bg-emerald-500',
+    },
+    warning: {
+        icon: AlertTriangle,
+        iconColor: 'text-amber-500',
+        bg: 'bg-amber-50 dark:bg-amber-500/10',
+        ring: 'ring-amber-100 dark:ring-amber-500/20',
+        dot: 'bg-amber-500',
+    },
+    error: {
+        icon: AlertTriangle,
+        iconColor: 'text-red-500',
+        bg: 'bg-red-50 dark:bg-red-500/10',
+        ring: 'ring-red-100 dark:ring-red-500/20',
+        dot: 'bg-red-500',
+    },
+    info: {
+        icon: Info,
+        iconColor: 'text-blue-500',
+        bg: 'bg-blue-50 dark:bg-blue-500/10',
+        ring: 'ring-blue-100 dark:ring-blue-500/20',
+        dot: 'bg-blue-500',
+    },
+};
+
+const formatTimeAgo = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diff = now - date;
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const NotificationDropdown = ({ onClose, bellRef }) => {
+    const {
+        unreadCount,
+        recentNotifications: notifications,
+        fetchRecentNotifications,
+        markAsRead,
+        markAllAsRead,
+        refresh
+    } = useNotifications();
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetchRecentNotifications();
+        let cancelled = false;
+        (async () => {
+            refresh();
+            await fetchRecentNotifications();
+            if (!cancelled) setIsLoading(false);
+        })();
 
-        // Close dropdown when clicking outside
         const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+            if (
+                dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+                bellRef?.current && !bellRef.current.contains(event.target)
+            ) {
                 onClose();
             }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [onClose]);
+        return () => {
+            cancelled = true;
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [onClose, bellRef, fetchRecentNotifications, refresh]);
 
-    const fetchRecentNotifications = async () => {
-        try {
-            setIsLoading(true);
-            const response = await notificationsService.getNotifications({ limit: 5 });
-            if (response.success) {
-                console.log('Notifications received:', response.data);
-                // Log first notification to see structure
-                if (response.data.length > 0) {
-                    console.log('First notification:', response.data[0]);
-                    console.log('createdAt value:', response.data[0].createdAt);
-                    console.log('createdAt type:', typeof response.data[0].createdAt);
-                }
-                setNotifications(response.data);
-            }
-        } catch (error) {
-            console.error('Error fetching notifications:', error);
-        } finally {
-            setIsLoading(false);
+    const handleNotificationClick = useCallback((notification) => {
+        if (!notification.isRead) {
+            markAsRead(notification._id);
         }
-    };
-
-    const handleNotificationClick = async (notification) => {
-        try {
-            // Mark as read if unread
-            if (!notification.isRead) {
-                await notificationsService.markAsRead(notification._id);
-                onNotificationRead();
-            }
-
-            // Navigate to action URL if exists
-            if (notification.actionUrl) {
-                navigate(notification.actionUrl);
-                onClose();
-            }
-        } catch (error) {
-            console.error('Error handling notification click:', error);
+        if (notification.actionUrl) {
+            navigate(notification.actionUrl);
+            onClose();
         }
-    };
+    }, [markAsRead, navigate, onClose]);
 
-    const handleMarkAllAsRead = async () => {
-        try {
-            await notificationsService.markAllAsRead();
-            onNotificationRead();
-            fetchRecentNotifications();
-        } catch (error) {
-            console.error('Error marking all as read:', error);
-        }
-    };
+    const handleMarkAllAsRead = useCallback(async () => {
+        await markAllAsRead();
+    }, [markAllAsRead]);
 
-    const getNotificationIcon = (type) => {
-        switch (type) {
-            case 'success':
-                return <CheckCircle className="h-5 w-5 text-green-500" />;
-            case 'warning':
-                return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-            case 'error':
-                return <AlertTriangle className="h-5 w-5 text-red-500" />;
-            default:
-                return <Info className="h-5 w-5 text-blue-500" />;
-        }
-    };
-
-    const getNotificationBgColor = (type, isRead) => {
-        if (isRead) return 'bg-white';
-
-        switch (type) {
-            case 'success':
-                return 'bg-green-50';
-            case 'warning':
-                return 'bg-yellow-50';
-            case 'error':
-                return 'bg-red-50';
-            default:
-                return 'bg-blue-50';
-        }
-    };
-
-    const formatTimeAgo = (dateString) => {
-        if (!dateString) return 'Unknown';
-
-        const date = new Date(dateString);
-
-        // Check if date is valid
-        if (isNaN(date.getTime())) {
-            console.error('Invalid date:', dateString);
-            return 'Invalid Date';
-        }
-
-        const now = new Date();
-        const diff = now - date;
-
-        if (diff < 60000) return 'Just now';
-        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-        if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
-        return date.toLocaleDateString();
-    };
-
-    const unreadCount = notifications.filter(n => !n.isRead).length;
+    const getConfig = (type) => TYPE_CONFIG[type] || TYPE_CONFIG.info;
 
     return (
         <div
             ref={dropdownRef}
-            className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[600px] flex flex-col"
+            className="absolute right-0 sm:right-0 mt-2.5 w-[calc(100vw-1rem)] sm:w-[400px] max-w-[calc(100vw-1rem)] bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-black/[0.04] dark:ring-white/[0.06] z-50 flex flex-col animate-slide-down overflow-hidden -mr-2 sm:mr-0"
+            style={{ maxHeight: 'min(520px, calc(100vh - 6rem))' }}
         >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
+            {/* ── Header ── */}
+            <div className="flex items-center justify-between px-5 py-4">
+                <div className="flex items-center gap-2.5">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white tracking-tight">
+                        Notifications
+                    </h3>
                     {unreadCount > 0 && (
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            {unreadCount} unread
-                        </p>
+                        <span className="inline-flex items-center h-5 px-1.5 rounded-md bg-red-500/10 text-[11px] font-bold text-red-600 dark:text-red-400 tabular-nums">
+                            {unreadCount} new
+                        </span>
                     )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                     {unreadCount > 0 && (
                         <button
                             onClick={handleMarkAllAsRead}
-                            className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                            className="btn-ghost btn-sm flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg px-2.5 py-1.5"
                         >
-                            Mark all read
+                            <CheckCheck className="h-3.5 w-3.5" />
+                            <span>Read all</span>
                         </button>
                     )}
                     <button
                         onClick={onClose}
-                        className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
                     >
                         <X className="h-4 w-4" />
                     </button>
                 </div>
             </div>
 
-            {/* Notifications List */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="h-px bg-gray-100 dark:bg-[#38383A]" />
+
+            {/* ── List ── */}
+            <div className="flex-1 overflow-y-auto overscroll-contain">
                 {isLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <div className="loading-spinner"></div>
+                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                        <div className="loading-spinner" />
+                        <p className="text-xs text-gray-400 dark:text-[#636366]">Loading notifications...</p>
                     </div>
                 ) : notifications.length === 0 ? (
-                    <div className="text-center py-12">
-                        <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-sm text-gray-500">No notifications yet</p>
+                    <div className="flex flex-col items-center justify-center py-14 px-6">
+                        <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-[#2C2C2E] flex items-center justify-center mb-4">
+                            <Sparkles className="h-7 w-7 text-gray-300 dark:text-[#636366]" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-[#8E8E93]">All caught up!</p>
+                        <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">No new notifications</p>
                     </div>
                 ) : (
-                    <div className="divide-y divide-gray-100">
-                        {notifications.map((notification) => (
-                            <div
-                                key={notification._id}
-                                onClick={() => handleNotificationClick(notification)}
-                                className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${getNotificationBgColor(notification.type, notification.isRead)
-                                    }`}
-                            >
-                                <div className="flex items-start gap-3">
+                    <div>
+                        {notifications.map((notification, index) => {
+                            const config = getConfig(notification.type);
+                            const Icon = config.icon;
+                            const isUnread = !notification.isRead;
+
+                            return (
+                                <div
+                                    key={notification._id}
+                                    onClick={() => handleNotificationClick(notification)}
+                                    className={`group relative flex items-start gap-3 px-5 py-3.5 cursor-pointer transition-all duration-150
+                                        ${isUnread
+                                            ? 'bg-primary-50/40 dark:bg-primary-500/[0.04]'
+                                            : 'hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/60'
+                                        }
+                                        ${index < notifications.length - 1 ? 'border-b border-gray-100/60 dark:border-[#2C2C2E]' : ''}
+                                    `}
+                                >
+                                    {/* Unread indicator bar */}
+                                    {isUnread && (
+                                        <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full bg-primary-500" />
+                                    )}
+
                                     {/* Icon */}
-                                    <div className="flex-shrink-0 mt-0.5">
-                                        {getNotificationIcon(notification.type)}
+                                    <div className={`flex-shrink-0 w-9 h-9 rounded-xl ${config.bg} ring-1 ${config.ring} flex items-center justify-center mt-0.5`}>
+                                        <Icon className={`h-4 w-4 ${config.iconColor}`} />
                                     </div>
 
                                     {/* Content */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2">
-                                            <h4 className={`text-sm font-medium ${!notification.isRead ? 'text-gray-900' : 'text-gray-600'
-                                                }`}>
+                                            <h4 className={`text-[13px] leading-snug ${isUnread ? 'font-semibold text-gray-900 dark:text-white' : 'font-medium text-gray-600 dark:text-[#8E8E93]'}`}>
                                                 {notification.title}
                                             </h4>
-                                            {!notification.isRead && (
-                                                <span className="flex-shrink-0 h-2 w-2 bg-primary-500 rounded-full mt-1.5"></span>
-                                            )}
+                                            <span className="flex-shrink-0 text-[11px] text-gray-400 dark:text-[#636366] tabular-nums whitespace-nowrap mt-0.5">
+                                                {formatTimeAgo(notification.createdAt)}
+                                            </span>
                                         </div>
-                                        <p className={`mt-1 text-sm ${!notification.isRead ? 'text-gray-700' : 'text-gray-500'
-                                            } line-clamp-2`}>
+                                        <p className={`mt-0.5 text-xs leading-relaxed line-clamp-2 ${isUnread ? 'text-gray-600 dark:text-[#8E8E93]' : 'text-gray-400 dark:text-[#636366]'}`}>
                                             {notification.message}
                                         </p>
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <p className="text-xs text-gray-400">
-                                                {formatTimeAgo(notification.createdAt)}
-                                            </p>
-                                            {notification.actionLabel && (
-                                                <>
-                                                    <span className="text-gray-300">•</span>
-                                                    <span className="text-xs text-primary-600 font-medium">
-                                                        {notification.actionLabel}
-                                                    </span>
-                                                </>
-                                            )}
-                                        </div>
+                                        {notification.actionLabel && (
+                                            <span className="inline-flex items-center gap-1 mt-1.5 text-[11px] font-medium text-primary-600 dark:text-primary-400 group-hover:underline">
+                                                {notification.actionLabel}
+                                                <ArrowRight className="h-3 w-3" />
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
-            {/* Footer */}
+            {/* ── Footer ── */}
             {notifications.length > 0 && (
-                <div className="p-3 border-t border-gray-200 bg-gray-50">
-                    <button
-                        onClick={() => {
-                            navigate('/app/notifications');
-                            onClose();
-                        }}
-                        className="w-full text-center text-sm text-primary-600 hover:text-primary-700 font-medium py-2"
-                    >
-                        View all notifications
-                    </button>
-                </div>
+                <>
+                    <div className="h-px bg-gray-100 dark:bg-[#38383A]" />
+                    <div className="px-5 py-3">
+                        <button
+                            onClick={() => {
+                                navigate('/app/notifications');
+                                onClose();
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                        >
+                            View all notifications
+                            <ArrowRight className="h-4 w-4" />
+                        </button>
+                    </div>
+                </>
             )}
         </div>
     );

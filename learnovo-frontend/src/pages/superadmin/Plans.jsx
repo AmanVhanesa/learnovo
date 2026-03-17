@@ -216,16 +216,16 @@ const SuperAdminPlans = () => {
         <div className="space-y-8">
             {/* Page Header */}
             <div>
-                <h1 className="text-2xl font-bold text-gray-900">Subscription Plans</h1>
-                <p className="mt-1 text-sm text-gray-500">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Subscription Plans</h1>
+                <p className="mt-1 text-sm text-gray-500 dark:text-[#8E8E93]">
                     Global subscription tiers, pricing, limits, and feature access.
                 </p>
             </div>
 
             {/* Info Banner */}
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex items-start gap-3">
                 <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-700">
+                <div className="text-sm text-blue-700 dark:text-blue-300">
                     <span className="font-semibold">Read-only overview.</span> Plan pricing and features are configured in the backend. To apply
                     custom limits for a specific school, use the <strong>Override Limits</strong> option inside their Tenant panel.
                 </div>
@@ -238,7 +238,7 @@ const SuperAdminPlans = () => {
                     return (
                         <div
                             key={plan.id}
-                            className={`relative bg-white rounded-2xl border-2 flex flex-col ${plan.borderClass} ${plan.isPopular ? 'shadow-lg shadow-violet-100 ring-2 ring-violet-400 ring-offset-2' : 'shadow-sm'}`}
+                            className={`relative bg-white dark:bg-[#1C1C1E] rounded-2xl border-2 flex flex-col ${plan.borderClass} ${plan.isPopular ? 'shadow-lg shadow-violet-100 ring-2 ring-violet-400 ring-offset-2' : 'shadow-sm'}`}
                         >
                             {plan.isPopular && (
                                 <div className="absolute -top-3.5 inset-x-0 flex justify-center">
@@ -249,7 +249,7 @@ const SuperAdminPlans = () => {
                             )}
 
                             {/* Header */}
-                            <div className="p-6 border-b border-gray-100">
+                            <div className="p-6 border-b border-gray-100 dark:border-[#38383A]">
                                 <div className="flex items-center gap-2 mb-4">
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${plan.color}`}>
                                         <Icon className="h-4 w-4" />
@@ -257,30 +257,30 @@ const SuperAdminPlans = () => {
                                     <span className={`text-sm font-bold px-2.5 py-0.5 rounded-full ${plan.color}`}>{plan.name}</span>
                                 </div>
                                 <div className="flex items-baseline gap-1 mb-1">
-                                    <span className="text-3xl font-extrabold text-gray-900">{plan.priceDisplay}</span>
+                                    <span className="text-3xl font-extrabold text-gray-900 dark:text-white">{plan.priceDisplay}</span>
                                     <span className="text-sm text-gray-400 font-medium">{plan.period}</span>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-2 leading-relaxed">{plan.description}</p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-2 leading-relaxed">{plan.description}</p>
                             </div>
 
                             {/* Limits */}
-                            <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Limits</p>
+                            <div className="px-6 py-4 bg-gray-50 dark:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A]">
+                                <p className="text-[10px] font-bold text-gray-400 dark:text-[#636366] uppercase tracking-widest mb-3">Limits</p>
                                 <div className="grid grid-cols-2 gap-2 text-sm">
                                     <div>
-                                        <p className="text-gray-500 text-xs">Students</p>
-                                        <p className="font-bold text-gray-900">{plan.limits.students === 0 ? '∞' : plan.limits.students.toLocaleString()}</p>
+                                        <p className="text-gray-500 dark:text-[#8E8E93] text-xs">Students</p>
+                                        <p className="font-bold text-gray-900 dark:text-white">{plan.limits.students === 0 ? '∞' : plan.limits.students.toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-gray-500 text-xs">Teachers</p>
-                                        <p className="font-bold text-gray-900">{plan.limits.teachers === 0 ? '∞' : plan.limits.teachers.toLocaleString()}</p>
+                                        <p className="text-gray-500 dark:text-[#8E8E93] text-xs">Teachers</p>
+                                        <p className="font-bold text-gray-900 dark:text-white">{plan.limits.teachers === 0 ? '∞' : plan.limits.teachers.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Features */}
                             <div className="px-6 py-4 flex-1">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Features</p>
+                                <p className="text-[10px] font-bold text-gray-400 dark:text-[#636366] uppercase tracking-widest mb-3">Features</p>
                                 <ul className="space-y-2">
                                     {Object.entries(plan.features).map(([feature, enabled]) => (
                                         <li key={feature} className="flex items-start gap-2">
@@ -288,7 +288,7 @@ const SuperAdminPlans = () => {
                                                 ? <Check className={`h-4 w-4 mt-0.5 flex-shrink-0 ${planColors[plan.id].check}`} />
                                                 : <X className="h-4 w-4 mt-0.5 flex-shrink-0 text-gray-300" />
                                             }
-                                            <span className={`text-xs ${enabled ? 'text-gray-700' : 'text-gray-400 line-through'}`}>
+                                            <span className={`text-xs ${enabled ? 'text-gray-700 dark:text-[#8E8E93]' : 'text-gray-400 dark:text-[#636366] line-through'}`}>
                                                 {feature}
                                             </span>
                                         </li>
@@ -311,12 +311,12 @@ const SuperAdminPlans = () => {
                 </button>
 
                 {showTable && (
-                    <div className="mt-4 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="mt-4 bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="w-full min-w-[700px] text-sm">
                                 <thead>
-                                    <tr className="bg-gray-50 border-b border-gray-200">
-                                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 w-56">Feature</th>
+                                    <tr className="bg-gray-50 dark:bg-[#2C2C2E] border-b border-gray-200 dark:border-[#38383A]">
+                                        <th className="text-left px-4 py-3 text-xs font-bold text-gray-700 dark:text-[#8E8E93] w-56">Feature</th>
                                         {PLANS.map(p => (
                                             <th key={p.id} className="text-center px-4 py-3">
                                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${p.color}`}>{p.name}</span>
@@ -327,14 +327,14 @@ const SuperAdminPlans = () => {
                                 <tbody>
                                     {FEATURE_GROUPS.map(group => (
                                         <React.Fragment key={group.label}>
-                                            <tr className="bg-gray-50/70 border-y border-gray-100">
-                                                <td colSpan={5} className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                                            <tr className="bg-gray-50/70 dark:bg-[#2C2C2E]/70 border-y border-gray-100 dark:border-[#38383A]">
+                                                <td colSpan={5} className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-[#636366]">
                                                     {group.label}
                                                 </td>
                                             </tr>
                                             {group.features.map(feature => (
-                                                <tr key={feature} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                                                    <td className="px-4 py-3 text-xs text-gray-700">{feature}</td>
+                                                <tr key={feature} className="border-b border-gray-50 dark:border-[#38383A] hover:bg-gray-50/50 dark:hover:bg-[#2C2C2E] transition-colors">
+                                                    <td className="px-4 py-3 text-xs text-gray-700 dark:text-white">{feature}</td>
                                                     {PLANS.map(p => (
                                                         <td key={p.id} className="text-center px-4 py-3">
                                                             {p.features[feature]
@@ -348,14 +348,14 @@ const SuperAdminPlans = () => {
                                         </React.Fragment>
                                     ))}
                                     {/* Limits rows */}
-                                    <tr className="bg-gray-50/70 border-y border-gray-100">
-                                        <td colSpan={5} className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-gray-400">Limits</td>
+                                    <tr className="bg-gray-50/70 dark:bg-[#2C2C2E]/70 border-y border-gray-100 dark:border-[#38383A]">
+                                        <td colSpan={5} className="px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-gray-400 dark:text-[#636366]">Limits</td>
                                     </tr>
                                     {['students', 'teachers'].map(key => (
-                                        <tr key={key} className="border-b border-gray-50 hover:bg-gray-50/50">
-                                            <td className="px-4 py-3 text-xs text-gray-700 capitalize">Max {key}</td>
+                                        <tr key={key} className="border-b border-gray-50 dark:border-[#38383A] hover:bg-gray-50/50 dark:hover:bg-[#2C2C2E]">
+                                            <td className="px-4 py-3 text-xs text-gray-700 dark:text-[#8E8E93] capitalize">Max {key}</td>
                                             {PLANS.map(p => (
-                                                <td key={p.id} className="text-center px-4 py-3 text-xs font-semibold text-gray-700">
+                                                <td key={p.id} className="text-center px-4 py-3 text-xs font-semibold text-gray-700 dark:text-white">
                                                     {p.limits[key] === 0 ? '∞' : p.limits[key].toLocaleString()}
                                                 </td>
                                             ))}

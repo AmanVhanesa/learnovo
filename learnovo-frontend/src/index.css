@@ -2,46 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════
+   LEARNOVO DESIGN SYSTEM — Glass-Inspired Modern UI
+   ═══════════════════════════════════════════════════════════════ */
+
 @layer base {
   html {
     scroll-behavior: smooth;
   }
 
   * {
-    @apply border-gray-200;
+    @apply border-gray-200 dark:border-[#38383A];
     -webkit-tap-highlight-color: transparent;
   }
 
+  /*
+   * Fix WebKit/Blink sub-pixel rendering bug:
+   * Elements with border-radius + overflow:hidden show a thin transparent
+   * seam/strip where child backgrounds don't fully cover the rounded edge.
+   * Forcing a GPU-composited mask eliminates the gap.
+   */
+  .overflow-hidden[class*="rounded"],
+  [class*="rounded-lg"][class*="overflow-hidden"],
+  [class*="rounded-xl"][class*="overflow-hidden"],
+  [class*="rounded-2xl"][class*="overflow-hidden"],
+  [class*="rounded-3xl"][class*="overflow-hidden"] {
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    mask-image: radial-gradient(white, black);
+  }
+
   body {
-    @apply bg-gray-50 text-gray-900 font-sans;
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    @apply bg-gray-50 text-gray-900 font-sans dark:bg-[#000000] dark:text-white;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.011em;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    letter-spacing: -0.02em;
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.025em;
+    @apply text-gray-900 dark:text-white;
   }
 
-  /* Smooth GPU-composited transitions — only links & buttons, NOT form inputs */
-  a,
-  button,
-  [role="button"],
-  [role="tab"],
-  [role="menuitem"] {
+  /* Smooth GPU-composited transitions — only interactive elements */
+  a, button, [role="button"], [role="tab"], [role="menuitem"] {
     transition-property: color, background-color, border-color, box-shadow, transform, opacity;
     transition-duration: 150ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Slim smooth custom scrollbar */
+  /* Refined custom scrollbar */
   ::-webkit-scrollbar {
     width: 5px;
     height: 5px;
@@ -52,62 +61,56 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.12);
+    background: rgba(0, 0, 0, 0.1);
     border-radius: 999px;
   }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.25);
+  .dark ::-webkit-scrollbar-track {
+    background: #000000;
   }
 
-  /* Honor reduced-motion for accessibility */
-  @media (prefers-reduced-motion: reduce) {
+  .dark ::-webkit-scrollbar-thumb {
+    background: #38383A;
+  }
 
-    *,
-    *::before,
-    *::after {
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: #48484A;
+  }
+
+  /* Accessibility: honor reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
   }
 
-  /*
-   * iOS Safari auto-zoom fix:
-   * Safari zooms in when a focused input has font-size < 16px.
-   * Force minimum 16px on all touch/mobile screens so the page
-   * never zooms on focus — the single biggest cause of the
-   * "page looks zoomed after refresh" issue on iPhone/iPad.
-   */
+  /* iOS Safari auto-zoom fix */
   @media screen and (max-width: 768px) {
-
-    input,
-    input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    input[type="number"],
-    input[type="search"],
-    input[type="tel"],
-    input[type="url"],
-    input[type="date"],
-    input[type="datetime-local"],
-    input[type="month"],
-    input[type="week"],
-    input[type="time"],
-    select,
-    textarea {
+    input, input[type="text"], input[type="email"], input[type="password"],
+    input[type="number"], input[type="search"], input[type="tel"],
+    input[type="url"], input[type="date"], input[type="datetime-local"],
+    input[type="month"], input[type="week"], input[type="time"],
+    select, textarea {
       font-size: 16px !important;
     }
   }
 
-  /* Prevent rubber-band overscroll causing layout shift on iOS */
   html {
-    scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
-    /* prevent iOS text inflation */
     text-size-adjust: 100%;
   }
 
-  /* Safe-area insets for notched iPhones/iPads (paired with viewport-fit=cover) */
+  /* Dark mode select option styling */
+  .dark select option {
+    background-color: #1C1C1E;
+    color: #FFFFFF;
+  }
+
   .safe-area-wrapper {
     padding-top: env(safe-area-inset-top);
     padding-right: env(safe-area-inset-right);
@@ -116,29 +119,46 @@
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   COMPONENT LAYER — Glass Design System
+   ═══════════════════════════════════════════════════════════════ */
+
 @layer components {
+
+  /* ── Buttons ────────────────────────────────────────────────── */
+
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg text-sm font-medium h-10 px-4 py-2 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none active:scale-95;
+    @apply inline-flex items-center justify-center rounded-xl text-sm font-semibold h-10 px-4 py-2
+           transition-all duration-200 ease-out
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+           disabled:opacity-50 disabled:pointer-events-none
+           active:scale-[0.97];
   }
 
   .btn-primary {
-    @apply bg-primary-600 text-white shadow-md hover:bg-primary-700 hover:shadow-lg hover:-translate-y-0.5;
+    @apply bg-primary-600 text-white shadow-md
+           hover:bg-primary-500 hover:shadow-lg hover:shadow-glow-sm
+           dark:bg-[#3EC4B1] dark:text-black dark:hover:bg-[#35a89a];
   }
 
   .btn-secondary {
-    @apply bg-secondary-600 text-white shadow-md hover:bg-secondary-700 hover:shadow-lg hover:-translate-y-0.5;
+    @apply bg-secondary-600 text-white shadow-md
+           hover:bg-secondary-500 hover:shadow-lg hover:shadow-lg;
   }
 
   .btn-outline {
-    @apply border-2 border-primary-600 text-primary-600 hover:bg-primary-50 hover:border-primary-700 hover:text-primary-700;
+    @apply border border-gray-300 text-gray-700 bg-white
+           hover:bg-gray-50 hover:border-gray-400
+           dark:border-[#38383A] dark:text-white dark:bg-transparent dark:hover:bg-[#2C2C2E];
   }
 
   .btn-ghost {
-    @apply hover:bg-gray-100 hover:text-gray-900;
+    @apply text-gray-600 hover:bg-gray-100/80 hover:text-gray-900
+           dark:text-[#3EC4B1] dark:hover:bg-[rgba(62,196,177,0.08)] dark:hover:text-[#3EC4B1];
   }
 
   .btn-sm {
-    @apply h-8 px-3 text-xs;
+    @apply h-8 px-3 text-xs rounded-lg;
   }
 
   .btn-md {
@@ -146,23 +166,201 @@
   }
 
   .btn-lg {
-    @apply h-12 px-8 text-base;
+    @apply h-12 px-6 text-base;
   }
+
+  .btn-icon {
+    @apply p-2 rounded-xl text-gray-400 transition-all
+           hover:bg-gray-100/80 hover:text-gray-600
+           dark:hover:bg-[#2C2C2E] dark:text-[#8E8E93] dark:hover:text-white;
+  }
+
+  .btn-close {
+    @apply p-2 rounded-xl text-gray-400
+           hover:text-gray-600 hover:bg-gray-100/80
+           dark:text-[#8E8E93] dark:hover:text-white dark:hover:bg-[#2C2C2E];
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white shadow-md
+           hover:bg-red-500 hover:shadow-lg hover:shadow-lg
+           dark:bg-[#FF453A] dark:hover:bg-[#FF6961];
+  }
+
+  /* ── Cards (Glass-Inspired) ─────────────────────────────────── */
 
   .card {
-    @apply rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:shadow-md;
+    @apply rounded-2xl bg-white border border-gray-100/80
+           shadow-glass
+           transition-all duration-200
+           dark:bg-[#1C1C1E] dark:border-[#38383A];
   }
 
+  .card:hover {
+    @apply shadow-glass-md;
+  }
+
+  .card-glass {
+    @apply rounded-2xl border border-white/20
+           bg-white/70 backdrop-blur-xl
+           shadow-glass
+           dark:bg-[#1C1C1E] dark:border-white/[0.06] dark:backdrop-blur-xl;
+  }
+
+  /* Stat/KPI card with subtle left accent and glass feel */
+  .stat-card {
+    @apply rounded-2xl bg-white border border-gray-100/80
+           p-3 sm:p-4 lg:p-5 shadow-glass
+           transition-all duration-200
+           hover:shadow-glass-md
+           dark:bg-[#1C1C1E] dark:border-[#38383A];
+  }
+
+  /* ── Inputs ─────────────────────────────────────────────────── */
+
   .input {
-    @apply flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm transition-all duration-200 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 focus-visible:border-primary-500 disabled:cursor-not-allowed disabled:opacity-50 hover:border-gray-400;
+    @apply flex h-11 sm:h-10 w-full rounded-xl border border-gray-200 bg-white
+           px-3.5 py-2 text-sm
+           transition-all duration-200
+           placeholder:text-gray-400
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-primary-500
+           disabled:cursor-not-allowed disabled:opacity-50
+           hover:border-gray-300
+           dark:bg-[#1C1C1E] dark:border-[#38383A] dark:text-white
+           dark:placeholder:text-[#636366] dark:hover:border-[#48484A]
+           dark:focus-visible:ring-[#3EC4B1] dark:focus-visible:border-[#3EC4B1];
   }
 
   .label {
-    @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+    @apply text-sm font-medium text-gray-700 leading-none
+           dark:text-[#8E8E93];
   }
 
+  /* ── Tables ─────────────────────────────────────────────────── */
+
+  .table-scroll {
+    @apply overflow-x-auto -mx-3 sm:mx-0;
+    -webkit-overflow-scrolling: touch;
+    /* Scroll hint shadow on right edge */
+    background:
+      linear-gradient(to right, white 30%, rgba(255,255,255,0)),
+      linear-gradient(to left, white 30%, rgba(255,255,255,0)),
+      linear-gradient(to right, rgba(0,0,0,0.06), rgba(0,0,0,0)),
+      linear-gradient(to left, rgba(0,0,0,0.06), rgba(0,0,0,0));
+    background-position: left center, right center, left center, right center;
+    background-repeat: no-repeat;
+    background-size: 20px 100%, 20px 100%, 10px 100%, 10px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+
+  .dark .table-scroll {
+    background:
+      linear-gradient(to right, #1C1C1E 30%, rgba(28,28,30,0)),
+      linear-gradient(to left, #1C1C1E 30%, rgba(28,28,30,0)),
+      linear-gradient(to right, rgba(0,0,0,0.3), rgba(0,0,0,0)),
+      linear-gradient(to left, rgba(0,0,0,0.3), rgba(0,0,0,0));
+    background-position: left center, right center, left center, right center;
+    background-repeat: no-repeat;
+    background-size: 20px 100%, 20px 100%, 10px 100%, 10px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+
+  .table {
+    @apply w-full border-collapse bg-white rounded-2xl overflow-hidden shadow-glass
+           dark:bg-[#1C1C1E];
+    min-width: 600px;
+  }
+
+  .table th {
+    @apply bg-gray-50/80 px-3 sm:px-5 py-3 sm:py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider
+           border-b border-gray-100
+           dark:bg-[#2C2C2E] dark:text-[#8E8E93] dark:border-[#38383A];
+    white-space: nowrap;
+    min-width: 80px;
+  }
+
+  .table td {
+    @apply px-3 sm:px-5 py-3 sm:py-3.5 whitespace-nowrap text-xs sm:text-sm text-gray-700
+           border-b border-gray-50
+           dark:text-white dark:border-[#2C2C2E];
+    min-width: 80px;
+  }
+
+  .table tbody tr {
+    @apply transition-colors duration-150;
+  }
+
+  .table tbody tr:hover {
+    @apply bg-primary-50;
+  }
+
+  .dark .table tbody tr:hover {
+    background-color: #2C2C2E;
+  }
+
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* ── Status Badges ──────────────────────────────────────────── */
+
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold;
+  }
+
+  .status-pending {
+    @apply bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200;
+  }
+  .dark .status-pending {
+    background-color: rgba(255, 214, 10, 0.12);
+    color: #FFD60A;
+    --tw-ring-color: rgba(255, 214, 10, 0.3);
+  }
+
+  .status-paid {
+    @apply bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200;
+  }
+  .dark .status-paid {
+    background-color: rgba(48, 209, 88, 0.12);
+    color: #30D158;
+    --tw-ring-color: rgba(48, 209, 88, 0.3);
+  }
+
+  .status-overdue {
+    @apply bg-red-50 text-red-700 ring-1 ring-inset ring-red-200;
+  }
+  .dark .status-overdue {
+    background-color: rgba(255, 69, 58, 0.12);
+    color: #FF453A;
+    --tw-ring-color: rgba(255, 69, 58, 0.3);
+  }
+
+  .status-active {
+    @apply bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200;
+  }
+  .dark .status-active {
+    background-color: rgba(48, 209, 88, 0.12);
+    color: #30D158;
+    --tw-ring-color: rgba(48, 209, 88, 0.3);
+  }
+
+  .status-inactive {
+    @apply bg-gray-50 text-gray-600 ring-1 ring-inset ring-gray-200;
+  }
+  .dark .status-inactive {
+    background-color: rgba(142, 142, 147, 0.12);
+    color: #8E8E93;
+    --tw-ring-color: rgba(142, 142, 147, 0.3);
+  }
+
+  /* ── Sidebar ────────────────────────────────────────────────── */
+
   .sidebar {
-    @apply fixed left-0 top-0 z-40 h-screen w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out;
+    @apply fixed left-0 top-0 z-40 h-screen w-64
+           bg-white/95 backdrop-blur-xl
+           border-r border-gray-200/60
+           transform transition-transform duration-300 ease-in-out
+           dark:bg-[#1C1C1E] dark:border-[#38383A];
   }
 
   .sidebar-open {
@@ -185,89 +383,243 @@
     @apply ml-0;
   }
 
-  .stat-card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-5 lg:p-6 hover:shadow-md transition-shadow duration-200;
-  }
-
-  .table {
-    @apply w-full border-collapse bg-white rounded-lg overflow-hidden shadow-sm;
-  }
-
-  .table th {
-    @apply bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200;
-  }
-
-  .table td {
-    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900 border-b border-gray-200;
-  }
-
-  .table tbody tr {
-    @apply transition-colors duration-150;
-  }
-
-  .table tbody tr:hover {
-    @apply bg-primary-50/50;
-  }
-
-  .status-badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
-  }
-
-  .status-pending {
-    @apply bg-yellow-100 text-yellow-800;
-  }
-
-  .status-paid {
-    @apply bg-green-100 text-green-800;
-  }
-
-  .status-overdue {
-    @apply bg-red-100 text-red-800;
-  }
-
-  .status-active {
-    @apply bg-green-100 text-green-800;
-  }
-
-  .status-inactive {
-    @apply bg-gray-100 text-gray-800;
-  }
+  /* ── Modals ─────────────────────────────────────────────────── */
 
   .modal-overlay {
-    @apply fixed top-0 right-0 bottom-0 left-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999];
-    /* Ensure it covers the entire viewport ignoring safe areas */
+    @apply fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm
+           flex items-end sm:items-center justify-center z-[9999];
     height: 100vh;
     height: 100dvh;
   }
 
   .modal-content {
-    @apply bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto overflow-hidden ring-0 outline-none border border-transparent;
-    /* Extra specific boundary enforcement for Safari/Mac to prevent ghost borders at top */
+    @apply bg-white shadow-glass-lg
+           max-w-md w-full max-h-[100vh] sm:max-h-[90vh] overflow-y-auto
+           ring-1 ring-black/[0.03]
+           animate-scale-in
+           dark:bg-[#1C1C1E] dark:ring-white/[0.06]
+           rounded-t-2xl sm:rounded-2xl sm:mx-4;
     -webkit-mask-image: -webkit-radial-gradient(white, black);
     mask-image: radial-gradient(white, black);
   }
 
-  .loading-spinner {
-    @apply animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500;
+  .modal-box-lg {
+    @apply bg-white shadow-glass-lg
+           w-full max-w-2xl max-h-[100vh] sm:max-h-[90vh] overflow-y-auto
+           ring-1 ring-black/[0.03]
+           dark:bg-[#1C1C1E] dark:ring-white/[0.06]
+           rounded-t-2xl sm:rounded-2xl sm:mx-4 md:mx-auto md:w-[90%];
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    mask-image: radial-gradient(white, black);
   }
 
+  /* ── Loading ────────────────────────────────────────────────── */
+
+  .loading-spinner {
+    @apply animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-primary-500;
+  }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    @apply bg-gray-200/60 rounded-xl animate-pulse dark:bg-[#2C2C2E];
+  }
+
+  /* ── Toast ──────────────────────────────────────────────────── */
+
   .toast {
-    @apply fixed top-4 right-4 z-50 max-w-sm w-full bg-white rounded-lg shadow-lg border border-gray-200 p-4;
+    @apply fixed top-4 left-4 right-4 sm:left-auto sm:right-4 z-50 max-w-sm w-auto sm:w-full
+           bg-white/95 backdrop-blur-xl rounded-2xl shadow-glass-lg
+           border border-gray-100/80 p-4
+           dark:bg-[#1C1C1E] dark:border-[#38383A] dark:text-white;
   }
 
   .toast-success {
-    @apply border-l-4 border-green-500;
+    @apply border-l-4 border-l-emerald-500;
   }
 
   .toast-error {
-    @apply border-l-4 border-red-500;
+    @apply border-l-4 border-l-red-500;
   }
 
   .toast-warning {
-    @apply border-l-4 border-yellow-500;
+    @apply border-l-4 border-l-amber-500;
   }
 
   .toast-info {
-    @apply border-l-4 border-blue-500;
+    @apply border-l-4 border-l-blue-500;
+  }
+
+  /* ── Page Headers ───────────────────────────────────────────── */
+
+  .page-header {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4;
+  }
+
+  .page-title {
+    @apply text-xl sm:text-2xl font-bold text-gray-900 tracking-tight dark:text-white;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-gray-500 mt-1 dark:text-[#8E8E93];
+  }
+
+  /* ── Tab Navigation ─────────────────────────────────────────── */
+
+  .tab-nav {
+    @apply flex gap-1 p-1 bg-gray-100/80 rounded-xl
+           dark:bg-[#1C1C1E] overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .tab-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-item {
+    @apply px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg
+           text-gray-500 transition-all duration-200
+           hover:text-gray-700 hover:bg-white/60
+           dark:text-[#8E8E93] dark:hover:text-[#3EC4B1] dark:hover:bg-[rgba(62,196,177,0.06)]
+           whitespace-nowrap flex-shrink-0;
+  }
+
+  .tab-item-active {
+    @apply bg-white text-gray-900 shadow-sm
+           dark:bg-[#2C2C2E] dark:text-[#3EC4B1];
+  }
+
+  /* ── Utility: Section dividers ──────────────────────────────── */
+
+  .section-divider {
+    @apply border-t border-gray-100 dark:border-[#38383A];
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE UTILITIES — Mobile & Tablet Fixes
+   ═══════════════════════════════════════════════════════════════ */
+
+@layer utilities {
+
+  /* Touch target — minimum 44px for interactive elements */
+  .touch-target {
+    @apply min-w-[44px] min-h-[44px];
+  }
+
+  /* Full-width mobile buttons */
+  .btn-mobile-full {
+    @apply w-full sm:w-auto;
+  }
+
+  /* Responsive text that won't overflow */
+  .text-break {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Hide scrollbar for horizontal scroll containers */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── Cross-cutting responsive overrides ───────────────────────── */
+
+@media screen and (max-width: 767px) {
+  /* Typography scaling for mobile */
+  h1 { font-size: 1.375rem; /* 22px */ }
+  h2 { font-size: 1.125rem; /* 18px */ }
+  h3 { font-size: 1rem;     /* 16px */ }
+
+  /* Prevent horizontal overflow from long words — BUT NOT in tables */
+  .card, .stat-card, p, span, label {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* ── GLOBAL TABLE FIX — prevent column collapse on mobile ── */
+  /* All tables (with or without .table class) get scroll + nowrap */
+  table {
+    min-width: 600px;
+  }
+
+  table th,
+  table td {
+    white-space: nowrap !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    min-width: 80px;
+  }
+
+  /* Name/description columns that SHOULD wrap get an opt-in class */
+  table td.wrap-cell,
+  table th.wrap-cell {
+    white-space: normal !important;
+    min-width: 150px;
+    word-break: break-word !important;
+  }
+
+  /* Ensure every overflow-x-auto parent works as scroll wrapper */
+  .overflow-x-auto,
+  .table-scroll,
+  [class*="overflow-x-auto"] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ensure images don't overflow */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Full-width form buttons on mobile */
+  .form-actions .btn {
+    width: 100%;
+  }
+}
+
+@media screen and (min-width: 768px) and (max-width: 1023px) {
+  /* Tablet: slightly reduced padding for cards */
+  .stat-card {
+    padding: 1rem;
+  }
+}
+
+/* ── Touch feedback for mobile ──────────────────────────────── */
+
+@media (hover: none) and (pointer: coarse) {
+  /* Active/press state for touch devices */
+  button:active, a:active, [role="button"]:active {
+    opacity: 0.85;
+  }
+
+  /* Slightly larger tap targets on pure-touch devices */
+  .btn-sm {
+    min-height: 36px;
+  }
+}
+
+/* ── Print styles ───────────────────────────────────────────── */
+
+@media print {
+  .sidebar, nav, .xl\\:hidden, .bottom-nav, [class*="BottomNav"] {
+    display: none !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
+  .card, .stat-card {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+    break-inside: avoid;
   }
 }

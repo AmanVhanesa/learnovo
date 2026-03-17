@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, User } from 'lucide-react';
+import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, User, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
+import { exportCSV } from '../../utils/exportHelpers';
 
 const DriversTab = ({ onStatsUpdate }) => {
     const [drivers, setDrivers] = useState([]);
@@ -9,17 +10,23 @@ const DriversTab = ({ onStatsUpdate }) => {
     const [showModal, setShowModal] = useState(false);
     const [editingDriver, setEditingDriver] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
     useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
         fetchDrivers();
-    }, [searchTerm, statusFilter]);
+    }, [debouncedSearch, statusFilter]);
 
     const fetchDrivers = async () => {
         try {
             setLoading(true);
             const params = { limit: 100 };
-            if (searchTerm) params.search = searchTerm;
+            if (debouncedSearch) params.search = debouncedSearch;
             if (statusFilter !== 'all') params.status = statusFilter;
 
             const response = await transportService.getDrivers(params);
@@ -77,7 +84,7 @@ const DriversTab = ({ onStatsUpdate }) => {
                 <img
                     src={driver.photo}
                     alt={driver.name}
-                    className={`${sizeClasses} rounded-full object-cover border-2 border-gray-200 flex-shrink-0`}
+                    className={`${sizeClasses} rounded-full object-cover border-2 border-gray-200 dark:border-[#38383A] flex-shrink-0`}
                 />
             );
         }
@@ -101,23 +108,48 @@ const DriversTab = ({ onStatsUpdate }) => {
                             placeholder="Search drivers..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                         />
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white w-full sm:w-auto"
                     >
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
                     <button
+                        onClick={() => {
+                            if (drivers.length === 0) { toast.error('No drivers to export'); return; }
+                            const rows = [
+                                ['Driver ID', 'Name', 'Phone', 'Email', 'License Number', 'License Type', 'License Expiry', 'Date of Joining', 'Salary', 'Status']
+                            ].concat(drivers.map(d => [
+                                d.driverId || '',
+                                d.name || '',
+                                d.phone || '',
+                                d.email || '',
+                                d.licenseNumber || '',
+                                d.licenseType || '',
+                                d.licenseExpiry ? new Date(d.licenseExpiry).toLocaleDateString() : '',
+                                d.dateOfJoining ? new Date(d.dateOfJoining).toLocaleDateString() : '',
+                                d.salary || '',
+                                d.isActive ? 'Active' : 'Inactive'
+                            ]))
+                            exportCSV('drivers.csv', rows)
+                            toast.success('Drivers exported successfully')
+                        }}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] flex-1 sm:flex-none"
+                    >
+                        <Download className="w-4 h-4" />
+                        Export
+                    </button>
+                    <button
                         onClick={handleAddDriver}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex-1 sm:flex-none"
                     >
                         <Plus className="w-5 h-5" />
                         Add Driver
@@ -129,13 +161,13 @@ const DriversTab = ({ onStatsUpdate }) => {
             {loading ? (
                 <div className="text-center py-12">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                    <p className="mt-2 text-gray-600">Loading drivers...</p>
+                    <p className="mt-2 text-gray-600 dark:text-[#8E8E93]">Loading drivers...</p>
                 </div>
             ) : drivers.length === 0 ? (
                 <div className="text-center py-12">
                     <UserCheck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No drivers found</h3>
-                    <p className="text-gray-600 mb-4">Get started by adding your first driver</p>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No drivers found</h3>
+                    <p className="text-gray-600 dark:text-[#8E8E93] mb-4">Get started by adding your first driver</p>
                     <button
                         onClick={handleAddDriver}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -145,36 +177,36 @@ const DriversTab = ({ onStatsUpdate }) => {
                     </button>
                 </div>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                <div className="overflow-x-auto table-scroll">
+                    <table className="min-w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
+                        <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Driver</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">License</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Driver</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Contact</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">License</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
                             {drivers.map((driver) => (
-                                <tr key={driver._id} className="hover:bg-gray-50">
+                                <tr key={driver._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center gap-3">
                                             <DriverAvatar driver={driver} size="sm" />
                                             <div>
-                                                <div className="text-sm font-medium text-gray-900">{driver.name}</div>
-                                                <div className="text-sm text-gray-500">{driver.driverId}</div>
+                                                <div className="text-sm font-medium text-gray-900 dark:text-white">{driver.name}</div>
+                                                <div className="text-sm text-gray-500 dark:text-[#8E8E93]">{driver.driverId}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{driver.phone}</div>
-                                        {driver.email && <div className="text-sm text-gray-500">{driver.email}</div>}
+                                        <div className="text-sm text-gray-900 dark:text-white">{driver.phone}</div>
+                                        {driver.email && <div className="text-sm text-gray-500 dark:text-[#8E8E93]">{driver.email}</div>}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{driver.licenseNumber}</div>
-                                        <div className="text-sm text-gray-500">
+                                        <div className="text-sm text-gray-900 dark:text-white">{driver.licenseNumber}</div>
+                                        <div className="text-sm text-gray-500 dark:text-[#8E8E93]">
                                             Expires: {new Date(driver.licenseExpiry).toLocaleDateString()}
                                         </div>
                                     </td>
@@ -335,25 +367,25 @@ const DriverModal = ({ driver, onClose }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                         {driver ? 'Edit Driver' : 'Add New Driver'}
                     </h2>
-                    <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
+                    <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600 dark:text-[#8E8E93]">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6">
                     {/* Photo Upload Section */}
-                    <div className="flex items-center gap-6 mb-6 pb-6 border-b border-gray-100">
+                    <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mb-6 pb-6 border-b border-gray-100 dark:border-[#2C2C2E]">
                         <div className="relative flex-shrink-0">
                             {photoPreview ? (
                                 <img
                                     src={photoPreview}
                                     alt="Driver"
-                                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200"
+                                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 dark:border-[#38383A]"
                                 />
                             ) : (
                                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center text-white text-2xl font-semibold">
@@ -367,8 +399,8 @@ const DriverModal = ({ driver, onClose }) => {
                             )}
                         </div>
                         <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 mb-1">Driver Photo</p>
-                            <p className="text-xs text-gray-500 mb-3">Upload a clear photo (JPG, PNG)</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">Driver Photo</p>
+                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mb-3">Upload a clear photo (JPG, PNG)</p>
                             <div className="flex flex-wrap gap-2">
                                 <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium cursor-pointer hover:bg-primary-700 active:scale-95 transition-all">
                                     <Upload className="h-3.5 w-3.5" />
@@ -403,62 +435,62 @@ const DriverModal = ({ driver, onClose }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Personal Information */}
                         <div className="md:col-span-2">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Personal Information</h3>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Name *</label>
                             <input
                                 type="text"
                                 name="name"
                                 value={formData.name}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Phone *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Phone *</label>
                             <input
                                 type="tel"
                                 name="phone"
                                 value={formData.phone}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Email</label>
                             <input
                                 type="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Date of Birth</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Date of Birth</label>
                             <input
                                 type="date"
                                 name="dateOfBirth"
                                 value={formData.dateOfBirth}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Gender</label>
                             <select
                                 name="gender"
                                 value={formData.gender}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="male">Male</option>
                                 <option value="female">Female</option>
@@ -467,12 +499,12 @@ const DriverModal = ({ driver, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Blood Group</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Blood Group</label>
                             <select
                                 name="bloodGroup"
                                 value={formData.bloodGroup}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="">Select Blood Group</option>
                                 <option value="A+">A+</option>
@@ -487,52 +519,52 @@ const DriverModal = ({ driver, onClose }) => {
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Address</label>
                             <textarea
                                 name="address"
                                 value={formData.address}
                                 onChange={handleChange}
                                 rows="2"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">National ID</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">National ID</label>
                             <input
                                 type="text"
                                 name="nationalId"
                                 value={formData.nationalId}
                                 onChange={handleChange}
                                 placeholder="Aadhaar / Passport / National ID"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         {/* License Information */}
                         <div className="md:col-span-2 mt-4">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">License Information</h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">License Information</h3>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">License Number *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">License Number *</label>
                             <input
                                 type="text"
                                 name="licenseNumber"
                                 value={formData.licenseNumber}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">License Type</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">License Type</label>
                             <select
                                 name="licenseType"
                                 value={formData.licenseType}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="LMV">LMV (Light Motor Vehicle)</option>
                                 <option value="HMV">HMV (Heavy Motor Vehicle)</option>
@@ -542,107 +574,107 @@ const DriverModal = ({ driver, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">License Expiry *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">License Expiry *</label>
                             <input
                                 type="date"
                                 name="licenseExpiry"
                                 value={formData.licenseExpiry}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         {/* Employment Information */}
                         <div className="md:col-span-2 mt-4">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">Employment Information</h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Employment Information</h3>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Date of Joining</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Date of Joining</label>
                             <input
                                 type="date"
                                 name="dateOfJoining"
                                 value={formData.dateOfJoining}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Salary</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Salary</label>
                             <input
                                 type="number"
                                 name="salary"
                                 value={formData.salary}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Experience (years)</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Experience (years)</label>
                             <input
                                 type="number"
                                 name="experience"
                                 value={formData.experience}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         {/* Emergency Contact */}
                         <div className="md:col-span-2 mt-4">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">Emergency Contact</h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Emergency Contact</h3>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contact Name</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Contact Name</label>
                             <input
                                 type="text"
                                 name="emergency.name"
                                 value={formData.emergencyContact.name}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contact Phone</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Contact Phone</label>
                             <input
                                 type="tel"
                                 name="emergency.phone"
                                 value={formData.emergencyContact.phone}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Relation</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Relation</label>
                             <input
                                 type="text"
                                 name="emergency.relation"
                                 value={formData.emergencyContact.relation}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
                     </div>
 
                     {/* Form Actions */}
-                    <div className="mt-6 flex justify-end gap-3">
+                    <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
                         <button
                             type="button"
                             onClick={() => onClose(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                            className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] w-full sm:w-auto"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={loading || photoUploading}
-                            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 w-full sm:w-auto"
                         >
                             {loading ? 'Saving...' : driver ? 'Update Driver' : 'Add Driver'}
                         </button>

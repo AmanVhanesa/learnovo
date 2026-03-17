@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Calendar, BookOpen, Users, UserPlus, Plus, Check, Lock, Unlock, Power, Trash2, Edit, X } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { academicSessionsService, classesService, subjectsService, classSubjectsService, teacherAssignmentsService } from '../services/academicsService'
 import { employeesService } from '../services/employeesService'
 import { useAuth } from '../contexts/AuthContext'
@@ -44,173 +45,112 @@ const formatGrade = (grade) => {
 
 const AcademicsManagement = () => {
     const { user } = useAuth()
+    const queryClient = useQueryClient()
     const [activeTab, setActiveTab] = useState('sessions')
-    const [isLoading, setIsLoading] = useState(true)
 
-    // Sessions state
-    const [sessions, setSessions] = useState([])
-    const [activeSession, setActiveSession] = useState(null)
+    // UI state for modals
     const [showSessionForm, setShowSessionForm] = useState(false)
     const [editingSession, setEditingSession] = useState(null)
-
-    // Classes state
-    const [classes, setClasses] = useState([])
     const [showClassForm, setShowClassForm] = useState(false)
     const [editingClass, setEditingClass] = useState(null)
-
-    // Subjects state
-    const [subjects, setSubjects] = useState([])
     const [showSubjectForm, setShowSubjectForm] = useState(false)
     const [editingSubject, setEditingSubject] = useState(null)
-
-    // Assignments state
-    const [classSubjects, setClassSubjects] = useState([])
-    const [teacherAssignments, setTeacherAssignments] = useState([])
-    const [teachers, setTeachers] = useState([])
     const [showAssignmentForm, setShowAssignmentForm] = useState(false)
 
-    useEffect(() => {
-        fetchSessions()
-        fetchClasses()
-        fetchSubjects()
-        fetchTeachers()
-    }, [])
-
-    useEffect(() => {
-        if (activeTab === 'assignments' && activeSession) {
-            fetchAssignments()
-        }
-    }, [activeTab, activeSession])
-
-    const fetchSessions = async () => {
-        try {
-            setIsLoading(true)
+    // Sessions query
+    const { data: sessionsData, isLoading } = useQuery({
+        queryKey: ['academic-sessions'],
+        queryFn: async () => {
             const [sessionsRes, activeRes] = await Promise.all([
                 academicSessionsService.list(),
                 academicSessionsService.getActive().catch(() => ({ data: null }))
             ])
+            return { sessions: sessionsRes.data || [], activeSession: activeRes.data }
+        },
+    })
+    const sessions = sessionsData?.sessions || []
+    const activeSession = sessionsData?.activeSession || null
 
-            setSessions(sessionsRes.data || [])
-            setActiveSession(activeRes.data)
-        } catch (error) {
-            console.error('Fetch sessions error:', error)
-            toast.error('Failed to load academic sessions')
-        } finally {
-            setIsLoading(false)
-        }
-    }
+    // Classes query
+    const { data: classes = [] } = useQuery({
+        queryKey: ['academic-classes'],
+        queryFn: async () => { const res = await classesService.list(); return sortClassesByGrade(res.data || []) },
+    })
 
-    const fetchClasses = async () => {
-        try {
-            const res = await classesService.list()
-            // Sort classes by grade order
-            const sortedClasses = sortClassesByGrade(res.data || [])
-            setClasses(sortedClasses)
-        } catch (error) {
-            console.error('Fetch classes error:', error)
-            toast.error('Failed to load classes')
-        }
-    }
+    // Subjects query
+    const { data: subjects = [] } = useQuery({
+        queryKey: ['academic-subjects'],
+        queryFn: async () => { const res = await subjectsService.list(); return res.data || [] },
+    })
 
-    const fetchSubjects = async () => {
-        try {
-            const res = await subjectsService.list()
-            setSubjects(res.data || [])
-        } catch (error) {
-            console.error('Fetch subjects error:', error)
-            toast.error('Failed to load subjects')
-        }
-    }
+    // Teachers query
+    const { data: teachers = [] } = useQuery({
+        queryKey: ['academic-teachers'],
+        queryFn: async () => { const res = await employeesService.list({ role: 'teacher', limit: 100 }); return res.data || [] },
+    })
 
-    const fetchTeachers = async () => {
-        try {
-            const res = await employeesService.list({ role: 'teacher', limit: 100 })
-            console.log('Teachers API Response:', res)
-            console.log('Teachers data:', res.data)
-            setTeachers(res.data || [])
-        } catch (error) {
-            console.error('Fetch teachers error:', error)
-        }
-    }
-
-    const fetchAssignments = async () => {
-        try {
+    // Assignments query (only when on assignments tab with active session)
+    const { data: assignmentsData } = useQuery({
+        queryKey: ['academic-assignments', activeSession?._id],
+        queryFn: async () => {
             const [csRes, taRes] = await Promise.all([
                 classSubjectsService.list({ academicSessionId: activeSession._id }),
                 teacherAssignmentsService.list({ academicSessionId: activeSession._id })
             ])
-            setClassSubjects(csRes.data || [])
-            setTeacherAssignments(taRes.data || [])
-        } catch (error) {
-            console.error('Fetch assignments error:', error)
-        }
-    }
+            return { classSubjects: csRes.data || [], teacherAssignments: taRes.data || [] }
+        },
+        enabled: activeTab === 'assignments' && !!activeSession,
+    })
+    const classSubjects = assignmentsData?.classSubjects || []
+    const teacherAssignments = assignmentsData?.teacherAssignments || []
 
-    const handleActivateSession = async (id) => {
-        try {
-            await academicSessionsService.activate(id)
-            toast.success('Academic session activated successfully')
-            fetchSessions()
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to activate session')
-        }
-    }
+    // Mutations
+    const activateSessionMutation = useMutation({
+        mutationFn: (id) => academicSessionsService.activate(id),
+        onSuccess: () => { toast.success('Academic session activated successfully'); queryClient.invalidateQueries({ queryKey: ['academic-sessions'] }) },
+        onError: (error) => { toast.error(error.response?.data?.message || 'Failed to activate session') },
+    })
+    const lockSessionMutation = useMutation({
+        mutationFn: ({ id, lock }) => academicSessionsService.lock(id, lock),
+        onSuccess: (_, { lock }) => { toast.success(`Session ${lock ? 'locked' : 'unlocked'} successfully`); queryClient.invalidateQueries({ queryKey: ['academic-sessions'] }) },
+        onError: () => { toast.error('Failed to lock/unlock session') },
+    })
+    const deleteSessionMutation = useMutation({
+        mutationFn: (id) => academicSessionsService.remove(id),
+        onSuccess: () => { toast.success('Session deleted successfully'); queryClient.invalidateQueries({ queryKey: ['academic-sessions'] }) },
+        onError: (error) => { toast.error(error.response?.data?.message || 'Failed to delete session') },
+    })
+    const deleteClassMutation = useMutation({
+        mutationFn: (id) => classesService.remove(id),
+        onSuccess: () => { toast.success('Class deleted successfully'); queryClient.invalidateQueries({ queryKey: ['academic-classes'] }) },
+        onError: (error) => { toast.error(error.response?.data?.message || 'Failed to delete class') },
+    })
+    const deleteSubjectMutation = useMutation({
+        mutationFn: (id) => subjectsService.remove(id),
+        onSuccess: () => { toast.success('Subject deleted successfully'); queryClient.invalidateQueries({ queryKey: ['academic-subjects'] }) },
+        onError: (error) => { toast.error(error.response?.data?.message || 'Failed to delete subject') },
+    })
+    const toggleSubjectMutation = useMutation({
+        mutationFn: (id) => subjectsService.toggle(id),
+        onSuccess: () => { toast.success('Subject status updated'); queryClient.invalidateQueries({ queryKey: ['academic-subjects'] }) },
+        onError: () => { toast.error('Failed to update subject status') },
+    })
 
-    const handleLockSession = async (id, lock) => {
-        try {
-            await academicSessionsService.lock(id, lock)
-            toast.success(`Session ${lock ? 'locked' : 'unlocked'} successfully`)
-            fetchSessions()
-        } catch (error) {
-            toast.error('Failed to lock/unlock session')
-        }
-    }
-
+    const handleActivateSession = async (id) => { activateSessionMutation.mutate(id) }
+    const handleLockSession = async (id, lock) => { lockSessionMutation.mutate({ id, lock }) }
     const handleDeleteSession = async (id) => {
         if (!confirm('Are you sure you want to delete this academic session?')) return
-
-        try {
-            await academicSessionsService.remove(id)
-            toast.success('Session deleted successfully')
-            fetchSessions()
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to delete session')
-        }
+        deleteSessionMutation.mutate(id)
     }
-
     const handleDeleteClass = async (id) => {
         if (!confirm('Are you sure you want to delete this class?')) return
-
-        try {
-            await classesService.remove(id)
-            toast.success('Class deleted successfully')
-            fetchClasses()
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to delete class')
-        }
+        deleteClassMutation.mutate(id)
     }
-
     const handleDeleteSubject = async (id) => {
         if (!confirm('Are you sure you want to delete this subject?')) return
-
-        try {
-            await subjectsService.remove(id)
-            toast.success('Subject deleted successfully')
-            fetchSubjects()
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to delete subject')
-        }
+        deleteSubjectMutation.mutate(id)
     }
-
-    const handleToggleSubject = async (id) => {
-        try {
-            await subjectsService.toggle(id)
-            toast.success('Subject status updated')
-            fetchSubjects()
-        } catch (error) {
-            toast.error('Failed to update subject status')
-        }
-    }
+    const handleToggleSubject = async (id) => { toggleSubjectMutation.mutate(id) }
 
     const tabs = [
         { id: 'sessions', label: 'Academic Sessions', icon: Calendar },
@@ -230,10 +170,10 @@ const AcademicsManagement = () => {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Academics Management</h1>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Academics Management</h1>
+                    <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
                         Manage academic sessions, classes, subjects, and assignments
                     </p>
                 </div>
@@ -241,23 +181,23 @@ const AcademicsManagement = () => {
 
             {/* Active Session Banner */}
             {activeSession && (
-                <div className="bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
+                <div className="bg-gradient-to-r from-primary-50 to-primary-100 dark:from-[#1a3a35] dark:to-[#162e2a] border border-primary-200 dark:border-[#2a5a52] rounded-lg p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary-600 rounded-lg">
+                            <div className="p-2 bg-primary-600 rounded-lg flex-shrink-0">
                                 <Calendar className="h-5 w-5 text-white" />
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-primary-900">Active Academic Session</p>
-                                <p className="text-lg font-bold text-primary-700">{activeSession.name}</p>
+                                <p className="text-sm font-medium text-primary-900 dark:text-primary-300">Active Academic Session</p>
+                                <p className="text-base sm:text-lg font-bold text-primary-700 dark:text-white">{activeSession.name}</p>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="text-xs text-primary-600">
+                        <div className="text-left sm:text-right ml-12 sm:ml-0">
+                            <p className="text-xs text-primary-600 dark:text-primary-400">
                                 {formatDate(activeSession.startDate)} - {formatDate(activeSession.endDate)}
                             </p>
                             {activeSession.isLocked && (
-                                <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                <span className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-yellow-100 dark:bg-[#332d1a] text-yellow-800 dark:text-yellow-400 text-xs rounded-full">
                                     <Lock className="h-3 w-3" />
                                     Locked
                                 </span>
@@ -268,8 +208,8 @@ const AcademicsManagement = () => {
             )}
 
             {/* Tabs */}
-            <div className="border-b border-gray-200">
-                <nav className="-mb-px flex space-x-8">
+            <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto">
+                <nav className="-mb-px flex space-x-8 whitespace-nowrap">
                     {tabs.map((tab) => {
                         const Icon = tab.icon
                         return (
@@ -278,7 +218,7 @@ const AcademicsManagement = () => {
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${activeTab === tab.id
                                     ? 'border-primary-500 text-primary-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300 dark:hover:border-[#38383A]'
                                     }`}
                             >
                                 <Icon className="h-4 w-4" />
@@ -290,12 +230,12 @@ const AcademicsManagement = () => {
             </div>
 
             {/* Tab Content */}
-            <div className="bg-white rounded-lg shadow-sm">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm">
                 {/* SESSIONS TAB */}
                 {activeTab === 'sessions' && (
-                    <div className="p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-semibold text-gray-900">Academic Sessions</h2>
+                    <div className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+                            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Academic Sessions</h2>
                             {user?.role === 'admin' && (
                                 <button
                                     onClick={() => {
@@ -313,34 +253,34 @@ const AcademicsManagement = () => {
                         {sessions.length === 0 ? (
                             <div className="text-center py-12">
                                 <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-500">No academic sessions found</p>
+                                <p className="text-gray-500 dark:text-[#8E8E93]">No academic sessions found</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
                                 {sessions.map((session) => (
                                     <div
                                         key={session._id}
-                                        className={`border rounded-lg p-4 ${session.isActive ? 'border-primary-300 bg-primary-50' : 'border-gray-200'
+                                        className={`border rounded-lg p-4 ${session.isActive ? 'border-primary-300 dark:border-[#2a5a52] bg-primary-50 dark:bg-[#1a3a35]' : 'border-gray-200 dark:border-[#38383A] dark:bg-[#2C2C2E]'
                                             }`}
                                     >
-                                        <div className="flex items-start justify-between">
+                                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                             <div className="flex-1">
-                                                <div className="flex items-center gap-3">
-                                                    <h3 className="text-lg font-semibold text-gray-900">{session.name}</h3>
+                                                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                                                    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{session.name}</h3>
                                                     {session.isActive && (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-[#1a332a] text-green-800 dark:text-green-400 text-xs font-semibold rounded-full">
                                                             <Check className="h-3 w-3" />
                                                             Active
                                                         </span>
                                                     )}
                                                     {session.isLocked && (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 dark:bg-[#332d1a] text-yellow-800 dark:text-yellow-400 text-xs font-semibold rounded-full">
                                                             <Lock className="h-3 w-3" />
                                                             Locked
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-sm text-gray-600 mt-1">
+                                                <p className="text-sm text-gray-600 dark:text-[#8E8E93] mt-1">
                                                     {formatDate(session.startDate)} - {formatDate(session.endDate)}
                                                 </p>
                                             </div>
@@ -350,15 +290,27 @@ const AcademicsManagement = () => {
                                                     {!session.isActive && (
                                                         <button
                                                             onClick={() => handleActivateSession(session._id)}
-                                                            className="p-2 text-green-600 hover:bg-green-50 rounded-md"
+                                                            className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-[#1a332a] rounded-md"
                                                             title="Activate"
                                                         >
                                                             <Power className="h-4 w-4" />
                                                         </button>
                                                     )}
+                                                    {!session.isLocked && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingSession(session)
+                                                                setShowSessionForm(true)
+                                                            }}
+                                                            className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-[#1a2533] rounded-md"
+                                                            title="Edit"
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => handleLockSession(session._id, !session.isLocked)}
-                                                        className="p-2 text-yellow-600 hover:bg-yellow-50 rounded-md"
+                                                        className="p-2 text-yellow-600 hover:bg-yellow-50 dark:hover:bg-[#332d1a] rounded-md"
                                                         title={session.isLocked ? 'Unlock' : 'Lock'}
                                                     >
                                                         {session.isLocked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
@@ -366,7 +318,7 @@ const AcademicsManagement = () => {
                                                     {!session.isActive && !session.isLocked && (
                                                         <button
                                                             onClick={() => handleDeleteSession(session._id)}
-                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-md"
+                                                            className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-[#331a1a] rounded-md"
                                                             title="Delete"
                                                         >
                                                             <Trash2 className="h-4 w-4" />
@@ -384,9 +336,9 @@ const AcademicsManagement = () => {
 
                 {/* CLASSES TAB */}
                 {activeTab === 'classes' && (
-                    <div className="p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-semibold text-gray-900">Classes & Sections</h2>
+                    <div className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+                            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Classes & Sections</h2>
                             {user?.role === 'admin' && (
                                 <button
                                     onClick={() => {
@@ -404,7 +356,7 @@ const AcademicsManagement = () => {
                         {classes.length === 0 ? (
                             <div className="text-center py-12">
                                 <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-500">No classes found</p>
+                                <p className="text-gray-500 dark:text-[#8E8E93]">No classes found</p>
                             </div>
                         ) : (() => {
                             // Group classes by grade
@@ -427,12 +379,12 @@ const AcademicsManagement = () => {
                                         const academicYear = gradeClasses[0]?.academicYear || '';
 
                                         return (
-                                            <div key={grade} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                            <div key={grade} className="border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] rounded-lg p-4 hover:shadow-md dark:hover:shadow-none dark:hover:border-[#48484A] transition-all">
                                                 {/* Grade Header */}
                                                 <div className="flex items-start justify-between mb-3">
                                                     <div>
-                                                        <h3 className="text-lg font-bold text-gray-900">{formatGrade(grade)}</h3>
-                                                        <p className="text-xs text-gray-500">{academicYear}</p>
+                                                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{formatGrade(grade)}</h3>
+                                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{academicYear}</p>
                                                     </div>
                                                     {user?.role === 'admin' && (
                                                         <div className="flex gap-1">
@@ -445,14 +397,14 @@ const AcademicsManagement = () => {
                                                                     })
                                                                     setShowClassForm(true)
                                                                 }}
-                                                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                                                className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-[#1a2533] rounded"
                                                                 title="Edit"
                                                             >
                                                                 <Edit className="h-4 w-4" />
                                                             </button>
                                                             <button
                                                                 onClick={() => handleDeleteClass(gradeClasses[0]._id)}
-                                                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                                                className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-[#331a1a] rounded"
                                                                 title="Delete"
                                                             >
                                                                 <Trash2 className="h-4 w-4" />
@@ -463,23 +415,23 @@ const AcademicsManagement = () => {
 
                                                 {/* Stats */}
                                                 <div className="flex gap-4 text-sm mb-3">
-                                                    <span className="text-gray-500"><strong className="text-gray-800">{totalStudents}</strong> Students</span>
-                                                    <span className="text-gray-500"><strong className="text-gray-800">{allSections.length}</strong> Sections</span>
+                                                    <span className="text-gray-500 dark:text-[#8E8E93]"><strong className="text-gray-800 dark:text-white">{totalStudents}</strong> Students</span>
+                                                    <span className="text-gray-500 dark:text-[#8E8E93]"><strong className="text-gray-800 dark:text-white">{allSections.length}</strong> Sections</span>
                                                 </div>
 
                                                 {/* Sections List */}
                                                 {allSections.length > 0 && (
                                                     <div className="space-y-1.5">
-                                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sections</p>
+                                                        <p className="text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Sections</p>
                                                         {allSections.map(section => (
-                                                            <div key={section._id} className="flex items-center justify-between bg-gray-50 rounded px-2.5 py-1.5">
+                                                            <div key={section._id} className="flex items-center justify-between bg-gray-50 dark:bg-[#2C2C2E] rounded px-2.5 py-1.5">
                                                                 <div>
-                                                                    <span className="text-sm font-medium text-gray-800 uppercase">{section.name}</span>
-                                                                    {(section.sectionTeacherName || section.sectionTeacher?.name) && (
-                                                                        <p className="text-xs text-gray-400">{section.sectionTeacherName || section.sectionTeacher?.name}</p>
+                                                                    <span className="text-sm font-medium text-gray-800 dark:text-white uppercase">{section.name}</span>
+                                                                    {(section.sectionTeacher?.fullName || section.sectionTeacher?.name || section.sectionTeacherName) && (
+                                                                        <p className="text-xs text-gray-400 dark:text-[#636366]">{section.sectionTeacher?.fullName || section.sectionTeacher?.name || section.sectionTeacherName}</p>
                                                                     )}
                                                                 </div>
-                                                                <span className="text-xs font-semibold text-gray-500 tabular-nums">
+                                                                <span className="text-xs font-semibold text-gray-500 dark:text-[#8E8E93] tabular-nums">
                                                                     {section.studentCount ?? 0}
                                                                 </span>
                                                             </div>
@@ -497,9 +449,9 @@ const AcademicsManagement = () => {
 
                 {/* SUBJECTS TAB */}
                 {activeTab === 'subjects' && (
-                    <div className="p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-lg font-semibold text-gray-900">Subjects</h2>
+                    <div className="p-4 sm:p-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+                            <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Subjects</h2>
                             {user?.role === 'admin' && (
                                 <button
                                     onClick={() => {
@@ -517,87 +469,131 @@ const AcademicsManagement = () => {
                         {subjects.length === 0 ? (
                             <div className="text-center py-12">
                                 <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-500">No subjects found</p>
+                                <p className="text-gray-500 dark:text-[#8E8E93]">No subjects found</p>
                             </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Subject Name</th>
-                                            <th>Code</th>
-                                            <th>Type</th>
-                                            <th>Max Marks</th>
-                                            <th>Passing Marks</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {subjects.map((subject) => (
-                                            <tr key={subject._id}>
-                                                <td className="font-medium">{subject.name}</td>
-                                                <td className="font-mono text-sm">{subject.subjectCode || '-'}</td>
-                                                <td>{subject.type || 'Theory'}</td>
-                                                <td>{subject.maxMarks || 100}</td>
-                                                <td>{subject.passingMarks || 33}</td>
-                                                <td>
-                                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${subject.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                                                        }`}>
-                                                        {subject.isActive ? 'Active' : 'Inactive'}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    {user?.role === 'admin' && (
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEditingSubject(subject)
-                                                                    setShowSubjectForm(true)
-                                                                }}
-                                                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                                                title="Edit"
-                                                            >
-                                                                <Edit className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleToggleSubject(subject._id)}
-                                                                className="p-1 text-yellow-600 hover:bg-yellow-50 rounded"
-                                                                title="Toggle Status"
-                                                            >
-                                                                <Power className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteSubject(subject._id)}
-                                                                className="p-1 text-red-600 hover:bg-red-50 rounded"
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </button>
+                        ) : (() => {
+                            // Group subjects by type
+                            const typeGroups = { 'Theory': [], 'Practical': [], 'Both': [] };
+                            subjects.forEach(s => {
+                                const t = s.type || 'Theory';
+                                if (!typeGroups[t]) typeGroups[t] = [];
+                                typeGroups[t].push(s);
+                            });
+                            const typeColors = {
+                                'Theory': { bg: 'bg-blue-50 dark:bg-[#1a2533]', border: 'border-blue-200 dark:border-[#2a4066]', badge: 'bg-blue-100 text-blue-700 dark:bg-[#1a2533] dark:text-blue-400', icon: '📖' },
+                                'Practical': { bg: 'bg-green-50 dark:bg-[#1a332a]', border: 'border-green-200 dark:border-[#2a5a42]', badge: 'bg-green-100 text-green-700 dark:bg-[#1a332a] dark:text-green-400', icon: '🔬' },
+                                'Both': { bg: 'bg-purple-50 dark:bg-[#271a33]', border: 'border-purple-200 dark:border-[#4a2a66]', badge: 'bg-purple-100 text-purple-700 dark:bg-[#271a33] dark:text-purple-400', icon: '📚' }
+                            };
+                            const activeTypes = Object.keys(typeGroups).filter(t => typeGroups[t].length > 0);
+
+                            return (
+                                <div className="space-y-6">
+                                    {/* Summary bar */}
+                                    <div className="flex flex-wrap gap-3">
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-[#2C2C2E] rounded-full text-sm">
+                                            <span className="font-semibold text-gray-800 dark:text-white">{subjects.length}</span>
+                                            <span className="text-gray-500 dark:text-[#8E8E93]">Total</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-[#1a332a] rounded-full text-sm">
+                                            <span className="font-semibold text-green-700 dark:text-green-400">{subjects.filter(s => s.isActive).length}</span>
+                                            <span className="text-green-600 dark:text-green-500">Active</span>
+                                        </div>
+                                        {subjects.filter(s => !s.isActive).length > 0 && (
+                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#2C2C2E] rounded-full text-sm">
+                                                <span className="font-semibold text-gray-500 dark:text-[#8E8E93]">{subjects.filter(s => !s.isActive).length}</span>
+                                                <span className="text-gray-400 dark:text-[#636366]">Inactive</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Grouped by type */}
+                                    {activeTypes.map(type => {
+                                        const colors = typeColors[type] || typeColors['Theory'];
+                                        const groupSubjects = typeGroups[type];
+
+                                        return (
+                                            <div key={type}>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className="text-lg">{colors.icon}</span>
+                                                    <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] uppercase tracking-wide">{type}</h3>
+                                                    <span className="text-xs text-gray-400 dark:text-[#636366]">({groupSubjects.length})</span>
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                                    {groupSubjects.map(subject => (
+                                                        <div
+                                                            key={subject._id}
+                                                            className={`relative border rounded-lg p-4 transition-all hover:shadow-md dark:hover:shadow-none dark:hover:border-[#48484A] ${subject.isActive ? colors.border + ' ' + colors.bg : 'border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] opacity-60'}`}
+                                                        >
+                                                            {/* Top row: name + actions */}
+                                                            <div className="flex items-start justify-between gap-2 mb-2">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <h4 className="font-semibold text-gray-900 dark:text-white truncate">{subject.name}</h4>
+                                                                    <span className="font-mono text-xs text-gray-500 dark:text-[#8E8E93]">{subject.subjectCode}</span>
+                                                                </div>
+                                                                {user?.role === 'admin' && (
+                                                                    <div className="flex gap-0.5 flex-shrink-0">
+                                                                        <button
+                                                                            onClick={() => { setEditingSubject(subject); setShowSubjectForm(true) }}
+                                                                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-[#1a2533] rounded"
+                                                                            title="Edit"
+                                                                        >
+                                                                            <Edit className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleToggleSubject(subject._id)}
+                                                                            className="p-1 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-[#332d1a] rounded"
+                                                                            title={subject.isActive ? 'Deactivate' : 'Activate'}
+                                                                        >
+                                                                            <Power className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDeleteSubject(subject._id)}
+                                                                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-[#331a1a] rounded"
+                                                                            title="Delete"
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Marks info */}
+                                                            <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-[#8E8E93]">
+                                                                <span>Max: <strong className="text-gray-800 dark:text-white">{subject.maxMarks || 100}</strong></span>
+                                                                <span className="text-gray-300 dark:text-[#636366]">|</span>
+                                                                <span>Pass: <strong className="text-gray-800 dark:text-white">{subject.passingMarks || 33}</strong></span>
+                                                            </div>
+
+                                                            {/* Status badge */}
+                                                            {!subject.isActive && (
+                                                                <span className="absolute top-2 right-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-200 dark:bg-[#38383A] text-gray-600 dark:text-[#8E8E93]">
+                                                                    Inactive
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
 
                 {/* ASSIGNMENTS TAB */}
                 {activeTab === 'assignments' && (
-                    <div className="p-6">
+                    <div className="p-4 sm:p-6">
                         {!activeSession ? (
                             <div className="text-center py-12">
                                 <UserPlus className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-500">Please activate an academic session first</p>
+                                <p className="text-gray-500 dark:text-[#8E8E93]">Please activate an academic session first</p>
                             </div>
                         ) : (
                             <>
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-lg font-semibold text-gray-900">Subject Assignments</h2>
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+                                    <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Subject Assignments</h2>
                                     {user?.role === 'admin' && (
                                         <button
                                             onClick={() => setShowAssignmentForm(true)}
@@ -615,8 +611,8 @@ const AcademicsManagement = () => {
                                         if (clsSubjects.length === 0) return null
 
                                         return (
-                                            <div key={cls._id} className="border border-gray-200 rounded-lg p-4">
-                                                <h3 className="text-md font-semibold text-gray-900 mb-3">{cls.name} - {cls.grade}</h3>
+                                            <div key={cls._id} className="border border-gray-200 dark:border-[#38383A] dark:bg-[#2C2C2E] rounded-lg p-4">
+                                                <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">{cls.name} - {cls.grade}</h3>
                                                 <div className="space-y-2">
                                                     {clsSubjects.map((cs) => {
                                                         const assignments = teacherAssignments.filter(ta =>
@@ -624,18 +620,18 @@ const AcademicsManagement = () => {
                                                         )
 
                                                         return (
-                                                            <div key={cs._id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                                                            <div key={cs._id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 dark:bg-[#1C1C1E] rounded-lg gap-2">
                                                                 <div className="flex-1">
-                                                                    <p className="font-medium text-gray-900">{cs.subjectId?.name}</p>
-                                                                    <p className="text-sm text-gray-600">
+                                                                    <p className="font-medium text-gray-900 dark:text-white">{cs.subjectId?.name}</p>
+                                                                    <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
                                                                         {assignments.length > 0 ? (
                                                                             <>Teachers: {assignments.map(a => a.teacherId?.name).join(', ')}</>
                                                                         ) : (
-                                                                            <span className="text-red-600">No teacher assigned</span>
+                                                                            <span className="text-red-600 dark:text-red-400">No teacher assigned</span>
                                                                         )}
                                                                     </p>
                                                                 </div>
-                                                                <div className="text-sm text-gray-600">
+                                                                <div className="text-sm text-gray-600 dark:text-[#8E8E93]">
                                                                     Max: {cs.maxMarks} | Pass: {cs.passingMarks}
                                                                 </div>
                                                             </div>
@@ -649,8 +645,8 @@ const AcademicsManagement = () => {
                                     {classSubjects.length === 0 && (
                                         <div className="text-center py-12">
                                             <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                            <p className="text-gray-500">No subject assignments found</p>
-                                            <p className="text-sm text-gray-400 mt-1">Start by assigning subjects to classes</p>
+                                            <p className="text-gray-500 dark:text-[#8E8E93]">No subject assignments found</p>
+                                            <p className="text-sm text-gray-400 dark:text-[#636366] mt-1">Start by assigning subjects to classes</p>
                                         </div>
                                     )}
                                 </div>
@@ -667,7 +663,7 @@ const AcademicsManagement = () => {
                     onClose={() => setShowSessionForm(false)}
                     onSuccess={() => {
                         setShowSessionForm(false)
-                        fetchSessions()
+                        queryClient.invalidateQueries({ queryKey: ['academic-sessions'] })
                     }}
                 />
             )}
@@ -679,7 +675,7 @@ const AcademicsManagement = () => {
                     onClose={() => setShowClassForm(false)}
                     onSuccess={() => {
                         setShowClassForm(false)
-                        fetchClasses()
+                        queryClient.invalidateQueries({ queryKey: ['academic-classes'] })
                     }}
                 />
             )}
@@ -690,7 +686,7 @@ const AcademicsManagement = () => {
                     onClose={() => setShowSubjectForm(false)}
                     onSuccess={() => {
                         setShowSubjectForm(false)
-                        fetchSubjects()
+                        queryClient.invalidateQueries({ queryKey: ['academic-subjects'] })
                     }}
                 />
             )}
@@ -704,7 +700,7 @@ const AcademicsManagement = () => {
                     onClose={() => setShowAssignmentForm(false)}
                     onSuccess={() => {
                         setShowAssignmentForm(false)
-                        fetchAssignments()
+                        queryClient.invalidateQueries({ queryKey: ['academic-assignments'] })
                     }}
                 />
             )}
@@ -725,6 +721,11 @@ const SessionFormModal = ({ session, onClose, onSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+
+        if (form.startDate && form.endDate && form.endDate <= form.startDate) {
+            toast.error('End date must be after start date')
+            return
+        }
 
         try {
             setIsSaving(true)
@@ -748,11 +749,11 @@ const SessionFormModal = ({ session, onClose, onSuccess }) => {
     return (
         <div className="modal-overlay">
             <div className="modal-content max-w-md">
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                         {session ? 'Edit Session' : 'Add Academic Session'}
                     </h3>
-                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
+                    <button onClick={onClose} className="btn-close">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
@@ -789,10 +790,14 @@ const SessionFormModal = ({ session, onClose, onSuccess }) => {
                                     className="input"
                                     value={form.endDate}
                                     onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                                    min={form.startDate || undefined}
                                     required
                                 />
                             </div>
                         </div>
+                        {form.startDate && form.endDate && form.endDate <= form.startDate && (
+                            <p className="text-xs text-red-500">End date must be after start date</p>
+                        )}
 
                         <div>
                             <label className="label">Description</label>
@@ -812,16 +817,16 @@ const SessionFormModal = ({ session, onClose, onSuccess }) => {
                                     id="isActive"
                                     checked={form.isActive}
                                     onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500"
                                 />
-                                <label htmlFor="isActive" className="text-sm text-gray-700">
+                                <label htmlFor="isActive" className="text-sm text-gray-700 dark:text-[#8E8E93]">
                                     Set as active session
                                 </label>
                             </div>
                         )}
                     </div>
 
-                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
+                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-[#38383A] mt-6">
                         <button type="button" onClick={onClose} className="btn btn-ghost">
                             Cancel
                         </button>
@@ -901,11 +906,11 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
     return (
         <div className="modal-overlay">
             <div className="modal-content max-w-lg">
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                         {classData ? 'Edit Class' : 'Add Class'}
                     </h3>
-                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
+                    <button onClick={onClose} className="btn-close">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
@@ -918,7 +923,11 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                             <select
                                 className="input"
                                 value={form.grade}
-                                onChange={(e) => setForm({ ...form, grade: e.target.value })}
+                                onChange={(e) => {
+                                    const grade = e.target.value
+                                    const autoName = ['Nursery', 'LKG', 'UKG'].includes(grade) ? grade : grade ? `Class ${grade}` : ''
+                                    setForm({ ...form, grade, name: classData ? form.name : autoName })
+                                }}
                                 required
                             >
                                 <option value="">Select Grade</option>
@@ -982,7 +991,7 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                                             <option value="">— No Teacher —</option>
                                             {teachers.map(t => (
                                                 <option key={t._id} value={t._id}>
-                                                    {t.name}{t.employeeId ? ` (${t.employeeId})` : ''}
+                                                    {t.fullName || t.name}{t.employeeId ? ` (${t.employeeId})` : ''}
                                                 </option>
                                             ))}
                                         </select>
@@ -990,7 +999,7 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                                             <button
                                                 type="button"
                                                 onClick={() => removeSection(idx)}
-                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded flex-shrink-0"
+                                                className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-[#331a1a] rounded flex-shrink-0"
                                             >
                                                 <X className="h-4 w-4" />
                                             </button>
@@ -998,11 +1007,11 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                                     </div>
                                 ))}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">Each section can have its own class teacher</p>
+                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Each section can have its own class teacher</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
+                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-[#38383A] mt-6">
                         <button type="button" onClick={onClose} className="btn btn-ghost">
                             Cancel
                         </button>
@@ -1031,6 +1040,11 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault()
 
+        if (form.passingMarks > form.maxMarks) {
+            toast.error('Passing marks cannot exceed max marks')
+            return
+        }
+
         try {
             setIsSaving(true)
 
@@ -1053,11 +1067,11 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
     return (
         <div className="modal-overlay">
             <div className="modal-content max-w-md">
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                         {subject ? 'Edit Subject' : 'Add Subject'}
                     </h3>
-                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
+                    <button onClick={onClose} className="btn-close">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
@@ -1120,10 +1134,14 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
                                     value={form.passingMarks}
                                     onChange={(e) => setForm({ ...form, passingMarks: parseInt(e.target.value) })}
                                     min="0"
+                                    max={form.maxMarks}
                                     required
                                 />
                             </div>
                         </div>
+                        {form.passingMarks > form.maxMarks && (
+                            <p className="text-xs text-red-500">Passing marks cannot exceed max marks ({form.maxMarks})</p>
+                        )}
 
                         <div>
                             <label className="label">Description</label>
@@ -1137,11 +1155,11 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
+                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-[#38383A] mt-6">
                         <button type="button" onClick={onClose} className="btn btn-ghost">
                             Cancel
                         </button>
-                        <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                        <button type="submit" className="btn btn-primary" disabled={isSaving || form.passingMarks > form.maxMarks}>
                             {isSaving ? 'Saving...' : subject ? 'Update' : 'Create'}
                         </button>
                     </div>
@@ -1200,9 +1218,9 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
     return (
         <div className="modal-overlay">
             <div className="modal-content max-w-md">
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Assign Subject to Class</h3>
-                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Assign Subject to Class</h3>
+                    <button onClick={onClose} className="btn-close">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
@@ -1296,7 +1314,7 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
+                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-[#38383A] mt-6">
                         <button type="button" onClick={onClose} className="btn btn-ghost">
                             Cancel
                         </button>

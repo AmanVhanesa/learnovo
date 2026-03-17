@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import {
@@ -11,7 +12,9 @@ import {
   Calendar,
   BookOpen,
   Bell,
-  UserPlus
+  UserPlus,
+  ClipboardList,
+  School
 } from 'lucide-react'
 import { Line, Doughnut } from 'react-chartjs-2'
 import KpiCard from '../components/KpiCard'
@@ -21,7 +24,9 @@ import Button from '../components/Button'
 import { CardSkeleton, ChartSkeleton } from '../components/LoadingSkeleton'
 import { exportCSV, exportPNGPlaceholder } from '../utils/exportHelpers'
 import { reportsService } from '../services/reportsService'
+import { backupService } from '../services/backupService'
 import RecentActivities from '../components/RecentActivities'
+import StudentActivityFeed from '../components/StudentActivityFeed'
 import toast from 'react-hot-toast'
 import {
   Chart as ChartJS,
@@ -30,6 +35,7 @@ import {
   PointElement,
   LineElement,
   ArcElement,
+  Filler,
   Title,
   Tooltip,
   Legend,
@@ -41,6 +47,7 @@ ChartJS.register(
   PointElement,
   LineElement,
   ArcElement,
+  Filler,
   Title,
   Tooltip,
   Legend
@@ -50,7 +57,8 @@ const Dashboard = () => {
   const { user } = useAuth()
   const { formatCurrency } = useSettings()
   const navigate = useNavigate()
-  const [stats, setStats] = useState({
+
+  const defaultStats = {
     students: { total: 0, active: 0 },
     teachers: { total: 0, active: 0 },
     admissions: { total: 0, pending: 0, approved: 0, rejected: 0 },
@@ -60,37 +68,54 @@ const Dashboard = () => {
     parent: { myChildren: 0, pendingFees: 0, notifications: 0, performance: 'Good' },
     enrollmentTrend: { labels: [], data: [] },
     recentActivities: []
-  })
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  }
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const res = await reportsService.getDashboardStats()
-      // Fetch recent activities in parallel or separately
-      const activitiesRes = await reportsService.getRecentActivities()
-
+  const { data: stats = defaultStats, isLoading, isFetching, error, refetch } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: async () => {
+      const [res, activitiesRes] = await Promise.all([
+        reportsService.getDashboardStats(),
+        reportsService.getRecentActivities()
+      ])
       if (res?.success && res?.data) {
-        setStats({
+        return {
+          ...defaultStats,
           ...res.data,
           recentActivities: activitiesRes.success ? activitiesRes.data : []
-        })
-      } else {
-        setError(null)
+        }
       }
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error)
-      setError(error.response?.data?.message || 'Failed to load dashboard data. Please check your connection and try again.')
-    } finally {
-      setIsLoading(false)
+      return defaultStats
+    },
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
+  })
+
+  // Refetch on tab visibility change (Page Visibility API)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refetch()
+      }
     }
-  }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [refetch])
+
+  // Backup reminder — only for admins
+  const { data: lastBackup } = useQuery({
+    queryKey: ['last-backup'],
+    queryFn: async () => {
+      const res = await backupService.getLastBackup()
+      return res.success ? res.data : null
+    },
+    enabled: user?.role === 'admin',
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const daysSinceBackup = lastBackup?.createdAt
+    ? Math.floor((Date.now() - new Date(lastBackup.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null
+  const showBackupReminder = user?.role === 'admin' && (daysSinceBackup === null || daysSinceBackup >= 7)
 
   // Export chart as PNG
   const exportChartAsPNG = (title, chartData) => {
@@ -147,6 +172,13 @@ const Dashboard = () => {
             bgColor: 'bg-blue-100'
           },
           {
+            title: 'My Classes',
+            value: stats.teacher?.myClasses || 0,
+            icon: School,
+            color: 'text-indigo-600',
+            bgColor: 'bg-indigo-100'
+          },
+          {
             title: "Today's Attendance",
             value: `${stats.teacher?.attendanceToday || 0}%`,
             icon: TrendingUp,
@@ -163,7 +195,7 @@ const Dashboard = () => {
           {
             title: 'Pending Submissions',
             value: stats.teacher?.pendingSubmissions || 0,
-            icon: AlertTriangle,
+            icon: ClipboardList,
             color: 'text-yellow-600',
             bgColor: 'bg-yellow-100'
           }
@@ -178,11 +210,15 @@ const Dashboard = () => {
             bgColor: 'bg-green-100'
           },
           {
-            title: 'Fees Status',
-            value: `${stats.student?.pendingFees || 0} Pending`,
+            title: 'Fees Due',
+            value: stats.student?.pendingFeesAmount
+              ? formatCurrency(stats.student.pendingFeesAmount)
+              : stats.student?.pendingFees
+                ? `${stats.student.pendingFees} Pending`
+                : 'All Clear',
             icon: CreditCard,
-            color: 'text-yellow-600',
-            bgColor: 'bg-yellow-100'
+            color: stats.student?.pendingFeesAmount ? 'text-red-600' : 'text-green-600',
+            bgColor: stats.student?.pendingFeesAmount ? 'bg-red-100' : 'bg-green-100'
           },
           {
             title: 'Assignments',
@@ -209,11 +245,15 @@ const Dashboard = () => {
             bgColor: 'bg-blue-100'
           },
           {
-            title: 'Fees Status',
-            value: `${stats.parent?.pendingFees || 0} Pending`,
+            title: 'Fees Due',
+            value: stats.parent?.pendingFeesAmount
+              ? formatCurrency(stats.parent.pendingFeesAmount)
+              : stats.parent?.pendingFees
+                ? `${stats.parent.pendingFees} Pending`
+                : 'All Clear',
             icon: CreditCard,
-            color: 'text-yellow-600',
-            bgColor: 'bg-yellow-100'
+            color: stats.parent?.pendingFeesAmount ? 'text-red-600' : 'text-green-600',
+            bgColor: stats.parent?.pendingFeesAmount ? 'bg-red-100' : 'bg-green-100'
           },
           {
             title: 'Notifications',
@@ -252,6 +292,7 @@ const Dashboard = () => {
     ]
   }
 
+  // Fee collection chart — admin only
   const feesData = {
     labels: ['Collected', 'Pending', 'Overdue'],
     datasets: [
@@ -266,59 +307,106 @@ const Dashboard = () => {
     ]
   }
 
+  // Weekly attendance trend — for teachers (real data from backend)
+  const weeklyAttendanceData = {
+    labels: stats.teacher?.weeklyAttendance?.labels?.length > 0
+      ? stats.teacher.weeklyAttendance.labels
+      : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [
+      {
+        label: 'Attendance %',
+        data: stats.teacher?.weeklyAttendance?.data?.length > 0
+          ? stats.teacher.weeklyAttendance.data
+          : [0, 0, 0, 0, 0, 0, 0],
+        borderColor: 'rgb(62, 196, 177)',
+        backgroundColor: 'rgba(62, 196, 177, 0.1)',
+        tension: 0.4,
+        fill: true,
+      }
+    ]
+  }
+
+  // Assignment submission chart — for teachers
+  const assignmentData = {
+    labels: ['Submitted', 'Pending', 'Late'],
+    datasets: [
+      {
+        data: [
+          stats.teacher?.submittedAssignments || 0,
+          stats.teacher?.pendingSubmissions || 0,
+          stats.teacher?.lateSubmissions || 0
+        ],
+        backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+      }
+    ]
+  }
+
   /* Deprecated: Legacy Recent Activities logic removed */
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200/60 dark:border-red-500/20 rounded-2xl p-4 animate-fade-in">
           <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-            <p className="text-sm text-red-600">{error}</p>
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 flex-shrink-0" />
+            <p className="text-sm text-red-700 dark:text-red-400">{error.response?.data?.message || 'Failed to load dashboard data. Please check your connection and try again.'}</p>
           </div>
-          <button
-            onClick={() => fetchDashboardData()}
-            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-          >
-            Try again
-          </button>
+        </div>
+      )}
+
+      {/* Backup Reminder Banner */}
+      {showBackupReminder && (
+        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200/60 dark:border-amber-500/20 rounded-2xl p-4 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <p className="text-sm text-amber-700 dark:text-amber-400">
+                {daysSinceBackup === null
+                  ? "You haven't taken a backup yet. Download a backup to keep your data safe."
+                  : `Your last backup was ${daysSinceBackup} days ago. We recommend backing up at least every 7 days.`
+                }
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/app/settings')}
+              className="text-sm font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 underline whitespace-nowrap ml-3"
+            >
+              Download backup
+            </button>
+          </div>
         </div>
       )}
 
       {/* Welcome message */}
-      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-          Welcome back, {user?.name || user?.fullName || user?.firstName || ''}!
-        </h1>
-        <div className="flex items-center gap-3 mt-2">
-          {user?.admissionNumber && (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-teal-100 text-teal-800">
-              <span className="font-mono font-semibold mr-2">
-                {user.admissionNumber}
-              </span>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(user.admissionNumber)
-                  toast.success('Admission number copied!')
-                }}
-                className="text-teal-600 hover:text-teal-700 transition-colors"
-                title="Copy admission number"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
-            </span>
-          )}
-          <p className="text-gray-600">
-            Here's what's happening with your {user?.role === 'admin' ? 'school' : 'account'} today.
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+            Welcome back, {user?.name || user?.fullName || user?.firstName || ''}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
+            Here's what's happening with your {user?.role === 'admin' ? 'school' : user?.role === 'teacher' ? 'classes' : 'account'} today.
           </p>
         </div>
+        {user?.admissionNumber && (
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(user.admissionNumber)
+              toast.success('Admission number copied!')
+            }}
+            className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 text-sm font-medium hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors"
+            title="Copy admission number"
+          >
+            <span className="font-mono">{user.admissionNumber}</span>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
         {isLoading ? (
           [...Array(4)].map((_, i) => <CardSkeleton key={i} />)
         ) : (
@@ -332,14 +420,20 @@ const Dashboard = () => {
               if (user?.role === 'admin' && (lowerTitle.includes('fee') || lowerTitle.includes('collection'))) {
                 return '/app/fees-finance'
               }
+              // Students and parents go to the Student Fees Dashboard (invoice-based)
+              if ((user?.role === 'student' || user?.role === 'parent') && (lowerTitle.includes('fee') || lowerTitle.includes('collection'))) {
+                return '/app/student/fees'
+              }
               if (lowerTitle.includes('fee') || lowerTitle.includes('collection')) return '/app/fees'
 
               // Specific redirect for Dashboard "New Admissions" stat (which counts Users) to Students page
               if (lowerTitle === 'new admissions') return '/app/students'
               if (lowerTitle.includes('admission')) return '/app/admissions'
 
-              if (lowerTitle.includes('assignment')) return '/app/assignments'
+              if (lowerTitle.includes('assignment') || lowerTitle.includes('submission')) return '/app/assignments'
+              if (lowerTitle.includes('class')) return '/app/students'
               if (lowerTitle.includes('notification')) return '/app/notifications'
+              if (lowerTitle.includes('attendance')) return '/app/attendance'
               return '/app/dashboard'
             }
 
@@ -350,8 +444,8 @@ const Dashboard = () => {
                 [stat.title, String(stat.value)]
               ]
 
-              // Add additional context based on stat type
-              if (stat.title.toLowerCase().includes('fee') && stats.fees) {
+              // Add additional context based on stat type (fee details admin-only)
+              if (stat.title.toLowerCase().includes('fee') && stats.fees && user?.role === 'admin') {
                 exportData.push(['Total Fees', stats.fees.total])
                 exportData.push(['Paid Fees', stats.fees.paid])
                 exportData.push(['Pending Fees', stats.fees.pending])
@@ -377,6 +471,7 @@ const Dashboard = () => {
                 onPrimary={() => navigate(getRoute(stat.title))}
                 secondaryLabel="Export"
                 onSecondary={handleExport}
+                isRefetching={isFetching && !isLoading}
               />
             )
           })
@@ -414,19 +509,37 @@ const Dashboard = () => {
               <>
                 <ChartCard
                   title="Weekly Attendance Trend"
-                  onExport={() => exportChartAsPNG('Weekly Attendance Trend', enrollmentData)}
+                  onExport={() => exportChartAsPNG('Weekly Attendance Trend', weeklyAttendanceData)}
                 >
                   {() => (
-                    <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
+                    <Line
+                      data={weeklyAttendanceData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { callback: (v) => `${v}%` },
+                          },
+                        },
+                        plugins: {
+                          tooltip: {
+                            callbacks: { label: (ctx) => `Attendance: ${ctx.parsed.y}%` },
+                          },
+                        },
+                      }}
+                    />
                   )}
                 </ChartCard>
 
                 <ChartCard
-                  title="Assignment Submission Status"
-                  onExport={() => exportChartAsPNG('Assignment Submission Status', feesData)}
+                  title="Homework Submission Status"
+                  onExport={() => exportChartAsPNG('Homework Submission Status', assignmentData)}
                 >
                   {() => (
-                    <Doughnut data={feesData} options={{ responsive: true, maintainAspectRatio: false }} />
+                    <Doughnut data={assignmentData} options={{ responsive: true, maintainAspectRatio: false }} />
                   )}
                 </ChartCard>
               </>
@@ -435,18 +548,58 @@ const Dashboard = () => {
         )}
       </div>
 
+      {/* Attendance Quick Widget — Admin */}
+      {user?.role === 'admin' && !isLoading && (
+        <div className="card p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Today's Attendance</h3>
+            <button
+              onClick={() => navigate('/app/attendance')}
+              className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              View Dashboard
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-green-50 dark:bg-green-900/10 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-green-600">{stats.attendance?.studentsPresentToday || 0}</p>
+              <p className="text-xs text-green-600/70">Students Present</p>
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/10 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-red-600">{stats.attendance?.studentsAbsentToday || 0}</p>
+              <p className="text-xs text-red-600/70">Students Absent</p>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-900/10 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-blue-600">{stats.attendance?.employeesPresentToday || 0}</p>
+              <p className="text-xs text-blue-600/70">Staff Present</p>
+            </div>
+            <div className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-3 text-center">
+              <p className="text-xl font-bold text-amber-600">{stats.attendance?.unmarkedClasses || 0}</p>
+              <p className="text-xs text-amber-600/70">Unmarked Classes</p>
+            </div>
+          </div>
+          {(stats.attendance?.unmarkedClasses || 0) > 0 && (
+            <div className="mt-3 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="h-4 w-4" />
+              <span>{stats.attendance.unmarkedClasses} class{stats.attendance.unmarkedClasses !== 1 ? 'es' : ''} haven't been marked yet.</span>
+              <button onClick={() => navigate('/app/attendance/mark')} className="font-medium underline">Mark Now</button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Admin specific widgets */}
       {user?.role === 'admin' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Upcoming Exams & Deadlines</h3>
+          <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-lg shadow-sm p-4 sm:p-6">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Upcoming Exams & Deadlines</h3>
             {stats.upcomingExams && stats.upcomingExams.length > 0 ? (
               <div className="space-y-3">
                 {stats.upcomingExams.map((exam, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{exam.name || 'Exam'}</p>
-                      <p className="text-xs text-gray-500">{exam.subject?.name} • {exam.class?.name}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">{exam.name || 'Exam'}</p>
+                      <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{exam.subject?.name} • {exam.class?.name}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-indigo-600">
@@ -457,7 +610,7 @@ const Dashboard = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 py-4 text-center">No upcoming exams found.</p>
+              <p className="text-sm text-gray-500 dark:text-[#8E8E93] py-4 text-center">No upcoming exams found.</p>
             )}
           </div>
         </div>
@@ -467,21 +620,92 @@ const Dashboard = () => {
       {user?.role === 'teacher' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Upcoming Assignment Deadlines */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Upcoming Assignment Deadlines</h3>
-            <p className="text-sm text-gray-500 py-4 text-center">No upcoming assignments found.</p>
+          <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Upcoming Assignment Deadlines</h3>
+              <button
+                onClick={() => navigate('/app/assignments')}
+                className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+              >
+                View all
+              </button>
+            </div>
+            {stats.teacher?.upcomingAssignments && stats.teacher.upcomingAssignments.length > 0 ? (
+              <div className="space-y-3">
+                {stats.teacher.upcomingAssignments.map((assignment, index) => {
+                  const dueDate = new Date(assignment.dueDate)
+                  const daysLeft = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24))
+                  const isUrgent = daysLeft <= 2
+                  return (
+                    <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${isUrgent ? 'bg-red-50 dark:bg-red-500/10' : 'bg-blue-50 dark:bg-blue-500/10'}`}>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{assignment.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{assignment.subject} - {assignment.class}</p>
+                      </div>
+                      <div className="text-right ml-3 flex-shrink-0">
+                        <p className={`text-sm font-medium ${isUrgent ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                          {dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </p>
+                        <p className={`text-xs ${isUrgent ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-[#8E8E93]'}`}>
+                          {daysLeft <= 0 ? 'Due today' : `${daysLeft}d left`}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <BookOpen className="h-8 w-8 text-gray-300 dark:text-[#636366] mx-auto mb-2" />
+                <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No upcoming assignments</p>
+              </div>
+            )}
           </div>
 
-          {/* Today's Class Schedule */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Today's Class Schedule</h3>
-            <p className="text-sm text-gray-500 py-4 text-center">No classes scheduled for today.</p>
+          {/* My Assigned Classes */}
+          <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">My Assigned Classes</h3>
+              <button
+                onClick={() => navigate('/app/students')}
+                className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+              >
+                View students
+              </button>
+            </div>
+            {stats.teacher?.assignedClasses && stats.teacher.assignedClasses.length > 0 ? (
+              <div className="space-y-3">
+                {stats.teacher.assignedClasses.map((cls, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
+                        <School className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{cls.name}</p>
+                        {cls.grade && <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Grade {cls.grade}</p>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <School className="h-8 w-8 text-gray-300 dark:text-[#636366] mx-auto mb-2" />
+                <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No classes assigned yet</p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Recent activities - Hidden for students and parents */}
-      {['admin', 'teacher'].includes(user?.role) && (
+      {/* Student / Parent activity feed */}
+      {(user?.role === 'student' || user?.role === 'parent') && (
+        <StudentActivityFeed />
+      )}
+
+      {/* Recent activities - Admin only (contains fee payments & employee data) */}
+      {user?.role === 'admin' && (
         <RecentActivities activities={stats.recentActivities} isLoading={isLoading} />
       )}
     </div>

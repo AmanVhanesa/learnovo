@@ -56,27 +56,27 @@ const BulkImportModal = ({ onClose, onSuccess }) => {
     return (
         <div className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal-content p-4 max-w-lg w-full">
-                <div className="flex items-center justify-between border-b border-gray-200 p-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Bulk Import Students</h3>
-                    <button className="p-2 rounded-md hover:bg-gray-100" onClick={onClose}>
-                        <X className="h-5 w-5" />
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-4">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Bulk Import Students</h3>
+                    <button className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#2C2C2E]" onClick={onClose}>
+                        <X className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
                     </button>
                 </div>
 
                 <div className="p-6 space-y-6">
                     {!result ? (
                         <>
-                            <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700">
+                            <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-lg text-sm text-blue-700 dark:text-blue-400">
                                 <p className="font-semibold mb-1">Instructions:</p>
                                 <ul className="list-disc list-inside space-y-1">
                                     <li>Upload a CSV file with student details.</li>
                                     <li>Required columns: <strong>name</strong>, <strong>email</strong>.</li>
                                     <li>Recommended: class, rollNumber, phone.</li>
-                                    <li><button onClick={downloadTemplate} className="underline text-blue-800 font-medium">Download Template CSV</button></li>
+                                    <li><button onClick={downloadTemplate} className="underline text-blue-800 dark:text-blue-300 font-medium">Download Template CSV</button></li>
                                 </ul>
                             </div>
 
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition-colors">
+                            <div className="border-2 border-dashed border-gray-300 dark:border-[#38383A] rounded-lg p-8 text-center hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
                                 <input
                                     type="file"
                                     id="csv-upload"
@@ -85,11 +85,11 @@ const BulkImportModal = ({ onClose, onSuccess }) => {
                                     onChange={handleFileChange}
                                 />
                                 <label htmlFor="csv-upload" className="cursor-pointer flex flex-col items-center">
-                                    <FileText className="h-12 w-12 text-gray-400 mb-3" />
-                                    <span className="text-sm font-medium text-gray-900">
+                                    <FileText className="h-12 w-12 text-gray-400 dark:text-[#636366] mb-3" />
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white">
                                         {file ? file.name : 'Click to upload CSV'}
                                     </span>
-                                    <span className="text-xs text-gray-500 mt-1">
+                                    <span className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
                                         {file ? `${(file.size / 1024).toFixed(2)} KB` : 'CSV files only'}
                                     </span>
                                 </label>
@@ -109,22 +109,22 @@ const BulkImportModal = ({ onClose, onSuccess }) => {
                     ) : (
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-green-50 p-4 rounded-lg border border-green-200 text-center">
-                                    <Check className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                                    <div className="text-2xl font-bold text-green-700">{result.data?.success || 0}</div>
-                                    <div className="text-sm text-green-800">Successfully Imported</div>
+                                <div className="bg-green-50 dark:bg-green-500/10 p-4 rounded-lg border border-green-200 dark:border-green-500/20 text-center">
+                                    <Check className="h-8 w-8 text-green-600 dark:text-green-400 mx-auto mb-2" />
+                                    <div className="text-2xl font-bold text-green-700 dark:text-green-400">{result.data?.success || 0}</div>
+                                    <div className="text-sm text-green-800 dark:text-green-300">Successfully Imported</div>
                                 </div>
-                                <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-center">
-                                    <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-2" />
-                                    <div className="text-2xl font-bold text-red-700">{result.data?.failed || 0}</div>
-                                    <div className="text-sm text-red-800">Failed Records</div>
+                                <div className="bg-red-50 dark:bg-red-500/10 p-4 rounded-lg border border-red-200 dark:border-red-500/20 text-center">
+                                    <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400 mx-auto mb-2" />
+                                    <div className="text-2xl font-bold text-red-700 dark:text-red-400">{result.data?.failed || 0}</div>
+                                    <div className="text-sm text-red-800 dark:text-red-300">Failed Records</div>
                                 </div>
                             </div>
 
                             {result.data?.errors && result.data.errors.length > 0 && (
-                                <div className="bg-gray-50 rounded-lg p-4 max-h-48 overflow-y-auto border border-gray-200">
-                                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Error Log:</h4>
-                                    <ul className="text-xs text-red-600 space-y-1">
+                                <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-lg p-4 max-h-48 overflow-y-auto border border-gray-200 dark:border-[#38383A]">
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-white mb-2">Error Log:</h4>
+                                    <ul className="text-xs text-red-600 dark:text-red-400 space-y-1">
                                         {result.data.errors.map((err, idx) => (
                                             <li key={idx}>• {err}</li>
                                         ))}

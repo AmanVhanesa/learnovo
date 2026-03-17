@@ -1,0 +1,628 @@
+import React, { useState, useEffect, useMemo } from 'react'
+import { AlertCircle, History, Printer, Tag, ChevronDown, ChevronUp, IndianRupee, CreditCard, Banknote, Smartphone, Building2, FileCheck, Globe, Download } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { paymentsService, discountsService } from '../../services/feesService'
+import { formatCurrency } from '../../utils/formatCurrency'
+import StatusBadge from '../StatusBadge'
+import ModalWrapper from '../ModalWrapper'
+
+const DISCOUNT_TYPES = ['Scholarship', 'Sibling Discount', 'Staff Ward', 'Merit-based', 'Financial Hardship', 'Other']
+
+const PAYMENT_METHODS = [
+  { value: 'Cash', label: 'Cash', icon: Banknote },
+  { value: 'UPI', label: 'UPI', icon: Smartphone },
+  { value: 'Bank Transfer', label: 'Bank Transfer', icon: Building2 },
+  { value: 'Cheque', label: 'Cheque', icon: FileCheck },
+  { value: 'Card', label: 'Card', icon: CreditCard },
+  { value: 'Online', label: 'Online', icon: Globe },
+]
+
+const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDownloadReceipt, onClose, onSuccess }) => {
+  const [activeTab, setActiveTab] = useState('collect')
+  const [selectedInvoice, setSelectedInvoice] = useState(null)
+  const [form, setForm] = useState({
+    amount: '',
+    paymentMethod: 'Cash',
+    paymentDate: new Date().toISOString().split('T')[0],
+    transactionDetails: {},
+    remarks: '',
+  })
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Inline discount state
+  const [showDiscount, setShowDiscount] = useState(false)
+  const [discountMode, setDiscountMode] = useState('fixed')
+  const [discountForm, setDiscountForm] = useState({ type: '', amount: '', percentage: '', reason: '' })
+  const [isApplyingDiscount, setIsApplyingDiscount] = useState(false)
+
+  useEffect(() => {
+    if (invoices.length === 0 && payments.length > 0) {
+      setActiveTab('history')
+    } else if (invoices.length > 0) {
+      setActiveTab('collect')
+      setSelectedInvoice(invoices[0])
+      setForm(f => ({ ...f, amount: invoices[0].balanceAmount || '' }))
+    }
+  }, [invoices, payments])
+
+  // Reset discount when invoice changes
+  useEffect(() => {
+    setShowDiscount(false)
+    setDiscountForm({ type: '', amount: '', percentage: '', reason: '' })
+  }, [selectedInvoice?._id])
+
+  const discountCalcAmount = useMemo(() => {
+    if (discountMode === 'percentage') {
+      return Math.round((parseFloat(discountForm.percentage || 0) / 100) * (selectedInvoice?.totalAmount || 0))
+    }
+    return parseFloat(discountForm.amount || 0)
+  }, [discountMode, discountForm.percentage, discountForm.amount, selectedInvoice?.totalAmount])
+
+  const effectiveBalance = useMemo(() => {
+    if (!selectedInvoice) return 0
+    const base = selectedInvoice.balanceAmount || 0
+    return Math.max(0, base - (showDiscount && discountCalcAmount > 0 ? discountCalcAmount : 0))
+  }, [selectedInvoice, showDiscount, discountCalcAmount])
+
+  const paymentProgress = useMemo(() => {
+    if (!selectedInvoice || !selectedInvoice.totalAmount) return 0
+    return Math.min(100, Math.round(((selectedInvoice.paidAmount || 0) / selectedInvoice.totalAmount) * 100))
+  }, [selectedInvoice])
+
+  const handleApplyDiscount = async () => {
+    if (!selectedInvoice) return
+    if (!discountForm.type) { toast.error('Select a discount type'); return }
+    if (!discountForm.reason.trim()) { toast.error('Provide a reason'); return }
+    if (discountCalcAmount <= 0) { toast.error('Enter a valid discount amount'); return }
+    if (discountCalcAmount > selectedInvoice.totalAmount) { toast.error('Discount exceeds total amount'); return }
+
+    try {
+      setIsApplyingDiscount(true)
+      const payload = {
+        type: discountForm.type,
+        reason: discountForm.reason.trim(),
+        amount: discountCalcAmount,
+      }
+      if (discountMode === 'percentage') {
+        payload.percentage = parseFloat(discountForm.percentage)
+      }
+      await discountsService.applyDiscount(selectedInvoice._id, payload)
+      toast.success('Discount applied successfully')
+      const newBalance = Math.max(0, selectedInvoice.balanceAmount - discountCalcAmount)
+      setSelectedInvoice(inv => ({ ...inv, balanceAmount: newBalance, discountAmount: discountCalcAmount }))
+      setForm(f => ({ ...f, amount: newBalance }))
+      setShowDiscount(false)
+      setDiscountForm({ type: '', amount: '', percentage: '', reason: '' })
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to apply discount')
+    } finally {
+      setIsApplyingDiscount(false)
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!selectedInvoice) { toast.error('Please select an invoice'); return }
+
+    const amount = parseFloat(form.amount)
+    if (!amount || amount <= 0) { toast.error('Enter a valid amount'); return }
+    if (amount > (selectedInvoice.balanceAmount || 0)) {
+      toast.error('Amount exceeds balance')
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      await paymentsService.collect({
+        studentId: student._id,
+        invoiceId: selectedInvoice._id,
+        amount,
+        paymentMethod: form.paymentMethod,
+        paymentDate: form.paymentDate,
+        transactionDetails: form.transactionDetails,
+        remarks: form.remarks,
+      })
+      onSuccess()
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to collect payment')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const tabClass = (tab) => `flex-1 py-3 text-sm font-medium text-center border-b-2 transition-colors ${
+    activeTab === tab
+      ? 'border-primary-500 text-primary-600 dark:text-primary-400 dark:border-primary-400'
+      : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'
+  }`
+
+  return (
+    <ModalWrapper title="Collect Fee Payment" onClose={onClose}>
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200 dark:border-[#38383A]">
+        <button className={tabClass('collect')} onClick={() => setActiveTab('collect')}>
+          <span className="flex items-center justify-center gap-1.5">
+            <IndianRupee className="h-3.5 w-3.5" /> Collect Payment
+          </span>
+        </button>
+        <button className={tabClass('history')} onClick={() => setActiveTab('history')}>
+          <span className="flex items-center justify-center gap-1.5">
+            <History className="h-3.5 w-3.5" /> Payment History
+            {payments.length > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-200 dark:bg-[#38383A] text-gray-600 dark:text-[#8E8E93] rounded-full">
+                {payments.length}
+              </span>
+            )}
+          </span>
+        </button>
+      </div>
+
+      {/* Collect Tab */}
+      {activeTab === 'collect' && (
+        <div className="p-4 sm:p-6">
+          {invoices.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="h-7 w-7 text-emerald-500 dark:text-emerald-400" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No Pending Invoices</h3>
+              <p className="text-sm text-gray-500 dark:text-[#8E8E93]">This student has no pending dues. All fees are paid.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Student info */}
+              <div className="flex items-center gap-3 p-3.5 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
+                <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-primary-700 dark:text-primary-400">
+                    {(student.fullName || student.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{student.fullName || student.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-[#636366]">
+                    ID: {student.studentId || student.admissionNumber} &middot; Class: {student.classId?.name || student.class || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Invoice selector */}
+              <div>
+                <label className="label mb-1.5 block">Select Invoice *</label>
+                <select
+                  className="input"
+                  value={selectedInvoice?._id || ''}
+                  onChange={(e) => {
+                    const inv = invoices.find(i => i._id === e.target.value)
+                    setSelectedInvoice(inv)
+                    setForm(f => ({ ...f, amount: inv?.balanceAmount || '' }))
+                  }}
+                  required
+                >
+                  {invoices.map((inv) => (
+                    <option key={inv._id} value={inv._id}>
+                      {inv.invoiceNumber} — {formatCurrency(inv.balanceAmount)} ({inv.status})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Selected invoice summary with progress */}
+              {selectedInvoice && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2.5 rounded-xl bg-gray-50 dark:bg-[#2C2C2E] border border-gray-100 dark:border-[#38383A]">
+                      <p className="text-[10px] font-semibold text-gray-500 dark:text-[#636366] uppercase">Total</p>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">{formatCurrency(selectedInvoice.totalAmount)}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30">
+                      <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase">Paid</p>
+                      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">{formatCurrency(selectedInvoice.paidAmount || 0)}</p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30">
+                      <p className="text-[10px] font-semibold text-red-600 dark:text-red-400 uppercase">Balance</p>
+                      <p className="text-sm font-bold text-red-700 dark:text-red-400 mt-0.5">{formatCurrency(selectedInvoice.balanceAmount)}</p>
+                    </div>
+                  </div>
+
+                  {/* Payment progress bar */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500 dark:text-[#636366]">Payment Progress</span>
+                      <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">{paymentProgress}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 dark:bg-[#38383A] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary-500 to-emerald-500 rounded-full transition-all duration-500"
+                        style={{ width: `${paymentProgress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Fee heads breakdown */}
+                  {selectedInvoice.feeItems?.length > 0 && (
+                    <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                      <div className="px-3 py-2 border-b border-gray-100 dark:border-[#38383A]">
+                        <span className="text-[10px] font-semibold text-gray-500 dark:text-[#636366] uppercase tracking-wide">Fee Breakdown</span>
+                      </div>
+                      <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
+                        {selectedInvoice.feeItems.map((item, i) => (
+                          <div key={i} className="px-3 py-2 flex justify-between text-xs">
+                            <span className="text-gray-600 dark:text-[#8E8E93]">{item.name || item.feeHeadName || `Item ${i + 1}`}</span>
+                            <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(item.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Due date warning */}
+                  {selectedInvoice.dueDate && new Date(selectedInvoice.dueDate) < new Date() && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/15 border border-red-200 dark:border-red-800/30 rounded-xl">
+                      <AlertCircle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                      <span className="text-xs text-red-700 dark:text-red-400">
+                        Overdue since {new Date(selectedInvoice.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Inline discount toggle */}
+              {selectedInvoice && !selectedInvoice.discountAmount && (
+                <div className="border border-gray-100 dark:border-[#38383A] rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscount(!showDiscount)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                      Apply Discount / Waiver
+                    </span>
+                    {showDiscount ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+
+                  {showDiscount && (
+                    <div className="px-4 pb-4 pt-1 space-y-3 border-t border-gray-100 dark:border-[#38383A] bg-blue-50/30 dark:bg-blue-950/10">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="label mb-1 block text-xs">Type *</label>
+                          <select
+                            className="input text-xs"
+                            value={discountForm.type}
+                            onChange={e => setDiscountForm(f => ({ ...f, type: e.target.value }))}
+                          >
+                            <option value="">Select...</option>
+                            {DISCOUNT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label mb-1 block text-xs">Mode</label>
+                          <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-[#38383A]">
+                            <button
+                              type="button"
+                              onClick={() => setDiscountMode('fixed')}
+                              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                                discountMode === 'fixed'
+                                  ? 'bg-primary-600 text-white dark:bg-primary-500'
+                                  : 'bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]'
+                              }`}
+                            >
+                              Fixed ₹
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDiscountMode('percentage')}
+                              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                                discountMode === 'percentage'
+                                  ? 'bg-primary-600 text-white dark:bg-primary-500'
+                                  : 'bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]'
+                              }`}
+                            >
+                              Percent %
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {discountMode === 'fixed' ? (
+                        <div>
+                          <label className="label mb-1 block text-xs">Amount *</label>
+                          <input
+                            type="number" min="1" step="1" max={selectedInvoice?.totalAmount}
+                            className="input text-xs"
+                            placeholder="e.g. 500"
+                            value={discountForm.amount}
+                            onChange={e => setDiscountForm(f => ({ ...f, amount: e.target.value }))}
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="label mb-1 block text-xs">Percentage *</label>
+                          <input
+                            type="number" min="1" max="100" step="1"
+                            className="input text-xs"
+                            placeholder="e.g. 10"
+                            value={discountForm.percentage}
+                            onChange={e => setDiscountForm(f => ({ ...f, percentage: e.target.value }))}
+                          />
+                          {discountForm.percentage > 0 && (
+                            <p className="text-xs text-primary-600 dark:text-primary-400 font-medium mt-1">= {formatCurrency(discountCalcAmount)}</p>
+                          )}
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="label mb-1 block text-xs">Reason *</label>
+                        <input
+                          type="text"
+                          className="input text-xs"
+                          placeholder="e.g. Scholarship awarded"
+                          value={discountForm.reason}
+                          onChange={e => setDiscountForm(f => ({ ...f, reason: e.target.value }))}
+                        />
+                      </div>
+
+                      {/* Discount preview */}
+                      {discountCalcAmount > 0 && (
+                        <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
+                          <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">New balance after discount</span>
+                          <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(effectiveBalance)}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleApplyDiscount}
+                        disabled={isApplyingDiscount}
+                        className="btn btn-sm w-full bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
+                      >
+                        {isApplyingDiscount ? 'Applying...' : 'Apply Discount'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Already has discount badge */}
+              {selectedInvoice?.discountAmount > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
+                  <Tag className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                    Discount applied: {formatCurrency(selectedInvoice.discountAmount)}
+                  </span>
+                </div>
+              )}
+
+              {/* Payment amount */}
+              <div>
+                <label className="label mb-1.5 block">Amount *</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={form.amount}
+                  onChange={(e) => setForm(prev => ({ ...prev, amount: e.target.value }))}
+                  max={selectedInvoice?.balanceAmount}
+                  min="1"
+                  step="1"
+                  required
+                />
+                <div className="flex items-center justify-between mt-1.5">
+                  <p className="text-xs text-gray-400 dark:text-[#636366]">
+                    Max: {formatCurrency(selectedInvoice?.balanceAmount || 0)}
+                  </p>
+                  {selectedInvoice?.balanceAmount && parseFloat(form.amount) < selectedInvoice.balanceAmount && parseFloat(form.amount) > 0 && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Partial payment</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment method with icons */}
+              <div>
+                <label className="label mb-1.5 block">Payment Method *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PAYMENT_METHODS.map((method) => {
+                    const Icon = method.icon
+                    const isSelected = form.paymentMethod === method.value
+                    return (
+                      <button
+                        key={method.value}
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, paymentMethod: method.value, transactionDetails: {} }))}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center ${
+                          isSelected
+                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
+                            : 'border-gray-200 dark:border-[#38383A] hover:border-gray-300 dark:hover:border-[#636366]'
+                        }`}
+                      >
+                        <Icon className={`h-4 w-4 ${isSelected ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-[#636366]'}`} />
+                        <span className={`text-xs font-medium ${isSelected ? 'text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-[#8E8E93]'}`}>
+                          {method.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Transaction details for digital payments */}
+              {['UPI', 'Bank Transfer', 'Cheque', 'Card', 'Online'].includes(form.paymentMethod) && (
+                <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-xl p-3 border border-gray-100 dark:border-[#38383A] space-y-3">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-[#636366] uppercase">Transaction Details</span>
+                  {form.paymentMethod === 'UPI' && (
+                    <input
+                      type="text"
+                      className="input text-sm"
+                      placeholder="UPI Transaction ID / Reference"
+                      value={form.transactionDetails.upiId || ''}
+                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, upiId: e.target.value } }))}
+                    />
+                  )}
+                  {form.paymentMethod === 'Bank Transfer' && (
+                    <input
+                      type="text"
+                      className="input text-sm"
+                      placeholder="Bank Transfer Reference Number"
+                      value={form.transactionDetails.referenceNumber || ''}
+                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, referenceNumber: e.target.value } }))}
+                    />
+                  )}
+                  {form.paymentMethod === 'Cheque' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        className="input text-sm"
+                        placeholder="Cheque Number"
+                        value={form.transactionDetails.chequeNumber || ''}
+                        onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, chequeNumber: e.target.value } }))}
+                      />
+                      <input
+                        type="text"
+                        className="input text-sm"
+                        placeholder="Bank Name"
+                        value={form.transactionDetails.bankName || ''}
+                        onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, bankName: e.target.value } }))}
+                      />
+                    </div>
+                  )}
+                  {form.paymentMethod === 'Card' && (
+                    <input
+                      type="text"
+                      className="input text-sm"
+                      placeholder="Card Transaction Reference"
+                      value={form.transactionDetails.cardRef || ''}
+                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, cardRef: e.target.value } }))}
+                    />
+                  )}
+                  {form.paymentMethod === 'Online' && (
+                    <input
+                      type="text"
+                      className="input text-sm"
+                      placeholder="Online Payment Reference / Order ID"
+                      value={form.transactionDetails.onlineRef || ''}
+                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, onlineRef: e.target.value } }))}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* Payment date */}
+              <div>
+                <label className="label mb-1.5 block">Payment Date *</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={form.paymentDate}
+                  onChange={(e) => setForm(prev => ({ ...prev, paymentDate: e.target.value }))}
+                  max={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+
+              {/* Remarks */}
+              <div>
+                <label className="label mb-1.5 block">Remarks</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={form.remarks}
+                  onChange={(e) => setForm(prev => ({ ...prev, remarks: e.target.value }))}
+                  placeholder="Optional notes about this payment"
+                />
+              </div>
+
+              {/* Payment summary */}
+              <div className="bg-primary-50 dark:bg-primary-900/15 border border-primary-200 dark:border-primary-800/30 rounded-xl p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-primary-800 dark:text-primary-300">Amount to Collect</span>
+                  <span className="text-lg font-bold text-primary-700 dark:text-primary-400">
+                    {formatCurrency(parseFloat(form.amount) || 0)}
+                  </span>
+                </div>
+                {form.paymentMethod && (
+                  <p className="text-xs text-primary-600 dark:text-primary-400/80 mt-1">
+                    via {form.paymentMethod} &middot; {new Date(form.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </p>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-5 border-t border-gray-100 dark:border-[#38383A]">
+                <button type="button" onClick={onClose} className="btn btn-outline w-full sm:w-auto">
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isSaving}>
+                  {isSaving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing...
+                    </span>
+                  ) : (
+                    `Collect ${formatCurrency(parseFloat(form.amount) || 0)}`
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {/* History Tab */}
+      {activeTab === 'history' && (
+        <div className="p-4 sm:p-6">
+          {payments.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-[#2C2C2E] flex items-center justify-center mx-auto mb-4">
+                <History className="h-7 w-7 text-gray-400 dark:text-[#636366]" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No Payment History</h3>
+              <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No payments found for this student.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Total summary */}
+              <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-xl p-3 border border-gray-100 dark:border-[#38383A] flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500 dark:text-[#636366] uppercase">Total Paid</span>
+                <span className="text-base font-bold text-green-600 dark:text-green-400">
+                  {formatCurrency(payments.reduce((sum, p) => sum + (p.amount || 0), 0))}
+                </span>
+              </div>
+
+              {payments.map((payment) => (
+                <div key={payment._id} className="flex items-center justify-between p-3.5 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(payment.amount)}</span>
+                      <StatusBadge status="Paid" />
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                      {new Date(payment.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} &bull; {payment.paymentMethod}
+                    </div>
+                    {payment.receiptNumber && (
+                      <p className="text-[11px] text-gray-400 dark:text-[#636366] mt-0.5 font-mono">Receipt: {payment.receiptNumber}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => onPrintReceipt(payment._id)} className="btn-icon !p-2" title="View Receipt">
+                      <Printer className="h-4 w-4" />
+                    </button>
+                    {onDownloadReceipt && (
+                      <button onClick={() => onDownloadReceipt(payment._id)} className="btn-icon !p-2" title="Download PDF">
+                        <Download className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-6 flex justify-end pt-4 border-t border-gray-100 dark:border-[#38383A]">
+            <button type="button" onClick={onClose} className="btn btn-outline">Close</button>
+          </div>
+        </div>
+      )}
+    </ModalWrapper>
+  )
+}
+
+export default PaymentModal

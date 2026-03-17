@@ -16,17 +16,17 @@ const AccountSettingsSection = ({ form, updateField }) => {
             <div className="flex items-center gap-3 mb-6">
                 <User className="h-6 w-6 text-primary-600" />
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Account Settings</h2>
-                    <p className="text-sm text-gray-500">Manage account preferences and regional settings</p>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Account Settings</h2>
+                    <p className="text-sm text-gray-500 dark:text-[#8E8E93]">Manage account preferences and regional settings</p>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Timezone */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
                     <div className="flex items-center gap-2 mb-4">
-                        <Globe className="h-5 w-5 text-gray-600" />
-                        <h3 className="text-sm font-medium text-gray-900">Timezone</h3>
+                        <Globe className="h-5 w-5 text-gray-600 dark:text-[#8E8E93]" />
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Timezone</h3>
                     </div>
                     <select
                         className="input"
@@ -39,16 +39,16 @@ const AccountSettingsSection = ({ form, updateField }) => {
                             </option>
                         ))}
                     </select>
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-2">
                         Affects attendance, exams, and report timestamps
                     </p>
                 </div>
 
                 {/* Date Format */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
                     <div className="flex items-center gap-2 mb-4">
-                        <Calendar className="h-5 w-5 text-gray-600" />
-                        <h3 className="text-sm font-medium text-gray-900">Date Format</h3>
+                        <Calendar className="h-5 w-5 text-gray-600 dark:text-[#8E8E93]" />
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Date Format</h3>
                     </div>
                     <select
                         className="input"
@@ -59,19 +59,19 @@ const AccountSettingsSection = ({ form, updateField }) => {
                         <option value="MM/DD/YYYY">MM/DD/YYYY (12/31/2024)</option>
                         <option value="YYYY-MM-DD">YYYY-MM-DD (2024-12-31)</option>
                     </select>
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-2">
                         How dates are displayed throughout the system
                     </p>
                 </div>
 
                 {/* Time Format */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
                     <div className="flex items-center gap-2 mb-4">
-                        <Clock className="h-5 w-5 text-gray-600" />
-                        <h3 className="text-sm font-medium text-gray-900">Time Format</h3>
+                        <Clock className="h-5 w-5 text-gray-600 dark:text-[#8E8E93]" />
+                        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Time Format</h3>
                     </div>
                     <div className="space-y-3">
-                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-primary-500 transition-colors">
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-[#38383A] rounded-lg cursor-pointer hover:border-primary-500 transition-colors">
                             <input
                                 type="radio"
                                 name="timeFormat"
@@ -81,11 +81,11 @@ const AccountSettingsSection = ({ form, updateField }) => {
                                 className="text-primary-600 focus:ring-primary-500"
                             />
                             <div>
-                                <p className="text-sm font-medium text-gray-900">12-hour</p>
-                                <p className="text-xs text-gray-500">2:30 PM</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">12-hour</p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">2:30 PM</p>
                             </div>
                         </label>
-                        <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-primary-500 transition-colors">
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-[#38383A] rounded-lg cursor-pointer hover:border-primary-500 transition-colors">
                             <input
                                 type="radio"
                                 name="timeFormat"
@@ -95,16 +95,16 @@ const AccountSettingsSection = ({ form, updateField }) => {
                                 className="text-primary-600 focus:ring-primary-500"
                             />
                             <div>
-                                <p className="text-sm font-medium text-gray-900">24-hour</p>
-                                <p className="text-xs text-gray-500">14:30</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">24-hour</p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">14:30</p>
                             </div>
                         </label>
                     </div>
                 </div>
 
                 {/* Currency (from existing settings) */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-sm font-medium text-gray-900 mb-4">Currency</h3>
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">Currency</h3>
                     <div className="space-y-3">
                         <div>
                             <label className="label">Default Currency</label>
@@ -140,14 +140,14 @@ const AccountSettingsSection = ({ form, updateField }) => {
                             </select>
                         </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-2">
                         Currency affects all fee displays and reports
                     </p>
                 </div>
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-                <p className="text-sm text-yellow-800">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">
                     <strong>Important:</strong> Changing timezone or date format affects how data is displayed system-wide. Existing records are not modified.
                 </p>
             </div>

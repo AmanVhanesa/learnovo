@@ -1,2959 +1,933 @@
-import React, { useState, useEffect } from 'react'
-import { DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar, Users, FileText, Search, X, Plus, Receipt, Settings, Printer, History, Edit, Trash2, Eye } from 'lucide-react'
-import { feesReportsService, invoicesService, paymentsService, feeStructuresService } from '../services/feesService'
-import { studentsService } from '../services/studentsService'
+import React, { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar,
+  Users, FileText, Search, X, Plus, Receipt, Settings, History,
+  Edit, Trash2, Eye, Printer, RotateCcw, Check, Ban, List,
+  ArrowUpRight, ArrowDownRight, Download, ChevronDown, ChevronUp,
+  Copy
+} from 'lucide-react'
+import {
+  feesReportsService, invoicesService, paymentsService, feeStructuresService, refundsService, discountsService
+} from '../services/feesService'
 import { academicSessionsService, classesService } from '../services/academicsService'
 import { useAuth } from '../contexts/AuthContext'
+import { formatCurrency } from '../utils/formatCurrency'
+import { sortByRelevance } from '../utils/searchRelevance'
+import { buildReceiptHtml, downloadReceiptAsPdf } from '../utils/receiptHelpers'
 import toast from 'react-hot-toast'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
-const SERVER_URL = API_BASE.replace(/\/api\/?$/, '')
-
-// Edit Invoice Modal
+// Shared UI
+import LoadingSpinner from '../components/LoadingSpinner'
+import EmptyState from '../components/EmptyState'
+import StatusBadge from '../components/StatusBadge'
 import EditInvoiceModal from '../components/EditInvoiceModal'
 
+// Fees sub-components
+import StudentSearch from '../components/fees/StudentSearch'
+import FeeStructureModal from '../components/fees/FeeStructureModal'
+import IndividualInvoiceModal from '../components/fees/IndividualInvoiceModal'
+import BulkInvoiceForm from '../components/fees/BulkInvoiceForm'
+import BulkDeleteInvoiceForm from '../components/fees/BulkDeleteInvoiceForm'
+import PaymentModal from '../components/fees/PaymentModal'
+import AllInvoicesTab from '../components/fees/AllInvoicesTab'
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+
+const TABS = [
+  { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
+  { id: 'allInvoices', label: 'All Invoices', icon: List },
+  { id: 'feeStructure', label: 'Fee Structure', icon: Settings },
+  { id: 'invoices', label: 'Generate Invoices', icon: Receipt },
+  { id: 'collect', label: 'Collect Payment', icon: DollarSign },
+  { id: 'defaulters', label: 'Defaulters', icon: AlertCircle },
+  { id: 'receipts', label: 'Receipts', icon: FileText },
+  { id: 'refunds', label: 'Refunds', icon: RotateCcw },
+  { id: 'disputes', label: 'Disputes & Alerts', icon: AlertTriangle },
+  { id: 'reports', label: 'Reports', icon: History },
+]
+
 const FeesFinance = () => {
-    const { user } = useAuth()
-    const [activeTab, setActiveTab] = useState('dashboard')
-    const [isLoading, setIsLoading] = useState(true)
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState('dashboard')
 
-    // Dashboard state
-    const [dashboardData, setDashboardData] = useState(null)
-    const [activeSession, setActiveSession] = useState(null)
+  const [showFeeStructureModal, setShowFeeStructureModal] = useState(false)
+  const [editingFeeStructure, setEditingFeeStructure] = useState(null)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState(null)
+  const [studentInvoices, setStudentInvoices] = useState([])
+  const [studentPayments, setStudentPayments] = useState([])
+  const [editingInvoice, setEditingInvoice] = useState(null)
+  const [receiptFilters, setReceiptFilters] = useState({ search: '', paymentMethod: '', startDate: '', endDate: '' })
+  const [resolvingDispute, setResolvingDispute] = useState(null)
+  const [resolveForm, setResolveForm] = useState({ action: 'APPROVE', note: '' })
 
-    // Fee Structure state
-    const [feeStructures, setFeeStructures] = useState([])
-    const [showFeeStructureModal, setShowFeeStructureModal] = useState(false)
-    const [editingFeeStructure, setEditingFeeStructure] = useState(null)
+  // ── Queries ──
 
-    // Invoice Generation state
-    const [classes, setClasses] = useState([])
-    const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const { data: activeSession, isLoading } = useQuery({
+    queryKey: ['fees-active-session'],
+    queryFn: async () => { const res = await academicSessionsService.getActive(); return res.data },
+  })
 
-    // Payment collection state
-    const [showPaymentModal, setShowPaymentModal] = useState(false)
-    const [selectedStudent, setSelectedStudent] = useState(null)
-    const [studentInvoices, setStudentInvoices] = useState([])
-    const [studentPayments, setStudentPayments] = useState([])
+  const { data: dashboardData } = useQuery({
+    queryKey: ['fees-dashboard', activeSession?._id],
+    queryFn: async () => { const res = await feesReportsService.getDashboard({ academicSessionId: activeSession?._id }); return res.data },
+    enabled: !!activeSession && (activeTab === 'dashboard' || activeTab === 'collect'),
+  })
 
-    // Defaulters state
-    const [defaulters, setDefaulters] = useState([])
+  const { data: feeStructures = [] } = useQuery({
+    queryKey: ['fee-structures', activeSession?._id],
+    queryFn: async () => { const res = await feeStructuresService.list({ academicSessionId: activeSession?._id }); return res.data || [] },
+    enabled: !!activeSession && (activeTab === 'feeStructure' || activeTab === 'invoices'),
+  })
 
-    // Editing state
-    const [editingInvoice, setEditingInvoice] = useState(null)
+  const { data: classes = [] } = useQuery({
+    queryKey: ['fees-classes'],
+    queryFn: async () => { const res = await classesService.list(); return res.data || [] },
+    enabled: !!activeSession && (activeTab === 'feeStructure' || activeTab === 'invoices'),
+  })
 
-    // Reports state
-    const [collectionReport, setCollectionReport] = useState(null)
+  const { data: defaulters = [], isLoading: defaultersLoading } = useQuery({
+    queryKey: ['fees-defaulters', activeSession?._id],
+    queryFn: async () => { const res = await feesReportsService.getDefaulters({ academicSessionId: activeSession?._id }); return res.data || [] },
+    enabled: !!activeSession && activeTab === 'defaulters',
+  })
 
-    // Receipts tab state
-    const [allReceipts, setAllReceipts] = useState([])
-    const [receiptsLoading, setReceiptsLoading] = useState(false)
-    const [receiptFilters, setReceiptFilters] = useState({
-        search: '',
-        paymentMethod: '',
-        startDate: '',
-        endDate: ''
-    })
+  const { data: collectionReport } = useQuery({
+    queryKey: ['fees-collection-report'],
+    queryFn: async () => {
+      const endDate = new Date(); const startDate = new Date(); startDate.setDate(1)
+      const res = await feesReportsService.getCollectionReport({ startDate: startDate.toISOString().split('T')[0], endDate: endDate.toISOString().split('T')[0] })
+      return res.data
+    },
+    enabled: !!activeSession && activeTab === 'reports',
+  })
 
-    // Disputes tab state
-    const [disputesData, setDisputesData] = useState({ disputes: [], stuckPayments: [] })
-    const [disputesLoading, setDisputesLoading] = useState(false)
-    const [resolvingDispute, setResolvingDispute] = useState(null)
-    const [resolveForm, setResolveForm] = useState({ action: 'APPROVE', note: '' })
+  const { data: allReceipts = [], isLoading: receiptsLoading } = useQuery({
+    queryKey: ['fees-receipts', receiptFilters.paymentMethod, receiptFilters.startDate, receiptFilters.endDate, receiptFilters.search],
+    queryFn: async () => {
+      const params = {}
+      if (receiptFilters.paymentMethod) params.paymentMethod = receiptFilters.paymentMethod
+      if (receiptFilters.startDate) params.startDate = receiptFilters.startDate
+      if (receiptFilters.endDate) params.endDate = receiptFilters.endDate
+      const res = await paymentsService.list(params)
+      let data = res.data || []
+      if (receiptFilters.search) {
+        const q = receiptFilters.search.toLowerCase()
+        data = data.filter(p =>
+          (p.studentId?.name || '').toLowerCase().includes(q) ||
+          (p.studentId?.fullName || '').toLowerCase().includes(q) ||
+          (p.receiptNumber || '').toLowerCase().includes(q) ||
+          (p.studentId?.admissionNumber || '').toLowerCase().includes(q) ||
+          (p.studentId?.studentId || '').toLowerCase().includes(q)
+        )
+        data = sortByRelevance(data, receiptFilters.search, [
+          { key: 'studentId.admissionNumber', weight: 1.5 },
+          { key: 'studentId.studentId', weight: 1.5 },
+          { key: 'receiptNumber', weight: 1.2 },
+          { key: 'studentId.fullName', weight: 1 },
+          { key: 'studentId.name', weight: 1 },
+        ])
+      }
+      return data
+    },
+    enabled: !!activeSession && activeTab === 'receipts',
+  })
 
-    useEffect(() => {
-        fetchActiveSession()
-    }, [])
+  const { data: disputesData = { disputes: [], stuckPayments: [] }, isLoading: disputesLoading } = useQuery({
+    queryKey: ['fees-disputes'],
+    queryFn: async () => {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${API_BASE}/admin-disputes`, { headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json()
+      return json.success ? json.data : { disputes: [], stuckPayments: [] }
+    },
+    enabled: !!activeSession && activeTab === 'disputes',
+  })
 
-    useEffect(() => {
-        if (activeSession) {
-            if (activeTab === 'dashboard') {
-                fetchDashboard()
-            } else if (activeTab === 'feeStructure') {
-                fetchFeeStructures()
-                fetchClasses()
-            } else if (activeTab === 'invoices') {
-                fetchFeeStructures()
-                fetchClasses()
-            } else if (activeTab === 'defaulters') {
-                fetchDefaulters()
-            } else if (activeTab === 'reports') {
-                fetchCollectionReport()
-            } else if (activeTab === 'receipts') {
-                fetchReceipts({})
-            } else if (activeTab === 'disputes') {
-                fetchDisputes()
-            }
-        }
-    }, [activeTab, activeSession])
+  // ── Actions ──
 
-    const fetchActiveSession = async () => {
-        try {
-            const res = await academicSessionsService.getActive()
-            setActiveSession(res.data)
-        } catch (error) {
-            console.error('Fetch session error:', error)
-        } finally {
-            setIsLoading(false)
-        }
-    }
+  const resolveDisputeMutation = useMutation({
+    mutationFn: async (disputeId) => {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${API_BASE}/admin-disputes/${disputeId}/resolve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ resolutionAction: resolveForm.action, adminNote: resolveForm.note }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.message || 'Failed')
+      return json
+    },
+    onSuccess: () => {
+      toast.success(`Dispute ${resolveForm.action === 'APPROVE' ? 'approved' : 'rejected'}`)
+      setResolvingDispute(null); setResolveForm({ action: 'APPROVE', note: '' })
+      queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })
+    },
+    onError: (error) => toast.error(error.message),
+  })
 
-    const fetchFeeStructures = async () => {
-        try {
-            const res = await feeStructuresService.list({
-                academicSessionId: activeSession?._id
-            })
-            setFeeStructures(res.data || [])
-        } catch (error) {
-            console.error('Fee structures error:', error)
-            setFeeStructures([])
-        }
-    }
+  const handleResolveDispute = (disputeId) => {
+    if (!resolveForm.note.trim()) { toast.error('Please add a note'); return }
+    resolveDisputeMutation.mutate(disputeId)
+  }
 
-    const fetchClasses = async () => {
-        try {
-            const res = await classesService.list()
-            setClasses(res.data || [])
-        } catch (error) {
-            console.error('Classes error:', error)
-            setClasses([])
-        }
-    }
+  const deleteInvoiceMutation = useMutation({
+    mutationFn: (id) => invoicesService.delete(id),
+    onSuccess: () => { toast.success('Invoice deleted'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) },
+    onError: (error) => toast.error(error.response?.data?.message || 'Failed to delete invoice'),
+  })
 
-    const fetchDashboard = async () => {
-        try {
-            const res = await feesReportsService.getDashboard({
-                academicSessionId: activeSession?._id
-            })
-            setDashboardData(res.data)
-        } catch (error) {
-            console.error('Dashboard error:', error)
-            setDashboardData({
-                summary: {
-                    totalCollected: 0,
-                    totalPending: 0,
-                    totalOverdue: 0,
-                    thisMonthCollection: 0
-                },
-                recentPayments: [],
-                paymentMethodBreakdown: []
-            })
-        }
-    }
+  const handleDeleteInvoice = (id) => {
+    if (!window.confirm('Delete this invoice? This cannot be undone.')) return
+    deleteInvoiceMutation.mutate(id)
+  }
 
-    const fetchDefaulters = async () => {
-        try {
-            const res = await feesReportsService.getDefaulters({
-                academicSessionId: activeSession?._id
-            })
-            setDefaulters(res.data || [])
-        } catch (error) {
-            console.error('Defaulters error:', error)
-            setDefaulters([])
-        }
-    }
+  const handleSelectStudent = async (student) => {
+    setSelectedStudent(student)
+    try {
+      const res = await invoicesService.getStudentInvoices(student._id)
+      setStudentInvoices((res.data || []).filter(inv => ['Pending', 'Partial', 'Overdue'].includes(inv.status)))
+      const paymentsRes = await paymentsService.list({ studentId: student._id })
+      setStudentPayments(paymentsRes.data || [])
+      setShowPaymentModal(true)
+    } catch { toast.error('Failed to load student data') }
+  }
 
-    const fetchCollectionReport = async () => {
-        try {
-            const endDate = new Date()
-            const startDate = new Date()
-            startDate.setDate(1)
+  // ── Receipt handlers ──
 
-            const res = await feesReportsService.getCollectionReport({
-                startDate: startDate.toISOString().split('T')[0],
-                endDate: endDate.toISOString().split('T')[0]
-            })
-            setCollectionReport(res.data)
-        } catch (error) {
-            console.error('Collection report error:', error)
-            setCollectionReport({
-                summary: { totalAmount: 0, totalCount: 0 },
-                byDate: []
-            })
-        }
-    }
+  const handleViewReceiptPdf = async (paymentId) => {
+    try {
+      const toastId = toast.loading('Opening PDF...')
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE}/invoices/payments/${paymentId}/receipt/pdf`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!response.ok) throw new Error('Failed')
+      const blob = await response.blob(); toast.dismiss(toastId)
+      const url = URL.createObjectURL(blob); window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+    } catch { toast.error('Failed to open receipt') }
+  }
 
-    const fetchReceipts = async (filters = {}) => {
-        setReceiptsLoading(true)
-        try {
-            const params = {}
-            if (filters.paymentMethod) params.paymentMethod = filters.paymentMethod
-            if (filters.startDate) params.startDate = filters.startDate
-            if (filters.endDate) params.endDate = filters.endDate
-            const res = await paymentsService.list(params)
-            let data = res.data || []
-            // Client-side text search across student name, receipt number, admission number
-            if (filters.search) {
-                const q = filters.search.toLowerCase()
-                data = data.filter(p =>
-                    (p.studentId?.name || '').toLowerCase().includes(q) ||
-                    (p.studentId?.fullName || '').toLowerCase().includes(q) ||
-                    (p.receiptNumber || '').toLowerCase().includes(q) ||
-                    (p.studentId?.admissionNumber || '').toLowerCase().includes(q) ||
-                    (p.studentId?.studentId || '').toLowerCase().includes(q)
-                )
-            }
-            setAllReceipts(data)
-        } catch (error) {
-            console.error('Fetch receipts error:', error)
-            setAllReceipts([])
-        } finally {
-            setReceiptsLoading(false)
-        }
-    }
+  const handleDownloadReceiptPdf = async (paymentId) => {
+    try {
+      const toastId = toast.loading('Generating PDF...')
+      const response = await paymentsService.getReceipt(paymentId)
+      const { payment, school } = response.data
+      await downloadReceiptAsPdf(payment, school)
+      toast.dismiss(toastId)
+      toast.success('Receipt downloaded!')
+    } catch { toast.error('Failed to download receipt') }
+  }
 
-    const fetchDisputes = async () => {
-        setDisputesLoading(true)
-        try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${API_BASE}/admin-disputes`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            const json = await res.json()
-            if (json.success) {
-                setDisputesData(json.data)
-            }
-        } catch (error) {
-            console.error('Fetch disputes error:', error)
-        } finally {
-            setDisputesLoading(false)
-        }
-    }
+  const handlePrintReceipt = async (paymentId) => {
+    try {
+      const toastId = toast.loading('Generating receipt...')
+      const response = await paymentsService.getReceipt(paymentId)
+      const { payment, school } = response.data; toast.dismiss(toastId)
+      const html = buildReceiptHtml(payment, school)
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const win = window.open(url, '_blank')
+      if (!win) {
+        const a = document.createElement('a'); a.href = url; a.download = `Receipt-${payment.receiptNumber}.html`
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        toast.success('Receipt downloaded!')
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 120000)
+    } catch { toast.error('Failed to load receipt') }
+  }
 
-    const handleResolveDispute = async (disputeId) => {
-        if (!resolveForm.note.trim()) {
-            toast.error('Please add a note before resolving')
-            return
-        }
-        try {
-            const token = localStorage.getItem('token')
-            const res = await fetch(`${API_BASE}/admin-disputes/${disputeId}/resolve`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    resolutionAction: resolveForm.action,
-                    adminNote: resolveForm.note
-                })
-            })
-            const json = await res.json()
-            if (json.success) {
-                toast.success(`Dispute ${resolveForm.action === 'APPROVE' ? 'approved' : 'rejected'} successfully`)
-                setResolvingDispute(null)
-                setResolveForm({ action: 'APPROVE', note: '' })
-                fetchDisputes()
-            } else {
-                toast.error(json.message || 'Failed to resolve dispute')
-            }
-        } catch (error) {
-            console.error('Resolve dispute error:', error)
-            toast.error('Failed to resolve dispute')
-        }
-    }
+  // ── Early returns ──
 
-    const handleDeleteInvoice = async (invoiceId) => {
-        if (!window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) return
-        try {
-            await invoicesService.delete(invoiceId)
-            toast.success('Invoice deleted successfully')
-            fetchDashboard()
-        } catch (error) {
-            console.error('Delete error:', error)
-            toast.error(error.response?.data?.message || 'Failed to delete invoice')
-        }
-    }
+  if (isLoading) return <LoadingSpinner size="lg" />
+  if (!activeSession) return <EmptyState icon={Calendar} title="No active academic session" description="Please activate an academic session first" />
 
-    const handleSelectStudent = async (student) => {
-        setSelectedStudent(student)
+  // ── Render ──
 
-        try {
-            const res = await invoicesService.getStudentInvoices(student._id)
-            const pendingInvoices = (res.data || []).filter(inv =>
-                inv.status === 'Pending' || inv.status === 'Partial' || inv.status === 'Overdue'
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Fees & Finance</h1>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Academic Session: {activeSession.name}</p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto scrollbar-none">
+        <nav className="-mb-px flex space-x-1 sm:space-x-2 whitespace-nowrap px-1">
+          {TABS.map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeTab === tab.id
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`py-3 px-3 border-b-2 font-medium text-sm flex items-center gap-1.5 transition-all whitespace-nowrap rounded-t-lg ${isActive ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50/50 dark:bg-primary-900/10' : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300 dark:hover:border-[#38383A]'}`}>
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
             )
-            setStudentInvoices(pendingInvoices)
-
-            // Fetch payment history
-            const paymentsRes = await paymentsService.list({ studentId: student._id })
-            setStudentPayments(paymentsRes.data || [])
-
-            setShowPaymentModal(true)
-        } catch (error) {
-            console.error('Fetch data error:', error)
-            toast.error('Failed to load student data')
-        }
-    }
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            minimumFractionDigits: 0
-        }).format(amount || 0)
-    }
-
-
-    // ─── Receipt helpers ────────────────────────────────────────────────────
-    const getReceiptData = async (paymentId) => {
-        const response = await paymentsService.getReceipt(paymentId)
-        return response.data
-    }
-
-    const buildReceiptHtml = (payment, school) => {
-        const getLogoUrl = (url) => {
-            if (!url) return null
-            const fullUrl = url.startsWith('http') ? url : `${SERVER_URL}${url}`
-            return encodeURI(fullUrl)
-        }
-        const logoUrl = getLogoUrl(school.logo)
-        const signatureUrl = getLogoUrl(school.principalSignature)
-
-        const studentName = payment.studentId?.name || payment.studentId?.fullName || 'N/A'
-        const studentAdmNo = payment.studentId?.admissionNumber || payment.studentId?.studentId || '-'
-        const studentClass = payment.studentId?.classId?.name || payment.studentId?.class || '-'
-        const studentSection = payment.studentId?.section || ''
-
-        return `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Receipt #${payment.receiptNumber}</title>
-                <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-                <meta charset="UTF-8">
-                <style>
-                    * { box-sizing: border-box; }
-                    body { font-family: 'Inter', sans-serif; padding: 0; margin: 0; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .container { max-width: 420px; margin: 0 auto; padding: 20px; }
-
-                    .header { display: flex; align-items: center; gap: 10px; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px; }
-                    .logo-container { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 6px; flex-shrink: 0; }
-                    .logo { max-width: 100%; max-height: 100%; object-fit: contain; }
-                    .school-info { flex: 1; min-width: 0; }
-                    .school-name { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin-bottom: 3px; letter-spacing: -0.3px; line-height: 1.2; }
-                    .school-details { font-size: 8px; color: #64748b; line-height: 1.3; }
-
-                    .receipt-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #f1f5f9; padding: 6px 10px; border-radius: 4px; border-left: 2px solid #2563eb; }
-                    .receipt-title { font-size: 11px; font-weight: 700; color: #2563eb; text-transform: uppercase; }
-                    .receipt-number { font-size: 9px; font-weight: 600; color: #475569; }
-
-                    .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-                    .section-title { font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
-                    .info-row { display: flex; margin-bottom: 4px; }
-                    .label { width: 70px; font-size: 8px; font-weight: 500; color: #64748b; }
-                    .value { flex: 1; font-size: 9px; font-weight: 600; color: #0f172a; }
-
-                    .amount-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px; text-align: center; margin-bottom: 20px; }
-                    .amount-label { font-size: 8px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-                    .amount-value { font-size: 20px; font-weight: 800; color: #1e40af; }
-
-                    /* Signatures — flex-end ensures both sig-lines are always flush at bottom */
-                    .signatures { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; padding: 0 10px; }
-                    .sig-block { text-align: center; display: flex; flex-direction: column; align-items: center; }
-                    /* Fixed-height space above line — same for both sides regardless of image */
-                    .sig-space { width: 120px; height: 56px; }
-                    .sig-image { width: 120px; height: 56px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 0; }
-                    .sig-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
-                    .sig-line { width: 120px; border-top: 1.5px solid #64748b; margin-top: 0; }
-                    .sig-text { font-size: 8px; font-weight: 600; color: #475569; margin-top: 4px; }
-
-                    .footer { margin-top: 16px; text-align: center; font-size: 7px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-
-                    /* Toolbar — hidden on print */
-                    @media print {
-                        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                        @page { size: A5; margin: 10mm; }
-                        .container { padding: 0; max-width: 100%; }
-                        .toolbar { display: none !important; }
-                        .page-body { padding-top: 0 !important; }
-                    }
-                    .toolbar {
-                        position: fixed; top: 0; left: 0; right: 0;
-                        background: #1e293b; color: white;
-                        padding: 10px 20px; display: flex; gap: 10px; align-items: center;
-                        z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                        font-family: 'Inter', sans-serif;
-                    }
-                    .toolbar-title { flex: 1; font-size: 13px; font-weight: 600; }
-                    .btn { padding: 7px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; font-family: 'Inter', sans-serif; transition: opacity 0.2s; }
-                    .btn:hover { opacity: 0.85; }
-                    .btn-print { background: #3b82f6; color: white; }
-                    .btn-close { background: #64748b; color: white; }
-                    .page-body { padding-top: 54px; }
-                </style>
-            </head>
-            <body>
-                <div class="toolbar">
-                    <span class="toolbar-title">📄 Receipt #${payment.receiptNumber}</span>
-                    <button class="btn btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
-                    <button class="btn btn-close" onclick="window.close()">✕ Close</button>
-                </div>
-                <div class="page-body">
-                <div class="container">
-                    <div class="header">
-                        <div class="logo-container">
-                            ${logoUrl ? `<img src="${logoUrl}" class="logo">` : '<span style="font-size: 30px; color: #cbd5e1;">🏫</span>'}
-                        </div>
-                        <div class="school-info">
-                            <div class="school-name">${school.schoolName}</div>
-                            <div class="school-details">${school.fullAddress || school.address?.city || ''}</div>
-                            <div class="school-details">Ph: ${school.phone || '-'} | ${school.email}</div>
-                            <div class="school-details">School Code: ${school.schoolCode || '-'} | UDISE: ${school.udiseCode || '-'}</div>
-                        </div>
-                    </div>
-
-                    <div class="receipt-meta">
-                        <div class="receipt-title">Payment Receipt</div>
-                        <div class="receipt-number">#${payment.receiptNumber}</div>
-                    </div>
-
-                    <div class="grid-container">
-                        <div class="info-column">
-                            <div class="section-title">Details</div>
-                            <div class="info-row"><div class="label">Date</div><div class="value">${new Date(payment.paymentDate).toLocaleDateString('en-IN')}</div></div>
-                            <div class="info-row"><div class="label">Mode</div><div class="value">${payment.paymentMethod}</div></div>
-                            ${payment.transactionDetails?.referenceNumber ? `<div class="info-row"><div class="label">Ref. No</div><div class="value">${payment.transactionDetails.referenceNumber}</div></div>` : ''}
-                            ${payment.invoiceId?.billingPeriod?.displayText ? `<div class="info-row"><div class="label">Period</div><div class="value" style="color: #2563eb; font-weight: 600;">${payment.invoiceId.billingPeriod.displayText}</div></div>` : ''}
-                            <div class="info-row"><div class="label">Status</div><div class="value" style="color: #16a34a">Paid</div></div>
-                        </div>
-                        <div class="info-column">
-                            <div class="section-title">Student</div>
-                            <div class="info-row"><div class="label">Name</div><div class="value">${studentName}</div></div>
-                            <div class="info-row"><div class="label">Adm. No</div><div class="value">${studentAdmNo}</div></div>
-                            <div class="info-row"><div class="label">Class</div><div class="value">${studentClass}${studentSection ? ` (${studentSection})` : ''}</div></div>
-                        </div>
-                    </div>
-
-                    <div class="amount-section">
-                        <div class="amount-label">Total Amount Paid</div>
-                        <div class="amount-value">₹${payment.amount.toLocaleString('en-IN')}</div>
-                    </div>
-
-                    <div class="signatures">
-                        <div class="sig-block">
-                            <div class="sig-space"></div>
-                            <div class="sig-line"></div>
-                            <div class="sig-text">Depositor</div>
-                        </div>
-                        <div class="sig-block">
-                            ${signatureUrl
-                ? `<div class="sig-image"><img src="${signatureUrl}" alt="Principal Signature" /></div>`
-                : '<div class="sig-space"></div>'
-            }
-                            <div class="sig-line"></div>
-                            <div class="sig-text">Authorized</div>
-                        </div>
-                    </div>
-
-                    <div class="footer">
-                        <p>Computer-generated receipt. Valid without physical signature.</p>
-                    </div>
-                </div>
-                </div>
-            </body>
-            </html>
-        `
-    }
-
-    // View receipt in new tab (without downloading)
-    const handleViewReceiptPdf = async (paymentId) => {
-        try {
-            const toastId = toast.loading('Opening PDF receipt...')
-            const token = localStorage.getItem('token')
-            const url = `${API_BASE}/invoices/payments/${paymentId}/receipt/pdf`
-            const response = await fetch(url, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (!response.ok) throw new Error(`PDF generation failed (${response.status})`)
-            const blob = await response.blob()
-            toast.dismiss(toastId)
-            const blobUrl = URL.createObjectURL(blob)
-            window.open(blobUrl, '_blank')
-            // Revoke after a delay to ensure it loads in the new tab first
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
-        } catch (error) {
-            console.error('View receipt PDF error:', error)
-            toast.error('Failed to open receipt')
-        }
-    }
-
-    // Download receipt as a proper PDF (works on all devices including iPad)
-    const handleDownloadReceiptPdf = async (paymentId) => {
-        try {
-            const toastId = toast.loading('Generating PDF receipt...')
-            const token = localStorage.getItem('token')
-            // API_BASE already includes /api so we do NOT add it again
-            const url = `${API_BASE}/invoices/payments/${paymentId}/receipt/pdf`
-            const response = await fetch(url, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            if (!response.ok) throw new Error(`PDF generation failed (${response.status})`)
-            const blob = await response.blob()
-            toast.dismiss(toastId)
-            const blobUrl = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = blobUrl
-            a.download = `Receipt-${paymentId}.pdf`
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
-            toast.success('Receipt downloaded!')
-        } catch (error) {
-            console.error('Download receipt PDF error:', error)
-            toast.error('Failed to download receipt')
-        }
-    }
-
-    // Keep old name as alias so other call-sites still work
-    const handlePrintReceipt = async (paymentId) => {
-        try {
-            const toastId = toast.loading('Generating receipt...')
-            const response = await paymentsService.getReceipt(paymentId)
-            const { payment, school } = response.data
-
-            toast.dismiss(toastId)
-
-            // Helper to get full Logo URL
-            const getLogoUrl = (url) => {
-                if (!url) return null
-                let fullUrl = url
-                if (!url.startsWith('http')) {
-                    fullUrl = `${SERVER_URL}${url}`
-                }
-                return encodeURI(fullUrl)
-            }
-            const logoUrl = getLogoUrl(school.logo)
-            const signatureUrl = getLogoUrl(school.principalSignature)
-
-            // Resolve student name from all possible fields
-            const studentName = payment.studentId?.name || payment.studentId?.fullName || 'N/A'
-            const studentAdmNo = payment.studentId?.admissionNumber || payment.studentId?.studentId || '-'
-            const studentClass = payment.studentId?.classId?.name || payment.studentId?.class || '-'
-            const studentSection = payment.studentId?.section || ''
-
-            const html = `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Receipt #${payment.receiptNumber}</title>
-                    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-                    <style>
-                        body { font-family: 'Inter', sans-serif; padding: 0; margin: 0; color: #1e293b; -webkit-print-color-adjust: exact; }
-                        .container { max-width: 420px; margin: 0 auto; padding: 15px; }
-                        
-                        /* Header Section */
-                        .header { display: flex; align-items: center; gap: 10px; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 12px; }
-                        .logo-container { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: #f8fafc; border-radius: 6px; flex-shrink: 0; }
-                        .logo { max-width: 100%; max-height: 100%; object-fit: contain; }
-                        .school-info { flex: 1; min-width: 0; }
-                        .school-name { font-size: 14px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin-bottom: 3px; letter-spacing: -0.3px; line-height: 1.2; }
-                        .school-details { font-size: 8px; color: #64748b; line-height: 1.3; }
-
-                        /* Receipt Title & Meta */
-                        .receipt-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; background: #f1f5f9; padding: 6px 10px; border-radius: 4px; border-left: 2px solid #2563eb; }
-                        .receipt-title { font-size: 11px; font-weight: 700; color: #2563eb; text-transform: uppercase; }
-                        .receipt-number { font-size: 9px; font-weight: 600; color: #475569; }
-
-                        /* Info Grid */
-                        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-                        .section-title { font-size: 8px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; }
-                        .info-row { display: flex; margin-bottom: 4px; }
-                        .label { width: 70px; font-size: 8px; font-weight: 500; color: #64748b; }
-                        .value { flex: 1; font-size: 9px; font-weight: 600; color: #0f172a; }
-
-                        /* Amount Section */
-                        .amount-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 10px; text-align: center; margin-bottom: 15px; }
-                        .amount-label { font-size: 8px; font-weight: 600; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-                        .amount-value { font-size: 20px; font-weight: 800; color: #1e40af; }
-                        
-                        /* Signature Section */
-                        .signatures { display: flex; justify-content: space-between; margin-top: 15px; padding: 0 10px; }
-                        .sig-block { text-align: center; }
-                        /* Empty space above depositor line for actual signature */
-                        .sig-space { width: 110px; height: 52px; margin-bottom: 4px; display: block; }
-                        .sig-line { width: 110px; border-top: 1.5px solid #94a3b8; margin: 0 auto 4px auto; }
-                        .sig-image { width: 110px; height: 44px; margin-bottom: 4px; display: flex; align-items: flex-end; justify-content: center; }
-                        .sig-image img { max-width: 100%; max-height: 100%; object-fit: contain; }
-                        .sig-text { font-size: 8px; font-weight: 600; color: #475569; }
-
-                        .footer { margin-top: 12px; text-align: center; font-size: 7px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-                        
-                        @media print {
-                            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                            @page { size: A5; margin: 10mm; }
-                            .container { padding: 0; max-width: 100%; }
-                            .toolbar { display: none !important; }
-                            .page-body { padding-top: 0 !important; }
-                        }
-
-                        /* Toolbar */
-                        .toolbar { 
-                            position: fixed; top: 0; left: 0; right: 0; 
-                            background: #1e293b; color: white; 
-                            padding: 10px 20px; display: flex; gap: 10px; align-items: center;
-                            z-index: 999; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                            font-family: 'Inter', sans-serif;
-                        }
-                        .toolbar-title { flex: 1; font-size: 13px; font-weight: 600; }
-                        .btn { 
-                            padding: 7px 18px; border: none; border-radius: 6px; 
-                            cursor: pointer; font-size: 12px; font-weight: 600; font-family: 'Inter', sans-serif;
-                            transition: opacity 0.2s;
-                        }
-                        .btn:hover { opacity: 0.85; }
-                        .btn-print { background: #3b82f6; color: white; }
-                        .btn-close { background: #64748b; color: white; }
-                        .page-body { padding-top: 52px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="toolbar">
-                        <span class="toolbar-title">📄 Receipt #${payment.receiptNumber}</span>
-                        <button class="btn btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
-                        <button class="btn btn-close" onclick="window.close()">✕ Close</button>
-                    </div>
-                    <div class="page-body">
-                    <div class="container">
-                        <div class="header">
-                            <div class="logo-container">
-                                ${logoUrl ? `<img src="${logoUrl}" class="logo">` : '<span style="font-size: 30px; color: #cbd5e1;">🏫</span>'}
-                            </div>
-                            <div class="school-info">
-                                <div class="school-name">${school.schoolName}</div>
-                                <div class="school-details">${school.fullAddress || school.address?.city || ''}</div>
-                                <div class="school-details">Ph: ${school.phone || '-'} | ${school.email}</div>
-                                <div class="school-details">School Code: ${school.schoolCode || '-'} | UDISE: ${school.udiseCode || '-'}</div>
-                            </div>
-                        </div>
-
-                        <div class="receipt-meta">
-                            <div class="receipt-title">Payment Receipt</div>
-                            <div class="receipt-number">#${payment.receiptNumber}</div>
-                        </div>
-
-                        <div class="grid-container">
-                            <div class="info-column">
-                                <div class="section-title">Details</div>
-                                <div class="info-row"><div class="label">Date</div><div class="value">${new Date(payment.paymentDate).toLocaleDateString('en-IN')}</div></div>
-                                <div class="info-row"><div class="label">Mode</div><div class="value">${payment.paymentMethod}</div></div>
-                                ${payment.transactionDetails?.referenceNumber ? `<div class="info-row"><div class="label">Ref. No</div><div class="value">${payment.transactionDetails.referenceNumber}</div></div>` : ''}
-                                ${payment.invoiceId?.billingPeriod?.displayText ? `<div class="info-row"><div class="label">Period</div><div class="value" style="color: #2563eb; font-weight: 600;">${payment.invoiceId.billingPeriod.displayText}</div></div>` : ''}
-                                <div class="info-row"><div class="label">Status</div><div class="value" style="color: #16a34a">Paid</div></div>
-                            </div>
-                            <div class="info-column">
-                                <div class="section-title">Student</div>
-                                <div class="info-row"><div class="label">Name</div><div class="value">${studentName}</div></div>
-                                <div class="info-row"><div class="label">Adm. No</div><div class="value">${studentAdmNo}</div></div>
-                                <div class="info-row"><div class="label">Class</div><div class="value">${studentClass}${studentSection ? ` (${studentSection})` : ''}</div></div>
-                            </div>
-                        </div>
-
-                        <div class="amount-section">
-                            <div class="amount-label">Total Amount Paid</div>
-                            <div class="amount-value">₹${payment.amount.toLocaleString('en-IN')}</div>
-                        </div>
-
-                        <div class="signatures">
-                            <div class="sig-block">
-                                <div class="sig-space"></div>
-                                <div class="sig-line"></div>
-                                <div class="sig-text">Depositor</div>
-                            </div>
-                            <div class="sig-block">
-                                ${signatureUrl
-                    ? `<div class="sig-image"><img src="${signatureUrl}" alt="Principal Signature" /></div>`
-                    : '<div class="sig-space"></div>'
-                }
-                                <div class="sig-line"></div>
-                                <div class="sig-text">Authorized</div>
-                            </div>
-                        </div>
-
-                        <div class="footer">
-                            <p>Computer-generated receipt. Valid without physical signature.</p>
-                        </div>
-                    </div>
-                    </div>
-                </body>
-                </html>
-            `
-
-            // Use Blob URL — avoids popup blocker that triggers on window.open('')
-            const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-            const blobUrl = URL.createObjectURL(blob)
-            const receiptWindow = window.open(blobUrl, '_blank')
-
-            if (!receiptWindow) {
-                // Fallback: directly download as an HTML file the user can open & print
-                const a = document.createElement('a')
-                a.href = blobUrl
-                a.download = `Receipt-${payment.receiptNumber}.html`
-                document.body.appendChild(a)
-                a.click()
-                document.body.removeChild(a)
-                toast.success('Receipt downloaded! Open the file to print.')
-            }
-
-            // Clean up blob URL after 2 minutes
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 120000)
-        } catch (error) {
-            console.error('Receipt print error:', error)
-            toast.error('Failed to load receipt details')
-        }
-    }
-
-    const tabs = [
-        { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
-        { id: 'feeStructure', label: 'Fee Structure', icon: Settings },
-        { id: 'invoices', label: 'Generate Invoices', icon: Receipt },
-        { id: 'collect', label: 'Collect Payment', icon: DollarSign },
-        { id: 'defaulters', label: 'Defaulters', icon: AlertCircle },
-        { id: 'receipts', label: 'Receipts', icon: FileText },
-        { id: 'disputes', label: 'Disputes & Alerts', icon: AlertTriangle },
-        { id: 'reports', label: 'Reports', icon: History }
-    ]
-
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-            </div>
-        )
-    }
-
-    if (!activeSession) {
-        return (
-            <div className="text-center py-12">
-                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No active academic session found</p>
-                <p className="text-sm text-gray-400 mt-1">Please activate an academic session first</p>
-            </div>
-        )
-    }
-
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Fees & Finance</h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        Academic Session: {activeSession.name}
-                    </p>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="border-b border-gray-200">
-                <nav className="-mb-px flex space-x-8 overflow-x-auto">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors whitespace-nowrap ${activeTab === tab.id
-                                    ? 'border-primary-500 text-primary-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                    }`}
-                            >
-                                <Icon className="h-4 w-4" />
-                                {tab.label}
-                            </button>
-                        )
-                    })}
-                </nav>
-            </div>
-
-            {/* Tab Content */}
-            <div>
-                {/* DASHBOARD TAB */}
-                {activeTab === 'dashboard' && dashboardData && (
-                    <div className="space-y-6">
-                        {/* Summary Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="bg-white rounded-lg shadow-sm p-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Total Collected</p>
-                                        <p className="text-2xl font-bold text-green-600 mt-2">
-                                            {formatCurrency(dashboardData.summary.totalCollected)}
-                                        </p>
-                                    </div>
-                                    <div className="p-3 bg-green-100 rounded-full">
-                                        <TrendingUp className="h-6 w-6 text-green-600" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg shadow-sm p-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Pending Dues</p>
-                                        <p className="text-2xl font-bold text-yellow-600 mt-2">
-                                            {formatCurrency(dashboardData.summary.totalPending)}
-                                        </p>
-                                    </div>
-                                    <div className="p-3 bg-yellow-100 rounded-full">
-                                        <AlertCircle className="h-6 w-6 text-yellow-600" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg shadow-sm p-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">Overdue Amount</p>
-                                        <p className="text-2xl font-bold text-red-600 mt-2">
-                                            {formatCurrency(dashboardData.summary.totalOverdue)}
-                                        </p>
-                                    </div>
-                                    <div className="p-3 bg-red-100 rounded-full">
-                                        <AlertCircle className="h-6 w-6 text-red-600" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-white rounded-lg shadow-sm p-6">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-600">This Month</p>
-                                        <p className="text-2xl font-bold text-blue-600 mt-2">
-                                            {formatCurrency(dashboardData.summary.thisMonthCollection)}
-                                        </p>
-                                    </div>
-                                    <div className="p-3 bg-blue-100 rounded-full">
-                                        <Calendar className="h-6 w-6 text-blue-600" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Recent Payments */}
-                        {dashboardData.recentPayments && dashboardData.recentPayments.length > 0 && (
-                            <div className="bg-white rounded-lg shadow-sm p-6">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Payments</h3>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receipt No.</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {dashboardData.recentPayments.map((payment) => (
-                                                <tr key={payment._id}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-primary-600">
-                                                        {payment.receiptNumber}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-medium text-gray-900">
-                                                            {payment.studentId?.name || payment.studentId?.fullName || 'N/A'}
-                                                        </div>
-                                                        <div className="text-xs text-gray-500">
-                                                            {payment.studentId?.admissionNumber || payment.studentId?.studentId || ''}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                                                        {formatCurrency(payment.amount)}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
-                                                            {payment.paymentMethod}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {new Date(payment.paymentDate).toLocaleDateString()}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <div className="flex justify-end items-center">
-                                                            <button
-                                                                onClick={() => handlePrintReceipt(payment._id)}
-                                                                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors mr-2"
-                                                                title="View Receipt"
-                                                            >
-                                                                <Eye className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDownloadReceiptPdf(payment._id)}
-                                                                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors"
-                                                                title="Download Receipt as PDF"
-                                                            >
-                                                                <FileText className="h-4 w-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Recent Invoices */}
-                        {dashboardData.recentInvoices && dashboardData.recentInvoices.length > 0 && (
-                            <div className="bg-white rounded-lg shadow-sm p-6">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Invoices</h3>
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice No.</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
-                                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {dashboardData.recentInvoices.map((invoice) => (
-                                                <tr key={invoice._id}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-semibold text-primary-600">
-                                                        {invoice.invoiceNumber}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-medium text-gray-900">
-                                                            {invoice.studentId?.fullName || invoice.studentId?.name || `Student ${invoice.studentId?.admissionNumber || invoice.studentId?.studentId || ''}`}
-                                                        </div>
-                                                        <div className="text-xs text-gray-500">
-                                                            {invoice.studentId?.admissionNumber || invoice.studentId?.studentId || invoice.studentId?.phone || '-'}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                                        {invoice.classId?.name || '-'}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                                                        {formatCurrency(invoice.totalAmount)}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap">
-                                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${invoice.status === 'Paid' ? 'bg-green-100 text-green-800' :
-                                                            invoice.status === 'Partial' ? 'bg-orange-100 text-orange-800' :
-                                                                invoice.status === 'Overdue' ? 'bg-red-100 text-red-800' :
-                                                                    'bg-yellow-100 text-yellow-800'
-                                                            }`}>
-                                                            {invoice.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {new Date(invoice.dueDate).toLocaleDateString()}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <div className="flex justify-end gap-2">
-                                                            <button
-                                                                onClick={() => setEditingInvoice(invoice)}
-                                                                className="text-blue-600 hover:text-blue-900 transition-colors"
-                                                                title="Edit Invoice"
-                                                            >
-                                                                <Edit className="h-4 w-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteInvoice(invoice._id)}
-                                                                className="text-red-600 hover:text-red-900 transition-colors"
-                                                                title="Delete Invoice"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* FEE STRUCTURE TAB */}
-                {activeTab === 'feeStructure' && (
-                    <div className="bg-white rounded-lg shadow-sm p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-semibold text-gray-900">Fee Structures</h3>
-                            <button
-                                onClick={() => {
-                                    setEditingFeeStructure(null)
-                                    setShowFeeStructureModal(true)
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                            >
-                                <Plus className="h-4 w-4" />
-                                Create Fee Structure
-                            </button>
-                        </div>
-
-                        {feeStructures.length === 0 ? (
-                            <div className="text-center py-12">
-                                <Settings className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-500">No fee structures found</p>
-                                <p className="text-sm text-gray-400 mt-1">Create a fee structure to start generating invoices</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {feeStructures.map((structure) => (
-                                    <div key={structure._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <h4 className="font-semibold text-gray-900">{structure.classId?.name}</h4>
-                                                <p className="text-sm text-gray-600">{structure.sectionId?.name || 'All Sections'}</p>
-                                            </div>
-                                            <span className={`px-2 py-1 text-xs rounded-full ${structure.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                                                }`}>
-                                                {structure.isActive ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-600">Total Amount:</span>
-                                                <span className="font-semibold text-gray-900">{formatCurrency(structure.totalAmount)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-600">Fee Heads:</span>
-                                                <span className="text-gray-900">{structure.feeHeads?.length || 0}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm">
-                                                <span className="text-gray-600">Frequency:</span>
-                                                <span className="text-gray-900 capitalize">{structure.feeHeads?.[0]?.frequency || 'N/A'}</span>
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    setEditingFeeStructure(structure)
-                                                    setShowFeeStructureModal(true)
-                                                }}
-                                                className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    if (window.confirm('Delete this fee structure?')) {
-                                                        try {
-                                                            await feeStructuresService.delete(structure._id)
-                                                            toast.success('Fee structure deleted')
-                                                            fetchFeeStructures()
-                                                        } catch (error) {
-                                                            toast.error('Failed to delete fee structure')
-                                                        }
-                                                    }
-                                                }}
-                                                className="px-3 py-2 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* GENERATE INVOICES TAB */}
-                {activeTab === 'invoices' && (
-                    <div className="bg-white rounded-lg shadow-sm p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Generate Invoices</h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="border border-gray-200 rounded-lg p-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="p-3 bg-blue-100 rounded-full">
-                                        <Receipt className="h-6 w-6 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold text-gray-900">Individual Invoice</h4>
-                                        <p className="text-sm text-gray-600">Generate invoice for a single student</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowInvoiceModal(true)}
-                                    className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                                >
-                                    Generate Individual Invoice
-                                </button>
-                            </div>
-
-                            <div className="border border-gray-200 rounded-lg p-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="p-3 bg-green-100 rounded-full">
-                                        <Users className="h-6 w-6 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold text-gray-900">Bulk Invoice</h4>
-                                        <p className="text-sm text-gray-600">Generate invoices for entire class</p>
-                                    </div>
-                                </div>
-                                <BulkInvoiceForm
-                                    classes={classes}
-                                    feeStructures={feeStructures}
-                                    activeSession={activeSession}
-                                    onSuccess={() => {
-                                        toast.success('Bulk invoices generated successfully')
-                                    }}
-                                />
-                            </div>
-
-
-                            <div className="border border-red-200 bg-red-50 rounded-lg p-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="p-3 bg-red-100 rounded-full">
-                                        <Trash2 className="h-6 w-6 text-red-600" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold text-gray-900">Bulk Delete</h4>
-                                        <p className="text-sm text-gray-600">Delete pending invoices for class</p>
-                                    </div>
-                                </div>
-                                <BulkDeleteInvoiceForm
-                                    classes={classes}
-                                    activeSession={activeSession}
-                                    onSuccess={() => {
-                                        if (activeTab === 'dashboard') fetchDashboard()
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* COLLECT PAYMENT TAB */}
-                {activeTab === 'collect' && (
-                    <div className="space-y-6">
-                        {/* Header with Instructions */}
-                        <div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg p-6 border border-primary-100">
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 bg-primary-100 rounded-full">
-                                    <DollarSign className="h-6 w-6 text-primary-600" />
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Collect Fee Payment</h3>
-                                    <p className="text-sm text-gray-600 mb-3">
-                                        Search for a student by name, admission number, or phone number to view their pending invoices and collect payment.
-                                    </p>
-                                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <span className="flex items-center gap-1">
-                                            <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
-                                            Step 1: Search student
-                                        </span>
-                                        <span>→</span>
-                                        <span className="flex items-center gap-1">
-                                            <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
-                                            Step 2: Select invoice
-                                        </span>
-                                        <span>→</span>
-                                        <span className="flex items-center gap-1">
-                                            <span className="w-2 h-2 bg-primary-500 rounded-full"></span>
-                                            Step 3: Collect payment
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Summary Cards */}
-                        {dashboardData && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-600 uppercase">Pending Dues</p>
-                                            <p className="text-xl font-bold text-yellow-600 mt-1">
-                                                {formatCurrency(dashboardData.summary.totalPending)}
-                                            </p>
-                                        </div>
-                                        <div className="p-2 bg-yellow-100 rounded-lg">
-                                            <AlertCircle className="h-5 w-5 text-yellow-600" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-600 uppercase">Overdue Amount</p>
-                                            <p className="text-xl font-bold text-red-600 mt-1">
-                                                {formatCurrency(dashboardData.summary.totalOverdue)}
-                                            </p>
-                                        </div>
-                                        <div className="p-2 bg-red-100 rounded-lg">
-                                            <AlertCircle className="h-5 w-5 text-red-600" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-medium text-gray-600 uppercase">This Month</p>
-                                            <p className="text-xl font-bold text-green-600 mt-1">
-                                                {formatCurrency(dashboardData.summary.thisMonthCollection)}
-                                            </p>
-                                        </div>
-                                        <div className="p-2 bg-green-100 rounded-lg">
-                                            <TrendingUp className="h-5 w-5 text-green-600" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Student Search Section */}
-                        <div className="bg-white rounded-lg shadow-sm p-6">
-                            <h4 className="text-md font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <Search className="h-5 w-5 text-gray-500" />
-                                Search Student
-                            </h4>
-                            <StudentSearch onSelectStudent={handleSelectStudent} />
-
-                            {selectedStudent && (
-                                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <p className="text-sm font-medium text-blue-900">Selected Student:</p>
-                                    <p className="text-lg font-bold text-blue-700">{selectedStudent.name}</p>
-                                    <p className="text-sm text-blue-600">ID: {selectedStudent.studentId}</p>
-                                </div>
-                            )}
-
-                            {!selectedStudent && (
-                                <div className="mt-6 text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-                                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                                    <p className="text-gray-600 font-medium">No student selected</p>
-                                    <p className="text-sm text-gray-500 mt-1">Search and select a student to view their pending invoices</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* DEFAULTERS TAB */}
-                {activeTab === 'defaulters' && (
-                    <div className="bg-white rounded-lg shadow-sm p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-semibold text-gray-900">Fee Defaulters</h3>
-                            <span className="text-sm text-gray-600">{defaulters.length} students</span>
-                        </div>
-
-                        {defaulters.length === 0 ? (
-                            <div className="text-center py-12">
-                                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-gray-500">No defaulters found</p>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Due</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Overdue Days</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {defaulters.map((defaulter) => (
-                                            <tr key={defaulter._id}>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <div className="text-sm font-medium text-gray-900">{defaulter.studentId?.fullName || defaulter.studentId?.name || 'Unknown Student'}</div>
-                                                    <div className="text-xs text-gray-500">{defaulter.studentId?.admissionNumber || defaulter.studentId?.studentId}</div>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600">
-                                                    {formatCurrency(defaulter.totalBalance)}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${defaulter.overdueDays > 30
-                                                        ? 'bg-red-100 text-red-800'
-                                                        : 'bg-yellow-100 text-yellow-800'
-                                                        }`}>
-                                                        {defaulter.overdueDays} days
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    {defaulter.studentId?.phone || '-'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* RECEIPTS TAB */}
-                {activeTab === 'receipts' && (
-                    <div className="space-y-4">
-                        {/* Filter Bar */}
-                        <div className="bg-white rounded-lg shadow-sm p-4">
-                            <div className="flex flex-wrap gap-3 items-end">
-                                {/* Search */}
-                                <div className="flex-1 min-w-[200px]">
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Search (name / receipt no. / adm. no.)</label>
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search..."
-                                            value={receiptFilters.search}
-                                            onChange={e => {
-                                                const updated = { ...receiptFilters, search: e.target.value }
-                                                setReceiptFilters(updated)
-                                                fetchReceipts(updated)
-                                            }}
-                                            className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Payment Method */}
-                                <div className="min-w-[150px]">
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Payment Method</label>
-                                    <select
-                                        value={receiptFilters.paymentMethod}
-                                        onChange={e => {
-                                            const updated = { ...receiptFilters, paymentMethod: e.target.value }
-                                            setReceiptFilters(updated)
-                                            fetchReceipts(updated)
-                                        }}
-                                        className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
-                                    >
-                                        <option value="">All Methods</option>
-                                        <option value="Cash">Cash</option>
-                                        <option value="Online">Online</option>
-                                        <option value="Cheque">Cheque</option>
-                                        <option value="Bank Transfer">Bank Transfer</option>
-                                        <option value="UPI">UPI</option>
-                                        <option value="DD">DD</option>
-                                    </select>
-                                </div>
-
-                                {/* From Date */}
-                                <div className="min-w-[140px]">
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">From Date</label>
-                                    <input
-                                        type="date"
-                                        value={receiptFilters.startDate}
-                                        onChange={e => {
-                                            const updated = { ...receiptFilters, startDate: e.target.value }
-                                            setReceiptFilters(updated)
-                                            fetchReceipts(updated)
-                                        }}
-                                        className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
-                                    />
-                                </div>
-
-                                {/* To Date */}
-                                <div className="min-w-[140px]">
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">To Date</label>
-                                    <input
-                                        type="date"
-                                        value={receiptFilters.endDate}
-                                        onChange={e => {
-                                            const updated = { ...receiptFilters, endDate: e.target.value }
-                                            setReceiptFilters(updated)
-                                            fetchReceipts(updated)
-                                        }}
-                                        className="border border-gray-200 rounded-lg text-sm py-2 px-3 w-full focus:outline-none focus:ring-2 focus:ring-primary-300"
-                                    />
-                                </div>
-
-                                {/* Clear */}
-                                <div>
-                                    <button
-                                        onClick={() => {
-                                            const cleared = { search: '', paymentMethod: '', startDate: '', endDate: '' }
-                                            setReceiptFilters(cleared)
-                                            fetchReceipts(cleared)
-                                        }}
-                                        className="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
-                                    >
-                                        <X className="h-3.5 w-3.5" /> Clear
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Receipts Table */}
-                        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                                <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                                    <FileText className="h-4 w-4 text-primary-500" />
-                                    All Receipts
-                                    {!receiptsLoading && (
-                                        <span className="ml-1 text-xs font-normal text-gray-400">({allReceipts.length} found)</span>
-                                    )}
-                                </h3>
-                            </div>
-
-                            {receiptsLoading ? (
-                                <div className="flex justify-center items-center py-16">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                                </div>
-                            ) : allReceipts.length === 0 ? (
-                                <div className="text-center py-16">
-                                    <FileText className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 font-medium">No receipts found</p>
-                                    <p className="text-gray-400 text-sm mt-1">Try adjusting your filters</p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Receipt No.</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Student</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Class</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Method</th>
-                                                <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                                                <th className="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-100">
-                                            {allReceipts.map((payment) => (
-                                                <tr key={payment._id} className="hover:bg-gray-50 transition-colors">
-                                                    <td className="px-5 py-3 whitespace-nowrap">
-                                                        <span className="text-sm font-mono font-semibold text-primary-600">{payment.receiptNumber}</span>
-                                                    </td>
-                                                    <td className="px-5 py-3 whitespace-nowrap">
-                                                        <div className="text-sm font-medium text-gray-900">
-                                                            {payment.studentId?.name || payment.studentId?.fullName || 'N/A'}
-                                                        </div>
-                                                        <div className="text-xs text-gray-400">
-                                                            {payment.studentId?.admissionNumber || payment.studentId?.studentId || ''}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600">
-                                                        {payment.studentId?.classId?.name || payment.studentId?.class || '-'}
-                                                        {payment.studentId?.section ? ` (${payment.studentId.section})` : ''}
-                                                    </td>
-                                                    <td className="px-5 py-3 whitespace-nowrap">
-                                                        <span className="text-sm font-semibold text-green-700">{formatCurrency(payment.amount)}</span>
-                                                    </td>
-                                                    <td className="px-5 py-3 whitespace-nowrap">
-                                                        <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded font-medium">{payment.paymentMethod}</span>
-                                                    </td>
-                                                    <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-500">
-                                                        {new Date(payment.paymentDate).toLocaleDateString('en-IN')}
-                                                    </td>
-                                                    <td className="px-5 py-3 whitespace-nowrap text-right">
-                                                        <div className="flex justify-end items-center">
-                                                            <button
-                                                                onClick={() => handlePrintReceipt(payment._id)}
-                                                                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors mr-2"
-                                                                title="View Receipt"
-                                                            >
-                                                                <Eye className="h-3.5 w-3.5" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDownloadReceiptPdf(payment._id)}
-                                                                className="text-primary-600 hover:text-primary-900 p-1 rounded hover:bg-primary-50 transition-colors"
-                                                                title="Download Receipt as PDF"
-                                                            >
-                                                                <FileText className="h-3.5 w-3.5" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* DISPUTES & ALERTS TAB */}
-                {activeTab === 'disputes' && (
-                    <div className="space-y-6">
-                        {disputesLoading ? (
-                            <div className="flex justify-center py-12">
-                                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600" />
-                            </div>
-                        ) : (
-                            <>
-                                {/* Stuck Payments Alert */}
-                                {disputesData.stuckPayments?.length > 0 && (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-                                        <div className="flex items-center gap-3 mb-4">
-                                            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                                            <div>
-                                                <h3 className="text-sm font-semibold text-amber-900">Stuck Payments ({disputesData.stuckPayments.length})</h3>
-                                                <p className="text-xs text-amber-700 mt-0.5">These payments have been PENDING for more than 1 hour and may need attention.</p>
-                                            </div>
-                                        </div>
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-sm">
-                                                <thead>
-                                                    <tr className="text-left text-xs font-medium text-amber-800 uppercase tracking-wide border-b border-amber-200">
-                                                        <th className="pb-2 pr-4">Student</th>
-                                                        <th className="pb-2 pr-4">Invoice</th>
-                                                        <th className="pb-2 pr-4">Amount</th>
-                                                        <th className="pb-2">Since</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-amber-100">
-                                                    {disputesData.stuckPayments.map(p => (
-                                                        <tr key={p._id} className="py-2">
-                                                            <td className="py-2 pr-4 font-medium text-gray-900">
-                                                                {p.studentId?.fullName || p.studentId?.name || 'N/A'}
-                                                            </td>
-                                                            <td className="py-2 pr-4 text-gray-600">
-                                                                {p.invoiceId?.invoiceNumber || '-'}
-                                                            </td>
-                                                            <td className="py-2 pr-4 text-gray-800 font-mono">
-                                                                {formatCurrency(p.amount)}
-                                                            </td>
-                                                            <td className="py-2 text-gray-500 text-xs">
-                                                                {new Date(p.createdAt).toLocaleString('en-IN')}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Active Disputes */}
-                                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <AlertCircle className="h-5 w-5 text-red-500" />
-                                            <h3 className="font-semibold text-gray-900">Active Disputes</h3>
-                                            {disputesData.disputes?.length > 0 && (
-                                                <span className="ml-1 px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded-full">
-                                                    {disputesData.disputes.length}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <button
-                                            onClick={fetchDisputes}
-                                            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-                                        >
-                                            Refresh
-                                        </button>
-                                    </div>
-
-                                    {disputesData.disputes?.length === 0 ? (
-                                        <div className="text-center py-16">
-                                            <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                                <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                            </div>
-                                            <p className="text-gray-600 font-medium">No active disputes</p>
-                                            <p className="text-sm text-gray-400 mt-1">All payment disputes have been resolved</p>
-                                        </div>
-                                    ) : (
-                                        <div className="divide-y divide-gray-100">
-                                            {disputesData.disputes.map(dispute => (
-                                                <div key={dispute._id} className="px-6 py-5">
-                                                    <div className="flex items-start justify-between gap-4">
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="font-semibold text-gray-900">
-                                                                    {dispute.studentId?.fullName || dispute.studentId?.name || 'N/A'}
-                                                                </span>
-                                                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${dispute.status === 'RAISED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                                                                    }`}>
-                                                                    {dispute.status}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-sm text-gray-600 mt-1">
-                                                                Invoice: <span className="font-mono font-medium">{dispute.invoiceId?.invoiceNumber || '-'}</span>
-                                                                {dispute.invoiceId?.totalAmount && (
-                                                                    <> · {formatCurrency(dispute.invoiceId.totalAmount)}</>
-                                                                )}
-                                                            </p>
-                                                            {dispute.reason && (
-                                                                <p className="text-sm text-gray-500 mt-1 italic">"{dispute.reason}"</p>
-                                                            )}
-                                                            <p className="text-xs text-gray-400 mt-1">
-                                                                Raised {new Date(dispute.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                            </p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => {
-                                                                setResolvingDispute(dispute._id)
-                                                                setResolveForm({ action: 'APPROVE', note: '' })
-                                                            }}
-                                                            className="flex-shrink-0 px-3 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
-                                                        >
-                                                            Resolve
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Inline resolve form */}
-                                                    {resolvingDispute === dispute._id && (
-                                                        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                                            <p className="text-sm font-medium text-gray-700 mb-3">Resolve Dispute</p>
-                                                            <div className="flex gap-3 mb-3">
-                                                                <button
-                                                                    onClick={() => setResolveForm(f => ({ ...f, action: 'APPROVE' }))}
-                                                                    className={`flex-1 py-2 text-sm font-medium rounded-lg border-2 transition-colors ${resolveForm.action === 'APPROVE'
-                                                                        ? 'border-green-500 bg-green-50 text-green-700'
-                                                                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                                                                        }`}
-                                                                >
-                                                                    ✓ Approve
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setResolveForm(f => ({ ...f, action: 'REJECT' }))}
-                                                                    className={`flex-1 py-2 text-sm font-medium rounded-lg border-2 transition-colors ${resolveForm.action === 'REJECT'
-                                                                        ? 'border-red-500 bg-red-50 text-red-700'
-                                                                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
-                                                                        }`}
-                                                                >
-                                                                    ✗ Reject
-                                                                </button>
-                                                            </div>
-                                                            <textarea
-                                                                value={resolveForm.note}
-                                                                onChange={e => setResolveForm(f => ({ ...f, note: e.target.value }))}
-                                                                placeholder="Admin note (required)..."
-                                                                rows={2}
-                                                                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-                                                            />
-                                                            <div className="flex gap-2 justify-end">
-                                                                <button
-                                                                    onClick={() => setResolvingDispute(null)}
-                                                                    className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleResolveDispute(dispute._id)}
-                                                                    className="px-4 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg"
-                                                                >
-                                                                    Confirm
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        )}
-                    </div>
-                )}
-
-                {/* REPORTS TAB */}
-                {activeTab === 'reports' && collectionReport && (
-                    <div className="bg-white rounded-lg shadow-sm p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Collection Report (This Month)</h3>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                                <p className="text-sm font-medium text-green-900">Total Collected</p>
-                                <p className="text-2xl font-bold text-green-700 mt-2">
-                                    {formatCurrency(collectionReport.summary.totalAmount)}
-                                </p>
-                                <p className="text-sm text-green-600 mt-1">
-                                    {collectionReport.summary.totalCount} payments
-                                </p>
-                            </div>
-
-                            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-sm font-medium text-blue-900">Daily Average</p>
-                                <p className="text-2xl font-bold text-blue-700 mt-2">
-                                    {formatCurrency(
-                                        collectionReport.summary.totalAmount / (collectionReport.byDate?.length || 1)
-                                    )}
-                                </p>
-                            </div>
-                        </div>
-
-                        {collectionReport.byDate && collectionReport.byDate.length > 0 && (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Collections</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {collectionReport.byDate.map((day) => (
-                                            <tr key={day.date}>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                    {new Date(day.date).toLocaleDateString('en-IN', {
-                                                        weekday: 'short',
-                                                        year: 'numeric',
-                                                        month: 'short',
-                                                        day: 'numeric'
-                                                    })}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.count}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                                                    {formatCurrency(day.amount)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Fee Structure Modal */}
-            {
-                showFeeStructureModal && (
-                    <FeeStructureModal
-                        feeStructure={editingFeeStructure}
-                        classes={classes}
-                        activeSession={activeSession}
-                        onClose={() => {
-                            setShowFeeStructureModal(false)
-                            setEditingFeeStructure(null)
-                        }}
-                        onSuccess={() => {
-                            setShowFeeStructureModal(false)
-                            setEditingFeeStructure(null)
-                            fetchFeeStructures()
-                            toast.success(editingFeeStructure ? 'Fee structure updated' : 'Fee structure created')
-                        }}
-                    />
-                )
-            }
-
-            {/* Individual Invoice Modal */}
-            {
-                showInvoiceModal && (
-                    <IndividualInvoiceModal
-                        feeStructures={feeStructures}
-                        activeSession={activeSession}
-                        onClose={() => setShowInvoiceModal(false)}
-                        onSuccess={() => {
-                            setShowInvoiceModal(false)
-                            toast.success('Invoice generated successfully')
-                        }}
-                    />
-                )
-            }
-
-            {/* Payment Modal */}
-            {
-                showPaymentModal && (
-                    <PaymentModal
-                        student={selectedStudent}
-                        invoices={studentInvoices}
-                        payments={studentPayments}
-                        onPrintReceipt={handlePrintReceipt}
-                        onClose={() => {
-                            setShowPaymentModal(false)
-                            setSelectedStudent(null)
-                            setStudentInvoices([])
-                            setStudentPayments([])
-                        }}
-                        onSuccess={() => {
-                            setShowPaymentModal(false)
-                            setSelectedStudent(null)
-                            setStudentInvoices([])
-                            if (activeTab === 'dashboard') fetchDashboard()
-                            toast.success('Payment collected successfully')
-                        }}
-                    />
-                )
-            }
-
-            {/* Edit Invoice Modal */}
-            {
-                editingInvoice && (
-                    <EditInvoiceModal
-                        invoice={editingInvoice}
-                        onClose={() => setEditingInvoice(null)}
-                        onSuccess={() => {
-                            setEditingInvoice(null)
-                            if (activeTab === 'dashboard') fetchDashboard()
-                        }}
-                    />
-                )
-            }
-        </div >
-    )
+          })}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      <div>
+        {activeTab === 'dashboard' && dashboardData && <DashboardTab data={dashboardData} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onEditInvoice={setEditingInvoice} onDeleteInvoice={handleDeleteInvoice} onNavigate={setActiveTab} />}
+        {activeTab === 'allInvoices' && <AllInvoicesTab activeSession={activeSession} onEditInvoice={setEditingInvoice} onCollectPayment={async (inv) => { if (inv.studentId) { const s = typeof inv.studentId === 'object' ? inv.studentId : { _id: inv.studentId }; await handleSelectStudent(s) } }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onDeleteInvoice={handleDeleteInvoice} />}
+        {activeTab === 'feeStructure' && <FeeStructureTab feeStructures={feeStructures} classes={classes} onCreateNew={() => { setEditingFeeStructure(null); setShowFeeStructureModal(true) }} onEdit={(s) => { setEditingFeeStructure(s); setShowFeeStructureModal(true) }} onDelete={async (id) => { if (window.confirm('Delete this fee structure?')) { try { await feeStructuresService.delete(id); toast.success('Deleted'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } } }} onDuplicate={async (s) => { try { await feeStructuresService.create({ classId: typeof s.classId === 'object' ? s.classId._id : s.classId, sectionId: s.sectionId ? (typeof s.sectionId === 'object' ? s.sectionId._id : s.sectionId) : null, academicSessionId: activeSession._id, feeHeads: s.feeHeads.map(h => ({ name: h.name, amount: h.amount, frequency: h.frequency, isCompulsory: h.isCompulsory, dueDay: h.dueDay })), isActive: true }); toast.success('Duplicated'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } }} />}
+        {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
+        {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
+        {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} />}
+        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} />}
+        {activeTab === 'refunds' && <RefundsTab />}
+        {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
+        {activeTab === 'reports' && collectionReport && <ReportsTab report={collectionReport} />}
+      </div>
+
+      {/* Modals */}
+      {showFeeStructureModal && <FeeStructureModal feeStructure={editingFeeStructure} classes={classes} activeSession={activeSession} onClose={() => { setShowFeeStructureModal(false); setEditingFeeStructure(null) }} onSuccess={() => { setShowFeeStructureModal(false); setEditingFeeStructure(null); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }); toast.success(editingFeeStructure ? 'Updated' : 'Created') }} />}
+      {showInvoiceModal && <IndividualInvoiceModal feeStructures={feeStructures} activeSession={activeSession} onClose={() => setShowInvoiceModal(false)} onSuccess={() => { setShowInvoiceModal(false); toast.success('Invoice generated'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
+      {showPaymentModal && <PaymentModal student={selectedStudent} invoices={studentInvoices} payments={studentPayments} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onClose={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); setStudentPayments([]) }} onSuccess={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); toast.success('Payment collected') }} />}
+      {editingInvoice && <EditInvoiceModal invoice={editingInvoice} onClose={() => setEditingInvoice(null)} onSuccess={() => { setEditingInvoice(null); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
+    </div>
+  )
 }
 
-// Student Search Component
-const StudentSearch = ({ onSelectStudent }) => {
-    const [searchTerm, setSearchTerm] = useState('')
-    const [searchResults, setSearchResults] = useState([])
-    const [isSearching, setIsSearching] = useState(false)
+// ════════════════════════════════════════════════════════════════════════════
+// TAB COMPONENTS
+// ════════════════════════════════════════════════════════════════════════════
 
-    const handleSearch = async (term) => {
-        setSearchTerm(term)
+const DashboardTab = ({ data, onPrintReceipt, onDownloadReceipt, onEditInvoice, onDeleteInvoice, onNavigate }) => {
+  const summary = data.summary || {}
+  const totalExpected = (summary.totalCollected || 0) + (summary.totalPending || 0) + (summary.totalOverdue || 0)
+  const collectionRate = totalExpected > 0 ? Math.round(((summary.totalCollected || 0) / totalExpected) * 100) : 0
+  const chartData = data.collectionByDate || data.byDate || []
+  const maxChartVal = chartData.length > 0 ? Math.max(...chartData.map(d => d.amount || 0), 1) : 1
+  const statusDist = data.invoiceStatusDistribution || data.statusDistribution || null
+  const statusItems = statusDist ? [
+    { label: 'Paid', value: statusDist.paid || 0, color: 'bg-green-500' },
+    { label: 'Pending', value: statusDist.pending || 0, color: 'bg-amber-500' },
+    { label: 'Partial', value: statusDist.partial || 0, color: 'bg-orange-500' },
+    { label: 'Overdue', value: statusDist.overdue || 0, color: 'bg-red-500' },
+  ] : null
+  const statusTotal = statusItems ? statusItems.reduce((s, i) => s + i.value, 0) : 0
 
-        if (term.length < 2) {
-            setSearchResults([])
-            return
-        }
-
-        setIsSearching(true)
-        try {
-            const res = await studentsService.list({ search: term })
-            setSearchResults(res.data || [])
-        } catch (error) {
-            console.error('Search error:', error)
-        } finally {
-            setIsSearching(false)
-        }
-    }
-
-    return (
-        <div className="relative">
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
-                    type="text"
-                    placeholder="Search by name, admission number, phone..."
-                    value={searchTerm}
-                    onChange={(e) => handleSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {[
+          { label: 'Total Collected', value: summary.totalCollected, icon: TrendingUp, bg: 'bg-green-100 dark:bg-green-900/30', ic: 'text-green-600 dark:text-green-400', vc: 'text-green-600 dark:text-green-400', trend: collectionRate > 0 ? `${collectionRate}% rate` : null, up: true },
+          { label: 'Pending Dues', value: summary.totalPending, icon: AlertCircle, bg: 'bg-amber-100 dark:bg-amber-900/30', ic: 'text-amber-600 dark:text-amber-400', vc: 'text-amber-600 dark:text-amber-400' },
+          { label: 'Overdue Amount', value: summary.totalOverdue, icon: AlertTriangle, bg: 'bg-red-100 dark:bg-red-900/30', ic: 'text-red-600 dark:text-red-400', vc: 'text-red-600 dark:text-red-400', trend: summary.totalOverdue > 0 ? 'Needs attention' : null, up: false },
+          { label: 'This Month', value: summary.thisMonthCollection, icon: Calendar, bg: 'bg-blue-100 dark:bg-blue-900/30', ic: 'text-blue-600 dark:text-blue-400', vc: 'text-blue-600 dark:text-blue-400' },
+        ].map((c) => (
+          <div key={c.label} className="card p-4 sm:p-5 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">{c.label}</p>
+                <p className={`text-lg sm:text-2xl font-bold mt-1.5 ${c.vc}`}>{formatCurrency(c.value)}</p>
+                {c.trend && <div className={`flex items-center gap-1 mt-1.5 text-xs font-medium ${c.up ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{c.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}{c.trend}</div>}
+              </div>
+              <div className={`p-2.5 ${c.bg} rounded-xl flex-shrink-0`}><c.icon className={`h-5 w-5 ${c.ic}`} /></div>
             </div>
+          </div>
+        ))}
+      </div>
 
-            {searchResults.length > 0 && (
-                <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                    {searchResults.map((student) => (
-                        <button
-                            key={student._id}
-                            onClick={() => {
-                                onSelectStudent(student)
-                                setSearchResults([])
-                                setSearchTerm('')
-                            }}
-                            className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
-                        >
-                            <div className="font-medium text-gray-900">{student.fullName || student.name}</div>
-                            <div className="text-sm text-gray-600">
-                                Admission: {student.admissionNumber || student.studentId || 'N/A'} | Class: {student.classId?.name || student.class || 'N/A'}
-                            </div>
-                        </button>
-                    ))}
-                </div>
-            )}
+      {totalExpected > 0 && (
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Collection Progress</h3>
+            <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{collectionRate}%</span>
+          </div>
+          <div className="w-full h-3 bg-gray-200 dark:bg-[#38383A] rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-700" style={{ width: `${Math.min(collectionRate, 100)}%` }} />
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-[#8E8E93]">
+            <span>Collected: {formatCurrency(summary.totalCollected)}</span>
+            <span>Expected: {formatCurrency(totalExpected)}</span>
+          </div>
         </div>
-    )
-}
+      )}
 
-// Fee Structure Modal Component
-const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSuccess }) => {
-    const [form, setForm] = useState({
-        classId: feeStructure?.classId?._id || '',
-        sectionId: feeStructure?.sectionId?._id || '',
-        academicSessionId: activeSession?._id || '',
-        feeHeads: feeStructure?.feeHeads || [
-            { name: 'Tuition Fee', amount: 0, frequency: 'monthly', isCompulsory: true, dueDay: 5 }
-        ],
-        isActive: feeStructure?.isActive ?? true
-    })
-    const [isSaving, setIsSaving] = useState(false)
-
-    const addFeeHead = () => {
-        setForm({
-            ...form,
-            feeHeads: [...form.feeHeads, { name: '', amount: 0, frequency: 'monthly', isCompulsory: true, dueDay: 5 }]
-        })
-    }
-
-    const removeFeeHead = (index) => {
-        setForm({
-            ...form,
-            feeHeads: form.feeHeads.filter((_, i) => i !== index)
-        })
-    }
-
-    const updateFeeHead = (index, field, value) => {
-        const updated = [...form.feeHeads]
-        updated[index] = { ...updated[index], [field]: value }
-        setForm({ ...form, feeHeads: updated })
-    }
-
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-
-        if (!form.classId) {
-            toast.error('Please select a class')
-            return
-        }
-
-        if (form.feeHeads.length === 0) {
-            toast.error('Please add at least one fee head')
-            return
-        }
-
-        try {
-            setIsSaving(true)
-
-            // Clean up the form data - convert empty sectionId to null
-            const formData = {
-                ...form,
-                sectionId: form.sectionId || null
-            }
-
-            if (feeStructure) {
-                await feeStructuresService.update(feeStructure._id, formData)
-            } else {
-                await feeStructuresService.create(formData)
-            }
-
-            onSuccess()
-        } catch (error) {
-            console.error('Save error:', error)
-            toast.error(error.response?.data?.message || 'Failed to save fee structure')
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">
-                        {feeStructure ? 'Edit Fee Structure' : 'Create Fee Structure'}
-                    </h3>
-                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6">
-                    <div className="space-y-6">
-                        {/* Class Selection */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Class *</label>
-                            <select
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                value={form.classId}
-                                onChange={(e) => setForm({ ...form, classId: e.target.value })}
-                                required
-                            >
-                                <option value="">Select Class</option>
-                                {classes.map((cls) => (
-                                    <option key={cls._id} value={cls._id}>{cls.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Fee Heads */}
-                        <div>
-                            <div className="flex justify-between items-center mb-3">
-                                <label className="block text-sm font-medium text-gray-700">Fee Heads *</label>
-                                <button
-                                    type="button"
-                                    onClick={addFeeHead}
-                                    className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    Add Fee Head
-                                </button>
-                            </div>
-
-                            <div className="space-y-3">
-                                {form.feeHeads.map((head, index) => (
-                                    <div key={index} className="border border-gray-200 rounded-lg p-4">
-                                        <div className="grid grid-cols-2 gap-4 mb-3">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
-                                                <input
-                                                    type="text"
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                                    value={head.name}
-                                                    onChange={(e) => updateFeeHead(index, 'name', e.target.value)}
-                                                    placeholder="e.g., Tuition Fee"
-                                                    required
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Amount</label>
-                                                <input
-                                                    type="number"
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                                    value={head.amount}
-                                                    onChange={(e) => updateFeeHead(index, 'amount', parseFloat(e.target.value))}
-                                                    min="0"
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Frequency</label>
-                                                <select
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                                    value={head.frequency}
-                                                    onChange={(e) => updateFeeHead(index, 'frequency', e.target.value)}
-                                                >
-                                                    <option value="monthly">Monthly</option>
-                                                    <option value="quarterly">Quarterly</option>
-                                                    <option value="annually">Annually</option>
-                                                    <option value="one-time">One-time</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-600 mb-1">Due Day</label>
-                                                <input
-                                                    type="number"
-                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                                    value={head.dueDay}
-                                                    onChange={(e) => updateFeeHead(index, 'dueDay', parseInt(e.target.value))}
-                                                    min="1"
-                                                    max="31"
-                                                />
-                                            </div>
-                                            <div className="flex items-end">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeFeeHead(index)}
-                                                    className="w-full px-3 py-2 bg-red-100 text-red-700 rounded-lg text-sm hover:bg-red-200"
-                                                >
-                                                    Remove
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Active Status */}
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="checkbox"
-                                id="isActive"
-                                checked={form.isActive}
-                                onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                            />
-                            <label htmlFor="isActive" className="text-sm font-medium text-gray-700">
-                                Active
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
-                            Cancel
-                        </button>
-                        <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50" disabled={isSaving}>
-                            {isSaving ? 'Saving...' : feeStructure ? 'Update' : 'Create'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="card p-5">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'View All Invoices', icon: List, tab: 'allInvoices', color: 'primary' },
+              { label: 'Collect Payment', icon: DollarSign, tab: 'collect', color: 'green' },
+              { label: 'Generate Invoices', icon: Receipt, tab: 'invoices', color: 'blue' },
+              { label: 'View Defaulters', icon: AlertCircle, tab: 'defaulters', color: 'red' },
+            ].map(a => (
+              <button key={a.label} onClick={() => onNavigate(a.tab)} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-[#38383A] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-all text-left group">
+                <div className={`p-2 bg-${a.color}-100 dark:bg-${a.color}-900/30 rounded-lg group-hover:scale-105 transition-transform`}><a.icon className={`h-4 w-4 text-${a.color}-600 dark:text-${a.color}-400`} /></div>
+                <span className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{a.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-    )
-}
 
-// Individual Invoice Modal
-const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSuccess }) => {
-    const [selectedStudent, setSelectedStudent] = useState(null)
-    const [form, setForm] = useState({
-        feeStructureId: '',
-        dueDate: '',
-        billingMonth: new Date().getMonth() + 1,
-        billingQuarter: Math.ceil((new Date().getMonth() + 1) / 3),
-        billingYear: new Date().getFullYear()
-    })
-    const [isSaving, setIsSaving] = useState(false)
-
-    // Get selected fee structure to determine frequency
-    const selectedFeeStructure = feeStructures.find(fs => fs._id === form.feeStructureId)
-    const rawFrequency = selectedFeeStructure?.feeHeads?.[0]?.frequency || 'One-time'
-    // Normalize frequency to title case for consistent comparison
-    const feeFrequency = rawFrequency.charAt(0).toUpperCase() + rawFrequency.slice(1).toLowerCase()
-
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-
-        if (!selectedStudent) {
-            toast.error('Please select a student')
-            return
-        }
-
-        if (!form.feeStructureId) {
-            toast.error('Please select a fee structure')
-            return
-        }
-
-        try {
-            setIsSaving(true)
-
-            // Build billing period based on frequency
-            let billingPeriod = null
-            if (feeFrequency === 'Monthly') {
-                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December']
-                billingPeriod = {
-                    month: form.billingMonth,
-                    year: form.billingYear,
-                    displayText: `${monthNames[form.billingMonth - 1]} ${form.billingYear}`
-                }
-            } else if (feeFrequency === 'Quarterly') {
-                const quarterMonths = {
-                    1: 'Jan-Mar',
-                    2: 'Apr-Jun',
-                    3: 'Jul-Sep',
-                    4: 'Oct-Dec'
-                }
-                billingPeriod = {
-                    quarter: form.billingQuarter,
-                    year: form.billingYear,
-                    displayText: `Q${form.billingQuarter} ${form.billingYear} (${quarterMonths[form.billingQuarter]})`
-                }
-            } else if (feeFrequency === 'Annual') {
-                billingPeriod = {
-                    year: form.billingYear,
-                    displayText: `Academic Year ${form.billingYear}-${form.billingYear + 1}`
-                }
-            }
-
-            await invoicesService.generate({
-                studentId: selectedStudent._id,
-                feeStructureId: form.feeStructureId,
-                dueDate: form.dueDate,
-                academicSessionId: activeSession._id,
-                billingPeriod
-            })
-
-            onSuccess()
-        } catch (error) {
-            console.error('Generate error:', error)
-            toast.error(error.response?.data?.message || 'Failed to generate invoice')
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Generate Individual Invoice</h3>
-                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6">
-                    <div className="space-y-6">
-                        {/* Student Search */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Select Student *</label>
-                            <StudentSearch onSelectStudent={setSelectedStudent} />
-                            {selectedStudent && (
-                                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <p className="text-sm font-medium text-blue-900">{selectedStudent.name}</p>
-                                    <p className="text-xs text-blue-600">
-                                        Admission: {selectedStudent.admissionNumber || selectedStudent.studentId || 'N/A'} | Class: {selectedStudent.classId?.name || selectedStudent.class || 'N/A'}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Fee Structure */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Fee Structure *</label>
-                            <select
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                value={form.feeStructureId}
-                                onChange={(e) => setForm({ ...form, feeStructureId: e.target.value })}
-                                required
-                            >
-                                <option value="">Select Fee Structure</option>
-                                {feeStructures.filter(fs => fs.isActive).map((structure) => (
-                                    <option key={structure._id} value={structure._id}>
-                                        {structure.classId?.name} - ₹{structure.totalAmount}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Billing Period Selection */}
-                        {form.feeStructureId && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                                <label className="block text-sm font-semibold text-blue-900">
-                                    Billing Period ({feeFrequency})
-                                </label>
-
-                                {feeFrequency === 'Monthly' && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
-                                            <select
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                value={form.billingMonth}
-                                                onChange={(e) => setForm({ ...form, billingMonth: parseInt(e.target.value) })}
-                                            >
-                                                <option value="1">January</option>
-                                                <option value="2">February</option>
-                                                <option value="3">March</option>
-                                                <option value="4">April</option>
-                                                <option value="5">May</option>
-                                                <option value="6">June</option>
-                                                <option value="7">July</option>
-                                                <option value="8">August</option>
-                                                <option value="9">September</option>
-                                                <option value="10">October</option>
-                                                <option value="11">November</option>
-                                                <option value="12">December</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
-                                            <input
-                                                type="number"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                value={form.billingYear}
-                                                onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
-                                                min="2020"
-                                                max="2050"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {feeFrequency === 'Quarterly' && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">Quarter</label>
-                                            <select
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                value={form.billingQuarter}
-                                                onChange={(e) => setForm({ ...form, billingQuarter: parseInt(e.target.value) })}
-                                            >
-                                                <option value="1">Q1 (Jan-Mar)</option>
-                                                <option value="2">Q2 (Apr-Jun)</option>
-                                                <option value="3">Q3 (Jul-Sep)</option>
-                                                <option value="4">Q4 (Oct-Dec)</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
-                                            <input
-                                                type="number"
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                                value={form.billingYear}
-                                                onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
-                                                min="2020"
-                                                max="2050"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {feeFrequency === 'Annual' && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-700 mb-1">Academic Year</label>
-                                        <input
-                                            type="number"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                            value={form.billingYear}
-                                            onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
-                                            min="2020"
-                                            max="2050"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">
-                                            Will show as: Academic Year {form.billingYear}-{form.billingYear + 1}
-                                        </p>
-                                    </div>
-                                )}
-
-                                {feeFrequency === 'One-time' && (
-                                    <p className="text-sm text-gray-600">No billing period needed for one-time fees</p>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Due Date */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Due Date *</label>
-                            <input
-                                type="date"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                value={form.dueDate}
-                                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                                min={new Date().toISOString().split('T')[0]}
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
-                            Cancel
-                        </button>
-                        <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50" disabled={isSaving}>
-                            {isSaving ? 'Generating...' : 'Generate Invoice'}
-                        </button>
-                    </div>
-                </form>
+        {statusItems && statusTotal > 0 ? (
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Invoice Status Distribution</h3>
+            <div className="flex h-3 rounded-full overflow-hidden bg-gray-200 dark:bg-[#38383A] mb-4">
+              {statusItems.map(item => item.value > 0 && <div key={item.label} className={`${item.color}`} style={{ width: `${(item.value / statusTotal) * 100}%` }} />)}
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              {statusItems.map(item => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${item.color}`} />
+                  <span className="text-sm text-gray-600 dark:text-[#8E8E93]">{item.label}</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white ml-auto">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="card p-5">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Summary</h3>
+            <div className="space-y-3">
+              {[{ l: 'Total Invoices', v: data.recentInvoices?.length || 0 }, { l: 'Recent Payments', v: data.recentPayments?.length || 0 }, { l: 'Collection Rate', v: `${collectionRate}%`, g: true }].map(r => (
+                <div key={r.l} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-[#38383A] last:border-0">
+                  <span className="text-sm text-gray-600 dark:text-[#8E8E93]">{r.l}</span>
+                  <span className={`text-sm font-semibold ${r.g ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>{r.v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {chartData.length > 0 && (
+        <div className="card p-5">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Daily Collection (This Month)</h3>
+          <div className="flex items-end gap-1 h-32">
+            {chartData.slice(-14).map((day, idx) => (
+              <div key={idx} className="flex-1 flex flex-col items-center gap-1 group">
+                <div className="relative w-full flex justify-center">
+                  <div className="absolute -top-6 hidden group-hover:block text-xs font-semibold text-gray-700 dark:text-white bg-white dark:bg-[#2C2C2E] px-2 py-1 rounded shadow-lg border border-gray-200 dark:border-[#38383A] whitespace-nowrap z-10">{formatCurrency(day.amount)}</div>
+                </div>
+                <div className="w-full bg-primary-500 dark:bg-primary-400 rounded-t-sm hover:bg-primary-600 dark:hover:bg-primary-300 transition-colors min-h-[2px]" style={{ height: `${Math.max((day.amount / maxChartVal) * 100, 2)}%` }} />
+                <span className="text-[10px] text-gray-400 dark:text-[#636366] truncate w-full text-center">{new Date(day.date).getDate()}</span>
+              </div>
+            ))}
+          </div>
         </div>
-    )
+      )}
+
+      {data.recentPayments?.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-[#38383A] flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2"><DollarSign className="h-4 w-4 text-green-500" /> Recent Payments <span className="text-xs font-normal text-gray-400 dark:text-[#636366]">({data.recentPayments.length})</span></h3>
+            <button onClick={() => onNavigate('receipts')} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700">View All &rarr;</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
+              <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Receipt', 'Student', 'Amount', 'Method', 'Date', 'Actions'].map(h => <th key={h} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${h === 'Amount' || h === 'Actions' ? 'text-right' : h === 'Method' ? 'text-center' : 'text-left'}`}>{h}</th>)}</tr></thead>
+              <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-100 dark:divide-[#38383A]">
+                {data.recentPayments.slice(0, 10).map((p) => (
+                  <tr key={p._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                    <td className="px-5 py-3 whitespace-nowrap text-sm font-mono font-semibold text-primary-600 dark:text-primary-400">{p.receiptNumber}</td>
+                    <td className="px-5 py-3 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{p.studentId?.name || p.studentId?.fullName || 'N/A'}</div><div className="text-xs text-gray-400 dark:text-[#636366]">{p.studentId?.admissionNumber || ''}</div></td>
+                    <td className="px-5 py-3 whitespace-nowrap text-right text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(p.amount)}</td>
+                    <td className="px-5 py-3 whitespace-nowrap text-center"><span className="px-2 py-0.5 bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] text-xs rounded-md font-medium">{p.paymentMethod}</span></td>
+                    <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(p.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
+                    <td className="px-5 py-3 whitespace-nowrap text-right"><div className="flex justify-end gap-1"><button onClick={() => onPrintReceipt(p._id)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors" title="View"><Eye className="h-3.5 w-3.5" /></button><button onClick={() => onDownloadReceipt(p._id)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors" title="Download"><Download className="h-3.5 w-3.5" /></button></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {data.recentInvoices?.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 dark:border-[#38383A] flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2"><FileText className="h-4 w-4 text-primary-500" /> Recent Invoices <span className="text-xs font-normal text-gray-400 dark:text-[#636366]">({data.recentInvoices.length})</span></h3>
+            <button onClick={() => onNavigate('allInvoices')} className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700">View All &rarr;</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
+              <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Invoice', 'Student', 'Class', 'Amount', 'Status', 'Due', 'Actions'].map(h => <th key={h} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${h === 'Amount' || h === 'Actions' ? 'text-right' : h === 'Status' ? 'text-center' : 'text-left'}`}>{h}</th>)}</tr></thead>
+              <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-100 dark:divide-[#38383A]">
+                {data.recentInvoices.slice(0, 10).map((inv) => (
+                  <tr key={inv._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                    <td className="px-5 py-3 whitespace-nowrap text-sm font-mono font-semibold text-primary-600 dark:text-primary-400">{inv.invoiceNumber}</td>
+                    <td className="px-5 py-3 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{inv.studentId?.fullName || inv.studentId?.name || 'N/A'}</div><div className="text-xs text-gray-400 dark:text-[#636366]">{inv.studentId?.admissionNumber || ''}</div></td>
+                    <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{inv.classId?.name || '-'}</td>
+                    <td className="px-5 py-3 whitespace-nowrap text-right text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(inv.totalAmount)}</td>
+                    <td className="px-5 py-3 whitespace-nowrap text-center"><StatusBadge status={inv.status} /></td>
+                    <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-'}</td>
+                    <td className="px-5 py-3 whitespace-nowrap text-right"><div className="flex justify-end gap-1"><button onClick={() => onEditInvoice(inv)} className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors" title="Edit"><Edit className="h-3.5 w-3.5" /></button><button onClick={() => onDeleteInvoice(inv._id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
-// Bulk Invoice Form Component
-const BulkInvoiceForm = ({ classes, feeStructures, activeSession, onSuccess }) => {
-    const [form, setForm] = useState({
-        classId: '',
-        feeStructureId: '',
-        dueDate: '',
-        billingMonth: new Date().getMonth() + 1, // 1-12
-        billingQuarter: Math.ceil((new Date().getMonth() + 1) / 3), // 1-4
-        billingYear: new Date().getFullYear()
-    })
-    const [isSaving, setIsSaving] = useState(false)
+// ── Fee Structure Tab ──
 
-    // Get selected fee structure to determine frequency
-    const selectedFeeStructure = feeStructures.find(fs => fs._id === form.feeStructureId)
-    const rawFrequency = selectedFeeStructure?.feeHeads?.[0]?.frequency || 'One-time'
-    // Normalize frequency to title case for consistent comparison
-    const feeFrequency = rawFrequency.charAt(0).toUpperCase() + rawFrequency.slice(1).toLowerCase()
+const FeeStructureTab = ({ feeStructures, classes, onCreateNew, onEdit, onDelete, onDuplicate }) => {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterClass, setFilterClass] = useState('')
+  const [expandedId, setExpandedId] = useState(null)
 
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-
-        if (!form.classId || !form.feeStructureId || !form.dueDate) {
-            toast.error('Please fill all fields')
-            return
-        }
-
-        console.log('=== BULK INVOICE FRONTEND ===');
-        console.log('Sending classId:', form.classId);
-        console.log('Sending feeStructureId:', form.feeStructureId);
-        console.log('Sending dueDate:', form.dueDate);
-        console.log('Active session ID:', activeSession._id);
-
-        try {
-            setIsSaving(true)
-
-            // Build billing period based on frequency
-            let billingPeriod = null
-            if (feeFrequency === 'Monthly') {
-                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December']
-                billingPeriod = {
-                    month: form.billingMonth,
-                    year: form.billingYear,
-                    displayText: `${monthNames[form.billingMonth - 1]} ${form.billingYear}`
-                }
-            } else if (feeFrequency === 'Quarterly') {
-                const quarterMonths = {
-                    1: 'Jan-Mar',
-                    2: 'Apr-Jun',
-                    3: 'Jul-Sep',
-                    4: 'Oct-Dec'
-                }
-                billingPeriod = {
-                    quarter: form.billingQuarter,
-                    year: form.billingYear,
-                    displayText: `Q${form.billingQuarter} ${form.billingYear} (${quarterMonths[form.billingQuarter]})`
-                }
-            } else if (feeFrequency === 'Annual') {
-                billingPeriod = {
-                    year: form.billingYear,
-                    displayText: `Academic Year ${form.billingYear}-${form.billingYear + 1}`
-                }
-            }
-
-            await invoicesService.generateBulk({
-                classId: form.classId,
-                feeStructureId: form.feeStructureId,
-                dueDate: form.dueDate,
-                academicSessionId: activeSession._id,
-                billingPeriod
-            })
-
-            setForm({
-                classId: '',
-                feeStructureId: '',
-                dueDate: '',
-                billingMonth: new Date().getMonth() + 1,
-                billingQuarter: Math.ceil((new Date().getMonth() + 1) / 3),
-                billingYear: new Date().getFullYear()
-            })
-            onSuccess()
-        } catch (error) {
-            console.error('Bulk generate error:', error)
-            toast.error(error.response?.data?.message || 'Failed to generate bulk invoices')
-        } finally {
-            setIsSaving(false)
-        }
+  const filtered = feeStructures.filter(s => {
+    if (filterClass && (typeof s.classId === 'object' ? s.classId?._id : s.classId) !== filterClass) return false
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      const cn = (typeof s.classId === 'object' ? s.classId?.name : '').toLowerCase()
+      const heads = (s.feeHeads || []).map(h => h.name.toLowerCase()).join(' ')
+      return cn.includes(q) || heads.includes(q)
     }
+    return true
+  })
 
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
-                <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    value={form.classId}
-                    onChange={(e) => setForm({ ...form, classId: e.target.value })}
-                    required
-                >
-                    <option value="">Select Class</option>
-                    {classes.map((cls) => (
-                        <option key={cls._id} value={cls._id}>{cls.name}</option>
-                    ))}
-                </select>
-            </div>
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Total Structures</p><p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{feeStructures.length}</p></div>
+        <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Active</p><p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{feeStructures.filter(s => s.isActive).length}</p></div>
+        <div className="card p-4 col-span-2 sm:col-span-1"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Combined Value</p><p className="text-2xl font-bold text-primary-600 dark:text-primary-400 mt-1">{formatCurrency(filtered.reduce((sum, s) => sum + (s.totalAmount || s.feeHeads?.reduce((a, h) => a + (h.amount || 0), 0) || 0), 0))}</p></div>
+      </div>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Fee Structure</label>
-                <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    value={form.feeStructureId}
-                    onChange={(e) => setForm({ ...form, feeStructureId: e.target.value })}
-                    required
-                >
-                    <option value="">Select Fee Structure</option>
-                    {feeStructures.filter(fs => fs.isActive && fs.classId?._id === form.classId).map((structure) => (
-                        <option key={structure._id} value={structure._id}>
-                            ₹{structure.totalAmount} - {structure.feeHeads?.length} heads
-                        </option>
-                    ))}
-                </select>
-            </div>
+      <div className="card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Fee Structures</h3>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+            <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-3 py-2 border border-gray-200 dark:border-[#38383A] dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366] rounded-xl text-sm w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary-300" /></div>
+            {classes.length > 0 && <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="input text-sm w-auto"><option value="">All Classes</option>{classes.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select>}
+            <button onClick={onCreateNew} className="btn btn-primary btn-sm flex items-center justify-center gap-1.5"><Plus className="h-4 w-4" /> Create New</button>
+          </div>
+        </div>
 
-            {/* Billing Period Selection - Show based on frequency */}
-            {form.feeStructureId && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                    <label className="block text-sm font-semibold text-blue-900">
-                        Billing Period ({feeFrequency})
-                    </label>
-
-                    {feeFrequency === 'Monthly' && (
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Month</label>
-                                <select
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    value={form.billingMonth}
-                                    onChange={(e) => setForm({ ...form, billingMonth: parseInt(e.target.value) })}
-                                >
-                                    <option value="1">January</option>
-                                    <option value="2">February</option>
-                                    <option value="3">March</option>
-                                    <option value="4">April</option>
-                                    <option value="5">May</option>
-                                    <option value="6">June</option>
-                                    <option value="7">July</option>
-                                    <option value="8">August</option>
-                                    <option value="9">September</option>
-                                    <option value="10">October</option>
-                                    <option value="11">November</option>
-                                    <option value="12">December</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    value={form.billingYear}
-                                    onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
-                                    min="2020"
-                                    max="2050"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {feeFrequency === 'Quarterly' && (
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Quarter</label>
-                                <select
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    value={form.billingQuarter}
-                                    onChange={(e) => setForm({ ...form, billingQuarter: parseInt(e.target.value) })}
-                                >
-                                    <option value="1">Q1 (Jan-Mar)</option>
-                                    <option value="2">Q2 (Apr-Jun)</option>
-                                    <option value="3">Q3 (Jul-Sep)</option>
-                                    <option value="4">Q4 (Oct-Dec)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
-                                <input
-                                    type="number"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    value={form.billingYear}
-                                    onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
-                                    min="2020"
-                                    max="2050"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {feeFrequency === 'Annual' && (
-                        <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Academic Year</label>
-                            <input
-                                type="number"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                value={form.billingYear}
-                                onChange={(e) => setForm({ ...form, billingYear: parseInt(e.target.value) })}
-                                min="2020"
-                                max="2050"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                                Will show as: Academic Year {form.billingYear}-{form.billingYear + 1}
-                            </p>
-                        </div>
-                    )}
-
-                    {feeFrequency === 'One-time' && (
-                        <p className="text-sm text-gray-600">No billing period needed for one-time fees</p>
-                    )}
-                </div>
-            )}
-
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
-                <input
-                    type="date"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    value={form.dueDate}
-                    onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
-                    required
-                />
-            </div>
-
-            <button
-                type="submit"
-                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                disabled={isSaving}
-            >
-                {isSaving ? 'Generating...' : 'Generate Bulk Invoices'}
-            </button>
-        </form>
-    )
-}
-
-// Payment Modal Component
-const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onClose, onSuccess }) => {
-    const [activeTab, setActiveTab] = useState('collect')
-    const [selectedInvoice, setSelectedInvoice] = useState(null)
-    const [form, setForm] = useState({
-        amount: '',
-        paymentMethod: 'Cash',
-        paymentDate: new Date().toISOString().split('T')[0],
-        transactionDetails: {},
-        remarks: ''
-    })
-    const [isSaving, setIsSaving] = useState(false)
-
-    useEffect(() => {
-        // If no invoices, switch to history tab by default
-        if (invoices.length === 0 && payments.length > 0) {
-            setActiveTab('history')
-        } else if (invoices.length > 0) {
-            setActiveTab('collect')
-            setSelectedInvoice(invoices[0])
-            setForm(f => ({ ...f, amount: invoices[0].balanceAmount }))
-        }
-    }, [invoices, payments])
-
-    const handleSubmit = async (e) => {
-        e.preventDefault()
-
-        if (!selectedInvoice) {
-            toast.error('Please select an invoice')
-            return
-        }
-
-        try {
-            setIsSaving(true)
-
-            await paymentsService.collect({
-                studentId: student._id,
-                invoiceId: selectedInvoice._id,
-                amount: parseFloat(form.amount),
-                paymentMethod: form.paymentMethod,
-                paymentDate: form.paymentDate,
-                transactionDetails: form.transactionDetails,
-                remarks: form.remarks
-            })
-
-            onSuccess()
-        } catch (error) {
-            console.error('Payment error:', error)
-            toast.error(error.response?.data?.message || 'Failed to collect payment')
-        } finally {
-            setIsSaving(false)
-        }
-    }
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            minimumFractionDigits: 0
-        }).format(amount || 0)
-    }
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">Student Fees</h3>
-                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
-
-                {/* Tabs */}
-                <div className="flex border-b border-gray-200">
-                    <button
-                        className={`flex-1 py-4 text-sm font-medium text-center border-b-2 ${activeTab === 'collect' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => setActiveTab('collect')}
-                    >
-                        Collect Payment
-                    </button>
-                    <button
-                        className={`flex-1 py-4 text-sm font-medium text-center border-b-2 ${activeTab === 'history' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                        onClick={() => setActiveTab('history')}
-                    >
-                        Payment History
-                    </button>
-                </div>
-
-                {/* COLLECT TAB */}
-                {activeTab === 'collect' && (
-                    <div className="p-6">
-                        {invoices.length === 0 ? (
-                            <div className="text-center py-8">
-                                <AlertCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Pending Invoices</h3>
-                                <p className="text-gray-600">This student has no pending dues.</p>
-                            </div>
-                        ) : (
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                {/* Student Info */}
-                                <div className="p-4 bg-gray-50 rounded-lg">
-                                    <p className="text-sm font-medium text-gray-600">Student</p>
-                                    <p className="text-lg font-bold text-gray-900">{student.fullName || student.name}</p>
-                                    <p className="text-sm text-gray-600">ID: {student.studentId || student.admissionNumber}</p>
-                                </div>
-
-                                {/* Select Invoice */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Invoice *</label>
-                                    <select
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                        value={selectedInvoice?._id || ''}
-                                        onChange={(e) => {
-                                            const invoice = invoices.find(inv => inv._id === e.target.value)
-                                            setSelectedInvoice(invoice)
-                                            setForm(f => ({ ...f, amount: invoice?.balanceAmount || '' }))
-                                        }}
-                                        required
-                                    >
-                                        {invoices.map((invoice) => (
-                                            <option key={invoice._id} value={invoice._id}>
-                                                {invoice.invoiceNumber} - Balance: {formatCurrency(invoice.balanceAmount)} ({invoice.status})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                {/* Amount */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Amount *</label>
-                                    <input
-                                        type="number"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                        value={form.amount}
-                                        onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                                        max={selectedInvoice?.balanceAmount}
-                                        min="1"
-                                        step="1"
-                                        required
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Maximum: {formatCurrency(selectedInvoice?.balanceAmount || 0)}
-                                    </p>
-                                </div>
-
-                                {/* Payment Method */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
-                                    <select
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                        value={form.paymentMethod}
-                                        onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
-                                        required
-                                    >
-                                        <option value="Cash">Cash</option>
-                                        <option value="UPI">UPI</option>
-                                        <option value="Bank Transfer">Bank Transfer</option>
-                                        <option value="Cheque">Cheque</option>
-                                        <option value="Card">Card</option>
-                                        <option value="Online">Online</option>
-                                    </select>
-                                </div>
-
-                                {/* Payment Date */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Payment Date *</label>
-                                    <input
-                                        type="date"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                        value={form.paymentDate}
-                                        onChange={(e) => setForm({ ...form, paymentDate: e.target.value })}
-                                        max={new Date().toISOString().split('T')[0]}
-                                        required
-                                    />
-                                </div>
-
-                                {/* Remarks */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Remarks</label>
-                                    <textarea
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                        rows="2"
-                                        value={form.remarks}
-                                        onChange={(e) => setForm({ ...form, remarks: e.target.value })}
-                                        placeholder="Optional remarks"
-                                    />
-                                </div>
-
-                                <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200">
-                                    <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
-                                        Cancel
-                                    </button>
-                                    <button type="submit" className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50" disabled={isSaving}>
-                                        {isSaving ? 'Processing...' : 'Collect Payment'}
-                                    </button>
-                                </div>
-                            </form>
-                        )}
+        {filtered.length === 0 ? (
+          <EmptyState icon={Settings} title={searchQuery || filterClass ? 'No matching structures' : 'No fee structures'} description={searchQuery || filterClass ? 'Try adjusting filters' : 'Create a fee structure to start generating invoices'} />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((s) => {
+              const total = s.totalAmount || s.feeHeads?.reduce((sum, h) => sum + (h.amount || 0), 0) || 0
+              const isExpanded = expandedId === s._id
+              return (
+                <div key={s._id} className="border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div><h4 className="font-semibold text-gray-900 dark:text-white">{typeof s.classId === 'object' ? s.classId?.name : 'Class'}</h4><p className="text-xs text-gray-500 dark:text-[#636366]">{s.sectionId?.name || 'All Sections'}</p></div>
+                      <StatusBadge status={s.isActive ? 'Active' : 'Inactive'} />
                     </div>
+                    <div className="flex items-baseline justify-between mb-3">
+                      <span className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(total)}</span>
+                      <span className="text-xs text-gray-500 dark:text-[#636366]">{s.feeHeads?.length || 0} heads</span>
+                    </div>
+                    <button onClick={() => setExpandedId(isExpanded ? null : s._id)} className="w-full flex items-center justify-between py-2 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700">
+                      <span>{isExpanded ? 'Hide' : 'View'} Fee Heads</span>
+                      {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </button>
+                    {isExpanded && (
+                      <div className="space-y-1.5 pt-2 border-t border-gray-100 dark:border-[#38383A]">
+                        {s.feeHeads?.map((h, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs py-1">
+                            <div className="flex items-center gap-1.5"><span className="text-gray-700 dark:text-gray-300">{h.name}</span>{h.isCompulsory && <span className="px-1 py-0.5 text-[9px] bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded font-semibold">Req</span>}</div>
+                            <div><span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(h.amount)}</span><span className="text-gray-400 dark:text-[#636366] ml-1 capitalize">/{h.frequency}</span></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-4 py-3 border-t border-gray-100 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] flex gap-2">
+                    <button onClick={() => onEdit(s)} className="flex-1 btn btn-sm btn-outline text-xs">Edit</button>
+                    <button onClick={() => onDuplicate(s)} className="btn btn-sm btn-outline text-xs p-2" title="Duplicate"><Copy className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => onDelete(s._id)} className="btn btn-sm text-xs p-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800/30" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Generate Invoices Tab ──
+
+const InvoicesTab = ({ classes, feeStructures, activeSession, onShowIndividual }) => {
+  const queryClient = useQueryClient()
+  return (
+    <div className="space-y-4">
+      <div className="bg-gradient-to-r from-blue-50 to-primary-50 dark:from-blue-900/15 dark:to-primary-900/15 rounded-xl p-4 border border-blue-100 dark:border-blue-800/30">
+        <div className="flex items-start gap-3">
+          <div className="p-2.5 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex-shrink-0"><Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div>
+          <div><h3 className="text-sm font-semibold text-gray-900 dark:text-white">Generate Invoices</h3><p className="text-xs text-gray-600 dark:text-[#8E8E93] mt-0.5">Create invoices for individual students or in bulk for an entire class.</p></div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="card p-5">
+          <div className="flex items-center gap-3 mb-4"><div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl"><Receipt className="h-6 w-6 text-blue-600 dark:text-blue-400" /></div><div><h4 className="font-semibold text-gray-900 dark:text-white">Individual Invoice</h4><p className="text-xs text-gray-500 dark:text-[#636366]">Generate for a single student</p></div></div>
+          <ul className="text-xs text-gray-600 dark:text-[#8E8E93] space-y-1.5 mb-4">
+            {['Search and select any student', 'Choose fee structure & billing period', 'Preview fee breakdown before generating'].map(t => <li key={t} className="flex items-center gap-1.5"><Check className="h-3 w-3 text-green-500 flex-shrink-0" /> {t}</li>)}
+          </ul>
+          <button onClick={onShowIndividual} className="w-full btn btn-primary">Generate Individual Invoice</button>
+        </div>
+        <div className="card p-5">
+          <div className="flex items-center gap-3 mb-4"><div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl"><Users className="h-6 w-6 text-green-600 dark:text-green-400" /></div><div><h4 className="font-semibold text-gray-900 dark:text-white">Bulk Invoice</h4><p className="text-xs text-gray-500 dark:text-[#636366]">Generate for entire class at once</p></div></div>
+          <BulkInvoiceForm classes={classes} feeStructures={feeStructures} activeSession={activeSession} onSuccess={() => { toast.success('Bulk invoices generated'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />
+        </div>
+        <div className="card p-5 border-red-200 dark:border-red-900/50">
+          <div className="flex items-center gap-3 mb-4"><div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-xl"><Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" /></div><div><h4 className="font-semibold text-gray-900 dark:text-white">Bulk Delete</h4><p className="text-xs text-gray-500 dark:text-[#636366]">Remove pending invoices for a class</p></div></div>
+          <BulkDeleteInvoiceForm classes={classes} activeSession={activeSession} onSuccess={() => queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Collect Payment Tab ──
+
+const CollectPaymentTab = ({ dashboardData, selectedStudent, onSelectStudent }) => (
+  <div className="space-y-6">
+    <div className="bg-gradient-to-r from-primary-50 to-primary-100 dark:from-[#1a3a35] dark:to-[#162e2a] border border-primary-200 dark:border-[#2a5a52] rounded-xl p-5 sm:p-6">
+      <div className="flex flex-col sm:flex-row items-start gap-4">
+        <div className="p-3 bg-primary-600 rounded-xl flex-shrink-0"><DollarSign className="h-6 w-6 text-white" /></div>
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-primary-900 dark:text-white mb-1">Collect Fee Payment</h3>
+          <p className="text-sm text-primary-700 dark:text-primary-300 mb-3">Search for a student to view their pending invoices and collect payment.</p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-primary-600 dark:text-primary-400">
+            {['Search student', 'Select invoice', 'Collect payment'].map((step, i) => (
+              <React.Fragment key={step}>{i > 0 && <span className="hidden sm:inline text-primary-300 dark:text-primary-600">&rarr;</span>}<span className="flex items-center gap-1.5"><span className="w-5 h-5 rounded-full bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>{step}</span></React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {dashboardData && (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          { label: 'Pending Dues', value: dashboardData.summary?.totalPending, color: 'amber', icon: AlertCircle },
+          { label: 'Overdue Amount', value: dashboardData.summary?.totalOverdue, color: 'red', icon: AlertTriangle },
+          { label: 'This Month', value: dashboardData.summary?.thisMonthCollection, color: 'green', icon: TrendingUp },
+        ].map((c) => (
+          <div key={c.label} className="card p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <div><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">{c.label}</p><p className={`text-xl font-bold text-${c.color}-600 dark:text-${c.color}-400 mt-1`}>{formatCurrency(c.value)}</p></div>
+              <div className={`p-2.5 bg-${c.color}-100 dark:bg-${c.color}-500/15 rounded-xl`}><c.icon className={`h-5 w-5 text-${c.color}-600 dark:text-${c.color}-400`} /></div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    <div className="card p-4 sm:p-6">
+      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2"><Search className="h-4 w-4 text-gray-400 dark:text-[#636366]" /> Search Student</h4>
+      <StudentSearch onSelectStudent={onSelectStudent} />
+      {selectedStudent ? (
+        <div className="mt-5 p-4 bg-primary-50 dark:bg-primary-500/10 border border-primary-200 dark:border-primary-500/20 rounded-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-500/15 flex items-center justify-center flex-shrink-0">
+              <span className="text-base font-bold text-primary-700 dark:text-primary-400">{(selectedStudent.fullName || selectedStudent.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}</span>
+            </div>
+            <div><p className="text-sm font-medium text-primary-900 dark:text-primary-300">Selected Student</p><p className="text-base font-bold text-primary-700 dark:text-primary-400">{selectedStudent.fullName || selectedStudent.name}</p><p className="text-xs text-primary-600 dark:text-primary-400/80">ID: {selectedStudent.studentId || selectedStudent.admissionNumber}</p></div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-5 text-center py-10 border border-dashed border-gray-200 dark:border-[#2C2C2E] rounded-xl bg-gray-50/50 dark:bg-[#1C1C1E]/50">
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-[#2C2C2E] flex items-center justify-center mx-auto mb-3">
+            <Users className="h-7 w-7 text-gray-300 dark:text-[#48484A]" />
+          </div>
+          <p className="text-gray-600 dark:text-[#8E8E93] font-medium text-sm">No student selected</p>
+          <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">Search and select a student to view their pending invoices</p>
+        </div>
+      )}
+    </div>
+  </div>
+)
+
+// ── Defaulters Tab ──
+
+const DefaultersTab = ({ defaulters, loading }) => {
+  const queryClient = useQueryClient()
+  const [applyingLateFee, setApplyingLateFee] = useState(false)
+  const [lateFeeModal, setLateFeeModal] = useState({ isOpen: false, invoiceId: null, studentName: '' })
+  const [lateFeeAmount, setLateFeeAmount] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortField, setSortField] = useState('totalBalance')
+  const [sortAsc, setSortAsc] = useState(false)
+
+  const handleApplyLateFee = async () => {
+    if (!lateFeeModal.invoiceId || !lateFeeAmount || parseFloat(lateFeeAmount) <= 0) { toast.error('Enter a valid amount'); return }
+    try { setApplyingLateFee(true); await invoicesService.applyLateFee(lateFeeModal.invoiceId, parseFloat(lateFeeAmount)); toast.success('Late fee applied'); setLateFeeModal({ isOpen: false, invoiceId: null, studentName: '' }); setLateFeeAmount(''); queryClient.invalidateQueries({ queryKey: ['fees-defaulters'] }) }
+    catch (error) { toast.error(error.response?.data?.message || 'Failed') } finally { setApplyingLateFee(false) }
+  }
+
+  const safeDefaulters = defaulters.filter(d => (d.liveBalance ?? d.totalBalance) > 0 && d.studentId)
+  const filteredDefaulters = safeDefaulters.filter(d => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return (d.studentId?.fullName || d.studentId?.name || '').toLowerCase().includes(q) || (d.studentId?.admissionNumber || d.studentId?.studentId || '').toLowerCase().includes(q) || (d.studentId?.phone || '').toLowerCase().includes(q)
+  })
+
+  const sortedDefaulters = [...filteredDefaulters].sort((a, b) => {
+    const dir = sortAsc ? 1 : -1
+    if (sortField === 'name') return dir * ((a.studentId?.fullName || a.studentId?.name || '').localeCompare(b.studentId?.fullName || b.studentId?.name || ''))
+    if (sortField === 'totalBalance') return dir * ((a.liveBalance ?? a.totalBalance ?? 0) - (b.liveBalance ?? b.totalBalance ?? 0))
+    if (sortField === 'overdueDays') return dir * ((a.overdueDays ?? 0) - (b.overdueDays ?? 0))
+    if (sortField === 'dueDate') return dir * ((a.oldestDueDate ? new Date(a.oldestDueDate).getTime() : 0) - (b.oldestDueDate ? new Date(b.oldestDueDate).getTime() : 0))
+    return 0
+  })
+
+  const totalOutstanding = safeDefaulters.reduce((sum, d) => sum + (d.liveBalance ?? d.totalBalance ?? 0), 0)
+  const SortIcon = ({ field }) => <span className="inline-block ml-1 text-[10px] opacity-50">{sortField === field ? (sortAsc ? '▲' : '▼') : '⇅'}</span>
+  const handleSort = (f) => { if (sortField === f) setSortAsc(!sortAsc); else { setSortField(f); setSortAsc(false) } }
+  const formatDueDate = (d) => { if (!d) return '-'; const dt = new Date(d); return isNaN(dt.getTime()) ? '-' : dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) }
+
+  if (loading) return <LoadingSpinner />
+
+  return (
+    <div className="space-y-4">
+      {safeDefaulters.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Total Defaulters</p><p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{safeDefaulters.length}</p></div>
+          <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Total Outstanding</p><p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{formatCurrency(totalOutstanding)}</p></div>
+          <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Avg. Overdue</p><p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{safeDefaulters.length ? Math.round(safeDefaulters.reduce((s, d) => s + (d.overdueDays || 0), 0) / safeDefaulters.length) : 0} days</p></div>
+        </div>
+      )}
+
+      <div className="card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Fee Defaulters</h3>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-8 py-2 border border-gray-200 dark:border-[#38383A] dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366] rounded-xl text-sm w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-primary-300" />{searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-full"><X className="h-3.5 w-3.5 text-gray-400" /></button>}</div>
+            <span className="text-sm text-gray-600 dark:text-[#8E8E93] whitespace-nowrap">{filteredDefaulters.length} students</span>
+          </div>
+        </div>
+
+        {sortedDefaulters.length === 0 ? <EmptyState icon={Users} title={searchQuery ? 'No matching defaulters' : 'No defaulters'} description={searchQuery ? 'Try adjusting search' : 'All students are up to date'} /> : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[750px] divide-y divide-gray-200 dark:divide-[#38383A]">
+              <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>
+                {[{ l: 'Student', f: 'name' }, { l: 'Total Due', f: 'totalBalance' }, { l: 'Due Date', f: 'dueDate' }, { l: 'Overdue', f: 'overdueDays' }, { l: 'Invoices' }, { l: 'Contact' }, { l: 'Actions', r: true }].map(c => (
+                  <th key={c.l} onClick={c.f ? () => handleSort(c.f) : undefined} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${c.r ? 'text-right' : 'text-left'} ${c.f ? 'cursor-pointer select-none hover:text-gray-700 dark:hover:text-white' : ''}`}>{c.l}{c.f && <SortIcon field={c.f} />}</th>
+                ))}
+              </tr></thead>
+              <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-100 dark:divide-[#38383A]">
+                {sortedDefaulters.map((d) => {
+                  const bal = d.liveBalance ?? d.totalBalance ?? 0, ov = d.overdueDays ?? 0
+                  return (
+                    <tr key={d._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                      <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{d.studentId?.fullName || d.studentId?.name || 'Unknown'}</div><div className="text-xs text-gray-500 dark:text-[#8E8E93]">{d.studentId?.admissionNumber || '-'}</div></td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">{formatCurrency(bal)}</td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDueDate(d.oldestDueDate)}</td>
+                      <td className="px-5 py-4 whitespace-nowrap"><span className={`inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-full ${ov > 60 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400' : ov > 30 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400' : ov > 0 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' : 'bg-gray-100 dark:bg-gray-800/30 text-gray-600 dark:text-gray-400'}`}>{ov > 0 ? `${ov} days` : 'Not yet due'}</span></td>
+                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{d.unpaidInvoiceCount ?? d.invoiceIds?.length ?? '-'} unpaid</td>
+                      <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm text-gray-600 dark:text-[#8E8E93]">{d.studentId?.phone || '-'}</div></td>
+                      <td className="px-5 py-4 whitespace-nowrap text-right">{d.invoiceIds?.[0] && <button onClick={() => setLateFeeModal({ isOpen: true, invoiceId: d.invoiceIds[0], studentName: d.studentId?.fullName || d.studentId?.name || 'Student' })} className="text-xs px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800/30 transition-colors">+ Late Fee</button>}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {lateFeeModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) { setLateFeeModal({ isOpen: false, invoiceId: null, studentName: '' }); setLateFeeAmount('') } }}>
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-scale-in">
+            <div className="p-5 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center"><h3 className="text-base font-bold text-gray-900 dark:text-white">Apply Late Fee</h3><button onClick={() => { setLateFeeModal({ isOpen: false, invoiceId: null, studentName: '' }); setLateFeeAmount('') }} className="btn-close"><X className="h-4 w-4" /></button></div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Apply late fee for <strong className="dark:text-white">{lateFeeModal.studentName}</strong></p>
+              <div><label className="label mb-1 block">Amount</label><input type="number" min="1" autoFocus className="input" placeholder="e.g. 500" value={lateFeeAmount} onChange={(e) => setLateFeeAmount(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleApplyLateFee() }} /></div>
+              <div className="flex justify-end gap-3"><button onClick={() => { setLateFeeModal({ isOpen: false, invoiceId: null, studentName: '' }); setLateFeeAmount('') }} className="btn btn-outline btn-sm">Cancel</button><button onClick={handleApplyLateFee} disabled={applyingLateFee || !lateFeeAmount} className="btn btn-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">{applyingLateFee ? 'Applying...' : 'Apply'}</button></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Receipts Tab ──
+
+const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt }) => (
+  <div className="space-y-4">
+    <div className="card p-3 sm:p-4">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
+        <div className="w-full sm:flex-1 sm:min-w-[200px]"><label className="label mb-1 block text-xs">Search</label><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" /><input type="text" placeholder="Name, receipt no..." value={filters.search} onChange={e => onFilterChange({ ...filters, search: e.target.value })} className="input pl-9 text-sm" /></div></div>
+        <div className="w-full sm:w-auto sm:min-w-[150px]"><label className="label mb-1 block text-xs">Method</label><select value={filters.paymentMethod} onChange={e => onFilterChange({ ...filters, paymentMethod: e.target.value })} className="input text-sm"><option value="">All</option>{['Cash', 'Online', 'Cheque', 'Bank Transfer', 'UPI', 'Card'].map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+        <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">From</label><input type="date" value={filters.startDate} onChange={e => onFilterChange({ ...filters, startDate: e.target.value })} className="input text-sm" /></div>
+        <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">To</label><input type="date" value={filters.endDate} onChange={e => onFilterChange({ ...filters, endDate: e.target.value })} className="input text-sm" /></div>
+        <button onClick={onClearFilters} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><X className="h-3.5 w-3.5" /> Clear</button>
+      </div>
+    </div>
+    <div className="card overflow-hidden">
+      <div className="px-5 py-4 border-b border-gray-100 dark:border-[#38383A] flex items-center justify-between"><h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2"><FileText className="h-4 w-4 text-primary-500" /> All Receipts {!loading && <span className="text-xs font-normal text-gray-400 dark:text-[#636366]">({receipts.length})</span>}</h3></div>
+      {loading ? <LoadingSpinner /> : receipts.length === 0 ? <EmptyState icon={FileText} title="No receipts" description="Try adjusting filters" /> : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
+            <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Receipt No.', 'Student', 'Class', 'Amount', 'Method', 'Date', 'Actions'].map(h => <th key={h} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${h === 'Actions' ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
+            <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-100 dark:divide-[#38383A]">
+              {receipts.map((p) => (
+                <tr key={p._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                  <td className="px-5 py-3 whitespace-nowrap text-sm font-mono font-semibold text-primary-600 dark:text-primary-400">{p.receiptNumber}</td>
+                  <td className="px-5 py-3 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{p.studentId?.name || p.studentId?.fullName || 'N/A'}</div><div className="text-xs text-gray-400 dark:text-[#636366]">{p.studentId?.admissionNumber || ''}</div></td>
+                  <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{p.studentId?.classId?.name || '-'}</td>
+                  <td className="px-5 py-3 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(p.amount)}</td>
+                  <td className="px-5 py-3 whitespace-nowrap"><span className="px-2 py-0.5 bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] text-xs rounded-md font-medium">{p.paymentMethod}</span></td>
+                  <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(p.paymentDate).toLocaleDateString('en-IN')}</td>
+                  <td className="px-5 py-3 whitespace-nowrap text-right"><div className="flex justify-end gap-1"><button onClick={() => onPrintReceipt(p._id)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button><button onClick={() => onDownloadReceipt(p._id)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"><Download className="h-3.5 w-3.5" /></button></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  </div>
+)
+
+// ── Disputes Tab ──
+
+const DisputesTab = ({ data, loading, resolvingDispute, resolveForm, onSetResolvingDispute, onSetResolveForm, onResolve, onRefresh }) => {
+  if (loading) return <LoadingSpinner />
+  return (
+    <div className="space-y-6">
+      {data.stuckPayments?.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-4"><AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0" /><div><h3 className="text-sm font-semibold text-amber-900 dark:text-amber-300">Stuck Payments ({data.stuckPayments.length})</h3><p className="text-xs text-amber-700 dark:text-amber-400/80 mt-0.5">Pending for more than 1 hour.</p></div></div>
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[600px]"><thead><tr className="text-left text-xs font-medium text-amber-800 dark:text-amber-400 uppercase tracking-wide border-b border-amber-200 dark:border-amber-800/30">{['Student', 'Invoice', 'Amount', 'Since'].map(h => <th key={h} className="pb-2 pr-4">{h}</th>)}</tr></thead><tbody className="divide-y divide-amber-100 dark:divide-amber-900/30">{data.stuckPayments.map(p => <tr key={p._id}><td className="py-2 pr-4 font-medium text-gray-900 dark:text-white">{p.studentId?.fullName || p.studentId?.name || 'N/A'}</td><td className="py-2 pr-4 text-gray-600 dark:text-[#8E8E93]">{p.invoiceId?.invoiceNumber || '-'}</td><td className="py-2 pr-4 font-mono text-gray-800 dark:text-white">{formatCurrency(p.amount)}</td><td className="py-2 text-xs text-gray-500 dark:text-[#8E8E93]">{new Date(p.createdAt).toLocaleString('en-IN')}</td></tr>)}</tbody></table></div>
+        </div>
+      )}
+      <div className="card overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-[#38383A] flex items-center justify-between">
+          <div className="flex items-center gap-2"><AlertCircle className="h-5 w-5 text-red-500" /><h3 className="font-semibold text-gray-900 dark:text-white">Active Disputes</h3>{data.disputes?.length > 0 && <span className="px-2 py-0.5 text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">{data.disputes.length}</span>}</div>
+          <button onClick={onRefresh} className="text-sm text-primary-600 dark:text-primary-400 font-medium">Refresh</button>
+        </div>
+        {data.disputes?.length === 0 ? (
+          <div className="text-center py-16"><div className="h-12 w-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3"><Check className="h-6 w-6 text-green-600 dark:text-green-400" /></div><p className="text-gray-600 dark:text-[#8E8E93] font-medium">No active disputes</p></div>
+        ) : (
+          <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
+            {data.disputes.map(d => (
+              <div key={d._id} className="px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap"><span className="font-semibold text-gray-900 dark:text-white">{d.studentId?.fullName || d.studentId?.name || 'N/A'}</span><StatusBadge status={d.status} /></div>
+                    <p className="text-sm text-gray-600 dark:text-[#8E8E93] mt-1">Invoice: <span className="font-mono font-medium">{d.invoiceId?.invoiceNumber || '-'}</span>{d.invoiceId?.totalAmount && <> &middot; {formatCurrency(d.invoiceId.totalAmount)}</>}</p>
+                    {d.reason && <p className="text-sm text-gray-500 dark:text-[#636366] mt-1 italic">&quot;{d.reason}&quot;</p>}
+                  </div>
+                  <button onClick={() => { onSetResolvingDispute(d._id); onSetResolveForm({ action: 'APPROVE', note: '' }) }} className="btn btn-primary btn-sm flex-shrink-0">Resolve</button>
+                </div>
+                {resolvingDispute === d._id && (
+                  <div className="mt-4 p-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-200 dark:border-[#38383A]">
+                    <div className="flex gap-3 mb-3">{['APPROVE', 'REJECT'].map(a => <button key={a} onClick={() => onSetResolveForm(f => ({ ...f, action: a }))} className={`flex-1 py-2 text-sm font-medium rounded-xl border-2 transition-colors ${resolveForm.action === a ? a === 'APPROVE' ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400' : 'border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93]'}`}>{a === 'APPROVE' ? 'Approve' : 'Reject'}</button>)}</div>
+                    <textarea value={resolveForm.note} onChange={e => onSetResolveForm(f => ({ ...f, note: e.target.value }))} placeholder="Admin note (required)..." rows={2} className="input mb-3 resize-none" />
+                    <div className="flex gap-2 justify-end"><button onClick={() => onSetResolvingDispute(null)} className="btn btn-outline btn-sm">Cancel</button><button onClick={() => onResolve(d._id)} className="btn btn-primary btn-sm">Confirm</button></div>
+                  </div>
                 )}
-
-                {/* HISTORY TAB */}
-                {activeTab === 'history' && (
-                    <div className="p-6">
-                        {payments.length === 0 ? (
-                            <div className="text-center py-8">
-                                <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">No History</h3>
-                                <p className="text-gray-600">No payment history found for this student.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {payments.map((payment) => (
-                                    <div key={payment._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="font-semibold text-gray-900">{formatCurrency(payment.amount)}</span>
-                                                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">Paid</span>
-                                            </div>
-                                            <div className="text-sm text-gray-500">
-                                                {new Date(payment.paymentDate).toLocaleDateString()} • {payment.paymentMethod}
-                                            </div>
-                                            <div className="text-xs text-gray-400 mt-1">Receipt: {payment.receiptNumber}</div>
-                                        </div>
-                                        <button
-                                            onClick={() => onPrintReceipt(payment._id)}
-                                            className="p-2 text-gray-600 hover:text-primary-600 hover:bg-white rounded-full transition-colors border border-transparent hover:border-gray-200"
-                                            title="Print Receipt"
-                                        >
-                                            <Printer className="h-5 w-5" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <div className="mt-6 flex justify-end pt-4 border-t border-gray-200">
-                            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    )
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
-// Bulk Delete Invoice Form Component
-const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
-    const [form, setForm] = useState({
-        classId: '',
-        sectionId: ''
-    })
-    const [isDeleting, setIsDeleting] = useState(false)
-    const [isPreviewing, setIsPreviewing] = useState(false)
-    const [previewCount, setPreviewCount] = useState(null) // null = not previewed yet
+// ── Reports Tab ──
 
-    // Reset preview when class changes
-    const handleClassChange = (e) => {
-        setForm({ ...form, classId: e.target.value, sectionId: '' })
-        setPreviewCount(null)
-    }
+const ReportsTab = ({ report }) => (
+  <div className="card p-4 sm:p-6">
+    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-6">Collection Report (This Month)</h3>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-xl"><p className="text-sm font-medium text-green-900 dark:text-green-300">Total Collected</p><p className="text-2xl font-bold text-green-700 dark:text-green-400 mt-2">{formatCurrency(report.summary.totalAmount)}</p><p className="text-sm text-green-600 dark:text-green-400/80 mt-1">{report.summary.totalCount} payments</p></div>
+      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-xl"><p className="text-sm font-medium text-blue-900 dark:text-blue-300">Daily Average</p><p className="text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">{formatCurrency(report.summary.totalAmount / (report.byDate?.length || 1))}</p></div>
+    </div>
+    {report.byDate?.length > 0 && (
+      <div className="overflow-x-auto"><table className="w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]"><thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Date', 'Collections', 'Amount'].map(h => <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">{h}</th>)}</tr></thead><tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">{report.byDate.map(d => <tr key={d.date} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{new Date(d.date).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{d.count}</td><td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(d.amount)}</td></tr>)}</tbody></table></div>
+    )}
+  </div>
+)
 
-    const handlePreview = async () => {
-        if (!form.classId) {
-            toast.error('Please select a class')
-            return
-        }
+// ── Refunds Tab ──
 
-        try {
-            setIsPreviewing(true)
-            const res = await invoicesService.list({
-                classId: form.classId,
-                academicSessionId: activeSession._id,
-                status: 'Pending'
-            })
-            const invoices = res.data || []
-            setPreviewCount(invoices.length)
-        } catch (error) {
-            console.error('Preview error:', error)
-            toast.error('Failed to fetch invoice count')
-        } finally {
-            setIsPreviewing(false)
-        }
-    }
+const RefundsTab = () => {
+  const queryClient = useQueryClient()
+  const [statusFilter, setStatusFilter] = useState('')
+  const [showInitiateModal, setShowInitiateModal] = useState(false)
+  const [refundForm, setRefundForm] = useState({ paymentId: '', studentId: '', invoiceId: '', amount: '', reason: '', refundMethod: 'original' })
+  const [processingId, setProcessingId] = useState(null)
+  const [rejectModal, setRejectModal] = useState({ isOpen: false, refundId: null })
+  const [rejectReason, setRejectReason] = useState('')
 
-    const handleSubmit = async (e) => {
-        e.preventDefault()
+  const { data: refunds = [], isLoading: loading } = useQuery({ queryKey: ['fees-refunds', statusFilter], queryFn: async () => { const res = await refundsService.list({ status: statusFilter || undefined }); return res.data || [] } })
+  const initiateRefundMutation = useMutation({ mutationFn: (data) => refundsService.initiate({ ...data, amount: parseFloat(data.amount) }), onSuccess: () => { toast.success('Refund initiated'); setShowInitiateModal(false); setRefundForm({ paymentId: '', studentId: '', invoiceId: '', amount: '', reason: '', refundMethod: 'original' }); queryClient.invalidateQueries({ queryKey: ['fees-refunds'] }) }, onError: (e) => toast.error(e.message || 'Failed') })
 
-        if (!form.classId) {
-            toast.error('Please select a class')
-            return
-        }
+  const handleApprove = async (id) => { try { setProcessingId(id); await refundsService.approve(id); toast.success('Approved'); queryClient.invalidateQueries({ queryKey: ['fees-refunds'] }) } catch (e) { toast.error(e.message || 'Failed') } finally { setProcessingId(null) } }
+  const handleReject = async () => { try { setProcessingId(rejectModal.refundId); await refundsService.reject(rejectModal.refundId, rejectReason); toast.success('Rejected'); setRejectModal({ isOpen: false, refundId: null }); setRejectReason(''); queryClient.invalidateQueries({ queryKey: ['fees-refunds'] }) } catch (e) { toast.error(e.message || 'Failed') } finally { setProcessingId(null) } }
+  const handleProcess = async (id) => { try { setProcessingId(id); await refundsService.process(id, { processedDate: new Date().toISOString() }); toast.success('Processed'); queryClient.invalidateQueries({ queryKey: ['fees-refunds'] }) } catch (e) { toast.error(e.message || 'Failed') } finally { setProcessingId(null) } }
 
-        if (previewCount === null) {
-            toast.error('Please preview first to see how many invoices will be deleted')
-            return
-        }
+  const badgeCls = (s) => ({ pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400', approved: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400', processed: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400', rejected: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400' }[s] || 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-800 dark:text-[#8E8E93]')
 
-        if (previewCount === 0) {
-            toast.error('No pending invoices found for this class')
-            return
-        }
-
-        if (!window.confirm(`Are you sure you want to delete ${previewCount} pending invoice(s) for this class? This cannot be undone.`)) {
-            return
-        }
-
-        try {
-            setIsDeleting(true)
-            await invoicesService.deleteBulk({
-                classId: form.classId,
-                sectionId: form.sectionId || undefined,
-                academicSessionId: activeSession._id
-            })
-
-            toast.success(`Successfully deleted ${previewCount} pending invoice(s)`)
-            setForm({ classId: '', sectionId: '' })
-            setPreviewCount(null)
-            onSuccess()
-        } catch (error) {
-            console.error('Bulk delete error:', error)
-            toast.error(error.response?.data?.message || 'Failed to delete invoices')
-        } finally {
-            setIsDeleting(false)
-        }
-    }
-
-    return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Class</label>
-                <select
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                    value={form.classId}
-                    onChange={handleClassChange}
-                    required
-                >
-                    <option value="">Select Class</option>
-                    {classes.map((cls) => (
-                        <option key={cls._id} value={cls._id}>{cls.name}</option>
-                    ))}
-                </select>
-            </div>
-
-            {/* Preview Button */}
-            {form.classId && previewCount === null && (
-                <button
-                    type="button"
-                    onClick={handlePreview}
-                    disabled={isPreviewing}
-                    className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center justify-center gap-2 border border-gray-300"
-                >
-                    {isPreviewing ? 'Checking...' : 'Preview Invoices to Delete'}
-                </button>
-            )}
-
-            {/* Preview Result */}
-            {previewCount !== null && (
-                <div className={`rounded-lg p-4 border ${previewCount > 0 ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
-                    {previewCount > 0 ? (
-                        <div className="flex items-center gap-2">
-                            <Trash2 className="h-5 w-5 text-red-500 flex-shrink-0" />
-                            <div>
-                                <p className="text-sm font-semibold text-red-800">
-                                    {previewCount} pending invoice(s) will be deleted
-                                </p>
-                                <p className="text-xs text-red-600 mt-0.5">Only invoices with no payments will be removed</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="text-sm font-medium text-green-800">
-                            ✓ No pending invoices found for this class
-                        </p>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setPreviewCount(null)}
-                        className="text-xs text-gray-500 underline mt-2 block"
-                    >
-                        Re-check
-                    </button>
-                </div>
-            )}
-
-            {/* Delete Button — only shown after preview with results */}
-            {previewCount !== null && previewCount > 0 && (
-                <button
-                    type="submit"
-                    className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                    disabled={isDeleting}
-                >
-                    <Trash2 className="h-4 w-4" />
-                    {isDeleting ? 'Deleting...' : `Delete ${previewCount} Pending Invoice(s)`}
-                </button>
-            )}
-
-            <p className="text-xs text-red-500 text-center">
-                * Only pending invoices with no payments will be deleted.
-            </p>
-        </form>
-    )
+  return (
+    <div className="space-y-4">
+      <div className="card p-3 sm:p-4"><div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="flex sm:items-center gap-2 sm:gap-3 flex-col sm:flex-row"><h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Refunds</h3><select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input text-sm w-auto"><option value="">All</option>{['pending', 'approved', 'processed', 'rejected'].map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
+        <button onClick={() => setShowInitiateModal(true)} className="btn btn-primary btn-sm flex items-center justify-center gap-1"><Plus className="h-4 w-4" />Initiate</button>
+      </div></div>
+      <div className="card overflow-hidden">
+        {loading ? <div className="flex justify-center py-12"><LoadingSpinner /></div> : refunds.length === 0 ? <EmptyState icon={RotateCcw} title="No refunds" description="Initiate a refund for overpayments" /> : (
+          <div className="overflow-x-auto"><table className="w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
+            <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Student', 'Amount', 'Reason', 'Method', 'Status', 'Date', 'Actions'].map(h => <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">{h}</th>)}</tr></thead>
+            <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
+              {refunds.map(r => (
+                <tr key={r._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
+                  <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{r.studentId?.fullName || r.studentId?.name || 'N/A'}</div></td>
+                  <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(r.amount)}</td>
+                  <td className="px-5 py-4 text-sm text-gray-600 dark:text-[#8E8E93] max-w-xs truncate">{r.reason}</td>
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93] capitalize">{r.refundMethod || 'Original'}</td>
+                  <td className="px-5 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${badgeCls(r.status)}`}>{r.status}</span></td>
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(r.createdAt).toLocaleDateString()}</td>
+                  <td className="px-5 py-4 whitespace-nowrap"><div className="flex gap-1">
+                    {r.status === 'pending' && <><button onClick={() => handleApprove(r._id)} disabled={processingId === r._id} className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg"><Check className="h-4 w-4" /></button><button onClick={() => setRejectModal({ isOpen: true, refundId: r._id })} className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Ban className="h-4 w-4" /></button></>}
+                    {r.status === 'approved' && <button onClick={() => handleProcess(r._id)} disabled={processingId === r._id} className="btn btn-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/30">{processingId === r._id ? '...' : 'Process'}</button>}
+                  </div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+        )}
+      </div>
+      {showInitiateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"><div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-scale-in">
+          <div className="p-5 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center"><h3 className="text-lg font-bold text-gray-900 dark:text-white">Initiate Refund</h3><button onClick={() => setShowInitiateModal(false)} className="btn-close"><X className="h-5 w-5" /></button></div>
+          <form onSubmit={(e) => { e.preventDefault(); initiateRefundMutation.mutate(refundForm) }} className="p-5 space-y-4">
+            <div><label className="label mb-1 block">Student</label><StudentSearch onSelectStudent={(s) => setRefundForm(f => ({ ...f, studentId: s._id }))} /></div>
+            <div><label className="label mb-1 block">Amount *</label><input type="number" required min="1" className="input" placeholder="e.g. 5000" value={refundForm.amount} onChange={(e) => setRefundForm(f => ({ ...f, amount: e.target.value }))} /></div>
+            <div><label className="label mb-1 block">Method</label><select className="input" value={refundForm.refundMethod} onChange={(e) => setRefundForm(f => ({ ...f, refundMethod: e.target.value }))}><option value="original">Original Method</option><option value="bank_transfer">Bank Transfer</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="adjust_next">Adjust Next Invoice</option></select></div>
+            <div><label className="label mb-1 block">Reason *</label><textarea required rows="3" className="input resize-none" placeholder="e.g. Overpayment..." value={refundForm.reason} onChange={(e) => setRefundForm(f => ({ ...f, reason: e.target.value }))} /></div>
+            <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setShowInitiateModal(false)} className="btn btn-outline btn-sm">Cancel</button><button type="submit" disabled={initiateRefundMutation.isPending} className="btn btn-primary btn-sm">{initiateRefundMutation.isPending ? 'Initiating...' : 'Initiate'}</button></div>
+          </form>
+        </div></div>
+      )}
+      {rejectModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"><div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-scale-in">
+          <div className="p-5 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center"><h3 className="text-base font-bold text-gray-900 dark:text-white">Reject Refund</h3><button onClick={() => { setRejectModal({ isOpen: false, refundId: null }); setRejectReason('') }} className="btn-close"><X className="h-4 w-4" /></button></div>
+          <div className="p-5 space-y-4">
+            <textarea required rows="3" className="input resize-none" placeholder="Rejection reason..." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+            <div className="flex justify-end gap-3"><button onClick={() => { setRejectModal({ isOpen: false, refundId: null }); setRejectReason('') }} className="btn btn-outline btn-sm">Cancel</button><button onClick={handleReject} disabled={!rejectReason.trim()} className="btn btn-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">Reject</button></div>
+          </div>
+        </div></div>
+      )}
+    </div>
+  )
 }
 
 export default FeesFinance

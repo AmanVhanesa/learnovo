@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fee Receipt — SP International School</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset ──────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  body {
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    background: #f4f5f7;
+    color: #334155;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Receipt Card ───────────────────────────────── */
+  .receipt {
+    width: 210mm;
+    height: 148mm;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ─────────────────────────────────────── */
+  .receipt-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px 12px;
+    border-bottom: 1.5px solid #e5e7eb;
+  }
+  .logo-container {
+    width: 50px; height: 50px; min-width: 50px;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  /* When real logo image is present */
+  .logo-container img {
+    width: 100%; height: 100%; object-fit: contain;
+  }
+  /* Fallback initials when no logo available */
+  .logo-initials {
+    font-size: 20px; font-weight: 700;
+    color: #2563eb; letter-spacing: 1px;
+  }
+  .header-text { flex: 1; min-width: 0; }
+  .school-name {
+    font-size: 16px; font-weight: 700;
+    color: #0f172a;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    line-height: 1.2;
+    margin-bottom: 3px;
+  }
+  .school-address {
+    font-size: 8px; color: #475569; line-height: 1.5;
+    font-weight: 500; margin-bottom: 1px;
+  }
+  .school-meta {
+    font-size: 7.5px; color: #6b7280; line-height: 1.5;
+    font-weight: 500;
+  }
+  .school-codes {
+    display: inline-flex; gap: 8px; margin-top: 2px;
+  }
+  .school-code-tag {
+    font-size: 6.5px; font-weight: 600; color: #3b82f6;
+    background: #eff6ff; padding: 1.5px 6px; border-radius: 3px;
+    letter-spacing: .3px;
+  }
+
+  /* ── Receipt Tag ────────────────────────────────── */
+  .receipt-tag {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 24px 0;
+    padding: 7px 14px;
+    background: linear-gradient(90deg, #eff6ff, #f8fafc);
+    border-radius: 6px;
+    border-left: 3px solid #2563eb;
+  }
+  .tag-label {
+    font-size: 10px; font-weight: 700;
+    color: #2563eb;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+  }
+  .tag-meta {
+    font-size: 9px; font-weight: 600;
+    color: #475569;
+    font-family: 'DM Sans', monospace;
+  }
+
+  /* ── Body ────────────────────────────────────────── */
+  .receipt-body {
+    flex: 1;
+    padding: 10px 24px 8px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* ── Two-column info grid ───────────────────────── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 32px;
+  }
+  .col-title {
+    font-size: 7.5px; font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    padding-bottom: 3px;
+    margin-bottom: 3px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .row {
+    display: flex;
+    margin-bottom: 2.5px;
+  }
+  .row-label {
+    width: 68px; min-width: 68px;
+    font-size: 8px; font-weight: 500;
+    color: #6b7280;
+  }
+  .row-value {
+    flex: 1;
+    font-size: 9px; font-weight: 600;
+    color: #111827;
+  }
+  .row-value.accent {
+    color: #2563eb; font-weight: 600;
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 8px; font-weight: 600;
+    color: #059669;
+  }
+  .status-pill::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #34d399;
+  }
+
+  /* ── Fee Breakdown ──────────────────────────────── */
+  .fee-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 2px;
+  }
+  .fee-table thead th {
+    font-size: 7px; font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 4px 0;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .fee-table thead th:last-child { text-align: right; }
+  .fee-table tbody td {
+    font-size: 8.5px; font-weight: 500;
+    color: #374151;
+    padding: 3.5px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .fee-table tbody td:last-child {
+    text-align: right;
+    font-weight: 600;
+    color: #111827;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Amount Strip ───────────────────────────────── */
+  .amount-strip {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border: 1.5px solid #93c5fd;
+    border-radius: 8px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .amount-strip-label {
+    font-size: 8px; font-weight: 600;
+    color: #3b82f6;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .amount-strip-value {
+    font-size: 22px; font-weight: 700;
+    color: #1e40af;
+    letter-spacing: -.3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .amount-strip-value .rs {
+    font-size: 14px; font-weight: 600;
+    margin-right: 1px;
+  }
+
+  /* ── Signatures ─────────────────────────────────── */
+  .signatures {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: auto;
+    padding: 0 6px;
+  }
+  .sig-block {
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .sig-image-area {
+    width: 110px; height: 40px;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .sig-image-area img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+  }
+  .sig-empty { width: 110px; height: 40px; }
+  .sig-line {
+    width: 110px;
+    border-top: 1px solid #d1d5db;
+  }
+  .sig-label {
+    font-size: 7.5px; font-weight: 500;
+    color: #6b7280; margin-top: 3px;
+  }
+
+  /* ── Footer ─────────────────────────────────────── */
+  .receipt-footer {
+    padding: 5px 24px 4px;
+    text-align: center;
+    font-size: 6.5px; color: #9ca3af;
+    border-top: 1px solid #e5e7eb;
+    font-weight: 500;
+  }
+  .receipt-footer .brand {
+    color: #2563eb; font-weight: 600;
+  }
+  .receipt-footer .generated-on {
+    margin-top: 2px;
+    font-size: 6.5px; color: #9ca3af; font-weight: 500;
+  }
+
+  /* ── Cut Line ───────────────────────────────────── */
+  .cut-line {
+    width: 210mm;
+    border: none;
+    border-top: 1.5px dashed #d1d5db;
+    margin: 8px 0 3px;
+  }
+  .cut-label {
+    text-align: center;
+    font-size: 7px; color: #d1d5db;
+    font-weight: 400; letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  /* ── Wrapper ────────────────────────────────────── */
+  .page-wrapper {
+    display: flex; flex-direction: column; align-items: center;
+  }
+
+  /* ── Toolbar ────────────────────────────────────── */
+  .toolbar {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: #fff; color: #1f2937;
+    padding: 10px 24px;
+    display: flex; gap: 10px; align-items: center;
+    z-index: 999;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .toolbar-title {
+    flex: 1; font-size: 13px; font-weight: 500;
+  }
+  .btn {
+    padding: 6px 16px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-weight: 500;
+    font-family: 'DM Sans', sans-serif; transition: all .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn-print { background: #3b82f6; color: white; }
+  .btn-close { background: #f3f4f6; color: #6b7280; }
+  .page-body { padding-top: 54px; }
+
+  /* ── Data Source Guide (screen only) ────────────── */
+  .data-guide {
+    width: 210mm;
+    margin-top: 32px;
+    padding: 20px 24px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+    font-size: 12px;
+    color: #374151;
+    line-height: 1.7;
+  }
+  .data-guide h3 {
+    font-size: 13px; font-weight: 600; color: #111827;
+    margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  .data-guide table {
+    width: 100%; border-collapse: collapse; font-size: 11px;
+  }
+  .data-guide th {
+    text-align: left; font-weight: 500; color: #9ca3af;
+    font-size: 9px; text-transform: uppercase; letter-spacing: .5px;
+    padding: 6px 8px; border-bottom: 1px solid #f3f4f6;
+  }
+  .data-guide td {
+    padding: 5px 8px; border-bottom: 1px solid #fafafa;
+    vertical-align: top;
+  }
+  .data-guide .src {
+    font-size: 10px; color: #6b7280;
+    background: #f9fafb; padding: 1px 6px; border-radius: 3px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+  .data-guide .model {
+    font-size: 9px; color: #3b82f6; font-weight: 500;
+  }
+
+  /* ── Print ──────────────────────────────────────── */
+  @media print {
+    body { background: none; padding: 0; margin: 0; }
+    @page { size: A4 portrait; margin: 0; }
+    .toolbar, .data-guide { display: none !important; }
+    .page-body { padding-top: 0 !important; }
+    .page-wrapper { width: 210mm; min-height: 297mm; padding: 8mm 14mm; }
+    .receipt {
+      border-radius: 0; box-shadow: none;
+      page-break-inside: avoid;
+      width: 100%;
+    }
+    .cut-line { width: 210mm; margin: 0; }
+    .cut-label { margin: 0; }
+    @page { size: A4 portrait; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <span class="toolbar-title">Receipt #RCP-2026-00001</span>
+  <button class="btn btn-print" onclick="window.print()">Print / Save as PDF</button>
+  <button class="btn btn-close" onclick="window.close()">Close</button>
+</div>
+
+<div class="page-body">
+<div class="page-wrapper">
+
+  <!-- ══════════════════════════════════════════════
+       RECEIPT 1 — School Copy
+       ══════════════════════════════════════════════ -->
+  <div class="receipt">
+
+    <div class="receipt-header">
+      <!-- Logo from: Tenant.logo OR Settings.institution.logo -->
+      <div class="logo-container">
+        <img src="https://ui-avatars.com/api/?name=SP&background=dbeafe&color=2563eb&size=108&font-size=0.38&bold=true&format=svg" alt="School Logo">
+      </div>
+      <div class="header-text">
+        <!-- Tenant.schoolName -->
+        <div class="school-name">SP International School</div>
+        <!-- Settings.institution.address -->
+        <div class="school-address">123 Knowledge Park, Sector 62, Noida, Uttar Pradesh 201301</div>
+        <!-- Settings.institution.contact.phone | Settings.institution.contact.email -->
+        <div class="school-meta">+91 98765 43210 &nbsp;&middot;&nbsp; info@spinternational.edu.in</div>
+        <!-- Settings.institution.schoolCode | Settings.institution.udiseCode -->
+        <div class="school-codes">
+          <span class="school-code-tag">Code: SPIS-2024</span>
+          <span class="school-code-tag">UDISE: 09876543210</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="receipt-tag">
+      <span class="tag-label">Payment Receipt</span>
+      <!-- Payment.receiptNumber -->
+      <span class="tag-meta">#RCP-2026-00001 &nbsp;&middot;&nbsp; School Copy</span>
+    </div>
+
+    <div class="receipt-body">
+      <div class="info-grid">
+
+        <!-- Left: Student -->
+        <div>
+          <div class="col-title">Student</div>
+          <!-- payment.studentId.name || payment.studentId.fullName -->
+          <div class="row">
+            <span class="row-label">Name</span>
+            <span class="row-value">Aarav Sharma</span>
+          </div>
+          <!-- payment.studentId.admissionNumber -->
+          <div class="row">
+            <span class="row-label">Adm. No.</span>
+            <span class="row-value">SPIS/2025/0042</span>
+          </div>
+          <!-- payment.studentId.classId.name + payment.studentId.section -->
+          <div class="row">
+            <span class="row-label">Class</span>
+            <span class="row-value">VIII (A)</span>
+          </div>
+          <!-- payment.studentId.fatherName -->
+          <div class="row">
+            <span class="row-label">Father</span>
+            <span class="row-value">Rajesh Sharma</span>
+          </div>
+        </div>
+
+        <!-- Right: Payment -->
+        <div>
+          <div class="col-title">Payment</div>
+          <!-- new Date(payment.paymentDate).toLocaleDateString('en-IN') -->
+          <div class="row">
+            <span class="row-label">Date</span>
+            <span class="row-value">15/03/2026</span>
+          </div>
+          <!-- payment.paymentMethod -->
+          <div class="row">
+            <span class="row-label">Mode</span>
+            <span class="row-value">Online / UPI</span>
+          </div>
+          <!-- payment.transactionDetails.referenceNumber -->
+          <div class="row">
+            <span class="row-label">Ref. No.</span>
+            <span class="row-value">UPI-426819374625</span>
+          </div>
+          <!-- payment.invoiceId.billingPeriod.displayText -->
+          <div class="row">
+            <span class="row-label">Period</span>
+            <span class="row-value accent">Q4 — Jan to Mar 2026</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Status</span>
+            <span class="row-value"><span class="status-pill">Paid</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fee Breakdown (from invoice line items) -->
+      <table class="fee-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th style="text-align:right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Tuition Fee</td><td>8,000.00</td></tr>
+          <tr><td>Computer Lab Fee</td><td>1,500.00</td></tr>
+          <tr><td>Activity &amp; Sports</td><td>1,500.00</td></tr>
+          <tr><td>Library &amp; Maintenance</td><td>1,000.00</td></tr>
+          <tr><td>Late Fee</td><td>500.00</td></tr>
+        </tbody>
+      </table>
+
+      <!-- payment.amount -->
+      <div class="amount-strip">
+        <span class="amount-strip-label">Total Amount Paid</span>
+        <span class="amount-strip-value"><span class="rs">&#8377;</span>12,500</span>
+      </div>
+
+      <!-- Signatures -->
+      <div class="signatures">
+        <div class="sig-block">
+          <div class="sig-empty"></div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Depositor</div>
+        </div>
+        <div class="sig-block">
+          <!-- Settings.institution.principalSignature -->
+          <div class="sig-image-area">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Autograph_of_Benjamin_Franklin.svg/320px-Autograph_of_Benjamin_Franklin.svg.png" alt="Principal Signature">
+          </div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Authorized Signatory</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="receipt-footer">
+      Computer-generated receipt. Valid without physical signature. &nbsp;&middot;&nbsp;
+      Powered by <span class="brand">Learnovo</span>
+      <div class="generated-on">Generated on <script>document.write(new Date().toLocaleString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}))</script></div>
+    </div>
+  </div>
+
+  <!-- ═══ CUT LINE ═══ -->
+  <hr class="cut-line">
+  <div class="cut-label">&#9986; &nbsp; cut here &nbsp; &#9986;</div>
+
+  <!-- ══════════════════════════════════════════════
+       RECEIPT 2 — Student Copy
+       ══════════════════════════════════════════════ -->
+  <div class="receipt">
+
+    <div class="receipt-header">
+      <div class="logo-container">
+        <img src="https://ui-avatars.com/api/?name=SP&background=f3f4f6&color=6b7280&size=92&font-size=0.38&bold=true&format=svg" alt="School Logo">
+      </div>
+      <div class="header-text">
+        <div class="school-name">SP International School</div>
+        <div class="school-meta">123 Knowledge Park, Sector 62, Noida, Uttar Pradesh 201301</div>
+        <div class="school-meta">+91 98765 43210 &nbsp;&middot;&nbsp; info@spinternational.edu.in</div>
+        <div class="school-meta">School Code: SPIS-2024 &nbsp;&middot;&nbsp; UDISE: 09876543210</div>
+      </div>
+    </div>
+
+    <div class="receipt-tag">
+      <span class="tag-label">Payment Receipt</span>
+      <span class="tag-meta">#RCP-2026-00001 &nbsp;&middot;&nbsp; Student Copy</span>
+    </div>
+
+    <div class="receipt-body">
+      <div class="info-grid">
+        <div>
+          <div class="col-title">Student</div>
+          <div class="row">
+            <span class="row-label">Name</span>
+            <span class="row-value">Aarav Sharma</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Adm. No.</span>
+            <span class="row-value">SPIS/2025/0042</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Class</span>
+            <span class="row-value">VIII (A)</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Father</span>
+            <span class="row-value">Rajesh Sharma</span>
+          </div>
+        </div>
+        <div>
+          <div class="col-title">Payment</div>
+          <div class="row">
+            <span class="row-label">Date</span>
+            <span class="row-value">15/03/2026</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Mode</span>
+            <span class="row-value">Online / UPI</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Ref. No.</span>
+            <span class="row-value">UPI-426819374625</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Period</span>
+            <span class="row-value accent">Q4 — Jan to Mar 2026</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Status</span>
+            <span class="row-value"><span class="status-pill">Paid</span></span>
+          </div>
+        </div>
+      </div>
+
+      <table class="fee-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th style="text-align:right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Tuition Fee</td><td>8,000.00</td></tr>
+          <tr><td>Computer Lab Fee</td><td>1,500.00</td></tr>
+          <tr><td>Activity &amp; Sports</td><td>1,500.00</td></tr>
+          <tr><td>Library &amp; Maintenance</td><td>1,000.00</td></tr>
+          <tr><td>Late Fee</td><td>500.00</td></tr>
+        </tbody>
+      </table>
+
+      <div class="amount-strip">
+        <span class="amount-strip-label">Total Amount Paid</span>
+        <span class="amount-strip-value"><span class="rs">&#8377;</span>12,500</span>
+      </div>
+
+      <div class="signatures">
+        <div class="sig-block">
+          <div class="sig-empty"></div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Depositor</div>
+        </div>
+        <div class="sig-block">
+          <div class="sig-image-area">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Autograph_of_Benjamin_Franklin.svg/320px-Autograph_of_Benjamin_Franklin.svg.png" alt="Principal Signature">
+          </div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Authorized Signatory</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="receipt-footer">
+      Computer-generated receipt. Valid without physical signature. &nbsp;&middot;&nbsp;
+      Powered by <span class="brand">Learnovo</span>
+      <div class="generated-on">Generated on <script>document.write(new Date().toLocaleString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}))</script></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       DATA SOURCE REFERENCE (screen only)
+       ══════════════════════════════════════════════ -->
+  <div class="data-guide">
+    <h3>Data Source Reference — Where each field comes from</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Receipt Field</th>
+          <th>Source Model</th>
+          <th>Field Path</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>School Logo</td>
+          <td><span class="model">Tenant</span> / <span class="model">Settings</span></td>
+          <td><span class="src">Tenant.logo</span> or <span class="src">Settings.institution.logo</span></td>
+          <td>Tenant logo used first; Settings overrides if present</td>
+        </tr>
+        <tr>
+          <td>School Name</td>
+          <td><span class="model">Tenant</span></td>
+          <td><span class="src">Tenant.schoolName</span></td>
+          <td>Primary source — always from Tenant model</td>
+        </tr>
+        <tr>
+          <td>Address</td>
+          <td><span class="model">Settings</span> / <span class="model">Tenant</span></td>
+          <td><span class="src">Settings.institution.address</span> or <span class="src">Tenant.fullAddress</span></td>
+          <td>Settings.institution.address (street, city, state, pincode)</td>
+        </tr>
+        <tr>
+          <td>Phone / Email</td>
+          <td><span class="model">Settings</span> &gt; <span class="model">Tenant</span></td>
+          <td><span class="src">Settings.institution.contact.phone</span>, <span class="src">.email</span></td>
+          <td>Settings overrides Tenant values</td>
+        </tr>
+        <tr>
+          <td>School Code</td>
+          <td><span class="model">Settings</span></td>
+          <td><span class="src">Settings.institution.schoolCode</span></td>
+          <td>Only in Settings model</td>
+        </tr>
+        <tr>
+          <td>UDISE Code</td>
+          <td><span class="model">Settings</span></td>
+          <td><span class="src">Settings.institution.udiseCode</span></td>
+          <td>Only in Settings model</td>
+        </tr>
+        <tr>
+          <td>Receipt Number</td>
+          <td><span class="model">Payment</span></td>
+          <td><span class="src">Payment.receiptNumber</span></td>
+          <td>Auto-generated: <code>RCP-YYYY-#####</code> via Counter model</td>
+        </tr>
+        <tr>
+          <td>Student Name</td>
+          <td><span class="model">Student</span></td>
+          <td><span class="src">payment.studentId.name</span> || <span class="src">.fullName</span></td>
+          <td>Populated via Payment → studentId ref</td>
+        </tr>
+        <tr>
+          <td>Admission No.</td>
+          <td><span class="model">Student</span></td>
+          <td><span class="src">payment.studentId.admissionNumber</span></td>
+          <td>Falls back to <span class="src">.studentId</span></td>
+        </tr>
+        <tr>
+          <td>Class / Section</td>
+          <td><span class="model">Student</span> → <span class="model">Class</span></td>
+          <td><span class="src">payment.studentId.classId.name</span> + <span class="src">.section</span></td>
+          <td>Deep populated via classId reference</td>
+        </tr>
+        <tr>
+          <td>Payment Date</td>
+          <td><span class="model">Payment</span></td>
+          <td><span class="src">payment.paymentDate</span></td>
+          <td>Formatted with <code>toLocaleDateString('en-IN')</code></td>
+        </tr>
+        <tr>
+          <td>Payment Mode</td>
+          <td><span class="model">Payment</span></td>
+          <td><span class="src">payment.paymentMethod</span></td>
+          <td>e.g., Cash, Online, UPI, Cheque</td>
+        </tr>
+        <tr>
+          <td>Reference No.</td>
+          <td><span class="model">Payment</span></td>
+          <td><span class="src">payment.transactionDetails.referenceNumber</span></td>
+          <td>Conditional — only shown if present</td>
+        </tr>
+        <tr>
+          <td>Billing Period</td>
+          <td><span class="model">Invoice</span></td>
+          <td><span class="src">payment.invoiceId.billingPeriod.displayText</span></td>
+          <td>Conditional — from linked invoice</td>
+        </tr>
+        <tr>
+          <td>Total Amount</td>
+          <td><span class="model">Payment</span></td>
+          <td><span class="src">payment.amount</span></td>
+          <td>Formatted with <code>toLocaleString('en-IN')</code></td>
+        </tr>
+        <tr>
+          <td>Principal Signature</td>
+          <td><span class="model">Settings</span></td>
+          <td><span class="src">Settings.institution.principalSignature</span></td>
+          <td>Image URL — only in Settings, not Tenant</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</div>
+
+</body>
+</html>

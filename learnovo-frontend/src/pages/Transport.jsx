@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bus, Users, MapPin, UserCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../services/transportService';
@@ -8,22 +9,12 @@ import RoutesTab from '../components/transport/RoutesTab';
 import AssignmentsTab from '../components/transport/AssignmentsTab';
 
 const Transport = () => {
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('drivers');
-    const [stats, setStats] = useState({
-        totalDrivers: 0,
-        totalVehicles: 0,
-        activeRoutes: 0,
-        studentsUsingTransport: 0
-    });
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        fetchStats();
-    }, []);
-
-    const fetchStats = async () => {
-        try {
-            setLoading(true);
+    const { data: stats = { totalDrivers: 0, totalVehicles: 0, activeRoutes: 0, studentsUsingTransport: 0 }, isLoading: loading } = useQuery({
+        queryKey: ['transport-stats'],
+        queryFn: async () => {
             const [driversRes, vehiclesRes, routesRes, assignmentsRes] = await Promise.all([
                 transportService.getDrivers({ limit: 1 }),
                 transportService.getVehicles({ limit: 1 }),
@@ -31,18 +22,17 @@ const Transport = () => {
                 transportService.getStudentTransportAssignments({ status: 'active', limit: 1 })
             ]);
 
-            setStats({
+            return {
                 totalDrivers: driversRes.pagination?.total || 0,
                 totalVehicles: vehiclesRes.pagination?.total || 0,
                 activeRoutes: routesRes.pagination?.total || 0,
                 studentsUsingTransport: assignmentsRes.pagination?.total || 0
-            });
-        } catch (error) {
-            console.error('Error fetching stats:', error);
-            toast.error('Failed to load transport statistics');
-        } finally {
-            setLoading(false);
-        }
+            };
+        },
+    });
+
+    const invalidateStats = () => {
+        queryClient.invalidateQueries({ queryKey: ['transport-stats'] });
     };
 
     const tabs = [
@@ -63,8 +53,8 @@ const Transport = () => {
         <div className="p-6">
             {/* Header */}
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">Transport Management</h1>
-                <p className="text-gray-600 mt-1">Manage drivers, vehicles, routes, and student transport assignments</p>
+                <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Transport Management</h1>
+                <p className="text-gray-600 dark:text-[#8E8E93] mt-1">Manage drivers, vehicles, routes, and student transport assignments</p>
             </div>
 
             {/* Stats Cards */}
@@ -72,11 +62,11 @@ const Transport = () => {
                 {statCards.map((stat, index) => {
                     const Icon = stat.icon;
                     return (
-                        <div key={index} className="bg-white rounded-lg shadow p-6">
+                        <div key={index} className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow p-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-600">{stat.label}</p>
-                                    <p className="text-3xl font-bold text-gray-800 mt-2">
+                                    <p className="text-sm text-gray-600 dark:text-[#8E8E93]">{stat.label}</p>
+                                    <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">
                                         {loading ? '...' : stat.value}
                                     </p>
                                 </div>
@@ -90,8 +80,8 @@ const Transport = () => {
             </div>
 
             {/* Tabs */}
-            <div className="bg-white rounded-lg shadow">
-                <div className="border-b border-gray-200">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow">
+                <div className="border-b border-gray-200 dark:border-[#38383A]">
                     <nav className="flex space-x-8 px-6" aria-label="Tabs">
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
@@ -103,7 +93,7 @@ const Transport = () => {
                     flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm
                     ${activeTab === tab.id
                                             ? 'border-primary-500 text-primary-600'
-                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                            : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300'
                                         }
                   `}
                                 >
@@ -117,10 +107,10 @@ const Transport = () => {
 
                 {/* Tab Content */}
                 <div className="p-6">
-                    {activeTab === 'drivers' && <DriversTab onStatsUpdate={fetchStats} />}
-                    {activeTab === 'vehicles' && <VehiclesTab onStatsUpdate={fetchStats} />}
-                    {activeTab === 'routes' && <RoutesTab onStatsUpdate={fetchStats} />}
-                    {activeTab === 'assignments' && <AssignmentsTab onStatsUpdate={fetchStats} />}
+                    {activeTab === 'drivers' && <DriversTab onStatsUpdate={invalidateStats} />}
+                    {activeTab === 'vehicles' && <VehiclesTab onStatsUpdate={invalidateStats} />}
+                    {activeTab === 'routes' && <RoutesTab onStatsUpdate={invalidateStats} />}
+                    {activeTab === 'assignments' && <AssignmentsTab onStatsUpdate={invalidateStats} />}
                 </div>
             </div>
         </div>

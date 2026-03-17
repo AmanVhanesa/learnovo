@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Edit, Trash2, Eye, Users, GraduationCap, Calendar, X, AlertTriangle } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { classesService } from '../services/classesService'
 import { teachersService } from '../services/teachersService'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,9 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 const Classes = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [classes, setClasses] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
   const [gradeFilter, setGradeFilter] = useState('')
   const [academicYearFilter, setAcademicYearFilter] = useState('')
@@ -29,37 +28,46 @@ const Classes = () => {
     count: 1,
     customNames: ['A'] // Array of strings or objects { id, name, studentCount }
   })
-  const [teachers, setTeachers] = useState([])
 
-  useEffect(() => {
-    fetchClasses()
-    fetchTeachers()
-  }, [])
+  const { data: classes = [], isLoading, error } = useQuery({
+    queryKey: ['classes'],
+    queryFn: async () => { const response = await classesService.list(); return response.data || [] },
+  })
 
-  const fetchClasses = async () => {
-    try {
-      setIsLoading(true)
-      setError(null) // Clear previous errors
-      const response = await classesService.list()
-      setClasses(response.data || [])
-    } catch (error) {
-      console.error('Error fetching classes:', error)
-      setError(error.response?.data?.message || 'Failed to load classes. Please check your connection and try again.')
-      setClasses([]) // Clear classes on error
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { data: teachers = [] } = useQuery({
+    queryKey: ['classes-teachers'],
+    queryFn: async () => { const { data } = await teachersService.list({ limit: 1000 }); return data || [] },
+  })
 
-  const fetchTeachers = async () => {
-    try {
-      const { data } = await teachersService.list({ limit: 1000 })
-      setTeachers(data || [])
-    } catch (error) {
-      console.error('Error fetching teachers:', error)
-      setTeachers([])
-    }
-  }
+  const saveMutation = useMutation({
+    mutationFn: async ({ editing, payload }) => {
+      if (editing) {
+        return classesService.update(editing._id, payload)
+      } else {
+        return classesService.create(payload)
+      }
+    },
+    onSuccess: () => {
+      setShowModal(false)
+      setEditing(null)
+      queryClient.invalidateQueries({ queryKey: ['classes'] })
+    },
+    onError: (error) => {
+      console.error('Error saving class:', error)
+      alert(error.response?.data?.message || 'Error saving class. Please try again.')
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (classId) => classesService.delete(classId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] })
+    },
+    onError: (error) => {
+      console.error('Error deleting class:', error)
+      alert('Error deleting class. Please try again.')
+    },
+  })
 
   const openAdd = () => {
     setEditing(null)
@@ -104,43 +112,22 @@ const Classes = () => {
 
   const saveClass = async (e) => {
     e.preventDefault()
-    try {
-      setIsLoading(true)
 
-      const payload = { ...form };
-      if (!editing) {
-        // Only send sections on create
-        payload.sections = generateSectionNames();
-      }
-
-      if (editing) {
-        await classesService.update(editing._id, payload)
-      } else {
-        await classesService.create(payload)
-      }
-
-      setShowModal(false)
-      setEditing(null)
-      fetchClasses()
-    } catch (error) {
-      console.error('Error saving class:', error)
-      alert(error.response?.data?.message || 'Error saving class. Please try again.')
-    } finally {
-      setIsLoading(false)
+    const payload = { ...form };
+    if (!editing) {
+      // Only send sections on create
+      payload.sections = generateSectionNames();
     }
+
+    saveMutation.mutate({ editing, payload })
   }
 
   const deleteClass = async (classItem) => {
     if (!window.confirm('Are you sure you want to delete this class?')) return
-
-    try {
-      await classesService.delete(classItem._id)
-      fetchClasses()
-    } catch (error) {
-      console.error('Error deleting class:', error)
-      alert('Error deleting class. Please try again.')
-    }
+    deleteMutation.mutate(classItem._id)
   }
+
+  const isSaving = saveMutation.isPending
 
   const filteredClasses = classes.filter(classItem => {
     const matchesSearch = classItem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -163,9 +150,9 @@ const Classes = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Class Management</h1>
-        <button className="btn btn-primary" onClick={openAdd}>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Class Management</h1>
+        <button className="btn btn-primary w-full sm:w-auto" onClick={openAdd}>
           <Plus className="h-4 w-4 mr-2" />
           Add Class
         </button>
@@ -173,14 +160,14 @@ const Classes = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
           <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-            <p className="text-sm text-red-600">{error}</p>
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
+            <p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || 'Failed to load classes. Please check your connection and try again.'}</p>
           </div>
           <button
-            onClick={() => fetchClasses()}
-            className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['classes'] })}
+            className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 underline"
           >
             Try again
           </button>
@@ -188,11 +175,11 @@ const Classes = () => {
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-3 sm:p-4">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4">
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
               <input
                 type="text"
                 placeholder="Search classes..."
@@ -232,7 +219,7 @@ const Classes = () => {
       </div>
 
       {/* Classes table */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table">
             <thead>
@@ -255,7 +242,7 @@ const Classes = () => {
                 </tr>
               ) : filteredClasses.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="text-center py-8 text-gray-500">
+                  <td colSpan="6" className="text-center py-8 text-gray-500 dark:text-[#8E8E93]">
                     No classes found
                   </td>
                 </tr>
@@ -263,10 +250,10 @@ const Classes = () => {
                 filteredClasses.map((classItem) => (
                   <tr key={classItem._id}>
                     <td>
-                      <div className="text-sm font-medium text-gray-900">{classItem.name}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{classItem.name}</div>
                     </td>
-                    <td className="text-sm text-gray-900">{classItem.grade}</td>
-                    <td className="text-sm text-gray-900">
+                    <td className="text-sm text-gray-900 dark:text-white">{classItem.grade}</td>
+                    <td className="text-sm text-gray-900 dark:text-white">
                       <div className="flex flex-wrap gap-1">
                         {classItem.sections && classItem.sections.length > 0 ? (
                           classItem.sections.map(sec => (
@@ -279,32 +266,32 @@ const Classes = () => {
                         )}
                       </div>
                     </td>
-                    <td className="text-sm text-gray-900">{classItem.academicYear}</td>
-                    <td className="text-sm text-gray-900">
+                    <td className="text-sm text-gray-900 dark:text-white">{classItem.academicYear}</td>
+                    <td className="text-sm text-gray-900 dark:text-white">
                       {classItem.classTeacher?.name || 'Not assigned'}
                     </td>
-                    <td className="text-sm text-gray-900">
+                    <td className="text-sm text-gray-900 dark:text-white">
                       <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-1 text-gray-400" />
+                        <Users className="h-4 w-4 mr-1 text-gray-400 dark:text-[#636366]" />
                         {classItem.studentCount || 0}
                       </div>
                     </td>
                     <td>
                       <div className="flex space-x-2">
                         <button
-                          className="p-1 text-gray-400 hover:text-blue-600"
+                          className="btn-icon hover:text-blue-600"
                           onClick={() => navigate(`/app/classes/${classItem._id}`)}
                         >
                           <Eye className="h-4 w-4" />
                         </button>
                         <button
-                          className="p-1 text-gray-400 hover:text-green-600"
+                          className="btn-icon hover:text-green-600"
                           onClick={() => openEdit(classItem)}
                         >
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
-                          className="p-1 text-gray-400 hover:text-red-600"
+                          className="btn-icon hover:text-red-600"
                           onClick={() => deleteClass(classItem)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -323,12 +310,12 @@ const Classes = () => {
       {showModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content p-6">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] pb-4 mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editing ? 'Edit Class' : 'Add Class'}
               </h3>
               <button
-                className="p-2 rounded-md hover:bg-gray-100"
+                className="btn-close"
                 onClick={() => { setShowModal(false); setEditing(null); }}
               >
                 <X className="h-5 w-5" />
@@ -337,7 +324,7 @@ const Classes = () => {
 
             <form className="space-y-4" onSubmit={saveClass}>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                   Class Name
                 </label>
                 <input
@@ -350,7 +337,7 @@ const Classes = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                   Grade
                 </label>
                 <select
@@ -379,7 +366,7 @@ const Classes = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                   Academic Year
                 </label>
                 <input
@@ -393,7 +380,7 @@ const Classes = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                   Class Teacher
                 </label>
                 <select
@@ -412,8 +399,8 @@ const Classes = () => {
               </div>
 
               {!editing && (
-                <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
-                  <label className="block text-sm font-medium text-gray-900 mb-3">Section Configuration</label>
+                <div className="bg-gray-50 dark:bg-[#000000] p-4 rounded-md border border-gray-200 dark:border-[#38383A]">
+                  <label className="block text-sm font-medium text-gray-900 dark:text-white mb-3">Section Configuration</label>
 
                   <div className="flex gap-4 mb-4">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -424,7 +411,7 @@ const Classes = () => {
                         onChange={() => setSectionConfig({ ...sectionConfig, type: 'STANDARD' })}
                         className="text-teal-600 focus:ring-teal-500"
                       />
-                      <span className="text-sm text-gray-700">Standard (A, B, C...)</span>
+                      <span className="text-sm text-gray-700 dark:text-[#8E8E93]">Standard (A, B, C...)</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -434,13 +421,13 @@ const Classes = () => {
                         onChange={() => setSectionConfig({ ...sectionConfig, type: 'CUSTOM' })}
                         className="text-teal-600 focus:ring-teal-500"
                       />
-                      <span className="text-sm text-gray-700">Custom Names</span>
+                      <span className="text-sm text-gray-700 dark:text-[#8E8E93]">Custom Names</span>
                     </label>
                   </div>
 
                   {sectionConfig.type === 'STANDARD' ? (
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Number of Sections</label>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">Number of Sections</label>
                       <input
                         type="number"
                         min="1"
@@ -449,13 +436,13 @@ const Classes = () => {
                         onChange={(e) => setSectionConfig({ ...sectionConfig, count: parseInt(e.target.value) || 1 })}
                         className="input w-32"
                       />
-                      <div className="mt-2 text-sm text-gray-600">
+                      <div className="mt-2 text-sm text-gray-600 dark:text-[#8E8E93]">
                         Preview: <span className="font-mono font-medium">{generateSectionNames().join(', ')}</span>
                       </div>
                     </div>
                   ) : (
                     <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Section Names</label>
+                      <label className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">Section Names</label>
                       <div className="flex gap-2 mb-2">
                         <input
                           type="text"
@@ -478,7 +465,7 @@ const Classes = () => {
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {sectionConfig.customNames.map((name, idx) => (
-                          <span key={idx} className="bg-white border border-gray-300 px-2 py-1 rounded-md text-sm flex items-center gap-1">
+                          <span key={idx} className="bg-white dark:bg-[#1C1C1E] border border-gray-300 dark:border-[#38383A] px-2 py-1 rounded-md text-sm flex items-center gap-1">
                             {name}
                             <button type="button" onClick={() => {
                               const newNames = sectionConfig.customNames.filter((_, i) => i !== idx);
@@ -503,9 +490,9 @@ const Classes = () => {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={isLoading}
+                  disabled={isSaving}
                 >
-                  {isLoading ? 'Saving...' : (editing ? 'Update' : 'Create')}
+                  {isSaving ? 'Saving...' : (editing ? 'Update' : 'Create')}
                 </button>
               </div>
             </form>

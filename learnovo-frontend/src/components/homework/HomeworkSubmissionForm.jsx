@@ -86,39 +86,39 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="flex justify-between items-center p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-                    <h2 className="text-2xl font-bold text-gray-900">Submit Homework</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Submit Homework</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-6">
                     {/* Homework Details (Read-only) */}
-                    <div className="bg-gray-50 rounded-lg p-4">
-                        <h3 className="font-semibold text-gray-900 mb-2">{homework.title}</h3>
-                        <p className="text-gray-700 text-sm mb-3">{homework.description}</p>
+                    <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-lg p-4">
+                        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{homework.title}</h3>
+                        <p className="text-gray-700 dark:text-[#8E8E93] text-sm mb-3">{homework.description}</p>
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
-                                <p className="text-gray-600">Subject</p>
-                                <p className="font-medium">{homework.subject?.name}</p>
+                                <p className="text-gray-600 dark:text-[#8E8E93]">Subject</p>
+                                <p className="font-medium text-gray-900 dark:text-white">{homework.subject?.name}</p>
                             </div>
                             <div>
-                                <p className="text-gray-600">Due Date</p>
-                                <p className="font-medium">{formatDate(homework.dueDate)}</p>
+                                <p className="text-gray-600 dark:text-[#8E8E93]">Due Date</p>
+                                <p className="font-medium text-gray-900 dark:text-white">{formatDate(homework.dueDate)}</p>
                             </div>
                         </div>
 
                         {/* Teacher's Attachments */}
                         {homework.attachments && homework.attachments.length > 0 && (
                             <div className="mt-4">
-                                <p className="text-sm font-medium text-gray-700 mb-2">Teacher's Attachments:</p>
+                                <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Teacher's Attachments:</p>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                     {homework.attachments.map((attachment, index) => (
-                                        <div key={index} className="border border-gray-200 rounded p-2">
+                                        <div key={index} className="border border-gray-200 dark:border-[#38383A] rounded p-2">
                                             {isImage(attachment.fileType) ? (
                                                 <img
                                                     src={attachment.fileUrl}
@@ -126,11 +126,11 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                                                     className="w-full h-20 object-cover rounded mb-1"
                                                 />
                                             ) : (
-                                                <div className="flex items-center justify-center h-20 bg-gray-100 rounded mb-1">
-                                                    <File className="h-6 w-6 text-gray-400" />
+                                                <div className="flex items-center justify-center h-20 bg-gray-100 dark:bg-[#2C2C2E] rounded mb-1">
+                                                    <File className="h-6 w-6 text-gray-400 dark:text-[#636366]" />
                                                 </div>
                                             )}
-                                            <p className="text-xs text-gray-600 truncate">{attachment.fileName}</p>
+                                            <p className="text-xs text-gray-600 dark:text-[#8E8E93] truncate">{attachment.fileName}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -142,27 +142,27 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Answer Text */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                                 Your Answer
                             </label>
                             <textarea
                                 value={submissionText}
                                 onChange={(e) => setSubmissionText(e.target.value)}
                                 rows={6}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
                                 placeholder="Write your answer here..."
                             />
                         </div>
 
                         {/* File Upload */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                                 Attach Files (Optional)
                             </label>
 
-                            <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:border-primary-500 transition-colors">
-                                <Upload className="h-5 w-5 text-gray-400 mr-2" />
-                                <span className="text-sm text-gray-600">Click to upload images or files</span>
+                            <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-[#38383A] rounded-md cursor-pointer hover:border-primary-500 transition-colors">
+                                <Upload className="h-5 w-5 text-gray-400 dark:text-[#636366] mr-2" />
+                                <span className="text-sm text-gray-600 dark:text-[#8E8E93]">Click to upload images or files</span>
                                 <input
                                     type="file"
                                     multiple
@@ -171,17 +171,17 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                                     className="hidden"
                                 />
                             </label>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
                                 Supported: JPG, PNG, GIF, PDF, DOC, DOCX (Max 5MB each)
                             </p>
 
                             {/* Existing Attachments */}
                             {existingAttachments.length > 0 && (
                                 <div className="mt-4">
-                                    <p className="text-sm font-medium text-gray-700 mb-2">Existing Attachments:</p>
+                                    <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Existing Attachments:</p>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                         {existingAttachments.map((attachment, index) => (
-                                            <div key={index} className="relative group border border-gray-200 rounded-md p-2">
+                                            <div key={index} className="relative group border border-gray-200 dark:border-[#38383A] rounded-md p-2">
                                                 {isImage(attachment.fileType) ? (
                                                     <img
                                                         src={attachment.fileUrl}
@@ -189,11 +189,11 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                                                         className="w-full h-24 object-cover rounded"
                                                     />
                                                 ) : (
-                                                    <div className="flex items-center justify-center h-24 bg-gray-100 rounded">
-                                                        <File className="h-8 w-8 text-gray-400" />
+                                                    <div className="flex items-center justify-center h-24 bg-gray-100 dark:bg-[#2C2C2E] rounded">
+                                                        <File className="h-8 w-8 text-gray-400 dark:text-[#636366]" />
                                                     </div>
                                                 )}
-                                                <p className="text-xs text-gray-600 mt-1 truncate">{attachment.fileName}</p>
+                                                <p className="text-xs text-gray-600 dark:text-[#8E8E93] mt-1 truncate">{attachment.fileName}</p>
                                                 <button
                                                     type="button"
                                                     onClick={() => removeExistingAttachment(index)}
@@ -210,10 +210,10 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                             {/* New Files Preview */}
                             {files.length > 0 && (
                                 <div className="mt-4">
-                                    <p className="text-sm font-medium text-gray-700 mb-2">New Files:</p>
+                                    <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">New Files:</p>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                         {files.map((file, index) => (
-                                            <div key={index} className="relative group border border-gray-200 rounded-md p-2">
+                                            <div key={index} className="relative group border border-gray-200 dark:border-[#38383A] rounded-md p-2">
                                                 {file.type.startsWith('image/') ? (
                                                     <img
                                                         src={URL.createObjectURL(file)}
@@ -221,11 +221,11 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                                                         className="w-full h-24 object-cover rounded"
                                                     />
                                                 ) : (
-                                                    <div className="flex items-center justify-center h-24 bg-gray-100 rounded">
-                                                        <File className="h-8 w-8 text-gray-400" />
+                                                    <div className="flex items-center justify-center h-24 bg-gray-100 dark:bg-[#2C2C2E] rounded">
+                                                        <File className="h-8 w-8 text-gray-400 dark:text-[#636366]" />
                                                     </div>
                                                 )}
-                                                <p className="text-xs text-gray-600 mt-1 truncate">{file.name}</p>
+                                                <p className="text-xs text-gray-600 dark:text-[#8E8E93] mt-1 truncate">{file.name}</p>
                                                 <button
                                                     type="button"
                                                     onClick={() => removeFile(index)}
@@ -242,28 +242,28 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
 
                         {/* Previous Feedback */}
                         {homework.mySubmission?.teacherFeedback && (
-                            <div className="p-4 bg-blue-50 rounded-lg">
-                                <p className="text-sm font-medium text-blue-900 mb-1">Previous Feedback:</p>
-                                <p className="text-sm text-blue-800">{homework.mySubmission.teacherFeedback}</p>
-                                {homework.mySubmission.grade && (
-                                    <p className="text-sm text-blue-800 mt-1">Grade: {homework.mySubmission.grade}</p>
+                            <div className="p-4 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
+                                <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">Previous Feedback:</p>
+                                <p className="text-sm text-blue-800 dark:text-blue-400">{homework.mySubmission.teacherFeedback}</p>
+                                {homework.mySubmission.grade != null && (
+                                    <p className="text-sm text-blue-800 dark:text-blue-400 mt-1">Grade: {homework.mySubmission.grade}</p>
                                 )}
                             </div>
                         )}
 
                         {/* Actions */}
-                        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                        <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-gray-200 dark:border-[#38383A]">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="btn btn-outline"
+                                className="btn btn-outline w-full sm:w-auto"
                                 disabled={isLoading}
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="btn btn-primary"
+                                className="btn btn-primary w-full sm:w-auto"
                                 disabled={isLoading}
                             >
                                 {isLoading ? 'Submitting...' : homework.mySubmission ? 'Update Submission' : 'Submit Homework'}

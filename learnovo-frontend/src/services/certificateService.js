@@ -61,14 +61,24 @@ const certificateService = {
             responseType: 'blob'
         });
 
-        // Helper to trigger download
-        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const blob = response.data;
+
+        // Guard: if the server returned a JSON error wrapped as blob, throw it
+        if (blob.type && blob.type.includes('application/json')) {
+            const text = await blob.text();
+            const err = JSON.parse(text);
+            throw new Error(err.message || 'Download failed');
+        }
+
+        // Trigger file download
+        const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', filename || 'certificate.pdf'); // filename usually from Content-Disposition
+        link.setAttribute('download', filename || 'certificate.pdf');
         document.body.appendChild(link);
         link.click();
         link.remove();
+        window.URL.revokeObjectURL(url);
         return response;
     },
 

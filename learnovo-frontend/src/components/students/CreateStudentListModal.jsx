@@ -73,12 +73,12 @@ const CreateStudentListModal = ({ isOpen, onClose, onSuccess }) => {
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-                <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose} />
+                <div className="fixed inset-0 transition-opacity bg-black/50" onClick={onClose} />
 
-                <div className="relative inline-block overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                    <div className="px-4 pt-5 pb-4 bg-white sm:p-6 sm:pb-4 border-b border-gray-100">
+                <div className="relative inline-block overflow-hidden text-left align-bottom transition-all transform bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg w-full">
+                    <div className="px-4 pt-5 pb-4 bg-white dark:bg-[#1C1C1E] sm:p-6 sm:pb-4 border-b border-gray-100 dark:border-[#2C2C2E]">
                         <div className="flex justify-between items-center mb-5">
-                            <h3 className="text-lg font-medium leading-6 text-gray-900">
+                            <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
                                 Create Custom Student List
                             </h3>
                             <button
@@ -91,7 +91,7 @@ const CreateStudentListModal = ({ isOpen, onClose, onSuccess }) => {
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                                     List Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
@@ -99,30 +99,30 @@ const CreateStudentListModal = ({ isOpen, onClose, onSuccess }) => {
                                     required
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="e.g. Annual Tour List"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Description <span className="text-gray-400 font-normal">(Optional)</span>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
+                                    Description <span className="text-gray-400 dark:text-[#636366] font-normal">(Optional)</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-primary-500 focus:border-primary-500 sm:text-sm dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="Brief description of this list..."
                                 />
                             </div>
 
                             <div>
                                 <div className="flex justify-between items-end mb-1">
-                                    <label className="block text-sm font-medium text-gray-700">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-white">
                                         Admission Numbers
                                     </label>
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-gray-500 dark:text-[#8E8E93]">
                                         {admissionNumbers.length} number{admissionNumbers.length !== 1 && 's'} recognized
                                     </span>
                                 </div>
@@ -133,19 +133,19 @@ const CreateStudentListModal = ({ isOpen, onClose, onSuccess }) => {
                                     rows={5}
                                     value={numbersText}
                                     onChange={(e) => setNumbersText(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-primary-500 focus:border-primary-500 sm:text-sm resize-none font-mono"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-primary-500 focus:border-primary-500 sm:text-sm resize-none font-mono dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="Paste admission numbers here...\nSeparate by commas, spaces, or new lines."
                                 />
-                                <p className="mt-1 text-xs text-gray-500">
+                                <p className="mt-1 text-xs text-gray-500 dark:text-[#8E8E93]">
                                     Invalid numbers will be skipped and shown as a warning.
                                 </p>
                             </div>
 
-                            <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
+                            <div className="pt-4 border-t border-gray-100 dark:border-[#38383A] flex justify-end gap-3">
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#8E8E93] bg-white dark:bg-[#1C1C1E] border border-gray-300 dark:border-[#38383A] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                                 >
                                     Cancel
                                 </button>

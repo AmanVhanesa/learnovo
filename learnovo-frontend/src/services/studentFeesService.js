@@ -10,8 +10,11 @@ export const studentFeesService = {
     // Get single invoice detail with attempts
     getInvoiceDetails: (id) => api.get(`/student-fees/${id}`),
 
-    // Initiate payment flow
+    // Initiate payment flow (gateway mode)
     initiatePayment: (invoiceId) => api.post(`/student-fees/${invoiceId}/pay`),
+
+    // Submit manual payment proof (manual mode — when gateway is not enabled)
+    submitManualPayment: (invoiceId, data) => api.post(`/student-fees/${invoiceId}/submit-payment`, data),
 
     // Check attempt status directly
     checkPaymentStatus: (attemptId) => api.get(`/student-fees/payment/${attemptId}/status`),
@@ -22,6 +25,15 @@ export const studentFeesService = {
     // Get dispute status
     getDispute: (id) => api.get(`/student-fees/dispute/${id}`),
 
-    // Get receipt data
-    getReceipt: (id) => api.get(`/student-fees/receipt/${id}`)
+    // Get receipt data (by receipt ID or paymentAttemptId)
+    getReceipt: (id) => api.get(`/student-fees/receipt/${id}`),
+
+    // Get all receipts for the logged-in student
+    getReceipts: () => api.get('/student-fees/receipts'),
+
+    // Request a refund (student-initiated)
+    requestRefund: (data) => api.post('/student-fees/refund-request', data),
+
+    // Get refund status
+    getRefunds: () => api.get('/student-fees/refunds')
 };

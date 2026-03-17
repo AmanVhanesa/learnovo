@@ -1,16 +1,16 @@
 import React, { useRef } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { Save, Camera, Loader } from 'lucide-react'
 import api from '../services/authService'
 import toast from 'react-hot-toast'
 
-const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')
+import { SERVER_URL } from '../constants/config'
 
 const Profile = () => {
   const { user, uploadPhoto: uploadPhotoFn } = useAuth()
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = React.useState(false)
-  const [loading, setLoading] = React.useState(false)
   const [formData, setFormData] = React.useState({
     name: '',
     email: '',
@@ -73,40 +73,45 @@ const Profile = () => {
     e.target.value = ''
   }
 
-  const handleProfileUpdate = async () => {
-    try {
-      setLoading(true)
+  const profileMutation = useMutation({
+    mutationFn: async () => {
       const response = await api.put('/auth/profile', {
         name: formData.name,
         phone: formData.phone,
         address: formData.address
       })
-      const data = response.data
+      return response.data
+    },
+    onSuccess: (data) => {
       if (data.success) {
         toast.success('Profile updated successfully')
       } else {
         toast.error(data.message || 'Failed to update profile')
       }
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Error updating profile:', error)
-      toast.error(error.response?.data?.message || 'An error occurred. Please try again.')
-    } finally {
-      setLoading(false)
+      const errData = error.response?.data
+      if (errData?.errors?.length) {
+        errData.errors.forEach(e => toast.error(e.msg || e.message || e))
+      } else {
+        toast.error(errData?.message || 'An error occurred. Please try again.')
+      }
     }
-  }
+  })
 
-  const handlePasswordUpdate = async () => {
-    if (formData.newPassword !== formData.confirmPassword) {
-      toast.error('New passwords do not match')
-      return
-    }
-    try {
-      setLoading(true)
+  const passwordMutation = useMutation({
+    mutationFn: async () => {
+      if (formData.newPassword !== formData.confirmPassword) {
+        throw new Error('New passwords do not match')
+      }
       const response = await api.put('/auth/password', {
         currentPassword: formData.currentPassword,
         newPassword: formData.newPassword
       })
-      const data = response.data
+      return response.data
+    },
+    onSuccess: (data) => {
       if (data.success) {
         toast.success('Password updated successfully')
         setFormData(prev => ({
@@ -118,42 +123,37 @@ const Profile = () => {
       } else {
         toast.error(data.message || 'Failed to update password')
       }
-    } catch (error) {
+    },
+    onError: (error) => {
+      if (error.message === 'New passwords do not match') {
+        toast.error('New passwords do not match')
+        return
+      }
       console.error('Error updating password:', error)
-      toast.error(error.response?.data?.message || 'An error occurred. Please try again.')
-    } finally {
-      setLoading(false)
+      const errData = error.response?.data
+      if (errData?.errors?.length) {
+        errData.errors.forEach(e => toast.error(e.msg || e.message || e))
+      } else {
+        toast.error(errData?.message || 'An error occurred. Please try again.')
+      }
     }
-  }
+  })
+
+  const loading = profileMutation.isPending || passwordMutation.isPending
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Profile</h1>
       </div>
 
       {/* Profile Photo Card */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Profile Photo</h3>
-        <div className="flex items-center gap-6">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Profile Photo</h3>
+        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
           {/* Avatar */}
           <div className="relative group">
-            <div className="h-24 w-24 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0 ring-4 ring-gray-100">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={user?.name}
-                  className="h-full w-full object-cover"
-                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
-                />
-              ) : null}
-              <span
-                className="text-2xl font-bold text-white"
-                style={{ display: avatarUrl ? 'none' : 'flex' }}
-              >
-                {initials}
-              </span>
-            </div>
+            <ProfileAvatar avatarUrl={avatarUrl} initials={initials} name={user?.name} />
             {/* Overlay on hover */}
             <button
               onClick={handlePhotoClick}
@@ -170,8 +170,8 @@ const Profile = () => {
 
           {/* Info + button */}
           <div>
-            <p className="text-sm font-medium text-gray-900">{displayName}</p>
-            <p className="text-sm text-gray-500 capitalize">{user?.role}</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{displayName}</p>
+            <p className="text-sm text-gray-500 dark:text-[#8E8E93] capitalize">{user?.role}</p>
             <button
               onClick={handlePhotoClick}
               disabled={uploading}
@@ -198,12 +198,12 @@ const Profile = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Personal Information */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Personal Information</h3>
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Personal Information</h3>
             <button
-              className="btn btn-primary btn-sm"
-              onClick={handleProfileUpdate}
+              className="btn btn-primary btn-sm w-full sm:w-auto"
+              onClick={() => profileMutation.mutate()}
               disabled={loading}
             >
               <Save className="h-4 w-4 mr-2" />
@@ -226,7 +226,7 @@ const Profile = () => {
               <input
                 type="email"
                 name="email"
-                className="input bg-gray-50"
+                className="input bg-gray-50 dark:bg-[#000000]"
                 value={formData.email}
                 disabled
                 title="Email cannot be changed directly"
@@ -253,18 +253,18 @@ const Profile = () => {
             </div>
             <div>
               <label className="label">Role</label>
-              <input type="text" className="input bg-gray-50" value={user?.role} disabled />
+              <input type="text" className="input bg-gray-50 dark:bg-[#000000]" value={user?.role} disabled />
             </div>
           </div>
         </div>
 
         {/* Change Password */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Change Password</h3>
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Change Password</h3>
             <button
-              className="btn btn-primary btn-sm"
-              onClick={handlePasswordUpdate}
+              className="btn btn-primary btn-sm w-full sm:w-auto"
+              onClick={() => passwordMutation.mutate()}
               disabled={loading}
             >
               <Save className="h-4 w-4 mr-2" />
@@ -305,6 +305,19 @@ const Profile = () => {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+const ProfileAvatar = ({ avatarUrl, initials, name }) => {
+  const [imgFailed, setImgFailed] = React.useState(false)
+  return (
+    <div className="h-24 w-24 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0 ring-4 ring-gray-100 dark:ring-[#38383A]">
+      {avatarUrl && !imgFailed ? (
+        <img src={avatarUrl} alt={name} className="h-full w-full object-cover" onError={() => setImgFailed(true)} />
+      ) : (
+        <span className="text-2xl font-bold text-white flex items-center justify-center">{initials}</span>
+      )}
     </div>
   )
 }

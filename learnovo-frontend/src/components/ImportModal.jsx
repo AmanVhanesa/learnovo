@@ -43,7 +43,9 @@ const ImportModal = ({
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         ];
 
-        if (!validTypes.includes(selectedFile.type)) {
+        const isValidType = validTypes.includes(selectedFile.type);
+        const isValidExt = /\.(csv|xlsx|xls)$/i.test(selectedFile.name);
+        if (!isValidType && !isValidExt) {
             toast.error('Please upload a CSV or Excel file');
             return;
         }
@@ -167,6 +169,8 @@ const ImportModal = ({
                     replaceDuplicates: duplicateAction === 'replace'
                     // duplicateAction === 'new' means neither flag set → always insert
                 }
+            }, {
+                timeout: 300000 // 5 minutes for large imports
             });
 
             if (response.data.success) {
@@ -187,7 +191,22 @@ const ImportModal = ({
             }
         } catch (error) {
             console.error('Execute import error:', error);
-            toast.error(error.response?.data?.message || 'Failed to import data');
+            const errData = error.response?.data;
+            const errMsg = errData?.message || 'Failed to import data';
+            const errDetail = errData?.error;
+
+            // Show detailed error to user
+            if (errDetail) {
+                toast.error(`${errMsg}: ${errDetail}`, { duration: 8000 });
+            } else {
+                toast.error(errMsg, { duration: 6000 });
+            }
+
+            // Store error info for display
+            setPreviewData(prev => ({
+                ...prev,
+                importError: errDetail || errMsg
+            }));
             setStep('preview');
         } finally {
             setImporting(false);
@@ -238,28 +257,28 @@ const ImportModal = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-4xl sm:mx-4 h-full sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+                <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] shrink-0">
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate pr-2">{title}</h2>
                     <button
                         onClick={handleClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center flex-shrink-0"
                     >
                         <X className="h-6 w-6" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="p-4 sm:p-6 overflow-y-auto flex-1">
                     {/* Upload Step */}
                     {step === 'upload' && (
                         <div className="space-y-6">
                             {/* Instructions */}
-                            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                                <h3 className="text-sm font-medium text-blue-900 mb-2">Instructions:</h3>
-                                <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
+                            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-md p-4">
+                                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-400 mb-2">Instructions:</h3>
+                                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
                                     <li>Upload a CSV file with {module} details.</li>
                                     <li>Download the template below to see the required format.</li>
                                     <li>Make sure all required columns are filled.</li>
@@ -267,7 +286,7 @@ const ImportModal = ({
                                 </ul>
                                 <button
                                     onClick={handleDownloadTemplate}
-                                    className="mt-3 inline-flex items-center text-sm text-blue-700 hover:text-blue-900 font-medium"
+                                    className="mt-3 inline-flex items-center text-sm text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-200 font-medium"
                                 >
                                     <Download className="h-4 w-4 mr-1" />
                                     Download Template CSV
@@ -276,9 +295,9 @@ const ImportModal = ({
 
                             {/* File Upload Area */}
                             <div
-                                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${dragActive
+                                className={`border-2 border-dashed rounded-lg p-6 sm:p-12 text-center transition-colors ${dragActive
                                     ? 'border-primary-500 bg-primary-50'
-                                    : 'border-gray-300 hover:border-gray-400'
+                                    : 'border-gray-300 dark:border-[#38383A] hover:border-gray-400'
                                     }`}
                                 onDragEnter={handleDrag}
                                 onDragLeave={handleDrag}
@@ -286,7 +305,7 @@ const ImportModal = ({
                                 onDrop={handleDrop}
                             >
                                 <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                                <p className="text-sm text-gray-600 mb-2">
+                                <p className="text-sm text-gray-600 dark:text-[#8E8E93] mb-2">
                                     {file ? file.name : 'Drag and drop your CSV file here, or click to browse'}
                                 </p>
                                 <input
@@ -303,7 +322,7 @@ const ImportModal = ({
                                     Choose File
                                 </label>
                                 {file && (
-                                    <div className="mt-4 flex items-center justify-center text-sm text-gray-600">
+                                    <div className="mt-4 flex items-center justify-center text-sm text-gray-600 dark:text-[#8E8E93]">
                                         <FileText className="h-4 w-4 mr-2" />
                                         {file.name} ({(file.size / 1024).toFixed(2)} KB)
                                     </div>
@@ -315,23 +334,37 @@ const ImportModal = ({
                     {/* Preview Step */}
                     {step === 'preview' && previewData && (
                         <div className="space-y-6">
+                            {/* Import Error Banner */}
+                            {previewData.importError && (
+                                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-4">
+                                    <div className="flex items-start gap-3">
+                                        <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <h4 className="text-sm font-semibold text-red-800 dark:text-red-400">Import Failed</h4>
+                                            <p className="text-sm text-red-700 dark:text-red-300 mt-1">{previewData.importError}</p>
+                                            <p className="text-xs text-red-500 dark:text-red-400/70 mt-2">Please check your data and try again. If the issue persists, try importing in smaller batches.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Summary */}
-                            <div className="grid grid-cols-4 gap-4">
-                                <div className="bg-gray-50 rounded-lg p-4">
-                                    <p className="text-sm text-gray-600">Total Rows</p>
-                                    <p className="text-2xl font-semibold text-gray-900">{previewData.summary.totalRows}</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                                <div className="bg-gray-50 dark:bg-[#000000] rounded-lg p-4">
+                                    <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Total Rows</p>
+                                    <p className="text-2xl font-semibold text-gray-900 dark:text-white">{previewData.summary.totalRows}</p>
                                 </div>
-                                <div className="bg-green-50 rounded-lg p-4">
-                                    <p className="text-sm text-green-600">Valid Rows</p>
-                                    <p className="text-2xl font-semibold text-green-900">{previewData.summary.validRows}</p>
+                                <div className="bg-green-50 dark:bg-green-500/10 rounded-lg p-4">
+                                    <p className="text-sm text-green-600 dark:text-green-400">Valid Rows</p>
+                                    <p className="text-2xl font-semibold text-green-900 dark:text-green-300">{previewData.summary.validRows}</p>
                                 </div>
-                                <div className="bg-red-50 rounded-lg p-4">
-                                    <p className="text-sm text-red-600">Invalid Rows</p>
-                                    <p className="text-2xl font-semibold text-red-900">{previewData.summary.invalidRows}</p>
+                                <div className="bg-red-50 dark:bg-red-500/10 rounded-lg p-4">
+                                    <p className="text-sm text-red-600 dark:text-red-400">Invalid Rows</p>
+                                    <p className="text-2xl font-semibold text-red-900 dark:text-red-300">{previewData.summary.invalidRows}</p>
                                 </div>
-                                <div className="bg-yellow-50 rounded-lg p-4">
-                                    <p className="text-sm text-yellow-600">Already Exist</p>
-                                    <p className="text-2xl font-semibold text-yellow-900">
+                                <div className="bg-yellow-50 dark:bg-yellow-500/10 rounded-lg p-4">
+                                    <p className="text-sm text-yellow-600 dark:text-yellow-400">Already Exist</p>
+                                    <p className="text-2xl font-semibold text-yellow-900 dark:text-yellow-300">
                                         {previewData.summary.duplicatesInDB || 0}
                                     </p>
                                 </div>
@@ -339,18 +372,18 @@ const ImportModal = ({
 
                             {/* Duplicates Warning & Action Choice */}
                             {previewData.summary.duplicatesInDB > 0 && (
-                                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                                <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-md p-4">
                                     <div className="flex items-start">
-                                        <AlertTriangle className="h-5 w-5 text-yellow-600 mr-2 mt-0.5" />
+                                        <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2 mt-0.5" />
                                         <div className="flex-1">
-                                            <h3 className="text-sm font-medium text-yellow-900 mb-2">
+                                            <h3 className="text-sm font-medium text-yellow-900 dark:text-yellow-300 mb-2">
                                                 {previewData.summary.duplicatesInDB} student(s) already exist in the system
                                             </h3>
-                                            <p className="text-sm text-yellow-700 mb-3">
+                                            <p className="text-sm text-yellow-700 dark:text-yellow-400 mb-3">
                                                 These students have admission numbers matching existing records. Choose what to do:
                                             </p>
                                             <div className="space-y-2">
-                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 transition-colors">
+                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-500/20 transition-colors">
                                                     <input
                                                         type="radio"
                                                         name="duplicateAction"
@@ -360,11 +393,11 @@ const ImportModal = ({
                                                         className="mt-0.5 h-4 w-4 text-primary-600"
                                                     />
                                                     <div>
-                                                        <span className="text-sm font-medium text-yellow-900">Skip duplicates</span>
-                                                        <p className="text-xs text-yellow-700">Existing students will not be changed</p>
+                                                        <span className="text-sm font-medium text-yellow-900 dark:text-yellow-300">Skip duplicates</span>
+                                                        <p className="text-xs text-yellow-700 dark:text-yellow-400/70">Existing students will not be changed</p>
                                                     </div>
                                                 </label>
-                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 transition-colors">
+                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-500/20 transition-colors">
                                                     <input
                                                         type="radio"
                                                         name="duplicateAction"
@@ -374,11 +407,11 @@ const ImportModal = ({
                                                         className="mt-0.5 h-4 w-4 text-primary-600"
                                                     />
                                                     <div>
-                                                        <span className="text-sm font-medium text-yellow-900">Replace (update) existing students</span>
-                                                        <p className="text-xs text-yellow-700">Existing records will be overwritten with CSV data</p>
+                                                        <span className="text-sm font-medium text-yellow-900 dark:text-yellow-300">Replace (update) existing students</span>
+                                                        <p className="text-xs text-yellow-700 dark:text-yellow-400/70">Existing records will be overwritten with CSV data</p>
                                                     </div>
                                                 </label>
-                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 transition-colors">
+                                                <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-500/20 transition-colors">
                                                     <input
                                                         type="radio"
                                                         name="duplicateAction"
@@ -388,8 +421,8 @@ const ImportModal = ({
                                                         className="mt-0.5 h-4 w-4 text-primary-600"
                                                     />
                                                     <div>
-                                                        <span className="text-sm font-medium text-yellow-900">Import as new</span>
-                                                        <p className="text-xs text-yellow-700">Duplicates will be inserted as separate new records</p>
+                                                        <span className="text-sm font-medium text-yellow-900 dark:text-yellow-300">Import as new</span>
+                                                        <p className="text-xs text-yellow-700 dark:text-yellow-400/70">Duplicates will be inserted as separate new records</p>
                                                     </div>
                                                 </label>
                                             </div>
@@ -400,23 +433,23 @@ const ImportModal = ({
 
                             {/* Errors */}
                             {previewData.errors && previewData.errors.length > 0 && (
-                                <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-md p-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center">
-                                            <AlertTriangle className="h-5 w-5 text-red-600 mr-2" />
-                                            <h3 className="text-sm font-medium text-red-900">
+                                            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
+                                            <h3 className="text-sm font-medium text-red-900 dark:text-red-400">
                                                 {previewData.errors.length} Validation Error(s)
                                             </h3>
                                         </div>
                                         <button
                                             onClick={handleDownloadErrors}
-                                            className="text-sm text-red-700 hover:text-red-900 font-medium"
+                                            className="text-sm text-red-700 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 font-medium"
                                         >
                                             Download Error Report
                                         </button>
                                     </div>
                                     <div className="max-h-40 overflow-y-auto">
-                                        <ul className="text-sm text-red-700 space-y-1">
+                                        <ul className="text-sm text-red-700 dark:text-red-400 space-y-1">
                                             {previewData.errors.slice(0, 10).map((error, index) => (
                                                 <li key={index}>
                                                     Row {error.row || error.rowNumber}: {error.field} - {error.message}
@@ -435,28 +468,28 @@ const ImportModal = ({
                             {/* Preview Table */}
                             {previewData.preview && previewData.preview.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-medium text-gray-900 mb-3">
+                                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                                         Preview (First 10 valid rows)
                                     </h3>
-                                    <div className="overflow-x-auto border rounded-lg">
-                                        <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-50">
+                                    <div className="overflow-x-auto border border-gray-200 dark:border-[#38383A] rounded-lg">
+                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+                                            <thead className="bg-gray-50 dark:bg-[#000000]">
                                                 <tr>
                                                     {Object.keys(previewData.preview[0]).filter(key => key !== '_rowNumber').map((key) => (
                                                         <th
                                                             key={key}
-                                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider"
                                                         >
                                                             {key}
                                                         </th>
                                                     ))}
                                                 </tr>
                                             </thead>
-                                            <tbody className="bg-white divide-y divide-gray-200">
+                                            <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-dark-border">
                                                 {previewData.preview.map((row, index) => (
                                                     <tr key={index}>
                                                         {Object.entries(row).filter(([key]) => key !== '_rowNumber').map(([key, value]) => (
-                                                            <td key={key} className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                                                            <td key={key} className="px-4 py-3 text-sm text-gray-900 dark:text-white whitespace-nowrap">
                                                                 {value || '-'}
                                                             </td>
                                                         ))}
@@ -474,8 +507,8 @@ const ImportModal = ({
                     {step === 'importing' && (
                         <div className="text-center py-12">
                             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600 mx-auto mb-4"></div>
-                            <p className="text-lg font-medium text-gray-900">Importing data...</p>
-                            <p className="text-sm text-gray-600 mt-2">Please wait while we process your file</p>
+                            <p className="text-lg font-medium text-gray-900 dark:text-white">Importing data...</p>
+                            <p className="text-sm text-gray-600 dark:text-[#8E8E93] mt-2">Please wait while we process your file</p>
                         </div>
                     )}
 
@@ -483,26 +516,37 @@ const ImportModal = ({
                     {step === 'complete' && (
                         <div className="text-center py-12">
                             <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-                            <p className="text-lg font-medium text-gray-900">Import Completed Successfully!</p>
+                            <p className="text-lg font-medium text-gray-900 dark:text-white">Import Completed Successfully!</p>
                             {previewData && (
                                 <div className="mt-4 space-y-2">
-                                    <p className="text-sm text-gray-600">
+                                    <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
                                         <span className="font-semibold text-green-600">{previewData.data?.success || 0}</span> students imported successfully
                                     </p>
                                     {previewData.data?.replaced > 0 && (
-                                        <p className="text-sm text-gray-600">
+                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
                                             <span className="font-semibold text-blue-600">{previewData.data.replaced}</span> students replaced (updated)
                                         </p>
                                     )}
                                     {previewData.data?.skipped > 0 && (
-                                        <p className="text-sm text-gray-600">
+                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
                                             <span className="font-semibold text-yellow-600">{previewData.data.skipped}</span> students skipped (already exist)
                                         </p>
                                     )}
                                     {previewData.data?.failed > 0 && (
-                                        <p className="text-sm text-gray-600">
-                                            <span className="font-semibold text-red-600">{previewData.data.failed}</span> students failed to import
-                                        </p>
+                                        <div>
+                                            <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
+                                                <span className="font-semibold text-red-600">{previewData.data.failed}</span> students failed to import
+                                            </p>
+                                            {/* Show error details */}
+                                            {previewData.data?.errorSample?.length > 0 && (
+                                                <div className="mt-3 text-left bg-red-50 dark:bg-red-500/10 rounded-lg p-3 max-h-40 overflow-y-auto">
+                                                    <p className="text-xs font-semibold text-red-700 mb-1">Error details:</p>
+                                                    {previewData.data.errorSample.map((err, i) => (
+                                                        <p key={i} className="text-xs text-red-600 py-0.5">{err}</p>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -511,12 +555,12 @@ const ImportModal = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+                <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 p-4 sm:p-6 border-t border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#000000] shrink-0">
                     {step === 'upload' && (
                         <>
                             <button
                                 onClick={handleClose}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#8E8E93] bg-white dark:bg-[#1C1C1E] border border-gray-300 dark:border-[#38383A] rounded-md hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
                             >
                                 Cancel
                             </button>
@@ -534,7 +578,7 @@ const ImportModal = ({
                         <>
                             <button
                                 onClick={() => setStep('upload')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-[#8E8E93] bg-white dark:bg-[#1C1C1E] border border-gray-300 dark:border-[#38383A] rounded-md hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
                             >
                                 Back
                             </button>

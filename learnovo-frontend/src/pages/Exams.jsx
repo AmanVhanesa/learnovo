@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    Plus, Search, Calendar, Trash2, X, ClipboardList,
-    Clock, BookOpen, User, MapPin, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, FileText
+    Plus, Search, Calendar, Trash2, X, ClipboardList, Edit,
+    Clock, BookOpen, User, MapPin, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, FileText,
+    Award, BarChart3, TrendingUp
 } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
@@ -12,10 +14,10 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 
 const STATUS_COLORS = {
-    Scheduled: 'bg-blue-100 text-blue-700',
-    Ongoing: 'bg-amber-100 text-amber-700',
-    Completed: 'bg-green-100 text-green-700',
-    Cancelled: 'bg-red-100 text-red-700',
+    Scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
+    Ongoing: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',
+    Completed: 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400',
+    Cancelled: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
 };
 
 const EXAM_SERIES = ['Unit Test', 'Midterm', 'Final', 'Custom'];
@@ -55,20 +57,15 @@ function calcDuration(start, end) {
 
 const Exams = () => {
     const { user } = useAuth();
-
-    /* ── Data lists ── */
-    const [exams, setExams] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [availableClasses, setClasses] = useState([]);
-    const [teachers, setTeachers] = useState([]);
+    const queryClient = useQueryClient();
 
     /* ── Modal / selection state ── */
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedExam, setSelectedExam] = useState(null);
+    const [editing, setEditing] = useState(null); // exam being edited
     const [resultCardTarget, setResultCardTarget] = useState(null); // { student, examSeries }
     const [form, setForm] = useState(EMPTY_FORM);
     const [formErrors, setFormErrors] = useState({});
-    const [submitting, setSubmitting] = useState(false);
 
     /* ── Filter state ── */
     const [filterStatus, setFilterStatus] = useState('');
@@ -90,31 +87,77 @@ const Exams = () => {
         return next;
     });
 
-    /* ── Load data on mount ── */
-    useEffect(() => { fetchExams(); fetchClasses(); fetchTeachers(); }, []);
-
-    const fetchExams = async () => {
-        try {
-            setLoading(true);
+    /* ── Data fetching with React Query ── */
+    const { data: exams = [], isLoading: loading } = useQuery({
+        queryKey: ['exams'],
+        queryFn: async () => {
             const res = await examsService.list();
-            setExams(res.data || []);
-        } catch { toast.error('Failed to load exams'); }
-        finally { setLoading(false); }
-    };
+            return res.data || [];
+        },
+    });
 
-    const fetchClasses = async () => {
-        try {
+    const { data: availableClasses = [] } = useQuery({
+        queryKey: ['exams-classes'],
+        queryFn: async () => {
             const res = await classesService.list();
-            setClasses(res.data || []);
-        } catch { toast.error('Failed to load classes'); }
-    };
+            return res.data || [];
+        },
+    });
 
-    const fetchTeachers = async () => {
-        try {
+    const { data: teachers = [] } = useQuery({
+        queryKey: ['exams-teachers'],
+        queryFn: async () => {
             const res = await teachersService.list({ limit: 100 });
-            setTeachers(res.data || res.teachers || []);
-        } catch { /* non-critical */ }
-    };
+            return res.data || res.teachers || [];
+        },
+    });
+
+    /* ── Student's own result card data ── */
+    const isStudent = user.role === 'student';
+    const { data: myResultData, isLoading: loadingMyResults } = useQuery({
+        queryKey: ['my-results', user._id || user.id],
+        queryFn: async () => {
+            const res = await examsService.getResultCard(user._id || user.id);
+            const d = res.data || res;
+            return {
+                subjects: d?.subjects || [],
+                summary: d?.summary || null,
+                student: d?.student || null,
+            };
+        },
+        enabled: isStudent,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    /* ── Mutations ── */
+    const saveMutation = useMutation({
+        mutationFn: async ({ isEdit, id, data }) => {
+            if (isEdit) {
+                return examsService.update(id, data);
+            }
+            return examsService.create(data);
+        },
+        onSuccess: (_, variables) => {
+            toast.success(variables.isEdit ? 'Exam updated successfully' : 'Exam scheduled successfully');
+            closeModal();
+            queryClient.invalidateQueries({ queryKey: ['exams'] });
+        },
+        onError: (err, variables) => {
+            const msg = err?.response?.data?.message || (variables.isEdit ? 'Failed to update exam' : 'Failed to create exam');
+            toast.error(msg);
+        },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id) => examsService.delete(id),
+        onSuccess: () => {
+            toast.success('Exam deleted');
+            queryClient.invalidateQueries({ queryKey: ['exams'] });
+        },
+        onError: () => {
+            toast.error('Failed to delete exam');
+        },
+    });
 
     /* ── Derive sections from the selected class (no extra API call) ── */
     const sections = useMemo(() => {
@@ -196,53 +239,254 @@ const Exams = () => {
         return errors;
     };
 
-    /* ── Submit handler ── */
+    /* ── Open edit modal ── */
+    const openEdit = (exam) => {
+        setEditing(exam);
+        setForm({
+            name: exam.name || '',
+            examSeries: exam.examSeries || 'Midterm',
+            class: exam.class || '',
+            classId: exam.classId || '',
+            section: exam.section || '',
+            subject: exam.subject || '',
+            date: exam.date ? exam.date.split('T')[0] : '',
+            startTime: exam.startTime || '',
+            endTime: exam.endTime || '',
+            totalMarks: exam.totalMarks || 100,
+            passingMarks: exam.passingMarks ?? 40,
+            examType: exam.examType || 'Written',
+            examMode: exam.examMode || 'Offline',
+            supervisor: exam.supervisor?._id || exam.supervisor || '',
+            examRoom: exam.examRoom || '',
+            status: exam.status || 'Scheduled',
+        });
+        // Resolve classId from grade if not set
+        if (!exam.classId && exam.class) {
+            const cls = availableClasses.find(c => c.grade === exam.class);
+            if (cls) setForm(prev => ({ ...prev, classId: cls._id }));
+        }
+        setShowAddModal(true);
+    };
+
+    /* ── Submit handler (create or edit) ── */
     const handleCreate = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         const errors = validate();
         if (Object.keys(errors).length) { setFormErrors(errors); return; }
 
-        setSubmitting(true);
-        try {
-            await examsService.create(form);
-            toast.success('Exam scheduled successfully');
-            setShowAddModal(false);
-            setForm(EMPTY_FORM);
-            setFormErrors({});
-            fetchExams();
-        } catch (err) {
-            const msg = err?.response?.data?.message || 'Failed to create exam';
-            toast.error(msg);
-        } finally { setSubmitting(false); }
+        saveMutation.mutate({
+            isEdit: !!editing,
+            id: editing?._id,
+            data: form
+        });
     };
+
+    const submitting = saveMutation.isPending;
 
     /* ── Delete handler ── */
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this exam and all its results?')) return;
-        try {
-            await examsService.delete(id);
-            toast.success('Exam deleted');
-            fetchExams();
-        } catch { toast.error('Failed to delete exam'); }
+        deleteMutation.mutate(id);
     };
 
     /* ── Close / reset modal ── */
     const closeModal = () => {
         setShowAddModal(false);
+        setEditing(null);
         setForm(EMPTY_FORM);
         setFormErrors({});
-        setSections([]);
     };
 
     /* ── Render ── */
+
+    /* ═══════════════════════════════════════════
+       STUDENT VIEW — dedicated results dashboard
+    ═══════════════════════════════════════════ */
+    if (isStudent) {
+        const mySubjects = myResultData?.subjects || [];
+        const mySummary = myResultData?.summary || null;
+
+        return (
+            <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">My Exams & Results</h1>
+                    <button
+                        className="btn btn-primary w-full sm:w-auto gap-1.5"
+                        onClick={() => setResultCardTarget({
+                            studentId: user._id || user.id,
+                            studentName: user.name || user.fullName,
+                            examSeries: ''
+                        })}
+                        disabled={!mySubjects.length}
+                    >
+                        <FileText className="h-4 w-4" />
+                        View Report Card
+                    </button>
+                </div>
+
+                {/* Summary Cards */}
+                {loadingMyResults ? (
+                    <div className="flex justify-center py-12"><div className="loading-spinner" /></div>
+                ) : mySummary ? (
+                    <>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4 text-center">
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-500/20 mx-auto mb-2">
+                                    <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium">Overall %</p>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{mySummary.overallPercentage}%</p>
+                            </div>
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4 text-center">
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-500/20 mx-auto mb-2">
+                                    <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium">Grade</p>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{mySummary.overallGrade}</p>
+                            </div>
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4 text-center">
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 dark:bg-green-500/20 mx-auto mb-2">
+                                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium">Passed</p>
+                                <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{mySummary.passCount}/{mySummary.totalSubjects}</p>
+                            </div>
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4 text-center">
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-500/20 mx-auto mb-2">
+                                    <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium">Total Marks</p>
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{mySummary.grandObtained}/{mySummary.grandTotal}</p>
+                            </div>
+                        </div>
+
+                        {/* Subject-wise Results */}
+                        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                            <div className="px-5 py-3.5 border-b border-gray-100 dark:border-[#38383A]">
+                                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Subject-wise Results</h2>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm min-w-[600px]">
+                                    <thead>
+                                        <tr className="bg-gray-50 dark:bg-[#000000] border-b border-gray-100 dark:border-[#38383A]">
+                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Subject</th>
+                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Exam</th>
+                                            <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Marks</th>
+                                            <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">%</th>
+                                            <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Grade</th>
+                                            <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Result</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {mySubjects.map((s, i) => (
+                                            <tr key={s.examId + '-' + i} className={`border-b border-gray-50 dark:border-[#38383A] ${i % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-[#000000]/30'}`}>
+                                                <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{s.subject}</td>
+                                                <td className="px-5 py-3">
+                                                    <div className="text-gray-700 dark:text-[#8E8E93]">{s.examName}</div>
+                                                    <div className="text-xs text-gray-400 dark:text-[#636366]">{s.examSeries} {s.date ? `\u2022 ${new Date(s.date).toLocaleDateString()}` : ''}</div>
+                                                </td>
+                                                <td className="px-5 py-3 text-center font-bold text-gray-900 dark:text-white">{s.marksObtained}/{s.totalMarks}</td>
+                                                <td className="px-5 py-3 text-center text-gray-700 dark:text-[#8E8E93]">{s.percentage}%</td>
+                                                <td className="px-5 py-3 text-center">
+                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                                        s.grade === 'A+' || s.grade === 'A' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
+                                                        s.grade === 'B' ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-400' :
+                                                        s.grade === 'C' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' :
+                                                        s.grade === 'D' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                                                        'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                                                    }`}>{s.grade}</span>
+                                                </td>
+                                                <td className="px-5 py-3 text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.isPassed ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400'}`}>
+                                                        {s.isPassed ? 'Pass' : 'Fail'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] flex flex-col items-center py-16 text-gray-400 dark:text-[#636366]">
+                        <Award className="h-10 w-10 mb-3 opacity-30" />
+                        <p className="font-medium">No results published yet</p>
+                        <p className="text-sm mt-1">Your exam results will appear here once your teacher publishes them.</p>
+                    </div>
+                )}
+
+                {/* Upcoming Exams for student */}
+                {!loading && exams.length > 0 && (
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                        <div className="px-5 py-3.5 border-b border-gray-100 dark:border-[#38383A]">
+                            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">My Exams Schedule</h2>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm min-w-[500px]">
+                                <thead>
+                                    <tr className="bg-gray-50 dark:bg-[#000000] border-b border-gray-100 dark:border-[#38383A]">
+                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Date</th>
+                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Exam</th>
+                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Subject</th>
+                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Time</th>
+                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {exams.map((exam, idx) => (
+                                        <tr key={exam._id} className={`border-b border-gray-50 dark:border-[#38383A] ${idx % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-[#000000]/30'}`}>
+                                            <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93]">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Calendar className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
+                                                    {new Date(exam.date).toLocaleDateString()}
+                                                </div>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <div className="font-medium text-gray-900 dark:text-white">{exam.name}</div>
+                                                {exam.examSeries && <div className="text-xs text-gray-400 dark:text-[#636366]">{exam.examSeries}</div>}
+                                            </td>
+                                            <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93]">{exam.subject}</td>
+                                            <td className="px-5 py-3 text-xs text-gray-600 dark:text-[#8E8E93]">
+                                                {exam.startTime && exam.endTime ? `${exam.startTime}–${exam.endTime}` : '—'}
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[exam.status] || 'bg-gray-100 text-gray-600'}`}>
+                                                    {exam.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Result Card Modal */}
+                {resultCardTarget && (
+                    <ResultCard
+                        studentId={resultCardTarget.studentId}
+                        studentName={resultCardTarget.studentName}
+                        defaultExamSeries={resultCardTarget.examSeries}
+                        onClose={() => setResultCardTarget(null)}
+                    />
+                )}
+            </div>
+        );
+    }
+
+    /* ═══════════════════════════════════════════
+       ADMIN / TEACHER VIEW — exam management
+    ═══════════════════════════════════════════ */
     return (
         <div className="space-y-6">
 
             {/* ── Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">Exams &amp; Results</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Exams &amp; Results</h1>
                 {(user.role === 'admin' || user.role === 'teacher') && (
-                    <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+                    <button className="btn btn-primary w-full sm:w-auto" onClick={() => setShowAddModal(true)}>
                         <Plus className="h-4 w-4 mr-2" />
                         Schedule Exam
                     </button>
@@ -250,17 +494,17 @@ const Exams = () => {
             </div>
 
             {/* ── Filters ── */}
-            <div className="flex flex-wrap gap-3 items-center">
-                <div className="relative flex-1 min-w-[180px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
                     <input
-                        className="input pl-9"
+                        className="input pl-9 w-full"
                         placeholder="Search exams…"
                         value={searchText}
                         onChange={e => setSearchText(e.target.value)}
                     />
                 </div>
-                <select className="input w-auto" value={filterClass} onChange={e => setFilterClass(e.target.value)}>
+                <select className="input w-full sm:w-auto" value={filterClass} onChange={e => setFilterClass(e.target.value)}>
                     <option value="">All Classes</option>
                     {availableClasses.map(c => (
                         <option key={c._id} value={c.grade}>
@@ -268,7 +512,7 @@ const Exams = () => {
                         </option>
                     ))}
                 </select>
-                <select className="input w-auto" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                <select className="input w-full sm:w-auto" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                     <option value="">All Statuses</option>
                     {EXAM_STATUSES.map(s => <option key={s}>{s}</option>)}
                 </select>
@@ -277,11 +521,11 @@ const Exams = () => {
             {/* ── Grouped Exam List ── */}
             <div className="space-y-3">
                 {loading ? (
-                    <div className="bg-white rounded-lg shadow-sm flex justify-center items-center py-16">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm flex justify-center items-center py-16">
                         <div className="loading-spinner" />
                     </div>
                 ) : Object.keys(groupedExams).length === 0 ? (
-                    <div className="bg-white rounded-lg shadow-sm flex flex-col items-center py-16 text-gray-400">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm flex flex-col items-center py-16 text-gray-400 dark:text-[#636366]">
                         <BookOpen className="h-10 w-10 mb-3 opacity-30" />
                         <p className="font-medium">No exams found</p>
                     </div>
@@ -289,23 +533,23 @@ const Exams = () => {
                     const isClassCollapsed = collapsedClasses.has(cls);
                     const totalInClass = Object.values(sectionMap).reduce((a, arr) => a + arr.length, 0);
                     return (
-                        <div key={cls} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                        <div key={cls} className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-[#38383A]">
                             {/* Class header */}
                             <button
-                                className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200"
+                                className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-50 dark:bg-[#000000] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors border-b border-gray-200 dark:border-[#38383A]"
                                 onClick={() => toggleClass(cls)}
                             >
                                 <div className="flex items-center gap-3">
                                     {isClassCollapsed
-                                        ? <ChevronRight className="h-4 w-4 text-gray-400" />
-                                        : <ChevronDown className="h-4 w-4 text-gray-400" />
+                                        ? <ChevronRight className="h-4 w-4 text-gray-400 dark:text-[#636366]" />
+                                        : <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#636366]" />
                                     }
-                                    <span className="font-bold text-gray-900 text-base">Class {cls}</span>
+                                    <span className="font-bold text-gray-900 dark:text-white text-base">Class {cls}</span>
                                     <span className="text-xs font-medium bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">
                                         {totalInClass} exam{totalInClass !== 1 ? 's' : ''}
                                     </span>
                                 </div>
-                                <span className="text-xs text-gray-400">{Object.keys(sectionMap).length} section{Object.keys(sectionMap).length !== 1 ? 's' : ''}</span>
+                                <span className="text-xs text-gray-400 dark:text-[#636366]">{Object.keys(sectionMap).length} section{Object.keys(sectionMap).length !== 1 ? 's' : ''}</span>
                             </button>
 
                             {/* Sections */}
@@ -316,14 +560,14 @@ const Exams = () => {
                                     <div key={sec}>
                                         {/* Section sub-header */}
                                         <button
-                                            className="w-full flex items-center gap-2.5 px-6 py-2.5 bg-indigo-50/60 hover:bg-indigo-100/50 transition-colors border-b border-indigo-100 text-left"
+                                            className="w-full flex items-center gap-2.5 px-6 py-2.5 bg-indigo-50/60 dark:bg-indigo-500/10 hover:bg-indigo-100/50 dark:hover:bg-indigo-500/20 transition-colors border-b border-indigo-100 dark:border-indigo-500/20 text-left"
                                             onClick={() => toggleSection(sectionKey)}
                                         >
                                             {isSecCollapsed
                                                 ? <ChevronRight className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
                                                 : <ChevronDown className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
                                             }
-                                            <span className="text-sm font-semibold text-indigo-700">
+                                            <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
                                                 {sec === 'All' ? 'All Sections' : `Section ${sec}`}
                                             </span>
                                             <span className="text-xs text-indigo-400 ml-auto">{examList.length} exam{examList.length !== 1 ? 's' : ''}</span>
@@ -332,58 +576,58 @@ const Exams = () => {
                                         {/* Exam rows for this section */}
                                         {!isSecCollapsed && (
                                             <div className="overflow-x-auto">
-                                                <table className="w-full text-sm">
+                                                <table className="w-full text-sm min-w-[700px]">
                                                     <thead>
-                                                        <tr className="bg-gray-50 border-b border-gray-100">
-                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exam Name</th>
-                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
-                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marks</th>
-                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                                        <tr className="bg-gray-50 dark:bg-[#000000] border-b border-gray-100 dark:border-[#38383A]">
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Date</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Exam Name</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Subject</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Time</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Marks</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Status</th>
+                                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Actions</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {examList.map((exam, idx) => (
-                                                            <tr key={exam._id} className={`border-b border-gray-100 transition-colors hover:bg-primary-50/40 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                                            <tr key={exam._id} className={`border-b border-gray-100 dark:border-[#38383A] transition-colors hover:bg-primary-50/40 ${idx % 2 === 0 ? 'bg-white dark:bg-[#1C1C1E]' : 'bg-gray-50/30 dark:bg-[#000000]/30'}`}>
                                                                 <td className="px-5 py-3">
-                                                                    <div className="flex items-center gap-1.5 text-gray-700">
-                                                                        <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                                                    <div className="flex items-center gap-1.5 text-gray-700 dark:text-[#8E8E93]">
+                                                                        <Calendar className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366] shrink-0" />
                                                                         {new Date(exam.date).toLocaleDateString()}
                                                                     </div>
                                                                 </td>
                                                                 <td className="px-5 py-3">
-                                                                    <div className="font-semibold text-gray-900">{exam.name}</div>
+                                                                    <div className="font-semibold text-gray-900 dark:text-white">{exam.name}</div>
                                                                     {exam.examSeries && (
-                                                                        <div className="text-xs text-gray-400">{exam.examSeries}</div>
+                                                                        <div className="text-xs text-gray-400 dark:text-[#636366]">{exam.examSeries}</div>
                                                                     )}
                                                                 </td>
-                                                                <td className="px-5 py-3 text-gray-700 font-medium">{exam.subject}</td>
+                                                                <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93] font-medium">{exam.subject}</td>
                                                                 <td className="px-5 py-3">
                                                                     {exam.startTime && exam.endTime ? (
-                                                                        <div className="flex items-center gap-1 text-xs text-gray-600">
-                                                                            <Clock className="h-3 w-3 text-gray-400" />
+                                                                        <div className="flex items-center gap-1 text-xs text-gray-600 dark:text-[#8E8E93]">
+                                                                            <Clock className="h-3 w-3 text-gray-400 dark:text-[#636366]" />
                                                                             {exam.startTime}–{exam.endTime}
-                                                                            <span className="text-gray-400">({calcDuration(exam.startTime, exam.endTime)})</span>
+                                                                            <span className="text-gray-400 dark:text-[#636366]">({calcDuration(exam.startTime, exam.endTime)})</span>
                                                                         </div>
-                                                                    ) : <span className="text-gray-300 text-xs">—</span>}
+                                                                    ) : <span className="text-gray-300 dark:text-[#636366] text-xs">—</span>}
                                                                 </td>
                                                                 <td className="px-5 py-3">
-                                                                    <span className="font-medium text-gray-900">{exam.totalMarks}</span>
+                                                                    <span className="font-medium text-gray-900 dark:text-white">{exam.totalMarks}</span>
                                                                     {exam.passingMarks != null && (
-                                                                        <span className="text-gray-400 text-xs ml-1">/ {exam.passingMarks} pass</span>
+                                                                        <span className="text-gray-400 dark:text-[#636366] text-xs ml-1">/ {exam.passingMarks} pass</span>
                                                                     )}
                                                                 </td>
                                                                 <td className="px-5 py-3">
-                                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[exam.status] || 'bg-gray-100 text-gray-600'}`}>
+                                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[exam.status] || 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93]'}`}>
                                                                         {exam.status}
                                                                     </span>
                                                                 </td>
                                                                 <td className="px-5 py-3">
                                                                     <div className="flex items-center gap-2">
                                                                         <button
-                                                                            className="btn btn-sm btn-outline text-teal-600 hover:bg-teal-50"
+                                                                            className="btn btn-sm btn-outline text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-500/10"
                                                                             onClick={() => {
                                                                                 if (user.role === 'student') {
                                                                                     setResultCardTarget({
@@ -401,13 +645,22 @@ const Exams = () => {
                                                                             Results
                                                                         </button>
                                                                         {(user.role === 'admin' || user.role === 'teacher') && (
-                                                                            <button
-                                                                                className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                                                                                onClick={() => handleDelete(exam._id)}
-                                                                                title="Delete exam"
-                                                                            >
-                                                                                <Trash2 className="h-4 w-4" />
-                                                                            </button>
+                                                                            <>
+                                                                                <button
+                                                                                    className="p-1 text-gray-400 dark:text-[#636366] hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                                                                                    onClick={() => openEdit(exam)}
+                                                                                    title="Edit exam"
+                                                                                >
+                                                                                    <Edit className="h-4 w-4" />
+                                                                                </button>
+                                                                                <button
+                                                                                    className="p-1 text-gray-400 dark:text-[#636366] hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                                                                    onClick={() => handleDelete(exam._id)}
+                                                                                    title="Delete exam"
+                                                                                >
+                                                                                    <Trash2 className="h-4 w-4" />
+                                                                                </button>
+                                                                            </>
                                                                         )}
                                                                     </div>
                                                                 </td>
@@ -430,21 +683,21 @@ const Exams = () => {
             ══════════════════════════════════════ */}
             {showAddModal && (
                 <div className="modal-overlay" role="dialog" aria-modal="true">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[92vh] flex flex-col">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-2xl w-full max-w-2xl mx-2 sm:mx-4 max-h-[92vh] flex flex-col">
 
                         {/* Modal header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-[#38383A] shrink-0">
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900">Schedule New Exam</h3>
-                                <p className="text-xs text-gray-400 mt-0.5">Fill in all required fields to schedule an exam</p>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editing ? 'Edit Exam' : 'Schedule New Exam'}</h3>
+                                <p className="text-xs text-gray-400 dark:text-[#636366] mt-0.5">{editing ? 'Update exam details' : 'Fill in all required fields to schedule an exam'}</p>
                             </div>
-                            <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors" onClick={closeModal}>
-                                <X className="h-5 w-5 text-gray-500" />
+                            <button className="btn-close" onClick={closeModal}>
+                                <X className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
                             </button>
                         </div>
 
                         {/* Scrollable body */}
-                        <form onSubmit={handleCreate} className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
+                        <form onSubmit={handleCreate} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-6">
 
                             {/* ── Section 1: Exam Details ── */}
                             <ModalSection icon={<BookOpen className="h-4 w-4" />} title="Exam Details">
@@ -585,7 +838,7 @@ const Exams = () => {
                                 {/* Live passing % hint */}
                                 {form.totalMarks > 0 && form.passingMarks > 0 &&
                                     Number(form.passingMarks) < Number(form.totalMarks) && (
-                                        <p className="text-xs text-gray-400 mt-1">
+                                        <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">
                                             Pass threshold: {Math.round((form.passingMarks / form.totalMarks) * 100)}%
                                         </p>
                                     )}
@@ -644,7 +897,7 @@ const Exams = () => {
                                             className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all
                                                 ${form.status === s
                                                     ? STATUS_COLORS[s] + ' border-current ring-2 ring-offset-1'
-                                                    : 'border-gray-200 text-gray-500 hover:border-gray-400'}`}
+                                                    : 'border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] hover:border-gray-400 dark:hover:border-[#48484A]'}`}
                                         >
                                             {s}
                                         </button>
@@ -655,14 +908,14 @@ const Exams = () => {
                         </form>
 
                         {/* Modal Footer */}
-                        <div className="px-6 py-4 border-t border-gray-100 shrink-0 flex justify-end gap-3 bg-gray-50 rounded-b-xl">
-                            <button type="button" className="btn btn-ghost" onClick={closeModal}>Cancel</button>
+                        <div className="px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-[#38383A] shrink-0 flex flex-col-reverse sm:flex-row justify-end gap-3 bg-gray-50 dark:bg-[#000000] rounded-b-xl">
+                            <button type="button" className="btn btn-ghost w-full sm:w-auto" onClick={closeModal}>Cancel</button>
                             <button
                                 onClick={handleCreate}
                                 disabled={submitting}
-                                className="btn btn-primary"
+                                className="btn btn-primary w-full sm:w-auto"
                             >
-                                {submitting ? 'Scheduling…' : 'Schedule Exam'}
+                                {submitting ? 'Saving…' : (editing ? 'Update Exam' : 'Schedule Exam')}
                             </button>
                         </div>
                     </div>
@@ -695,16 +948,16 @@ const ModalSection = ({ icon, title, children }) => (
     <div>
         <div className="flex items-center gap-2 mb-3">
             <span className="text-primary-600">{icon}</span>
-            <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{title}</h4>
+            <h4 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] uppercase tracking-wide">{title}</h4>
         </div>
-        <div className="pl-6 border-l-2 border-gray-100">
+        <div className="pl-6 border-l-2 border-gray-100 dark:border-[#38383A]">
             {children}
         </div>
     </div>
 );
 
 const FieldLabel = ({ children, required }) => (
-    <label className="label mb-1 block text-gray-700">
+    <label className="label mb-1 block text-gray-700 dark:text-[#8E8E93]">
         {children}
         {required && <span className="text-red-500 ml-0.5">*</span>}
     </label>

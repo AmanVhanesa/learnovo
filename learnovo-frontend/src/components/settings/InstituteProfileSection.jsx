@@ -1,8 +1,15 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Building2 } from 'lucide-react'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
-const SERVER_URL = API_URL.replace(/\/api\/?$/, '')
+const InstitutionImage = ({ src, alt, fallbackText, className = '' }) => {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return <span className="text-gray-400 dark:text-[#8E8E93] text-xs text-center px-2">{fallbackText}</span>
+  }
+  return <img src={src} alt={alt} className={`h-full w-full object-contain ${className}`} onError={() => setFailed(true)} />
+}
+
+import { SERVER_URL } from '../../constants/config'
 
 const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSignatureUpload }) => {
     // Helper to get safe logo URL
@@ -17,8 +24,8 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
             <div className="flex items-center gap-3 mb-6">
                 <Building2 className="h-6 w-6 text-primary-600" />
                 <div>
-                    <h2 className="text-xl font-semibold text-gray-900">Institute Profile</h2>
-                    <p className="text-sm text-gray-500">Manage your institution's basic information and branding</p>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Institute Profile</h2>
+                    <p className="text-sm text-gray-500 dark:text-[#8E8E93]">Manage your institution's basic information and branding</p>
                 </div>
             </div>
 
@@ -102,7 +109,7 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                             className="input"
                             value={form.institution?.affiliationNumber || ''}
                             onChange={(e) => updateField('institution.affiliationNumber', e.target.value)}
-                            placeholder="e.g. 430123"
+                            placeholder="e.g. SSA/RTE/20XX/XXXXXX"
                         />
                     </div>
 
@@ -113,7 +120,7 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                             className="input"
                             value={form.institution?.schoolCode || ''}
                             onChange={(e) => updateField('institution.schoolCode', e.target.value)}
-                            placeholder="e.g. SCH-001"
+                            placeholder="e.g. 04XXXXX"
                         />
                     </div>
 
@@ -200,18 +207,13 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
 
                     <div>
                         <label className="label">Institution Logo</label>
-                        <div className="mt-2 flex items-center gap-4">
-                            <div className="h-24 w-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
-                                {form.institution?.logo ? (
-                                    <img
-                                        src={getLogoUrl(form.institution.logo)}
-                                        alt="School Logo"
-                                        className="h-full w-full object-contain"
-                                        onError={(e) => e.target.style.display = 'none'}
-                                    />
-                                ) : (
-                                    <span className="text-gray-400 text-xs text-center px-2">No Logo</span>
-                                )}
+                        <div className="mt-2 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                            <div className="h-24 w-24 border-2 border-dashed border-gray-300 dark:border-[#38383A] rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-[#2C2C2E]">
+                                <InstitutionImage
+                                    src={form.institution?.logo ? getLogoUrl(form.institution.logo) : null}
+                                    alt="School Logo"
+                                    fallbackText="No Logo"
+                                />
                             </div>
                             <div className="flex flex-col gap-2">
                                 <input
@@ -227,7 +229,7 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                                 >
                                     Change Logo
                                 </label>
-                                <p className="text-xs text-gray-500">Recommended: 200x200px PNG/JPG</p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Recommended: 200x200px PNG/JPG</p>
                             </div>
                         </div>
                     </div>
@@ -235,18 +237,14 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                     {/* Principal Signature */}
                     <div>
                         <label className="label">Principal Signature</label>
-                        <div className="mt-2 flex items-center gap-4">
-                            <div className="h-24 w-48 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden bg-gray-50">
-                                {form.institution?.principalSignature ? (
-                                    <img
-                                        src={getLogoUrl(form.institution.principalSignature)}
-                                        alt="Principal Signature"
-                                        className="h-full w-full object-contain p-2"
-                                        onError={(e) => e.target.style.display = 'none'}
-                                    />
-                                ) : (
-                                    <span className="text-gray-400 text-xs text-center px-2">No Signature</span>
-                                )}
+                        <div className="mt-2 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                            <div className="h-24 w-48 border-2 border-dashed border-gray-300 dark:border-[#38383A] rounded-lg flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-[#2C2C2E]">
+                                <InstitutionImage
+                                    src={form.institution?.principalSignature ? getLogoUrl(form.institution.principalSignature) : null}
+                                    alt="Principal Signature"
+                                    fallbackText="No Signature"
+                                    className="p-2"
+                                />
                             </div>
                             <div className="flex flex-col gap-2">
                                 <input
@@ -262,7 +260,7 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                                 >
                                     Upload Signature
                                 </label>
-                                <p className="text-xs text-gray-500">Recommended: 300x100px PNG with transparent background</p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Recommended: 300x100px PNG with transparent background</p>
                                 <p className="text-xs text-blue-600">Will appear on certificates and fee receipts</p>
                             </div>
                         </div>

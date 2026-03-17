@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Plus, Edit, Trash2, Users, BookOpen, UserPlus, GraduationCap, X } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { classesService } from '../services/classesService'
 import { studentsService } from '../services/studentsService'
 import { teachersService } from '../services/teachersService'
@@ -11,13 +12,7 @@ const ClassDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [classItem, setClassItem] = useState(null)
-  const [students, setStudents] = useState([])
-  const [subjects, setSubjects] = useState([])
-  const [allStudents, setAllStudents] = useState([])
-  const [allSubjects, setAllSubjects] = useState([])
-  const [teachers, setTeachers] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState('students')
   const [showEnrollModal, setShowEnrollModal] = useState(false)
   const [showSubjectModal, setShowSubjectModal] = useState(false)
@@ -27,98 +22,99 @@ const ClassDetail = () => {
     teacherId: ''
   })
 
-  useEffect(() => {
-    fetchClassDetails()
-    fetchAllStudents()
-    fetchAllSubjects()
-    fetchTeachers()
-  }, [id])
-
-  const fetchClassDetails = async () => {
-    try {
-      setIsLoading(true)
+  // Fetch class details (class info, students, subjects) in parallel
+  const { data: classDetailsData, isLoading } = useQuery({
+    queryKey: ['class-details', id],
+    queryFn: async () => {
       const [classResponse, studentsResponse, subjectsResponse] = await Promise.all([
         classesService.get(id),
         classesService.getStudents(id),
         classesService.getSubjects(id)
       ])
+      return {
+        classItem: classResponse.data,
+        students: studentsResponse.data || [],
+        subjects: subjectsResponse.data || [],
+      }
+    },
+  })
 
-      setClassItem(classResponse.data)
-      setStudents(studentsResponse.data)
-      setSubjects(subjectsResponse.data)
-    } catch (error) {
-      console.error('Error fetching class details:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const classItem = classDetailsData?.classItem || null
+  const students = classDetailsData?.students || []
+  const subjects = classDetailsData?.subjects || []
 
-  const fetchAllStudents = async () => {
-    try {
+  // Fetch all unenrolled students for the enroll modal
+  const { data: allStudents = [] } = useQuery({
+    queryKey: ['unenrolled-students'],
+    queryFn: async () => {
       const response = await studentsService.list()
       // Filter out students already enrolled in any class
-      const unenrolledStudents = response.data.filter(student => !student.classId)
-      setAllStudents(unenrolledStudents)
-    } catch (error) {
-      console.error('Error fetching students:', error)
-    }
-  }
+      return (response.data || []).filter(student => !student.classId)
+    },
+  })
 
-  const fetchAllSubjects = async () => {
-    try {
-      const response = await subjectsService.list()
-      setAllSubjects(response.data)
-    } catch (error) {
-      console.error('Error fetching subjects:', error)
-    }
-  }
+  // Fetch all subjects for the assign modal
+  const { data: allSubjects = [] } = useQuery({
+    queryKey: ['all-subjects'],
+    queryFn: async () => { const response = await subjectsService.list(); return response.data || [] },
+  })
 
-  const fetchTeachers = async () => {
-    try {
-      const { data } = await teachersService.list({ limit: 100 })
-      setTeachers(data || [])
-    } catch (error) {
-      console.error('Error fetching teachers:', error)
-      setTeachers([])
-    }
-  }
+  // Fetch teachers for the assign modal
+  const { data: teachers = [] } = useQuery({
+    queryKey: ['class-detail-teachers'],
+    queryFn: async () => { const { data } = await teachersService.list({ limit: 100 }); return data || [] },
+  })
 
-  const handleEnrollStudents = async () => {
-    try {
-      await classesService.enrollStudents(id, selectedStudents)
+  const enrollMutation = useMutation({
+    mutationFn: (studentIds) => classesService.enrollStudents(id, studentIds),
+    onSuccess: () => {
       setShowEnrollModal(false)
       setSelectedStudents([])
-      fetchClassDetails()
-      fetchAllStudents()
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['class-details', id] })
+      queryClient.invalidateQueries({ queryKey: ['unenrolled-students'] })
+    },
+    onError: (error) => {
       console.error('Error enrolling students:', error)
       alert('Error enrolling students. Please try again.')
-    }
+    },
+  })
+
+  const assignSubjectMutation = useMutation({
+    mutationFn: (formData) => classesService.assignSubject(id, formData),
+    onSuccess: () => {
+      setShowSubjectModal(false)
+      setSubjectForm({ subjectId: '', teacherId: '' })
+      queryClient.invalidateQueries({ queryKey: ['class-details', id] })
+    },
+    onError: (error) => {
+      console.error('Error assigning subject:', error)
+      alert('Error assigning subject. Please try again.')
+    },
+  })
+
+  const removeSubjectMutation = useMutation({
+    mutationFn: (subjectId) => classesService.removeSubject(id, subjectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['class-details', id] })
+    },
+    onError: (error) => {
+      console.error('Error removing subject:', error)
+      alert('Error removing subject. Please try again.')
+    },
+  })
+
+  const handleEnrollStudents = async () => {
+    enrollMutation.mutate(selectedStudents)
   }
 
   const handleAssignSubject = async (e) => {
     e.preventDefault()
-    try {
-      await classesService.assignSubject(id, subjectForm)
-      setShowSubjectModal(false)
-      setSubjectForm({ subjectId: '', teacherId: '' })
-      fetchClassDetails()
-    } catch (error) {
-      console.error('Error assigning subject:', error)
-      alert('Error assigning subject. Please try again.')
-    }
+    assignSubjectMutation.mutate(subjectForm)
   }
 
   const handleRemoveSubject = async (subjectId) => {
     if (!window.confirm('Are you sure you want to remove this subject?')) return
-
-    try {
-      await classesService.removeSubject(id, subjectId)
-      fetchClassDetails()
-    } catch (error) {
-      console.error('Error removing subject:', error)
-      alert('Error removing subject. Please try again.')
-    }
+    removeSubjectMutation.mutate(subjectId)
   }
 
   if (isLoading) {
@@ -132,7 +128,7 @@ const ClassDetail = () => {
   if (!classItem) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">Class not found</p>
+        <p className="text-gray-500 dark:text-[#8E8E93]">Class not found</p>
       </div>
     )
   }
@@ -141,50 +137,50 @@ const ClassDetail = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3 sm:space-x-4">
           <button
             onClick={() => navigate('/classes')}
-            className="p-2 rounded-md hover:bg-gray-100"
+            className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#2C2C2E] flex-shrink-0"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{classItem.name}</h1>
-            <p className="text-gray-600">{classItem.grade} • {classItem.academicYear}</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{classItem.name}</h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-[#8E8E93]">{classItem.grade} &bull; {classItem.academicYear}</p>
           </div>
         </div>
       </div>
 
       {/* Class Info */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="card p-4 sm:p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <div>
-            <h3 className="text-sm font-medium text-gray-500">Class Teacher</h3>
-            <p className="text-lg font-semibold text-gray-900">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-[#8E8E93]">Class Teacher</h3>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">
               {classItem.classTeacher?.name || 'Not assigned'}
             </p>
-            <p className="text-sm text-gray-600">{classItem.classTeacher?.email}</p>
+            <p className="text-sm text-gray-600 dark:text-[#8E8E93]">{classItem.classTeacher?.email}</p>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-500">Total Students</h3>
-            <p className="text-lg font-semibold text-gray-900">{students.length}</p>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-[#8E8E93]">Total Students</h3>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">{students.length}</p>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-gray-500">Subjects</h3>
-            <p className="text-lg font-semibold text-gray-900">{subjects.length}</p>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-[#8E8E93]">Subjects</h3>
+            <p className="text-lg font-semibold text-gray-900 dark:text-white">{subjects.length}</p>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm">
+        <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto">
+          <nav className="flex space-x-8 px-4 sm:px-6 whitespace-nowrap">
             <button
               onClick={() => setActiveTab('students')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'students'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'
                 }`}
             >
               <Users className="h-4 w-4 inline mr-2" />
@@ -193,8 +189,8 @@ const ClassDetail = () => {
             <button
               onClick={() => setActiveTab('subjects')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'subjects'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'
                 }`}
             >
               <BookOpen className="h-4 w-4 inline mr-2" />
@@ -203,14 +199,14 @@ const ClassDetail = () => {
           </nav>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Students Tab */}
           {activeTab === 'students' && (
             <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Enrolled Students</h3>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">Enrolled Students</h3>
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-primary w-full sm:w-auto"
                   onClick={() => setShowEnrollModal(true)}
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -219,7 +215,7 @@ const ClassDetail = () => {
               </div>
 
               {students.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 dark:text-[#8E8E93]">
                   No students enrolled in this class
                 </div>
               ) : (
@@ -237,11 +233,11 @@ const ClassDetail = () => {
                     <tbody>
                       {students.map((student) => (
                         <tr key={student._id}>
-                          <td className="text-sm text-gray-900">{student.studentId}</td>
-                          <td className="text-sm font-medium text-gray-900">{student.name}</td>
-                          <td className="text-sm text-gray-900">{student.email}</td>
-                          <td className="text-sm text-gray-900">{student.rollNumber}</td>
-                          <td className="text-sm text-gray-900">
+                          <td className="text-sm text-gray-900 dark:text-white">{student.studentId}</td>
+                          <td className="text-sm font-medium text-gray-900 dark:text-white">{student.name}</td>
+                          <td className="text-sm text-gray-900 dark:text-white">{student.email}</td>
+                          <td className="text-sm text-gray-900 dark:text-white">{student.rollNumber}</td>
+                          <td className="text-sm text-gray-900 dark:text-white">
                             {student.admissionDate ? new Date(student.admissionDate).toLocaleDateString() : '-'}
                           </td>
                         </tr>
@@ -256,10 +252,10 @@ const ClassDetail = () => {
           {/* Subjects Tab */}
           {activeTab === 'subjects' && (
             <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Subjects & Teachers</h3>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-white">Subjects & Teachers</h3>
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-primary w-full sm:w-auto"
                   onClick={() => setShowSubjectModal(true)}
                 >
                   <GraduationCap className="h-4 w-4 mr-2" />
@@ -268,7 +264,7 @@ const ClassDetail = () => {
               </div>
 
               {subjects.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 dark:text-[#8E8E93]">
                   No subjects assigned to this class
                 </div>
               ) : (
@@ -285,9 +281,9 @@ const ClassDetail = () => {
                     <tbody>
                       {subjects.map((subject) => (
                         <tr key={subject.subject._id}>
-                          <td className="text-sm font-medium text-gray-900">{subject.subject.name}</td>
-                          <td className="text-sm text-gray-900">{subject.subject.subjectCode}</td>
-                          <td className="text-sm text-gray-900">{subject.teacher?.name || 'Not assigned'}</td>
+                          <td className="text-sm font-medium text-gray-900 dark:text-white">{subject.subject.name}</td>
+                          <td className="text-sm text-gray-900 dark:text-white">{subject.subject.subjectCode}</td>
+                          <td className="text-sm text-gray-900 dark:text-white">{subject.teacher?.name || 'Not assigned'}</td>
                           <td>
                             <button
                               className="p-1 text-gray-400 hover:text-red-600"
@@ -311,10 +307,10 @@ const ClassDetail = () => {
       {showEnrollModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content p-6">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Enroll Students</h3>
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] pb-4 mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Enroll Students</h3>
               <button
-                className="p-2 rounded-md hover:bg-gray-100"
+                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#2C2C2E]"
                 onClick={() => setShowEnrollModal(false)}
               >
                 <X className="h-5 w-5" />
@@ -322,18 +318,18 @@ const ClassDetail = () => {
             </div>
 
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
                 Select students to enroll in this class:
               </p>
 
               {allStudents.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">
+                <p className="text-gray-500 dark:text-[#8E8E93] text-center py-4">
                   All students are already enrolled in classes
                 </p>
               ) : (
                 <div className="max-h-64 overflow-y-auto space-y-2">
                   {allStudents.map((student) => (
-                    <label key={student._id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
+                    <label key={student._id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-[#2C2C2E] rounded">
                       <input
                         type="checkbox"
                         checked={selectedStudents.includes(student._id)}
@@ -344,11 +340,11 @@ const ClassDetail = () => {
                             setSelectedStudents(selectedStudents.filter(id => id !== student._id))
                           }
                         }}
-                        className="rounded border-gray-300"
+                        className="rounded border-gray-300 dark:border-[#38383A]"
                       />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{student.name}</p>
-                        <p className="text-xs text-gray-500">{student.email}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{student.name}</p>
+                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{student.email}</p>
                       </div>
                     </label>
                   ))}
@@ -379,10 +375,10 @@ const ClassDetail = () => {
       {showSubjectModal && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content p-6">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Assign Subject</h3>
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] pb-4 mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Assign Subject</h3>
               <button
-                className="p-2 rounded-md hover:bg-gray-100"
+                className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#2C2C2E]"
                 onClick={() => setShowSubjectModal(false)}
               >
                 <X className="h-5 w-5" />
@@ -391,7 +387,7 @@ const ClassDetail = () => {
 
             <form className="space-y-4" onSubmit={handleAssignSubject}>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                   Subject
                 </label>
                 <select
@@ -410,7 +406,7 @@ const ClassDetail = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
                   Teacher
                 </label>
                 <select

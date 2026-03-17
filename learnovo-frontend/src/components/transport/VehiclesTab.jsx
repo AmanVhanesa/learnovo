@@ -10,18 +10,24 @@ const VehiclesTab = ({ onStatsUpdate }) => {
     const [showModal, setShowModal] = useState(false);
     const [editingVehicle, setEditingVehicle] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     useEffect(() => {
         fetchVehicles();
         fetchDrivers();
-    }, [searchTerm, statusFilter]);
+    }, [debouncedSearch, statusFilter]);
 
     const fetchVehicles = async () => {
         try {
             setLoading(true);
             const params = { limit: 100 };
-            if (searchTerm) params.search = searchTerm;
+            if (debouncedSearch) params.search = debouncedSearch;
             if (statusFilter !== 'all') params.status = statusFilter;
 
             const response = await transportService.getVehicles(params);
@@ -88,7 +94,7 @@ const VehiclesTab = ({ onStatsUpdate }) => {
                             placeholder="Search vehicles..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                         />
                     </div>
                 </div>
@@ -96,7 +102,7 @@ const VehiclesTab = ({ onStatsUpdate }) => {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                     >
                         <option value="all">All Status</option>
                         <option value="active">Active</option>
@@ -116,13 +122,13 @@ const VehiclesTab = ({ onStatsUpdate }) => {
             {loading ? (
                 <div className="text-center py-12">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                    <p className="mt-2 text-gray-600">Loading vehicles...</p>
+                    <p className="mt-2 text-gray-600 dark:text-[#8E8E93]">Loading vehicles...</p>
                 </div>
             ) : vehicles.length === 0 ? (
                 <div className="text-center py-12">
                     <Bus className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No vehicles found</h3>
-                    <p className="text-gray-600 mb-4">Get started by adding your first vehicle</p>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No vehicles found</h3>
+                    <p className="text-gray-600 dark:text-[#8E8E93] mb-4">Get started by adding your first vehicle</p>
                     <button
                         onClick={handleAddVehicle}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
@@ -133,38 +139,38 @@ const VehiclesTab = ({ onStatsUpdate }) => {
                 </div>
             ) : (
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <table className="min-w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
+                        <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacity</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Driver</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Vehicle</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Type</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Capacity</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Driver</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
                             {vehicles.map((vehicle) => (
-                                <tr key={vehicle._id} className="hover:bg-gray-50">
+                                <tr key={vehicle._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div>
-                                            <div className="text-sm font-medium text-gray-900">{vehicle.vehicleNumber}</div>
-                                            <div className="text-sm text-gray-500">{vehicle.vehicleId}</div>
+                                            <div className="text-sm font-medium text-gray-900 dark:text-white">{vehicle.vehicleNumber}</div>
+                                            <div className="text-sm text-gray-500 dark:text-[#8E8E93]">{vehicle.vehicleId}</div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm text-gray-900">{vehicle.vehicleType}</div>
-                                        {vehicle.model && <div className="text-sm text-gray-500">{vehicle.model}</div>}
+                                        <div className="text-sm text-gray-900 dark:text-white">{vehicle.vehicleType}</div>
+                                        {vehicle.model && <div className="text-sm text-gray-500 dark:text-[#8E8E93]">{vehicle.model}</div>}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                         {vehicle.capacity} seats
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {vehicle.assignedDriver ? (
-                                            <div className="text-sm text-gray-900">{vehicle.assignedDriver.name}</div>
+                                            <div className="text-sm text-gray-900 dark:text-white">{vehicle.assignedDriver.name}</div>
                                         ) : (
-                                            <span className="text-sm text-gray-500">Not assigned</span>
+                                            <span className="text-sm text-gray-500 dark:text-[#8E8E93]">Not assigned</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
@@ -251,12 +257,12 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-                    <h2 className="text-xl font-semibold text-gray-900">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                         {vehicle ? 'Edit Vehicle' : 'Add New Vehicle'}
                     </h2>
-                    <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600">
+                    <button onClick={() => onClose(false)} className="text-gray-400 hover:text-gray-600 dark:text-[#8E8E93]">
                         <X className="w-6 h-6" />
                     </button>
                 </div>
@@ -265,11 +271,11 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Vehicle Information */}
                         <div className="md:col-span-2">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">Vehicle Information</h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Vehicle Information</h3>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Number *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Vehicle Number *</label>
                             <input
                                 type="text"
                                 name="vehicleNumber"
@@ -277,18 +283,18 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
                                 onChange={handleChange}
                                 required
                                 placeholder="e.g., MH-12-AB-1234"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Vehicle Type *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Vehicle Type *</label>
                             <select
                                 name="vehicleType"
                                 value={formData.vehicleType}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="Bus">Bus</option>
                                 <option value="Van">Van</option>
@@ -300,18 +306,18 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Model</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Model</label>
                             <input
                                 type="text"
                                 name="model"
                                 value={formData.model}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Manufacturing Year</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Manufacturing Year</label>
                             <input
                                 type="number"
                                 name="manufacturingYear"
@@ -319,23 +325,23 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
                                 onChange={handleChange}
                                 min="1990"
                                 max={new Date().getFullYear()}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Color</label>
                             <input
                                 type="text"
                                 name="color"
                                 value={formData.color}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Seating Capacity *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Seating Capacity *</label>
                             <input
                                 type="number"
                                 name="capacity"
@@ -343,17 +349,17 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
                                 onChange={handleChange}
                                 required
                                 min="1"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Fuel Type</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Fuel Type</label>
                             <select
                                 name="fuelType"
                                 value={formData.fuelType}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="Petrol">Petrol</option>
                                 <option value="Diesel">Diesel</option>
@@ -364,12 +370,12 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Assigned Driver</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Assigned Driver</label>
                             <select
                                 name="assignedDriver"
                                 value={formData.assignedDriver}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             >
                                 <option value="">No Driver Assigned</option>
                                 {drivers.map(driver => (
@@ -382,53 +388,53 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
 
                         {/* Legal Documents */}
                         <div className="md:col-span-2 mt-4">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">Legal Documents</h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Legal Documents</h3>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Insurance Number</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Insurance Number</label>
                             <input
                                 type="text"
                                 name="insuranceNumber"
                                 value={formData.insuranceNumber}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Insurance Expiry *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Insurance Expiry *</label>
                             <input
                                 type="date"
                                 name="insuranceExpiry"
                                 value={formData.insuranceExpiry}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Fitness Certificate Expiry *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Fitness Certificate Expiry *</label>
                             <input
                                 type="date"
                                 name="fitnessExpiry"
                                 value={formData.fitnessExpiry}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Pollution Certificate Expiry *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Pollution Certificate Expiry *</label>
                             <input
                                 type="date"
                                 name="pollutionExpiry"
                                 value={formData.pollutionExpiry}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>
                     </div>
@@ -438,7 +444,7 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
                         <button
                             type="button"
                             onClick={() => onClose(false)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                            className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
                         >
                             Cancel
                         </button>

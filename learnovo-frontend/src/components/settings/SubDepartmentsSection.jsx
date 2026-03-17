@@ -93,18 +93,18 @@ const SubDepartmentsSection = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div className="flex items-center gap-3">
                     <Building2 className="h-6 w-6 text-primary-600" />
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Sub Departments</h2>
-                        <p className="text-sm text-gray-500">Manage configurable sub-departments for students (e.g. 29 LG SEC)</p>
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sub Departments</h2>
+                        <p className="text-sm text-gray-500 dark:text-[#8E8E93]">Manage configurable sub-departments for students (e.g. 29 LG SEC)</p>
                     </div>
                 </div>
                 {!isAdding && (
                     <button
                         onClick={() => setIsAdding(true)}
-                        className="btn btn-primary"
+                        className="btn btn-primary w-full sm:w-auto"
                     >
                         <Plus className="h-4 w-4 mr-2" />
                         Add New
@@ -114,8 +114,8 @@ const SubDepartmentsSection = () => {
 
             {/* Add/Edit Form */}
             {isAdding && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-sm font-medium text-gray-900 mb-4">
+                <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
                         {editingId ? 'Edit Sub Department' : 'Add New Sub Department'}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -158,36 +158,36 @@ const SubDepartmentsSection = () => {
             {/* List */}
             <div className="space-y-4">
                 {isLoading ? (
-                    <div className="text-center py-4">Loading...</div>
+                    <div className="text-center py-4 dark:text-[#8E8E93]">Loading...</div>
                 ) : subDepartments.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="text-center py-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg border border-gray-200 dark:border-[#38383A]">
                         <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-sm text-gray-500">No sub-departments found</p>
+                        <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No sub-departments found</p>
                     </div>
                 ) : (
-                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-                        <table className="min-w-full divide-y divide-gray-300">
-                            <thead className="bg-gray-50">
+                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 dark:ring-[#38383A] rounded-lg overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-300 dark:divide-[#38383A]">
+                            <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
                                 <tr>
-                                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">Name</th>
-                                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Description</th>
-                                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
+                                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Name</th>
+                                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Description</th>
+                                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Status</th>
                                     <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
                                         <span className="sr-only">Actions</span>
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 bg-white">
+                            <tbody className="divide-y divide-gray-200 dark:divide-[#38383A] bg-white dark:bg-[#1C1C1E]">
                                 {subDepartments.map((subDept) => (
                                     <tr key={subDept._id}>
-                                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900">
+                                        <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 dark:text-white">
                                             {subDept.name}
                                         </td>
-                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-[#8E8E93]">
                                             {subDept.description || '-'}
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-4 text-sm">
-                                            <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${subDept.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${subDept.isActive ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'}`}>
                                                 {subDept.isActive ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>

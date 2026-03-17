@@ -82,26 +82,26 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         <div className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal-content max-w-3xl p-0">
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
-                    <h3 className="text-xl font-semibold text-gray-900">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-4 sm:p-6">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
                         {employee ? 'Edit Employee' : 'Add New Employee'}
                     </h3>
-                    <button onClick={onCancel} className="p-2 rounded-md hover:bg-gray-100">
+                    <button onClick={onCancel} className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#2C2C2E]">
                         <X className="h-5 w-5" />
                     </button>
                 </div>
 
                 {/* Form Content */}
-                <form onSubmit={handleSubmit} className="p-6">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6">
                     <div className="max-h-[70vh] overflow-y-auto space-y-6">
                         {/* Photo Upload */}
-                        <div className="flex items-center gap-6">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
                             <div className="relative flex-shrink-0">
                                 {photoPreview ? (
                                     <img
                                         src={photoPreview}
                                         alt="Employee"
-                                        className="h-24 w-24 rounded-full object-cover border-2 border-gray-200"
+                                        className="h-24 w-24 rounded-full object-cover border-2 border-gray-200 dark:border-[#38383A]"
                                     />
                                 ) : (
                                     <div className="h-24 w-24 rounded-full bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center">
@@ -115,8 +115,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                 )}
                             </div>
                             <div className="flex-1">
-                                <p className="text-sm font-medium text-gray-900 mb-1">Employee Photo</p>
-                                <p className="text-xs text-gray-500 mb-3">Upload a clear photo (JPG, PNG)</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">Employee Photo</p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] mb-3">Upload a clear photo (JPG, PNG)</p>
                                 {/* Two separate buttons for universal Android/iPad compatibility */}
                                 <div className="flex flex-wrap gap-2">
                                     <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium cursor-pointer hover:bg-primary-700 active:scale-95 transition-all">
@@ -152,8 +152,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                         </div>
 
                         {/* Basic Information */}
-                        <div className="border-t border-gray-100 pt-4">
-                            <h4 className="text-sm font-semibold text-gray-900 mb-4">Basic Information</h4>
+                        <div className="border-t border-gray-100 dark:border-[#38383A] pt-4">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Basic Information</h4>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="md:col-span-2">
@@ -247,7 +247,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         step="0.01"
                                         placeholder="0"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Amount to deduct per unpaid leave day</p>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Amount to deduct per unpaid leave day</p>
                                 </div>
 
                                 <div>
@@ -281,7 +281,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                                 onChange={(e) => updateField('createLogin', e.target.checked)}
                                                 className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                                             />
-                                            <span className="text-sm text-gray-700">Create login credentials</span>
+                                            <span className="text-sm text-gray-700 dark:text-white">Create login credentials</span>
                                         </label>
                                     </div>
                                 </div>
@@ -289,8 +289,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                         </div>
 
                         {/* Personal Information */}
-                        <div className="border-t border-gray-100 pt-4">
-                            <h4 className="text-sm font-semibold text-gray-900 mb-4">Personal Information</h4>
+                        <div className="border-t border-gray-100 dark:border-[#38383A] pt-4">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Personal Information</h4>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -398,8 +398,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                         </div>
 
                         {/* Bank Details */}
-                        <div className="border-t border-gray-100 pt-4">
-                            <h4 className="text-sm font-semibold text-gray-900 mb-4">Bank Details</h4>
+                        <div className="border-t border-gray-100 dark:border-[#38383A] pt-4">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Bank Details</h4>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -436,11 +436,11 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
-                        <button type="button" onClick={onCancel} className="btn btn-ghost">
+                    <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-[#38383A] mt-6">
+                        <button type="button" onClick={onCancel} className="btn btn-ghost w-full sm:w-auto">
                             Cancel
                         </button>
-                        <button type="submit" className="btn btn-primary" disabled={isLoading || photoUploading}>
+                        <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isLoading || photoUploading}>
                             {isLoading ? 'Saving...' : employee ? 'Update Employee' : 'Add Employee'}
                         </button>
                     </div>

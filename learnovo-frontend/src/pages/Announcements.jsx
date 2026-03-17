@@ -1,14 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Megaphone, Users, Calendar, AlertCircle, Trash2, Edit } from 'lucide-react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Megaphone, Users, Calendar, AlertCircle, Trash2, X, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import announcementsService from '../services/announcementsService';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 const Announcements = () => {
     const { user } = useAuth();
-    const [announcements, setAnnouncements] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    const { refresh: refreshNotifications } = useNotifications();
+    const queryClient = useQueryClient();
+    const isAdmin = user?.role === 'admin';
+    const [deletingId, setDeletingId] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
@@ -18,74 +21,83 @@ const Announcements = () => {
         expiresAt: ''
     });
 
-    useEffect(() => {
-        fetchAnnouncements();
-    }, []);
-
-    const fetchAnnouncements = async () => {
-        try {
-            setLoading(true);
+    const { data: announcements = [], isLoading: loading } = useQuery({
+        queryKey: ['announcements'],
+        queryFn: async () => {
             const response = await announcementsService.getAnnouncements();
-            setAnnouncements(response.data || []);
-        } catch (error) {
-            console.error('Error fetching announcements:', error);
-            toast.error('Failed to load announcements');
-        } finally {
-            setLoading(false);
-        }
-    };
+            return response.data || [];
+        },
+    });
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-
-        if (submitting) return; // Prevent double submission
-
-        try {
-            setSubmitting(true);
-            const response = await announcementsService.createAnnouncement(formData);
-            toast.success(response.message || 'Announcement created successfully');
+    const createMutation = useMutation({
+        mutationFn: (payload) => announcementsService.createAnnouncement(payload),
+        onSuccess: (response) => {
+            toast.success(response.message || 'Announcement created & notifications sending');
             setShowCreateModal(false);
-            setFormData({
-                title: '',
-                message: '',
-                targetAudience: ['all'],
-                priority: 'medium',
-                expiresAt: ''
-            });
-            await fetchAnnouncements(); // Refresh the list
-        } catch (error) {
-            console.error('Error creating announcement:', error);
-            toast.error(error.response?.data?.message || 'Failed to create announcement');
-        } finally {
-            setSubmitting(false);
-        }
+            setFormData({ title: '', message: '', targetAudience: ['all'], priority: 'medium', expiresAt: '' });
+            queryClient.invalidateQueries({ queryKey: ['announcements'] });
+            // Trigger immediate notification refresh so bell updates for all users on next poll
+            setTimeout(() => refreshNotifications(), 1500);
+        },
+        onError: (error) => {
+            console.error('Create announcement error:', error?.response?.status, error?.response?.data || error.message);
+            // The backend may have saved the announcement but failed during notification broadcast.
+            // Always refresh to show the actual state.
+            queryClient.invalidateQueries({ queryKey: ['announcements'] });
+
+            // Determine the error message
+            let msg = 'Failed to create announcement';
+            if (error.response?.data?.message) {
+                msg = error.response.data.message;
+            } else if (error.response?.data?.errors?.length) {
+                msg = error.response.data.errors.map(e => e.msg || e.message).join(', ');
+            } else if (error.message) {
+                msg = error.message;
+            }
+
+            // If it was a server error (500) but the announcement was actually saved,
+            // show a warning instead of an error
+            if (error.response?.status === 500) {
+                setShowCreateModal(false);
+                setFormData({ title: '', message: '', targetAudience: ['all'], priority: 'medium', expiresAt: '' });
+                toast.success('Announcement created (notifications may be delayed)');
+            } else {
+                toast.error(msg);
+            }
+        },
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (createMutation.isPending) return;
+
+        // Clean payload - remove empty expiresAt so backend .optional() skips it
+        const payload = { ...formData };
+        if (!payload.expiresAt) delete payload.expiresAt;
+        createMutation.mutate(payload);
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this announcement?')) {
-            return;
-        }
+    const submitting = createMutation.isPending;
 
-        try {
-            // Optimistically update UI
-            setAnnouncements(prev => prev.map(a =>
-                a._id === id ? { ...a, _deleting: true } : a
-            ));
+    const deleteMutation = useMutation({
+        mutationFn: (id) => announcementsService.deleteAnnouncement(id),
+        onMutate: (id) => {
+            setDeletingId(id);
+        },
+        onSuccess: () => {
+            toast.success('Announcement deleted');
+            queryClient.invalidateQueries({ queryKey: ['announcements'] });
+            setDeletingId(null);
+        },
+        onError: () => {
+            toast.error('Failed to delete announcement');
+            setDeletingId(null);
+        },
+    });
 
-            await announcementsService.deleteAnnouncement(id);
-            toast.success('Announcement deleted successfully');
-
-            // Remove from list
-            setAnnouncements(prev => prev.filter(a => a._id !== id));
-        } catch (error) {
-            console.error('Error deleting announcement:', error);
-            toast.error(error.response?.data?.message || 'Failed to delete announcement');
-
-            // Revert optimistic update
-            setAnnouncements(prev => prev.map(a =>
-                a._id === id ? { ...a, _deleting: false } : a
-            ));
-        }
+    const handleDelete = (id) => {
+        if (!window.confirm('Are you sure you want to delete this announcement?')) return;
+        deleteMutation.mutate(id);
     };
 
     const handleAudienceChange = (audience) => {
@@ -95,247 +107,255 @@ const Announcements = () => {
             const currentAudience = formData.targetAudience.filter(a => a !== 'all');
             if (currentAudience.includes(audience)) {
                 const newAudience = currentAudience.filter(a => a !== audience);
-                setFormData({
-                    ...formData,
-                    targetAudience: newAudience.length > 0 ? newAudience : ['all']
-                });
+                setFormData({ ...formData, targetAudience: newAudience.length > 0 ? newAudience : ['all'] });
             } else {
                 setFormData({ ...formData, targetAudience: [...currentAudience, audience] });
             }
         }
     };
 
-    const getPriorityColor = (priority) => {
+    const getPriorityStyle = (priority) => {
         switch (priority) {
-            case 'high': return 'text-red-600 bg-red-50';
-            case 'medium': return 'text-yellow-600 bg-yellow-50';
-            case 'low': return 'text-blue-600 bg-blue-50';
-            default: return 'text-gray-600 bg-gray-50';
+            case 'high': return { badge: 'text-red-700 bg-red-100 dark:bg-red-500/20 dark:text-red-400', border: 'border-l-red-500' };
+            case 'medium': return { badge: 'text-yellow-700 bg-yellow-100 dark:bg-yellow-500/20 dark:text-yellow-400', border: 'border-l-yellow-500' };
+            case 'low': return { badge: 'text-blue-700 bg-blue-100 dark:bg-blue-500/20 dark:text-blue-400', border: 'border-l-blue-500' };
+            default: return { badge: 'text-gray-700 bg-gray-100 dark:bg-gray-500/20 dark:text-[#8E8E93]', border: 'border-l-gray-400' };
         }
     };
 
     const formatDate = (date) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
+        return new Date(date).toLocaleDateString('en-IN', {
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
         });
+    };
+
+    const isExpired = (expiresAt) => expiresAt && new Date(expiresAt) < new Date();
+
+    const timeAgo = (date) => {
+        const diff = Date.now() - new Date(date).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'Just now';
+        if (mins < 60) return `${mins}m ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        const days = Math.floor(hrs / 24);
+        if (days < 7) return `${days}d ago`;
+        return formatDate(date);
     };
 
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
             </div>
         );
     }
 
     return (
-        <div className="p-6">
+        <div className="space-y-4 sm:space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Announcements</h1>
-                    <p className="text-gray-600 mt-1">Broadcast messages to students, teachers, and parents</p>
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Announcements</h1>
+                    <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
+                        {isAdmin ? 'Create and manage school-wide announcements' : 'Stay updated with school announcements'}
+                    </p>
                 </div>
-                {user?.role === 'admin' && (
+                {isAdmin && (
                     <button
                         onClick={() => setShowCreateModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="btn btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
                     >
-                        <Plus size={20} />
-                        Create Announcement
+                        <Plus className="h-4 w-4" />
+                        New Announcement
                     </button>
                 )}
             </div>
 
             {/* Announcements List */}
-            <div className="space-y-4">
-                {announcements.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-lg shadow">
-                        <Megaphone size={48} className="mx-auto text-gray-400 mb-4" />
-                        <p className="text-gray-600">No announcements yet</p>
-                        {user?.role === 'admin' && (
-                            <p className="text-sm text-gray-500 mt-2">Create your first announcement to get started</p>
-                        )}
-                    </div>
-                ) : (
-                    announcements.map((announcement) => (
-                        <div key={announcement._id} className="bg-white rounded-lg shadow p-6">
-                            <div className="flex justify-between items-start mb-4">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <h3 className="text-lg font-semibold text-gray-900">{announcement.title}</h3>
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(announcement.priority)}`}>
-                                            {announcement.priority}
-                                        </span>
-                                    </div>
-                                    <p className="text-gray-700 whitespace-pre-wrap">{announcement.message}</p>
-                                </div>
-                                {user?.role === 'admin' && (
-                                    <button
-                                        onClick={() => handleDelete(announcement._id)}
-                                        disabled={announcement._deleting}
-                                        className="text-red-600 hover:text-red-700 p-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="Delete announcement"
-                                    >
-                                        {announcement._deleting ? (
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                                        ) : (
-                                            <Trash2 size={18} />
-                                        )}
-                                    </button>
-                                )}
-                            </div>
+            {announcements.length === 0 ? (
+                <div className="card p-6 sm:p-12 text-center">
+                    <Megaphone className="h-12 w-12 text-gray-300 dark:text-[#636366] mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No announcements</h3>
+                    <p className="text-sm text-gray-500 dark:text-[#8E8E93]">
+                        {isAdmin ? 'Create your first announcement to get started' : 'No announcements have been posted yet'}
+                    </p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {announcements.map((announcement) => {
+                        const style = getPriorityStyle(announcement.priority);
+                        const expired = isExpired(announcement.expiresAt);
 
-                            <div className="flex flex-wrap gap-4 text-sm text-gray-600 border-t pt-4">
-                                <div className="flex items-center gap-2">
-                                    <Users size={16} />
-                                    <span>
+                        return (
+                            <div
+                                key={announcement._id}
+                                className={`card p-4 sm:p-6 border-l-4 ${style.border} ${expired ? 'opacity-60' : ''} ${deletingId === announcement._id ? 'opacity-40 pointer-events-none' : ''}`}
+                            >
+                                <div className="flex justify-between items-start gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{announcement.title}</h3>
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${style.badge}`}>
+                                                {announcement.priority}
+                                            </span>
+                                            {expired && (
+                                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-[#2C2C2E] dark:text-[#8E8E93]">
+                                                    Expired
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-gray-700 dark:text-[#8E8E93] text-sm leading-relaxed whitespace-pre-wrap">{announcement.message}</p>
+                                    </div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => handleDelete(announcement._id)}
+                                            disabled={deletingId === announcement._id}
+                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg flex-shrink-0"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-[#8E8E93] mt-4 pt-3 border-t border-gray-100 dark:border-[#38383A]">
+                                    <div className="flex items-center gap-1.5">
+                                        <Users className="h-3.5 w-3.5" />
                                         {announcement.targetAudience.includes('all')
-                                            ? 'All Users'
+                                            ? 'Everyone'
                                             : announcement.targetAudience.map(a => a.charAt(0).toUpperCase() + a.slice(1)).join(', ')
                                         }
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Calendar size={16} />
-                                    <span>{formatDate(announcement.createdAt)}</span>
-                                </div>
-                                {announcement.notificationsSent > 0 && (
-                                    <div className="flex items-center gap-2">
-                                        <Megaphone size={16} />
-                                        <span>{announcement.notificationsSent} notifications sent</span>
                                     </div>
-                                )}
-                                {announcement.expiresAt && (
-                                    <div className="flex items-center gap-2 text-orange-600">
-                                        <AlertCircle size={16} />
-                                        <span>Expires: {formatDate(announcement.expiresAt)}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <Clock className="h-3.5 w-3.5" />
+                                        {timeAgo(announcement.createdAt)}
                                     </div>
-                                )}
+                                    {announcement.notificationsSent > 0 && (
+                                        <div className="flex items-center gap-1.5">
+                                            <Megaphone className="h-3.5 w-3.5" />
+                                            {announcement.notificationsSent} notified
+                                        </div>
+                                    )}
+                                    {announcement.expiresAt && (
+                                        <div className={`flex items-center gap-1.5 ${expired ? 'text-gray-400' : 'text-orange-500'}`}>
+                                            <AlertCircle className="h-3.5 w-3.5" />
+                                            Expires: {formatDate(announcement.expiresAt)}
+                                        </div>
+                                    )}
+                                    {announcement.createdBy?.name && (
+                                        <div className="flex items-center gap-1.5">
+                                            By: {announcement.createdBy.name}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))
-                )}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Create Announcement Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="p-6">
-                            <h2 className="text-xl font-bold text-gray-900 mb-4">Create Announcement</h2>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">New Announcement</h2>
+                            <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-full">
+                                <X className="h-5 w-5 text-gray-400 dark:text-[#636366]" />
+                            </button>
+                        </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                {/* Title */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Title *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.title}
-                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        required
-                                        maxLength={200}
-                                    />
+                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
+                                    Title <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.title}
+                                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#2C2C2E] dark:text-white"
+                                    placeholder="Announcement title"
+                                    required
+                                    maxLength={200}
+                                />
+                                <p className="text-xs text-gray-400 mt-1 text-right">{formData.title.length}/200</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
+                                    Message <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={formData.message}
+                                    onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#2C2C2E] dark:text-white"
+                                    rows={5}
+                                    required
+                                    maxLength={2000}
+                                    placeholder="Write your announcement..."
+                                />
+                                <p className="text-xs text-gray-400 mt-1 text-right">{formData.message.length}/2000</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
+                                    Target Audience <span className="text-red-500">*</span>
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {['all', 'student', 'teacher', 'parent', 'admin'].map((audience) => {
+                                        const selected = formData.targetAudience.includes(audience);
+                                        return (
+                                            <button
+                                                key={audience}
+                                                type="button"
+                                                onClick={() => handleAudienceChange(audience)}
+                                                className={`px-3 py-1.5 text-sm rounded-full border transition-colors capitalize ${
+                                                    selected
+                                                        ? 'bg-primary-50 dark:bg-primary-500/20 border-primary-300 dark:border-primary-500/40 text-primary-700 dark:text-primary-400 font-medium'
+                                                        : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
+                                                }`}
+                                            >
+                                                {audience === 'all' ? 'Everyone' : audience}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                            </div>
 
-                                {/* Message */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Message *
-                                    </label>
-                                    <textarea
-                                        value={formData.message}
-                                        onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        rows={5}
-                                        required
-                                        maxLength={2000}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">{formData.message.length}/2000 characters</p>
-                                </div>
-
-                                {/* Target Audience */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Target Audience *
-                                    </label>
-                                    <div className="space-y-2">
-                                        {['all', 'student', 'teacher', 'parent', 'admin'].map((audience) => (
-                                            <label key={audience} className="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={formData.targetAudience.includes(audience)}
-                                                    onChange={() => handleAudienceChange(audience)}
-                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                <span className="text-sm text-gray-700 capitalize">{audience}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Priority */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Priority
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Priority</label>
                                     <select
                                         value={formData.priority}
                                         onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#2C2C2E] dark:text-white"
                                     >
                                         <option value="low">Low</option>
                                         <option value="medium">Medium</option>
                                         <option value="high">High</option>
                                     </select>
                                 </div>
-
-                                {/* Expiration Date */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Expiration Date (Optional)
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Expires (Optional)</label>
                                     <input
                                         type="datetime-local"
                                         value={formData.expiresAt}
                                         onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#2C2C2E] dark:text-white"
                                     />
                                 </div>
+                            </div>
 
-                                {/* Actions */}
-                                <div className="flex gap-3 pt-4">
-                                    <button
-                                        type="submit"
-                                        disabled={submitting}
-                                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                    >
-                                        {submitting ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                                Creating...
-                                            </>
-                                        ) : (
-                                            'Create & Send'
-                                        )}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowCreateModal(false)}
-                                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-100 dark:border-[#38383A]">
+                                <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-outline w-full sm:w-auto">
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={submitting} className="btn btn-primary w-full sm:w-auto">
+                                    {submitting ? 'Sending...' : 'Create & Broadcast'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

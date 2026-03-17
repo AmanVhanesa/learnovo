@@ -60,18 +60,18 @@ const BankAccountsSection = ({ form, updateField, settingsService }) => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div className="flex items-center gap-3">
                     <Banknote className="h-6 w-6 text-primary-600" />
                     <div>
-                        <h2 className="text-xl font-semibold text-gray-900">Bank Accounts</h2>
-                        <p className="text-sm text-gray-500">Manage bank details for fee invoices and receipts</p>
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Bank Accounts</h2>
+                        <p className="text-sm text-gray-500 dark:text-[#8E8E93]">Manage bank details for fee invoices and receipts</p>
                     </div>
                 </div>
                 {!isAdding && (
                     <button
                         onClick={() => setIsAdding(true)}
-                        className="btn btn-primary"
+                        className="btn btn-primary w-full sm:w-auto"
                     >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Account
@@ -81,8 +81,8 @@ const BankAccountsSection = ({ form, updateField, settingsService }) => {
 
             {/* Add/Edit Form */}
             {isAdding && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-sm font-medium text-gray-900 mb-4">
+                <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
                         {editingId !== null ? 'Edit Bank Account' : 'Add New Bank Account'}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -142,21 +142,21 @@ const BankAccountsSection = ({ form, updateField, settingsService }) => {
                                     type="checkbox"
                                     checked={formData.isDefault}
                                     onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
-                                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                    className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500"
                                 />
-                                <span className="text-sm text-gray-700">Set as default bank account</span>
+                                <span className="text-sm text-gray-700 dark:text-[#8E8E93]">Set as default bank account</span>
                             </label>
                         </div>
                     </div>
-                    <div className="flex gap-3 mt-6">
+                    <div className="flex flex-col sm:flex-row gap-3 mt-6">
                         <button
                             onClick={editingId !== null ? handleUpdate : handleAdd}
-                            className="btn btn-primary"
+                            className="btn btn-primary w-full sm:w-auto"
                             disabled={!formData.bankName || !formData.accountNumber}
                         >
                             {editingId !== null ? 'Update' : 'Add'} Account
                         </button>
-                        <button onClick={resetForm} className="btn btn-outline">
+                        <button onClick={resetForm} className="btn btn-outline w-full sm:w-auto">
                             Cancel
                         </button>
                     </div>
@@ -166,42 +166,42 @@ const BankAccountsSection = ({ form, updateField, settingsService }) => {
             {/* Bank Accounts List */}
             <div className="space-y-4">
                 {(form.bankAccounts || []).length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="text-center py-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg border border-gray-200 dark:border-[#38383A]">
                         <Banknote className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-sm text-gray-500">No bank accounts added yet</p>
+                        <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No bank accounts added yet</p>
                         <p className="text-xs text-gray-400 mt-1">Add your first bank account to get started</p>
                     </div>
                 ) : (
                     (form.bankAccounts || []).map((account, index) => (
                         <div
                             key={index}
-                            className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                            className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6 hover:shadow-md transition-shadow"
                         >
-                            <div className="flex items-start justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <h3 className="text-lg font-semibold text-gray-900">{account.bankName}</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{account.bankName}</h3>
                                         {account.isDefault && (
-                                            <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 text-primary-800">
+                                            <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-400">
                                                 <Star className="h-3 w-3 mr-1" />
                                                 Default
                                             </span>
                                         )}
                                     </div>
-                                    <div className="space-y-1 text-sm text-gray-600">
+                                    <div className="space-y-1 text-sm text-gray-600 dark:text-[#8E8E93]">
                                         <p><span className="font-medium">Account:</span> {account.accountNumber}</p>
                                         {account.branch && <p><span className="font-medium">Branch:</span> {account.branch}</p>}
                                         {account.address && <p><span className="font-medium">Address:</span> {account.address}</p>}
                                         {account.instructions && (
-                                            <p className="text-xs text-gray-500 mt-2 italic">{account.instructions}</p>
+                                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-2 italic">{account.instructions}</p>
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex gap-2 ml-4">
+                                <div className="flex gap-2 sm:ml-4">
                                     {!account.isDefault && (
                                         <button
                                             onClick={() => setAsDefault(index)}
-                                            className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-md"
+                                            className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-md"
                                             title="Set as default"
                                         >
                                             <Star className="h-4 w-4" />
@@ -209,13 +209,13 @@ const BankAccountsSection = ({ form, updateField, settingsService }) => {
                                     )}
                                     <button
                                         onClick={() => handleEdit(account, index)}
-                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md"
+                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md"
                                     >
                                         <Edit2 className="h-4 w-4" />
                                     </button>
                                     <button
                                         onClick={() => handleDelete(index)}
-                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </button>

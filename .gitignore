@@ -4,3 +4,4 @@ config.env
 *.env.local
 test_output.log
 uploads/
+.claude/

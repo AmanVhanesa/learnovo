@@ -72,14 +72,14 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between border-b border-gray-200 p-6">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
                     <div>
-                        <h3 className="text-xl font-semibold text-gray-900">Edit Invoice</h3>
-                        <p className="text-sm text-gray-500">#{invoice.invoiceNumber}</p>
+                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Edit Invoice</h3>
+                        <p className="text-sm text-gray-500 dark:text-[#8E8E93]">#{invoice.invoiceNumber}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100">
-                        <X className="h-5 w-5" />
+                    <button onClick={onClose} className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#2C2C2E]">
+                        <X className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
                     </button>
                 </div>
 
@@ -87,7 +87,7 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
                     {/* Items Section */}
                     <div>
                         <div className="flex justify-between items-center mb-3">
-                            <label className="block text-sm font-medium text-gray-700">Fee Items</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-white">Fee Items</label>
                             <button
                                 type="button"
                                 onClick={handleAddItem}
@@ -105,7 +105,7 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
                                         <input
                                             type="text"
                                             placeholder="Fee Head Name"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-sm dark:bg-[#1C1C1E] dark:text-white"
                                             value={item.feeHeadName}
                                             onChange={(e) => handleItemChange(index, 'feeHeadName', e.target.value)}
                                             required
@@ -115,7 +115,7 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
                                         <input
                                             type="number"
                                             placeholder="Amount"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-sm dark:bg-[#1C1C1E] dark:text-white"
                                             value={item.amount}
                                             onChange={(e) => handleItemChange(index, 'amount', parseFloat(e.target.value))}
                                             min="0"
@@ -125,7 +125,7 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
                                     <button
                                         type="button"
                                         onClick={() => handleRemoveItem(index)}
-                                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg"
                                         title="Remove Item"
                                     >
                                         <Trash2 className="h-4 w-4" />
@@ -135,20 +135,20 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
                         </div>
 
                         {items.length === 0 && (
-                            <div className="text-center py-4 text-sm text-gray-500 bg-gray-50 rounded-lg">
+                            <div className="text-center py-4 text-sm text-gray-500 dark:text-[#8E8E93] bg-gray-50 dark:bg-[#2C2C2E] rounded-lg">
                                 No items added
                             </div>
                         )}
                     </div>
 
                     {/* Summary */}
-                    <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                    <div className="bg-gray-50 dark:bg-[#2C2C2E] p-4 rounded-lg space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Total Amount:</span>
-                            <span className="font-semibold">₹{totalAmount.toLocaleString()}</span>
+                            <span className="text-gray-600 dark:text-[#8E8E93]">Total Amount:</span>
+                            <span className="font-semibold dark:text-white">₹{totalAmount.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Paid Amount:</span>
+                            <span className="text-gray-600 dark:text-[#8E8E93]">Paid Amount:</span>
                             <span className="font-semibold text-green-600">₹{paidAmount.toLocaleString()}</span>
                         </div>
                         {totalAmount < paidAmount && (
@@ -162,20 +162,20 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
                     {/* Due Date & Remarks */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-2">Due Date</label>
                             <input
                                 type="date"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg dark:bg-[#1C1C1E] dark:text-white"
                                 value={dueDate}
                                 onChange={(e) => setDueDate(e.target.value)}
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Remarks</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-2">Remarks</label>
                             <input
                                 type="text"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg dark:bg-[#1C1C1E] dark:text-white"
                                 value={remarks}
                                 onChange={(e) => setRemarks(e.target.value)}
                                 placeholder="Optional remarks"
@@ -184,11 +184,11 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-[#38383A]">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                            className="px-4 py-2 text-gray-700 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-lg"
                         >
                             Cancel
                         </button>
