@@ -262,6 +262,54 @@ router.delete('/tenants/:id', async (req, res) => {
 });
 
 /**
+ * POST /api/super-admin/tenants
+ * Create a new tenant with admin user (super admin only, no transaction)
+ */
+router.post('/tenants', async (req, res) => {
+    try {
+        const { schoolName, email, password, schoolCode, subdomain, phone, address, subscription } = req.body;
+        if (!schoolName || !email || !password || !schoolCode) {
+            return res.status(400).json({ success: false, message: 'schoolName, email, password, and schoolCode are required.', requestId: req.requestId });
+        }
+
+        const tenant = await Tenant.create({
+            schoolName: schoolName.trim(),
+            email: email.toLowerCase(),
+            schoolCode: schoolCode.toLowerCase(),
+            subdomain: (subdomain || schoolCode).toLowerCase(),
+            phone: phone || '',
+            address: address || {},
+            isActive: true,
+            subscription: subscription || { plan: 'enterprise', status: 'active', maxStudents: 10000, maxTeachers: 500 },
+            settings: { timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', currency: 'INR', academicYear: '2025-2026' }
+        });
+
+        const adminUser = await User.create({
+            tenantId: tenant._id,
+            fullName: `${schoolName.trim()} Admin`,
+            firstName: schoolName.trim(),
+            lastName: 'Admin',
+            email: email.toLowerCase(),
+            password,
+            role: 'admin',
+            isActive: true
+        });
+
+        await audit(req, 'CREATE_TENANT', 'Tenant', tenant._id, { schoolName, schoolCode, email });
+
+        return res.status(201).json({
+            success: true,
+            message: 'Tenant created successfully.',
+            data: { tenant, adminUser: { id: adminUser._id, email: adminUser.email, role: adminUser.role } },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: create tenant error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: error.message || 'Server error creating tenant.', requestId: req.requestId });
+    }
+});
+
+/**
  * POST /api/super-admin/tenants/:id/extend-trial
  * Extend trial by N days
  * Body: { days }
