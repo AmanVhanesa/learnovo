@@ -5,6 +5,170 @@ const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const Assignment = require('../models/Assignment');
 const User = require('../models/User');
+const Class = require('../models/Class');
+
+/**
+ * Build a class filter for teachers using all 4 allocation methods.
+ * Returns an array of class name strings (since Assignment.class is a String field).
+ */
+async function resolveTeacherClassNames(teacherId, tenantId) {
+  const classNames = new Set();
+
+  try {
+    // 1. Class model: classTeacher or subjects[].teacher
+    const directClasses = await Class.find({
+      tenantId,
+      $or: [
+        { classTeacher: teacherId },
+        { 'subjects.teacher': teacherId },
+      ],
+    }).select('name').lean();
+    directClasses.forEach(c => classNames.add(c.name));
+
+    // 2. Section model: sectionTeacher
+    const Section = require('../models/Section');
+    const sectionDocs = await Section.find({
+      tenantId, sectionTeacher: teacherId, isActive: true,
+    }).select('classId').lean();
+    if (sectionDocs.length > 0) {
+      const sectionClassIds = [...new Set(sectionDocs.map(s => s.classId?.toString()).filter(Boolean))];
+      const sectionClasses = await Class.find({
+        _id: { $in: sectionClassIds }, tenantId,
+      }).select('name').lean();
+      sectionClasses.forEach(c => classNames.add(c.name));
+    }
+
+    // 3. TeacherSubjectAssignment model
+    const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
+    const tsaDocs = await TeacherSubjectAssignment.find({
+      teacherId, tenantId, isActive: true,
+    }).select('classId').lean();
+    if (tsaDocs.length > 0) {
+      const tsaClassIds = [...new Set(tsaDocs.map(a => a.classId?.toString()).filter(Boolean))];
+      const tsaClasses = await Class.find({
+        _id: { $in: tsaClassIds }, tenantId,
+      }).select('name').lean();
+      tsaClasses.forEach(c => classNames.add(c.name));
+    }
+
+    // 4. Legacy User.assignedClasses
+    const teacher = await User.findById(teacherId).select('assignedClasses').lean();
+    if (teacher && Array.isArray(teacher.assignedClasses)) {
+      teacher.assignedClasses.forEach(c => c && classNames.add(c));
+    }
+  } catch (e) {
+    console.warn('resolveTeacherClassNames error:', e.message);
+  }
+
+  return [...classNames];
+}
+
+// ── IMPORTANT: specific routes BEFORE /:id ──────────────────────────
+
+// @desc    Get assignment statistics
+// @route   GET /api/assignments/stats/overview
+// @access  Private
+router.get('/stats/overview', protect, async(req, res) => {
+  try {
+    const user = req.user;
+    const tenantId = user.tenantId;
+
+    const filter = { tenantId };
+
+    if (user.role === 'teacher') {
+      const teacherClassNames = await resolveTeacherClassNames(user._id, tenantId);
+      if (teacherClassNames.length > 0) {
+        filter.$or = [
+          { teacher: user._id },
+          { class: { $in: teacherClassNames } },
+        ];
+      } else {
+        filter.teacher = user._id;
+      }
+    } else if (user.role === 'student') {
+      filter.assignedTo = user._id;
+      filter.isVisible = true;
+    } else if (user.role === 'parent') {
+      const childrenIds = Array.isArray(user.children) ? user.children : [];
+      if (childrenIds.length > 0) {
+        filter.assignedTo = { $in: childrenIds };
+      }
+    }
+
+    const assignments = await Assignment.find(filter);
+
+    const stats = {
+      totalAssignments: assignments.length,
+      activeAssignments: assignments.filter(a => a.status === 'active').length,
+      completedAssignments: assignments.filter(a => a.status === 'completed').length,
+      cancelledAssignments: assignments.filter(a => a.status === 'cancelled').length
+    };
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching assignment stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching statistics'
+    });
+  }
+});
+
+// @desc    Get upcoming assignments
+// @route   GET /api/assignments/upcoming/list
+// @access  Private
+router.get('/upcoming/list', protect, async(req, res) => {
+  try {
+    const user = req.user;
+    const tenantId = user.tenantId;
+    const today = new Date();
+
+    const filter = {
+      tenantId,
+      status: 'active',
+      dueDate: { $gte: today }
+    };
+
+    if (user.role === 'teacher') {
+      const teacherClassNames = await resolveTeacherClassNames(user._id, tenantId);
+      if (teacherClassNames.length > 0) {
+        filter.$or = [
+          { teacher: user._id },
+          { class: { $in: teacherClassNames } },
+        ];
+      } else {
+        filter.teacher = user._id;
+      }
+    } else if (user.role === 'student') {
+      filter.assignedTo = user._id;
+      filter.isVisible = true;
+    } else if (user.role === 'parent') {
+      const childrenIds = Array.isArray(user.children) ? user.children : [];
+      if (childrenIds.length > 0) {
+        filter.assignedTo = { $in: childrenIds };
+      }
+    }
+
+    const upcomingAssignments = await Assignment.find(filter)
+      .populate('teacher', 'name email')
+      .sort({ dueDate: 1 })
+      .limit(10);
+
+    res.json({
+      success: true,
+      data: upcomingAssignments
+    });
+  } catch (error) {
+    console.error('Error fetching upcoming assignments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching upcoming assignments'
+    });
+  }
+});
 
 // @desc    Get all assignments (role-based)
 // @route   GET /api/assignments
@@ -19,24 +183,27 @@ router.get('/', protect, async(req, res) => {
     const filter = { tenantId };
 
     if (user.role === 'teacher') {
-      filter.teacher = user._id;
+      // Teachers see assignments they created + assignments for their classes
+      const teacherClassNames = await resolveTeacherClassNames(user._id, tenantId);
+      if (teacherClassNames.length > 0) {
+        filter.$or = [
+          { teacher: user._id },
+          { class: { $in: teacherClassNames } },
+        ];
+      } else {
+        filter.teacher = user._id;
+      }
     } else if (user.role === 'student') {
-      // Find assignments assigned to this student
       filter.assignedTo = user._id;
       filter.isVisible = true;
     } else if (user.role === 'admin') {
       // Admin can see all assignments in their tenant
     } else if (user.role === 'parent') {
-      // Parents see assignments for their children
       const childrenIds = Array.isArray(user.children) ? user.children : [];
       if (childrenIds.length > 0) {
         filter.assignedTo = { $in: childrenIds };
       } else {
-        // No children, return empty
-        return res.json({
-          success: true,
-          data: []
-        });
+        return res.json({ success: true, data: [] });
       }
     }
 
@@ -79,15 +246,13 @@ router.get('/:id', protect, async(req, res) => {
 
     const filter = { _id: id, tenantId };
 
-    // Students and parents can only see assignments assigned to them/their children
     if (user.role === 'student') {
       filter.assignedTo = user._id;
     } else if (user.role === 'parent') {
       const childrenIds = Array.isArray(user.children) ? user.children : [];
       filter.assignedTo = { $in: childrenIds };
-    } else if (user.role === 'teacher') {
-      filter.teacher = user._id;
     }
+    // Teachers and admins can view any assignment in their tenant
 
     const assignment = await Assignment.findOne(filter)
       .populate('teacher', 'name email')
@@ -140,11 +305,20 @@ router.post('/', protect, authorize('admin', 'teacher'), [
     // If assignedTo is not provided, assign to all students in the class
     let studentIds = assignedTo;
     if (!studentIds || studentIds.length === 0) {
-      const students = await User.find({
+      const studentQuery = {
         role: 'student',
-        class: className,
         tenantId: req.user.tenantId
-      }).select('_id');
+      };
+      // Try matching by classId first, then by class name string
+      if (classId) {
+        studentQuery.$or = [
+          { classId: classId },
+          { class: className },
+        ];
+      } else {
+        studentQuery.class = className;
+      }
+      const students = await User.find(studentQuery).select('_id');
       studentIds = students.map(s => s._id);
     }
 
@@ -162,9 +336,7 @@ router.post('/', protect, authorize('admin', 'teacher'), [
       instructions
     });
 
-    // Populate assignment
     await assignment.populate('teacher', 'name email');
-    await assignment.populate('assignedTo', 'name email rollNumber');
 
     res.status(201).json({
       success: true,
@@ -204,8 +376,7 @@ router.put('/:id', protect, authorize('admin', 'teacher'), [
       updates,
       { new: true, runValidators: true }
     )
-      .populate('teacher', 'name email')
-      .populate('assignedTo', 'name email rollNumber');
+      .populate('teacher', 'name email');
 
     if (!assignment) {
       return res.status(404).json({
@@ -260,95 +431,6 @@ router.delete('/:id', protect, authorize('admin', 'teacher'), async(req, res) =>
     res.status(500).json({
       success: false,
       message: 'Server error while deleting assignment'
-    });
-  }
-});
-
-// @desc    Get assignment statistics
-// @route   GET /api/assignments/stats/overview
-// @access  Private
-router.get('/stats/overview', protect, async(req, res) => {
-  try {
-    const user = req.user;
-    const tenantId = user.tenantId;
-
-    const filter = { tenantId };
-
-    if (user.role === 'teacher') {
-      filter.teacher = user._id;
-    } else if (user.role === 'student') {
-      filter.assignedTo = user._id;
-      filter.isVisible = true;
-    } else if (user.role === 'parent') {
-      const childrenIds = Array.isArray(user.children) ? user.children : [];
-      if (childrenIds.length > 0) {
-        filter.assignedTo = { $in: childrenIds };
-      }
-    }
-
-    const assignments = await Assignment.find(filter);
-    
-    const stats = {
-      totalAssignments: assignments.length,
-      activeAssignments: assignments.filter(a => a.status === 'active').length,
-      completedAssignments: assignments.filter(a => a.status === 'completed').length,
-      cancelledAssignments: assignments.filter(a => a.status === 'cancelled').length
-    };
-
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    console.error('Error fetching assignment stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching statistics'
-    });
-  }
-});
-
-// @desc    Get upcoming assignments
-// @route   GET /api/assignments/upcoming/list
-// @access  Private
-router.get('/upcoming/list', protect, async(req, res) => {
-  try {
-    const user = req.user;
-    const tenantId = user.tenantId;
-    const today = new Date();
-
-    const filter = {
-      tenantId,
-      status: 'active',
-      dueDate: { $gte: today }
-    };
-
-    if (user.role === 'teacher') {
-      filter.teacher = user._id;
-    } else if (user.role === 'student') {
-      filter.assignedTo = user._id;
-      filter.isVisible = true;
-    } else if (user.role === 'parent') {
-      const childrenIds = Array.isArray(user.children) ? user.children : [];
-      if (childrenIds.length > 0) {
-        filter.assignedTo = { $in: childrenIds };
-      }
-    }
-
-    const upcomingAssignments = await Assignment.find(filter)
-      .populate('teacher', 'name email')
-      .sort({ dueDate: 1 })
-      .limit(10);
-
-    res.json({
-      success: true,
-      data: upcomingAssignments
-    });
-  } catch (error) {
-    console.error('Error fetching upcoming assignments:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching upcoming assignments'
     });
   }
 });

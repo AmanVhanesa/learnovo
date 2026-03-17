@@ -170,7 +170,7 @@ studentBalanceSchema.statics.getDefaulters = async function (tenantId, academicS
     }
 
     const defaulters = await this.find(query)
-        .populate('studentId', 'name fullName studentId phone email classId sectionId')
+        .populate('studentId', 'name fullName studentId phone email classId sectionId admissionNumber')
         .populate('academicSessionId', 'name')
         .sort({ totalBalance: -1 })
         .limit(options.limit || 1000);

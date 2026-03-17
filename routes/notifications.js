@@ -143,4 +143,24 @@ router.patch('/:id/unread', protect, async (req, res) => {
   }
 });
 
+// @desc    Soft-delete a notification
+// @route   DELETE /api/notifications/:id
+// @access  Private
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId, userId: req.user._id, isDeleted: false },
+      { $set: { isDeleted: true, deletedAt: new Date() } },
+      { new: true }
+    );
+    if (!notification) {
+      return res.status(404).json({ success: false, message: 'Notification not found' });
+    }
+    res.json({ success: true, message: 'Notification deleted' });
+  } catch (error) {
+    console.error('Delete notification error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;

@@ -88,7 +88,16 @@ async function generateAdmissionNumber(tenantId, session = null) {
     return String(nextSequence);
 }
 
+async function rollbackAdmissionNumber(tenantId) {
+    const Counter = mongoose.model('Counter');
+    await Counter.findOneAndUpdate(
+        { name: 'admission_global', tenantId },
+        { $inc: { sequence: -1 } }
+    );
+}
+
 module.exports = {
     generateAdmissionNumber,
-    extractSequenceNumber
+    extractSequenceNumber,
+    rollbackAdmissionNumber
 };

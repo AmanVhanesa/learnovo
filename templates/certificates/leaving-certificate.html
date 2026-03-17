@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Leaving Certificate - {{student_name}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  @page { size: A4 portrait; margin: 0; }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 794px;
+    height: 1123px;
+    font-family: 'Inter', sans-serif;
+    color: #1C1C2E;
+    background: #FAFBFF;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    width: 794px;
+    height: 1123px;
+    position: relative;
+    overflow: hidden;
+    background: #FAFBFF;
+  }
+
+  /* ── PREMIUM BORDER SYSTEM ── */
+  .border-frame-1 {
+    position: absolute; inset: 8px;
+    border: 3px solid #1A2E5A;
+    border-radius: 12px;
+    pointer-events: none; z-index: 2;
+  }
+  .border-frame-2 {
+    position: absolute; inset: 14px;
+    border: 1.5px solid #C9A84C;
+    pointer-events: none; z-index: 2;
+  }
+  .border-frame-3 {
+    position: absolute; inset: 18px;
+    border: 0.5px solid #1A2E5A;
+    pointer-events: none; z-index: 2;
+    opacity: 0.3;
+  }
+
+  /* Gold accent dots along the middle border */
+  .border-frame-2::before {
+    content: '';
+    position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; background: #C9A84C; border-radius: 50%;
+  }
+  .border-frame-2::after {
+    content: '';
+    position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%);
+    width: 5px; height: 5px; background: #C9A84C; border-radius: 50%;
+  }
+
+  /* Side accent dots */
+  .side-dot-left, .side-dot-right {
+    position: absolute; width: 5px; height: 5px;
+    background: #C9A84C; border-radius: 50%;
+    z-index: 3; pointer-events: none;
+  }
+  .side-dot-left { left: 11.5px; top: 50%; transform: translateY(-50%); }
+  .side-dot-right { right: 11.5px; top: 50%; transform: translateY(-50%); }
+
+  /* ── ORNATE CORNERS ── */
+  .corner { position: absolute; width: 70px; height: 70px; z-index: 3; pointer-events: none; }
+  .corner svg { width: 100%; height: 100%; }
+  .corner-tl { top: 5px; left: 5px; }
+  .corner-tr { top: 5px; right: 5px; transform: scaleX(-1); }
+  .corner-bl { bottom: 5px; left: 5px; transform: scaleY(-1); }
+  .corner-br { bottom: 5px; right: 5px; transform: scale(-1,-1); }
+
+  /* ── WATERMARK ── */
+  .watermark {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%) rotate(-35deg);
+    font-family: 'Playfair Display', serif; font-size: 58px; font-weight: 700;
+    color: rgba(26,46,90,0.03); letter-spacing: 14px;
+    white-space: nowrap; z-index: 1; pointer-events: none; text-transform: uppercase;
+  }
+
+  /* ── CONTENT WRAPPER ── */
+  .content-wrap {
+    position: absolute;
+    top: 22px; left: 22px; right: 22px; bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    z-index: 4;
+    overflow: hidden;
+  }
+
+  /* ── HEADER BAND ── */
+  .header-band {
+    width: 100%; min-height: 160px;
+    background: linear-gradient(135deg, #0F1F3D 0%, #1A2E5A 55%, #243F7A 100%);
+    display: flex; align-items: center;
+    padding: 18px 34px 14px 34px;
+    position: relative; flex-shrink: 0;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .header-band::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, transparent 0%, #C9A84C 15%, #E8D48B 50%, #C9A84C 85%, transparent 100%);
+  }
+
+  .header-band::before {
+    content: ''; position: absolute; inset: 0;
+    background: repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.015) 20px, rgba(255,255,255,0.015) 22px);
+    pointer-events: none;
+  }
+
+  .school-logo-wrap {
+    width: 78px; height: 78px; border-radius: 50%;
+    border: 3px solid rgba(201,168,76,0.6); overflow: hidden; flex-shrink: 0;
+    background: rgba(255,255,255,0.12); display: flex;
+    align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  }
+
+  .school-logo-wrap img { width: 66px; height: 66px; object-fit: contain; border-radius: 50%; }
+
+  .school-info { flex: 1; text-align: center; padding: 0 14px; }
+
+  .school-name {
+    font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700;
+    color: #FFFFFF; letter-spacing: 1.5px; line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .school-address { font-size: 9.5px; color: rgba(255,255,255,0.85); margin-top: 10px; line-height: 1.4; }
+  .school-contacts { font-size: 8.5px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+
+  .school-codes { display: flex; justify-content: center; gap: 16px; margin-top: 5px; }
+  .school-code-item { font-size: 7.5px; color: rgba(255,255,255,0.55); letter-spacing: 0.5px; text-transform: uppercase; font-weight: 500; }
+  .school-code-item span { color: #E8D48B; font-weight: 600; }
+
+  /* ── TITLE ── */
+  .title-section { text-align: center; padding: 14px 40px 0; flex-shrink: 0; }
+
+  .cert-title {
+    font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700;
+    color: #1A2E5A; letter-spacing: 5px; text-transform: uppercase;
+    position: relative; display: inline-block; padding-bottom: 8px;
+  }
+
+  .cert-title::after {
+    content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 220px; height: 2px;
+    background: linear-gradient(90deg, transparent, #C9A84C, transparent);
+  }
+
+  .title-ornament { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 6px; }
+  .title-ornament .line { width: 45px; height: 1px; background: linear-gradient(90deg, transparent, #C9A84C); }
+  .title-ornament .line:last-child { background: linear-gradient(90deg, #C9A84C, transparent); }
+  .title-ornament .diamond { width: 6px; height: 6px; background: #C9A84C; transform: rotate(45deg); flex-shrink: 0; }
+
+  /* ── CERT META ROW ── */
+  .cert-meta-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 32px 0; flex-shrink: 0;
+  }
+
+  .cert-number-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #F0F4FF; border: 1px solid #DDE3F0; border-radius: 16px;
+    padding: 3px 10px; font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px; font-weight: 500; color: #1A2E5A;
+  }
+
+  .cert-number-badge .hash { color: #C9A84C; font-weight: 700; font-size: 10px; }
+
+  .cert-meta-right { display: flex; gap: 16px; }
+  .meta-item { font-size: 9px; color: #6B7280; font-weight: 500; }
+  .meta-item span { color: #1C1C2E; font-weight: 600; }
+
+  /* ── TABLE ── */
+  .table-section { padding: 8px 32px 0; flex-shrink: 0; }
+
+  .lc-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    border-radius: 8px; overflow: hidden;
+    border: 1px solid #DDE3F0; font-size: 10.5px;
+  }
+
+  .lc-table tr:nth-child(odd) { background: #FFFFFF; }
+  .lc-table tr:nth-child(even) { background: #F7F9FC; }
+
+  .lc-table td {
+    padding: 6px 12px;
+    border-bottom: 1px solid #EDF0F7;
+    vertical-align: top; line-height: 1.35;
+  }
+
+  .lc-table tr:last-child td { border-bottom: none; }
+
+  .lc-table .row-num {
+    width: 28px; font-family: 'JetBrains Mono', monospace;
+    font-size: 8px; font-weight: 600; color: #C9A84C;
+    text-align: center; padding-right: 2px;
+  }
+
+  .lc-table .row-label { width: 245px; font-weight: 600; color: #1A2E5A; }
+  .lc-table .row-value { color: #2D2D3F; font-weight: 500; }
+  .lc-table tr.highlight-row .row-value { font-weight: 700; color: #1A2E5A; }
+
+  /* ── REMARKS ── */
+  .remarks-section { padding: 8px 32px 0; flex-shrink: 0; }
+
+  .remarks-box {
+    background: linear-gradient(135deg, #FFFBF0 0%, #FFF8E8 100%);
+    border: 1px solid #EDE0C0; border-left: 3px solid #C9A84C;
+    border-radius: 6px; padding: 7px 14px;
+    font-size: 9px; color: #5A4E30; line-height: 1.45;
+  }
+
+  .remarks-box strong {
+    color: #7B6520; font-size: 8px; text-transform: uppercase;
+    letter-spacing: 1px; display: block; margin-bottom: 2px;
+  }
+
+  /* ── SPACER ── */
+  .flex-spacer { flex: 1; min-height: 4px; }
+
+  /* ── FOOTER ── */
+  .footer-section { flex-shrink: 0; }
+
+  .footer-top-row {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 36px 6px;
+  }
+
+  .footer-note {
+    font-size: 7.5px; color: #8891A5; max-width: 340px;
+    line-height: 1.45; font-style: italic;
+  }
+
+  .qr-block {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 8px; background: #F7F9FC;
+    border: 1px solid #E8ECF4; border-radius: 6px;
+  }
+
+  .qr-placeholder {
+    width: 40px; height: 40px; background: #1A2E5A; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .qr-placeholder::after { content: 'QR'; font-size: 9px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+
+  .qr-text { font-size: 7px; color: #8891A5; line-height: 1.35; font-weight: 500; }
+  .qr-text strong { display: block; color: #1A2E5A; font-size: 7.5px; }
+
+  .footer-meta-row {
+    display: flex; justify-content: space-between;
+    padding: 0 36px 6px;
+    font-size: 9px; color: #6B7280; font-style: italic;
+  }
+
+  .signature-area {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 0 42px 8px; height: 85px;
+  }
+
+  .sig-block { text-align: center; width: 145px; }
+  .sig-img { height: 36px; margin: 0 auto 3px; object-fit: contain; }
+  .sig-line { width: 120px; height: 1.5px; background: #1A2E5A; margin: 0 auto 4px; }
+  .sig-name { font-size: 10px; font-weight: 700; color: #1A2E5A; }
+
+  .seal-block { text-align: center; width: 90px; }
+
+  .seal-circle {
+    width: 80px; height: 80px; border: 2px dashed #C9A84C;
+    border-radius: 50%; margin: 0 auto 3px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .seal-text {
+    font-size: 6.5px; color: #C9A84C; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 1.2px; line-height: 1.3;
+  }
+
+  .footer-gradient {
+    height: 34px; width: 100%;
+    background: linear-gradient(135deg, #0F1F3D 0%, #1A2E5A 55%, #243F7A 100%);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    border-radius: 0 0 8px 8px;
+  }
+
+  .footer-gradient::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent 0%, #C9A84C 15%, #E8D48B 50%, #C9A84C 85%, transparent 100%);
+  }
+
+  .footer-gradient-text {
+    font-size: 7px; color: rgba(255,255,255,0.5);
+    letter-spacing: 3px; text-transform: uppercase; font-weight: 500;
+  }
+
+  @media print {
+    html, body { width: 210mm; height: 297mm; }
+    .page { width: 210mm; height: 297mm; page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Premium Border System -->
+  <div class="border-frame-1"></div>
+  <div class="border-frame-2"></div>
+  <div class="border-frame-3"></div>
+  <div class="side-dot-left"></div>
+  <div class="side-dot-right"></div>
+
+  <!-- Ornate Filigree Corners -->
+  <div class="corner corner-tl"><svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 66V14C4 8.477 8.477 4 14 4H66" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 60V18C10 13.582 13.582 10 18 10H60" stroke="#1A2E5A" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="4" cy="4" r="3" fill="#C9A84C"/>
+    <circle cx="4" cy="4" r="1.5" fill="#1A2E5A"/>
+    <path d="M4 42C4 42 8 38 12 38C16 38 16 44 12 44C8 44 8 38 12 34" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M42 4C42 4 38 8 38 12C38 16 44 16 44 12C44 8 38 8 34 12" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M4 26C6 24 10 24 10 28C10 32 4 30 4 26Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <path d="M26 4C24 6 24 10 28 10C32 10 30 4 26 4Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <rect x="14" y="11" width="4" height="4" transform="rotate(45 16 13)" fill="#C9A84C" opacity="0.4"/>
+  </svg></div>
+  <div class="corner corner-tr"><svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 66V14C4 8.477 8.477 4 14 4H66" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 60V18C10 13.582 13.582 10 18 10H60" stroke="#1A2E5A" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="4" cy="4" r="3" fill="#C9A84C"/>
+    <circle cx="4" cy="4" r="1.5" fill="#1A2E5A"/>
+    <path d="M4 42C4 42 8 38 12 38C16 38 16 44 12 44C8 44 8 38 12 34" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M42 4C42 4 38 8 38 12C38 16 44 16 44 12C44 8 38 8 34 12" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M4 26C6 24 10 24 10 28C10 32 4 30 4 26Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <path d="M26 4C24 6 24 10 28 10C32 10 30 4 26 4Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <rect x="14" y="11" width="4" height="4" transform="rotate(45 16 13)" fill="#C9A84C" opacity="0.4"/>
+  </svg></div>
+  <div class="corner corner-bl"><svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 66V14C4 8.477 8.477 4 14 4H66" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 60V18C10 13.582 13.582 10 18 10H60" stroke="#1A2E5A" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="4" cy="4" r="3" fill="#C9A84C"/>
+    <circle cx="4" cy="4" r="1.5" fill="#1A2E5A"/>
+    <path d="M4 42C4 42 8 38 12 38C16 38 16 44 12 44C8 44 8 38 12 34" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M42 4C42 4 38 8 38 12C38 16 44 16 44 12C44 8 38 8 34 12" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M4 26C6 24 10 24 10 28C10 32 4 30 4 26Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <path d="M26 4C24 6 24 10 28 10C32 10 30 4 26 4Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <rect x="14" y="11" width="4" height="4" transform="rotate(45 16 13)" fill="#C9A84C" opacity="0.4"/>
+  </svg></div>
+  <div class="corner corner-br"><svg viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 66V14C4 8.477 8.477 4 14 4H66" stroke="#C9A84C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 60V18C10 13.582 13.582 10 18 10H60" stroke="#1A2E5A" stroke-width="1" stroke-linecap="round"/>
+    <circle cx="4" cy="4" r="3" fill="#C9A84C"/>
+    <circle cx="4" cy="4" r="1.5" fill="#1A2E5A"/>
+    <path d="M4 42C4 42 8 38 12 38C16 38 16 44 12 44C8 44 8 38 12 34" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M42 4C42 4 38 8 38 12C38 16 44 16 44 12C44 8 38 8 34 12" stroke="#C9A84C" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+    <path d="M4 26C6 24 10 24 10 28C10 32 4 30 4 26Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <path d="M26 4C24 6 24 10 28 10C32 10 30 4 26 4Z" stroke="#C9A84C" stroke-width="0.5" fill="none"/>
+    <rect x="14" y="11" width="4" height="4" transform="rotate(45 16 13)" fill="#C9A84C" opacity="0.4"/>
+  </svg></div>
+
+  <!-- Watermark -->
+  <div class="watermark">LEAVING CERTIFICATE</div>
+
+  <!-- ═══ CONTENT ═══ -->
+  <div class="content-wrap">
+
+    <!-- HEADER -->
+    <div class="header-band">
+      <div class="school-logo-wrap">
+        <!-- LOGO_PLACEHOLDER -->
+      </div>
+      <div class="school-info">
+        <div class="school-name">{{school_name}}</div>
+        <div class="school-address">{{school_address}}</div>
+        <div class="school-contacts">Phone: {{school_phone}} &nbsp;|&nbsp; Email: {{school_email}}</div>
+        <div class="school-codes">
+          <div class="school-code-item">Affiliation No: <span>{{affiliation_no}}</span></div>
+          <div class="school-code-item">School Code: <span>{{school_code}}</span></div>
+          <div class="school-code-item">UDISE: <span>{{udise_no}}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TITLE -->
+    <div class="title-section">
+      <div class="cert-title">School Leaving Certificate</div>
+      <div class="title-ornament">
+        <div class="line"></div><div class="diamond"></div><div class="line"></div>
+      </div>
+    </div>
+
+    <!-- CERT META -->
+    <div class="cert-meta-row">
+      <div class="cert-number-badge"><span class="hash">#</span> {{certificate_number}}</div>
+      <div class="cert-meta-right">
+        <div class="meta-item">SR No: <span>{{sr_number}}</span></div>
+        <div class="meta-item">Date: <span>{{issue_date}}</span></div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-section">
+      <table class="lc-table">
+        <tr class="highlight-row">
+          <td class="row-num">01</td>
+          <td class="row-label">Name of the Student</td>
+          <td class="row-value">{{student_name}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">02</td>
+          <td class="row-label">Father's / Guardian's Name</td>
+          <td class="row-value">{{father_name}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">03</td>
+          <td class="row-label">Mother's Name</td>
+          <td class="row-value">{{mother_name}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">04</td>
+          <td class="row-label">Nationality</td>
+          <td class="row-value">{{nationality}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">05</td>
+          <td class="row-label">Category (Gen / SC / ST / OBC)</td>
+          <td class="row-value">{{category}}</td>
+        </tr>
+        <tr class="highlight-row">
+          <td class="row-num">06</td>
+          <td class="row-label">Date of Birth</td>
+          <td class="row-value">{{dob}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">07</td>
+          <td class="row-label">Admission Number</td>
+          <td class="row-value" style="font-family:'JetBrains Mono',monospace;letter-spacing:0.5px;">{{admission_no}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">08</td>
+          <td class="row-label">Date of First Admission in School</td>
+          <td class="row-value">{{admission_date}}</td>
+        </tr>
+        <tr class="highlight-row">
+          <td class="row-num">09</td>
+          <td class="row-label">Class in which Last Studied</td>
+          <td class="row-value">{{class_last_studied}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">10</td>
+          <td class="row-label">Board Examination Last Taken</td>
+          <td class="row-value">{{board_exam_result}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">11</td>
+          <td class="row-label">Whether Qualified for Promotion</td>
+          <td class="row-value">{{promotion_status}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">12</td>
+          <td class="row-label">Subjects Studied</td>
+          <td class="row-value" style="font-size:9.5px;line-height:1.5;">{{subjects}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">13</td>
+          <td class="row-label">Month up to which Fees Paid</td>
+          <td class="row-value">{{fee_status}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">14</td>
+          <td class="row-label">General Conduct</td>
+          <td class="row-value">{{conduct}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">15</td>
+          <td class="row-label">Date of Application for Certificate</td>
+          <td class="row-value">{{application_date}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">16</td>
+          <td class="row-label">Date of Issue of Certificate</td>
+          <td class="row-value">{{issue_date}}</td>
+        </tr>
+        <tr class="highlight-row">
+          <td class="row-num">17</td>
+          <td class="row-label">Reason for Leaving the School</td>
+          <td class="row-value">{{reason_for_leaving}}</td>
+        </tr>
+        <tr>
+          <td class="row-num">18</td>
+          <td class="row-label">Any Other Remarks</td>
+          <td class="row-value">{{remarks}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- REMARKS -->
+    <div class="remarks-section">
+      <div class="remarks-box">
+        <strong>Important Note</strong>
+        This certificate is issued based on school records. No alteration shall be made on this certificate.
+        Erasing or overwriting renders it invalid.
+      </div>
+    </div>
+
+    <!-- SPACER -->
+    <div class="flex-spacer"></div>
+
+    <!-- FOOTER -->
+    <div class="footer-section">
+      <!-- Note -->
+      <div class="footer-top-row">
+        <div class="footer-note">
+          Certified that the above information is in accordance with the school records.
+          This certificate does not entitle the holder to any benefits unless countersigned by the competent authority.
+        </div>
+      </div>
+
+      <!-- Place & Date -->
+      <div class="footer-meta-row">
+        <span>Place: {{place}}</span>
+      </div>
+
+      <!-- Signatures -->
+      <div class="signature-area">
+        <div class="sig-block">
+          <div class="sig-line"></div>
+          <div class="sig-name">Class Teacher</div>
+        </div>
+        <div class="seal-block">
+          <div class="seal-circle">
+          </div>
+        </div>
+        <div class="sig-block">
+          <!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->
+          <div class="sig-line"></div>
+          <div class="sig-name">Principal</div>
+        </div>
+      </div>
+
+      <!-- Bottom gradient bar -->
+      <div class="footer-gradient">
+        <span class="footer-gradient-text">Powered by Learnovo &mdash; School Management System</span>
+      </div>
+    </div>
+
+  </div><!-- /content-wrap -->
+</div>
+</body>
+</html>

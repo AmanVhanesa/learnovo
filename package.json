@@ -37,6 +37,7 @@
     "express-rate-limit": "^6.10.0",
     "express-validator": "^7.0.1",
     "fast-csv": "^5.0.5",
+    "googleapis": "^171.4.0",
     "helmet": "^7.0.0",
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
@@ -45,6 +46,7 @@
     "node-cache": "^5.1.2",
     "nodemailer": "^6.9.4",
     "pdfkit": "^0.13.0",
+    "puppeteer": "^24.39.1",
     "razorpay": "^2.9.6",
     "uuid": "^9.0.1",
     "xlsx": "^0.18.5"

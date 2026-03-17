@@ -4,6 +4,29 @@ const { setupTestDB, createTestTenant, createTestUser, getAuthToken, makeAuthent
 
 setupTestDB();
 
+// ─── Helpers for modern import pipeline tests ────────────────────────────────
+
+/** Build a minimal valid student row for the preview/execute pipeline */
+const makeStudentRow = (i) => ({
+  admissionNumber: `ADM${String(i).padStart(3, '0')}`,
+  firstName: `First${i}`,
+  lastName: `Last${i}`,
+  dateOfBirth: '2010-06-15',
+  gender: 'male',
+  currentClass: 'Class 1',
+  currentSection: 'A'
+});
+
+/** Convert an array of row objects to a CSV Buffer */
+const rowsToCSV = (rows) => {
+  if (!rows.length) return Buffer.from('', 'utf8');
+  const header = Object.keys(rows[0]).join(',');
+  const lines = rows.map(r => Object.values(r).join(','));
+  return Buffer.from([header, ...lines].join('\n'), 'utf8');
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 describe('CSV Import API', () => {
   let tenant;
   let adminUser;
@@ -282,6 +305,196 @@ describe('CSV Import API', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.message).toContain('Only admins can access templates');
       expect(response.body.requestId).toBeDefined();
+    });
+  });
+
+  // ── Modern import pipeline: preview → execute ────────────────────────────
+
+  describe('POST /api/students/import/preview', () => {
+    it('should accept a 50-row CSV and return totalRows === 50', async() => {
+      const rows = Array.from({ length: 50 }, (_, i) => makeStudentRow(i + 1));
+      const csvBuffer = rowsToCSV(rows);
+
+      const response = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', csvBuffer, { filename: 'students.csv', contentType: 'text/csv' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.summary.totalRows).toBe(50);
+    });
+
+    it('should return validData, summary, errors, and preview fields', async() => {
+      const rows = [makeStudentRow(1), makeStudentRow(2)];
+      const csvBuffer = rowsToCSV(rows);
+
+      const response = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', csvBuffer, { filename: 'students.csv', contentType: 'text/csv' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.validData)).toBe(true);
+      expect(Array.isArray(response.body.errors)).toBe(true);
+      expect(Array.isArray(response.body.duplicates)).toBe(true);
+      expect(response.body.summary).toBeDefined();
+      expect(response.body.summary.totalRows).toBe(2);
+    });
+
+    it('should mark a row with a missing required field as invalid', async() => {
+      const rows = [
+        { admissionNumber: 'ADM001', firstName: '', lastName: 'Last', dateOfBirth: '2010-01-01', gender: 'male', currentClass: 'Class 1', currentSection: 'A' }
+      ];
+      const csvBuffer = rowsToCSV(rows);
+
+      const response = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', csvBuffer, { filename: 'students.csv', contentType: 'text/csv' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.summary.invalidRows).toBeGreaterThan(0);
+    });
+
+    it('should return 400 when no file is attached', async() => {
+      const response = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should return 403 for non-admin users', async() => {
+      const teacherUser = await createTestUser(tenant._id, { role: 'teacher', email: 'teacher.preview@test.com' });
+      const teacherToken = await getAuthToken(teacherUser);
+      const rows = [makeStudentRow(1)];
+      const csvBuffer = rowsToCSV(rows);
+
+      const response = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${teacherToken}`)
+        .attach('file', csvBuffer, { filename: 'students.csv', contentType: 'text/csv' })
+        .expect(403);
+
+      expect(response.body.success).toBe(false);
+    });
+  });
+
+  describe('POST /api/students/import/execute', () => {
+    it('should import all valid rows and return success count', async() => {
+      // Step 1: preview to get validData
+      const rows = Array.from({ length: 5 }, (_, i) => makeStudentRow(i + 1));
+      const csvBuffer = rowsToCSV(rows);
+
+      const previewRes = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', csvBuffer, { filename: 'students.csv', contentType: 'text/csv' });
+
+      expect(previewRes.body.success).toBe(true);
+      const validData = previewRes.body.validData;
+      expect(validData.length).toBeGreaterThan(0);
+
+      // Step 2: execute
+      const response = await request(app)
+        .post('/api/students/import/execute')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ validData, options: { skipDuplicates: true } })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.success).toBe(validData.length);
+      expect(response.body.data.failed).toBe(0);
+    });
+
+    it('should skip duplicate rows when skipDuplicates is true', async() => {
+      // First import
+      const rows = [makeStudentRow(1)];
+      const csvBuffer = rowsToCSV(rows);
+
+      const firstPreview = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', csvBuffer, { filename: 'students.csv', contentType: 'text/csv' });
+
+      await request(app)
+        .post('/api/students/import/execute')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ validData: firstPreview.body.validData, options: { skipDuplicates: true } })
+        .expect(200);
+
+      // Second import of the same row — should be skipped
+      const secondPreview = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', csvBuffer, { filename: 'students.csv', contentType: 'text/csv' });
+
+      // The duplicate should appear in the duplicates array, not validData
+      const duplicateRow = (secondPreview.body.duplicates || []).map(d => d.data);
+
+      const response = await request(app)
+        .post('/api/students/import/execute')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          validData: [...(secondPreview.body.validData || []), ...duplicateRow],
+          options: { skipDuplicates: true }
+        })
+        .expect(200);
+
+      expect(response.body.data.skipped).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should return 400 when validData is missing', async() => {
+      const response = await request(app)
+        .post('/api/students/import/execute')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ options: {} })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should return 400 when validData is empty array', async() => {
+      const response = await request(app)
+        .post('/api/students/import/execute')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ validData: [], options: {} })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+    });
+
+    it('should still import valid rows when some rows fail', async() => {
+      // Mix valid row + row with bad data that will fail at DB level
+      const rows = [makeStudentRow(10)];
+      const csvBuffer = rowsToCSV(rows);
+
+      const previewRes = await request(app)
+        .post('/api/students/import/preview')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', csvBuffer, { filename: 'students.csv', contentType: 'text/csv' });
+
+      const validData = previewRes.body.validData;
+
+      // Inject a corrupted row alongside the valid one
+      const mixedData = [
+        ...validData,
+        { admissionNumber: null, role: 'student', tenantId: tenant._id }
+      ];
+
+      const response = await request(app)
+        .post('/api/students/import/execute')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ validData: mixedData, options: { skipDuplicates: true } })
+        .expect(200);
+
+      // The valid row should succeed even though the corrupted one failed
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.success).toBeGreaterThanOrEqual(1);
     });
   });
 });

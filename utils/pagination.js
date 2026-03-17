@@ -11,7 +11,7 @@
  */
 
 const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
+const MAX_LIMIT = 500;
 
 /**
  * Extract and clamp page/limit from query params.
@@ -30,14 +30,17 @@ function parsePagination(query = {}) {
  * Build a standard paginated response envelope.
  */
 function paginatedResponse(data, total, page, limit) {
+  const totalPages = Math.ceil(total / limit);
   return {
     success: true,
     data,
     pagination: {
       total,
       page,
+      current: page,      // backward-compat alias
       limit,
-      totalPages: Math.ceil(total / limit),
+      totalPages,
+      pages: totalPages,  // backward-compat alias (frontend reads this)
     },
   };
 }

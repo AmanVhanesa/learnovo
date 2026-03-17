@@ -68,6 +68,7 @@ router.get('/', protect, [
     // Add class filter for teachers
     if (req.user.role === 'teacher' && req.user.assignedClasses) {
       const studentsInClass = await User.find({
+        tenantId: req.user.tenantId,
         role: 'student',
         class: { $in: req.user.assignedClasses }
       }).select('_id');
@@ -77,6 +78,7 @@ router.get('/', protect, [
     // Add class filter from query
     if (req.query.class) {
       const studentsInClass = await User.find({
+        tenantId: req.user.tenantId,
         role: 'student',
         class: req.query.class
       }).select('_id');
@@ -109,6 +111,7 @@ router.get('/', protect, [
       }))
     );
 
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     res.json({
       success: true,
       data: formattedFees,
@@ -127,6 +130,103 @@ router.get('/', protect, [
   }
 });
 
+// @desc    Get fee statistics
+// @route   GET /api/fees/statistics
+// @access  Private
+router.get('/statistics', protect, async(req, res) => {
+  try {
+    const filter = {};
+
+    if (req.user.tenantId) {
+      filter.tenantId = req.user.tenantId;
+    }
+
+    if (req.user.role === 'teacher' && req.user.assignedClasses) {
+      const studentsInClass = await User.find({
+        tenantId: req.user.tenantId,
+        role: 'student',
+        class: { $in: req.user.assignedClasses }
+      }).select('_id');
+      filter.student = { $in: studentsInClass.map(s => s._id) };
+    } else if (req.user.role === 'student') {
+      filter.student = req.user._id;
+    } else if (req.user.role === 'parent' && req.user.children) {
+      filter.student = { $in: req.user.children };
+    }
+
+    const totalFees = await Fee.countDocuments(filter);
+    const paidFees = await Fee.countDocuments({ ...filter, status: 'paid' });
+    const pendingFees = await Fee.countDocuments({ ...filter, status: 'pending' });
+    const overdueFees = await Fee.countDocuments({ ...filter, status: 'overdue' });
+
+    const fees = await Fee.find(filter);
+    const totalAmount = fees.reduce((sum, fee) => sum + fee.amount, 0);
+    const paidAmount = fees.filter(fee => fee.status === 'paid').reduce((sum, fee) => sum + fee.amount, 0);
+    const pendingAmount = fees.filter(fee => fee.status === 'pending').reduce((sum, fee) => sum + fee.amount, 0);
+    const overdueAmount = fees.filter(fee => fee.status === 'overdue').reduce((sum, fee) => sum + fee.amount, 0);
+
+    res.json({
+      success: true,
+      data: {
+        counts: { total: totalFees, paid: paidFees, pending: pendingFees, overdue: overdueFees },
+        amounts: {
+          total: await formatCurrencyWithSettings(totalAmount),
+          paid: await formatCurrencyWithSettings(paidAmount),
+          pending: await formatCurrencyWithSettings(pendingAmount),
+          overdue: await formatCurrencyWithSettings(overdueAmount)
+        },
+        rawAmounts: { total: totalAmount, paid: paidAmount, pending: pendingAmount, overdue: overdueAmount }
+      }
+    });
+  } catch (error) {
+    console.error('Get fee statistics error:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching fee statistics' });
+  }
+});
+
+// @desc    Get overdue fees
+// @route   GET /api/fees/overdue
+// @access  Private
+router.get('/overdue', protect, async(req, res) => {
+  try {
+    const filter = { status: 'overdue' };
+
+    if (req.user.tenantId) {
+      filter.tenantId = req.user.tenantId;
+    }
+
+    if (req.user.role === 'teacher' && req.user.assignedClasses) {
+      const studentsInClass = await User.find({
+        tenantId: req.user.tenantId,
+        role: 'student',
+        class: { $in: req.user.assignedClasses }
+      }).select('_id');
+      filter.student = { $in: studentsInClass.map(s => s._id) };
+    } else if (req.user.role === 'student') {
+      filter.student = req.user._id;
+    } else if (req.user.role === 'parent' && req.user.children) {
+      filter.student = { $in: req.user.children };
+    }
+
+    const overdueFees = await Fee.find(filter)
+      .populate('student', 'name email phone class studentId rollNumber')
+      .sort({ dueDate: 1 });
+
+    const formattedFees = await Promise.all(
+      overdueFees.map(async(fee) => ({
+        ...fee.toJSON(),
+        formattedAmount: await formatCurrencyWithSettings(fee.amount, fee.currency),
+        student: fee.student
+      }))
+    );
+
+    res.json({ success: true, data: formattedFees });
+  } catch (error) {
+    console.error('Get overdue fees error:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching overdue fees' });
+  }
+});
+
 // @desc    Get single fee
 // @route   GET /api/fees/:id
 // @access  Private
@@ -140,6 +240,11 @@ router.get('/:id', protect, canAccessFee, async(req, res) => {
         success: false,
         message: 'Fee not found'
       });
+    }
+
+    // Verify tenant access
+    if (req.user.tenantId && fee.tenantId && fee.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     res.json({
@@ -555,6 +660,11 @@ router.put('/:id', protect, authorize('admin', 'teacher'), [
       });
     }
 
+    // Verify tenant access
+    if (req.user.tenantId && fee.tenantId && fee.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
     // Don't allow updating paid fees
     if (fee.status === 'paid') {
       return res.status(400).json({
@@ -608,6 +718,11 @@ router.put('/:id/pay', protect, authorize('admin', 'teacher'), [
       });
     }
 
+    // Verify tenant access
+    if (req.user.tenantId && fee.tenantId && fee.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
     if (fee.status === 'paid') {
       return res.status(400).json({
         success: false,
@@ -652,6 +767,11 @@ router.post('/:id/remind', protect, authorize('admin', 'teacher'), async(req, re
         success: false,
         message: 'Fee not found'
       });
+    }
+
+    // Verify tenant access
+    if (req.user.tenantId && fee.tenantId && fee.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     if (fee.status === 'paid') {
@@ -700,6 +820,11 @@ router.delete('/:id', protect, authorize('admin'), async(req, res) => {
       });
     }
 
+    // Verify tenant access
+    if (req.user.tenantId && fee.tenantId && fee.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
     // Don't allow deleting paid fees
     if (fee.status === 'paid') {
       return res.status(400).json({
@@ -720,119 +845,6 @@ router.delete('/:id', protect, authorize('admin'), async(req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error while deleting fee'
-    });
-  }
-});
-
-// @desc    Get fee statistics
-// @route   GET /api/fees/statistics
-// @access  Private
-router.get('/statistics', protect, async(req, res) => {
-  try {
-    // Build filter based on user role
-    const filter = {};
-
-    if (req.user.role === 'teacher' && req.user.assignedClasses) {
-      const studentsInClass = await User.find({
-        role: 'student',
-        class: { $in: req.user.assignedClasses }
-      }).select('_id');
-      filter.student = { $in: studentsInClass.map(s => s._id) };
-    } else if (req.user.role === 'student') {
-      filter.student = req.user._id;
-    } else if (req.user.role === 'parent' && req.user.children) {
-      filter.student = { $in: req.user.children };
-    }
-
-    // Get fee statistics
-    const totalFees = await Fee.countDocuments(filter);
-    const paidFees = await Fee.countDocuments({ ...filter, status: 'paid' });
-    const pendingFees = await Fee.countDocuments({ ...filter, status: 'pending' });
-    const overdueFees = await Fee.countDocuments({ ...filter, status: 'overdue' });
-
-    // Get amount statistics
-    const fees = await Fee.find(filter);
-    const totalAmount = fees.reduce((sum, fee) => sum + fee.amount, 0);
-    const paidAmount = fees.filter(fee => fee.status === 'paid').reduce((sum, fee) => sum + fee.amount, 0);
-    const pendingAmount = fees.filter(fee => fee.status === 'pending').reduce((sum, fee) => sum + fee.amount, 0);
-    const overdueAmount = fees.filter(fee => fee.status === 'overdue').reduce((sum, fee) => sum + fee.amount, 0);
-
-    const statistics = {
-      counts: {
-        total: totalFees,
-        paid: paidFees,
-        pending: pendingFees,
-        overdue: overdueFees
-      },
-      amounts: {
-        total: await formatCurrencyWithSettings(totalAmount),
-        paid: await formatCurrencyWithSettings(paidAmount),
-        pending: await formatCurrencyWithSettings(pendingAmount),
-        overdue: await formatCurrencyWithSettings(overdueAmount)
-      },
-      rawAmounts: {
-        total: totalAmount,
-        paid: paidAmount,
-        pending: pendingAmount,
-        overdue: overdueAmount
-      }
-    };
-
-    res.json({
-      success: true,
-      data: statistics
-    });
-  } catch (error) {
-    console.error('Get fee statistics error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching fee statistics'
-    });
-  }
-});
-
-// @desc    Get overdue fees
-// @route   GET /api/fees/overdue
-// @access  Private
-router.get('/overdue', protect, async(req, res) => {
-  try {
-    // Build filter based on user role
-    const filter = { status: 'overdue' };
-
-    if (req.user.role === 'teacher' && req.user.assignedClasses) {
-      const studentsInClass = await User.find({
-        role: 'student',
-        class: { $in: req.user.assignedClasses }
-      }).select('_id');
-      filter.student = { $in: studentsInClass.map(s => s._id) };
-    } else if (req.user.role === 'student') {
-      filter.student = req.user._id;
-    } else if (req.user.role === 'parent' && req.user.children) {
-      filter.student = { $in: req.user.children };
-    }
-
-    const overdueFees = await Fee.find(filter)
-      .populate('student', 'name email phone class studentId rollNumber')
-      .sort({ dueDate: 1 });
-
-    // Format fees with currency
-    const formattedFees = await Promise.all(
-      overdueFees.map(async(fee) => ({
-        ...fee.toJSON(),
-        formattedAmount: await formatCurrencyWithSettings(fee.amount, fee.currency),
-        student: fee.student
-      }))
-    );
-
-    res.json({
-      success: true,
-      data: formattedFees
-    });
-  } catch (error) {
-    console.error('Get overdue fees error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching overdue fees'
     });
   }
 });

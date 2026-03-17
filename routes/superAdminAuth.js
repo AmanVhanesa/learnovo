@@ -1,17 +1,27 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
 const SuperAdmin = require('../models/SuperAdmin');
 const { logger } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
+// Rate limit login attempts: 5 per 15 minutes per IP
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { success: false, message: 'Too many login attempts. Please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
 /**
  * @route   POST /api/super-admin/auth/login
  * @desc    Super admin login — returns JWT signed with SUPER_ADMIN_JWT_SECRET
  * @access  Public
  */
-router.post('/login', [
+router.post('/login', loginLimiter, [
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
     body('password').notEmpty().withMessage('Password is required')
 ], async (req, res) => {

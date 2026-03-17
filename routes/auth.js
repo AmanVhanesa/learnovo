@@ -203,11 +203,12 @@ router.post('/login', [
       }
     }
 
-    // Find user by email or admissionNumber
+    // Find user by email or admissionNumber (escape regex special chars for safety)
+    const escapedIdentifier = loginIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const identifierQuery = {
       $or: [
         { email: emailLower },
-        { admissionNumber: { $regex: new RegExp(`^${loginIdentifier}$`, 'i') } }
+        { admissionNumber: { $regex: new RegExp(`^${escapedIdentifier}$`, 'i') } }
       ]
     };
 
@@ -299,9 +300,15 @@ router.post('/login', [
       user: {
         id: user._id,
         name: user.name,
+        fullName: user.fullName,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         role: user.role,
         avatar: user.avatar,
+        photo: user.photo,
+        phone: user.phone,
+        address: user.address,
         lastLogin: user.lastLogin,
         tenantId: tenantId ? tenantId.toString() : null
       },
@@ -371,12 +378,16 @@ router.put('/profile', protect, [
   handleValidationErrors
 ], async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const { name, phone, address } = req.body;
     const userId = req.user.id;
 
     const updateData = {};
-    if (name) updateData.name = name;
-    if (phone) updateData.phone = phone;
+    if (name !== undefined) {
+      updateData.name = name;
+      updateData.fullName = name;
+    }
+    if (phone !== undefined) updateData.phone = phone;
+    if (address !== undefined) updateData.address = address;
 
     const user = await User.findByIdAndUpdate(
       userId,
@@ -390,14 +401,32 @@ router.put('/profile', protect, [
       user: {
         id: user._id,
         name: user.name,
+        fullName: user.fullName,
         email: user.email,
         role: user.role,
         avatar: user.avatar,
-        phone: user.phone
+        photo: user.photo,
+        phone: user.phone,
+        address: user.address,
+        tenantId: user.tenantId
       }
     });
   } catch (error) {
     console.error('Profile update error:', error);
+
+    // Return field-level Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const fieldErrors = Object.entries(error.errors).map(([field, err]) => ({
+        field,
+        message: err.message
+      }));
+      return res.status(400).json({
+        success: false,
+        message: fieldErrors.map(e => e.message).join('. '),
+        errors: fieldErrors
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Server error during profile update'

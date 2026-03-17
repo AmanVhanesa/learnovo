@@ -240,6 +240,14 @@ router.post('/', protect, authorize('admin'), [
             }
         });
     } catch (error) {
+        // Rollback the counter so the employeeId doesn't get skipped
+        try {
+            const currentYear = new Date().getFullYear().toString();
+            await Counter.rollbackSequence('employee', currentYear, req.user.tenantId);
+        } catch (rollbackErr) {
+            console.error('Counter rollback failed:', rollbackErr);
+        }
+
         console.error('Create employee error:', error);
         if (error.code === 11000) {
             return res.status(409).json({

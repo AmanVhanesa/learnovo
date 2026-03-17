@@ -210,6 +210,83 @@ router.post('/:id/pay', protect, authorize('student'), async (req, res) => {
 });
 
 /**
+ * @desc    Submit manual payment proof (when gateway is not enabled)
+ * @route   POST /api/student-fees/:id/submit-payment
+ * @access  Private (Student)
+ */
+router.post('/:id/submit-payment', protect, authorize('student'), [
+    body('paymentMode').isIn(['UPI', 'BANK_TRANSFER', 'CASH', 'CHEQUE', 'OTHER']).withMessage('Invalid payment mode'),
+    body('amount').isNumeric().custom(v => v > 0).withMessage('Amount must be positive'),
+    body('paymentDate').isISO8601().withMessage('Valid payment date required'),
+    body('transactionRefId').optional({ nullable: true }),
+    body('proofScreenshotUrl').optional({ nullable: true }),
+], handleValidationErrors, async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const invoice = await FeeInvoice.findOne({
+            _id: req.params.id,
+            studentId: req.user._id,
+            tenantId: req.user.tenantId
+        }).session(session);
+
+        if (!invoice) throw new Error('Invoice not found');
+        if (invoice.status === 'Paid') throw new Error('This invoice is already fully paid.');
+
+        // Block if there is already a pending submission for this invoice
+        const existingPending = await PaymentAttempt.findOne({
+            invoiceId: invoice._id,
+            studentId: req.user._id,
+            status: { $in: ['PENDING', 'PROCESSING', 'INITIATED', 'UNDER_REVIEW'] }
+        }).session(session);
+
+        if (existingPending) {
+            throw new Error('You already have a payment awaiting verification for this invoice.');
+        }
+
+        const { paymentMode, amount, paymentDate, transactionRefId, proofScreenshotUrl } = req.body;
+
+        // Amount cannot exceed balance
+        if (amount > invoice.balanceAmount) {
+            throw new Error(`Amount (${amount}) exceeds balance due (${invoice.balanceAmount}).`);
+        }
+
+        const idempotencyKey = `manual_${invoice._id}_${Date.now()}`;
+
+        const attempt = new PaymentAttempt({
+            tenantId: req.user.tenantId,
+            idempotencyKey,
+            studentId: req.user._id,
+            invoiceId: invoice._id,
+            amount,
+            status: 'PENDING',
+            triggerSource: 'STUDENT_PORTAL',
+            paymentMode,
+            transactionRefId: transactionRefId || null,
+            paymentDate: new Date(paymentDate),
+            proofScreenshotUrl: proofScreenshotUrl || null,
+        });
+
+        await attempt.save({ session });
+        await createAuditLog(attempt._id, session, req.user.tenantId, null, 'PENDING', 'STUDENT_PORTAL', `Manual payment submitted: ${paymentMode}`);
+
+        await session.commitTransaction();
+        session.endSession();
+
+        res.status(201).json({
+            success: true,
+            message: 'Your payment has been submitted for verification. You will be notified once it is approved.',
+            data: { paymentAttemptId: attempt._id, status: 'PENDING' }
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ success: false, message: error.message || 'Payment submission failed' });
+    }
+});
+
+/**
  * @desc    Check status of an ongoing payment attempt
  * @route   GET /api/student-fees/payment/:id/status
  * @access  Private (Student)
@@ -347,26 +424,136 @@ router.get('/dispute/:id', protect, authorize('student'), async (req, res) => {
 });
 
 /**
- * @desc    Get receipt logic (mocked PDF stream for now, frontend drives it via components)
+ * @desc    Get all receipts for the logged-in student
+ * @route   GET /api/student-fees/receipts
+ * @access  Private (Student)
+ */
+router.get('/receipts', protect, authorize('student'), async (req, res) => {
+    try {
+        const receipts = await Receipt.find({
+            studentId: req.user._id,
+            tenantId: req.user.tenantId
+        })
+            .populate('invoiceId', 'invoiceNumber totalAmount items')
+            .populate('paymentAttemptId', 'gatewayRefId amount status paymentMode transactionRefId paymentDate triggerSource')
+            .populate('verifiedByUserId', 'name fullName')
+            .sort({ issuedAt: -1 });
+
+        res.json({ success: true, data: receipts });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error fetching receipts' });
+    }
+});
+
+/**
+ * @desc    Get a single receipt by receipt ID or paymentAttemptId
  * @route   GET /api/student-fees/receipt/:id
  * @access  Private (Student)
  */
 router.get('/receipt/:id', protect, authorize('student'), async (req, res) => {
     try {
-        const receipt = await Receipt.findOne({
+        // Try by receipt _id first, then by paymentAttemptId
+        let receipt = await Receipt.findOne({
             _id: req.params.id,
             studentId: req.user._id,
             tenantId: req.user.tenantId
-        }).populate('invoiceId', 'invoiceNumber')
-            .populate('paymentAttemptId', 'gatewayRefId amount status');
+        });
+
+        if (!receipt) {
+            receipt = await Receipt.findOne({
+                paymentAttemptId: req.params.id,
+                studentId: req.user._id,
+                tenantId: req.user.tenantId
+            });
+        }
 
         if (!receipt) return res.status(404).json({ success: false, message: 'Receipt not found' });
 
-        // Typically we use pdfkit to pipe a stream here. 
-        // For now, we return the robust JSON graph so the Frontend React component can render & print it client-side.
+        await receipt.populate('invoiceId', 'invoiceNumber totalAmount items billingPeriod');
+        await receipt.populate('paymentAttemptId', 'gatewayRefId amount status paymentMode transactionRefId paymentDate triggerSource');
+        await receipt.populate('studentId', 'name fullName admissionNumber classId section parentName');
+        await receipt.populate('verifiedByUserId', 'name fullName');
+
+        // Populate student's classId
+        if (receipt.studentId?.classId) {
+            await receipt.populate('studentId.classId', 'name grade');
+        }
+
         res.json({ success: true, data: receipt });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+/**
+ * @desc    Admin verifies a manual payment submission → generates receipt
+ * @route   POST /api/student-fees/admin/verify-payment/:attemptId
+ * @access  Private (Admin)
+ */
+router.post('/admin/verify-payment/:attemptId', protect, authorize('admin', 'accountant'), async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const attempt = await PaymentAttempt.findOne({
+            _id: req.params.attemptId,
+            tenantId: req.user.tenantId
+        }).session(session);
+
+        if (!attempt) throw new Error('Payment attempt not found');
+        if (['SUCCESS', 'VERIFIED', 'FAILED'].includes(attempt.status)) {
+            throw new Error(`Payment is already ${attempt.status}. Cannot verify again.`);
+        }
+
+        // Mark as VERIFIED
+        const previousStatus = attempt.status;
+        attempt.status = 'VERIFIED';
+        attempt.verifiedBy = req.user._id;
+        attempt.verifiedAt = new Date();
+        await attempt.save({ session });
+
+        // Update invoice
+        const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
+        if (invoice) {
+            invoice.paidAmount += attempt.amount;
+            invoice.balanceAmount = invoice.totalAmount + (invoice.lateFeeApplied || 0) - invoice.paidAmount;
+            if (invoice.balanceAmount <= 0) { invoice.status = 'Paid'; invoice.balanceAmount = 0; }
+            else { invoice.status = 'Partial'; }
+            await invoice.save({ session });
+        }
+
+        // Generate Receipt
+        const receiptNum = await Receipt.generateReceiptNumber(req.user.tenantId);
+        const receipt = new Receipt({
+            tenantId: req.user.tenantId,
+            paymentAttemptId: attempt._id,
+            studentId: attempt.studentId,
+            invoiceId: attempt.invoiceId,
+            receiptNumber: receiptNum,
+            initiatedBy: attempt.triggerSource === 'ADMIN_MANUAL' ? 'admin' : 'student',
+            verifiedByUserId: req.user._id,
+            verifiedByName: req.user.name || req.user.fullName || 'Admin',
+            amount: attempt.amount,
+            paymentMode: attempt.paymentMode || 'OTHER',
+            transactionRefId: attempt.transactionRefId || null,
+            paymentDate: attempt.paymentDate || attempt.createdAt,
+        });
+        await receipt.save({ session });
+
+        await createAuditLog(attempt._id, session, req.user.tenantId, previousStatus, 'VERIFIED', 'ADMIN_MANUAL', `Verified by ${req.user.name || 'Admin'}`);
+
+        await session.commitTransaction();
+        session.endSession();
+
+        res.json({
+            success: true,
+            message: 'Payment verified and receipt generated.',
+            data: { attempt, receipt }
+        });
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        res.status(400).json({ success: false, message: error.message || 'Verification failed' });
     }
 });
 

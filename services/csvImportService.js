@@ -18,20 +18,13 @@ class CSVImportService {
     };
   }
 
-  // Validate CSV headers
+  // Validate CSV headers — only reject if required headers are missing; extra columns are allowed
   validateHeaders(headers, role) {
     const required = this.requiredHeaders[role];
     const missing = required.filter(header => !headers.includes(header));
 
     if (missing.length > 0) {
       throw new Error(`Missing required headers: ${missing.join(', ')}`);
-    }
-
-    const allValidHeaders = [...required, ...this.optionalHeaders[role]];
-    const invalid = headers.filter(header => !allValidHeaders.includes(header));
-
-    if (invalid.length > 0) {
-      throw new Error(`Invalid headers: ${invalid.join(', ')}`);
     }
 
     return true;
@@ -50,221 +43,218 @@ class CSVImportService {
     });
   }
 
-  // Import teachers
+  // Import teachers — batched insertMany instead of per-row User.create()
   async importTeachers(tenantId, csvData, adminEmail) {
-    const results = {
-      created: 0,
-      skipped: 0,
-      errors: []
-    };
+    const results = { created: 0, skipped: 0, errors: [] };
 
-    logger.info('Starting teacher import', {
-      tenantId,
-      adminEmail,
-      recordCount: csvData.length
-    });
+    logger.info('Starting teacher import', { tenantId, adminEmail, recordCount: csvData.length });
+
+    // Collect emails of all valid rows for duplicate check in one query
+    const emailsInFile = csvData
+      .filter(row => row.name && row.email)
+      .map(row => row.email.toLowerCase().trim());
+
+    const existingEmails = new Set();
+    if (emailsInFile.length > 0) {
+      const existing = await User.find({ tenantId, role: 'teacher', email: { $in: emailsInFile } })
+        .select('email').lean();
+      existing.forEach(u => existingEmails.add(u.email));
+    }
+
+    const docsToInsert = [];
 
     for (let i = 0; i < csvData.length; i++) {
       const row = csvData[i];
-      const rowNumber = i + 2; // +2 because CSV is 1-indexed and we skip header
+      const rowNumber = i + 2;
 
+      if (!row.name || !row.email) {
+        results.errors.push({ row: rowNumber, error: 'Missing required fields: name and email are required' });
+        results.skipped++;
+        continue;
+      }
+
+      const email = row.email.toLowerCase().trim();
+
+      if (existingEmails.has(email)) {
+        results.errors.push({ row: rowNumber, error: `Teacher with email ${email} already exists` });
+        results.skipped++;
+        continue;
+      }
+
+      docsToInsert.push({
+        tenantId,
+        name: row.name.trim(),
+        email,
+        password: this.generateTemporaryPassword(),
+        role: 'teacher',
+        phone: row.phone?.trim(),
+        qualifications: row.qualifications?.trim(),
+        subjects: row.subjects ? row.subjects.split(',').map(s => s.trim()) : []
+      });
+    }
+
+    if (docsToInsert.length === 0) {
+      logger.info('Teacher import completed (nothing to insert)', { tenantId, adminEmail, results });
+      return results;
+    }
+
+    // Batch insert in chunks of 100
+    const CHUNK_SIZE = 100;
+    const insertedDocs = [];
+    for (let i = 0; i < docsToInsert.length; i += CHUNK_SIZE) {
+      const chunk = docsToInsert.slice(i, i + CHUNK_SIZE);
       try {
-        // Validate required fields
-        if (!row.name || !row.email) {
-          results.errors.push({
-            row: rowNumber,
-            error: 'Missing required fields: name and email are required'
+        const inserted = await User.insertMany(chunk, { ordered: false });
+        insertedDocs.push(...inserted);
+        results.created += inserted.length;
+      } catch (bulkErr) {
+        // ordered:false — some docs may have been inserted despite the error
+        const inserted = bulkErr.insertedDocs || [];
+        insertedDocs.push(...inserted);
+        results.created += inserted.length;
+        if (bulkErr.writeErrors) {
+          bulkErr.writeErrors.forEach(we => {
+            results.errors.push({ row: '?', error: we.errmsg || we.message });
+            results.skipped++;
           });
-          results.skipped++;
-          continue;
         }
+      }
+    }
 
-        // Check if teacher already exists
-        const existingTeacher = await User.findOne({
-          tenantId,
-          email: row.email.toLowerCase(),
-          role: 'teacher'
-        });
-
-        if (existingTeacher) {
-          results.errors.push({
-            row: rowNumber,
-            error: `Teacher with email ${row.email} already exists`
-          });
-          results.skipped++;
-          continue;
-        }
-
-        // Create teacher
-        const teacherData = {
-          tenantId,
-          name: row.name.trim(),
-          email: row.email.toLowerCase().trim(),
-          password: this.generateTemporaryPassword(),
-          role: 'teacher',
-          phone: row.phone?.trim(),
-          qualifications: row.qualifications?.trim(),
-          subjects: row.subjects ? row.subjects.split(',').map(s => s.trim()) : []
-        };
-
-        const teacher = await User.create(teacherData);
-        results.created++;
-
-        // Send invitation email
+    // Fire invitation emails asynchronously after the batch completes
+    Promise.all(
+      insertedDocs.map(teacher =>
         emailService.sendUserInvitationEmail(
           teacher.email,
           teacher.name,
-          'Your School', // This should be fetched from tenant
+          'Your School',
           'teacher',
           this.generateInvitationToken(teacher._id)
         ).catch(error => {
           logger.error('Failed to send teacher invitation email', error, {
-            tenantId,
-            teacherId: teacher._id,
-            email: teacher.email
+            tenantId, teacherId: teacher._id, email: teacher.email
           });
-        });
+        })
+      )
+    ).catch(() => {});
 
-        logger.info('Teacher created successfully', {
-          tenantId,
-          teacherId: teacher._id,
-          email: teacher.email,
-          row: rowNumber
-        });
-
-      } catch (error) {
-        results.errors.push({
-          row: rowNumber,
-          error: error.message
-        });
-        results.skipped++;
-
-        logger.error('Failed to create teacher', error, {
-          tenantId,
-          row: rowNumber,
-          email: row.email
-        });
-      }
-    }
-
-    logger.info('Teacher import completed', {
-      tenantId,
-      adminEmail,
-      results
-    });
-
+    logger.info('Teacher import completed', { tenantId, adminEmail, results });
     return results;
   }
 
-  // Import students
+  // Import students — batched insertMany instead of per-row User.create()
   async importStudents(tenantId, csvData, adminEmail) {
-    const results = {
-      created: 0,
-      skipped: 0,
-      errors: []
-    };
+    const results = { created: 0, skipped: 0, errors: [] };
 
-    logger.info('Starting student import', {
-      tenantId,
-      adminEmail,
-      recordCount: csvData.length
+    logger.info('Starting student import', { tenantId, adminEmail, recordCount: csvData.length });
+
+    // Collect all emails + rollNumbers for bulk duplicate check
+    const emailsInFile = [];
+    const rollNosInFile = [];
+    csvData.forEach(row => {
+      if (row.email) emailsInFile.push(row.email.toLowerCase().trim());
+      if (row.rollno) rollNosInFile.push(row.rollno.trim());
     });
+
+    const existingEmails = new Set();
+    const existingRollNos = new Set();
+    if (emailsInFile.length > 0 || rollNosInFile.length > 0) {
+      const existing = await User.find({
+        tenantId,
+        role: 'student',
+        $or: [
+          ...(emailsInFile.length > 0 ? [{ email: { $in: emailsInFile } }] : []),
+          ...(rollNosInFile.length > 0 ? [{ rollNumber: { $in: rollNosInFile } }] : [])
+        ]
+      }).select('email rollNumber').lean();
+      existing.forEach(u => {
+        if (u.email) existingEmails.add(u.email);
+        if (u.rollNumber) existingRollNos.add(u.rollNumber);
+      });
+    }
+
+    const docsToInsert = [];
 
     for (let i = 0; i < csvData.length; i++) {
       const row = csvData[i];
-      const rowNumber = i + 2; // +2 because CSV is 1-indexed and we skip header
+      const rowNumber = i + 2;
 
+      if (!row.name || !row.email || !row.class || !row.rollno) {
+        results.errors.push({ row: rowNumber, error: 'Missing required fields: name, email, class, and rollno are required' });
+        results.skipped++;
+        continue;
+      }
+
+      const email = row.email.toLowerCase().trim();
+      const rollNumber = row.rollno.trim();
+
+      if (existingEmails.has(email) || existingRollNos.has(rollNumber)) {
+        results.errors.push({ row: rowNumber, error: `Student with email ${email} or roll number ${rollNumber} already exists` });
+        results.skipped++;
+        continue;
+      }
+
+      docsToInsert.push({
+        tenantId,
+        name: row.name.trim(),
+        email,
+        password: this.generateTemporaryPassword(),
+        role: 'student',
+        phone: row.phone?.trim(),
+        class: row.class?.trim(),
+        rollNumber,
+        guardianName: row.guardianName?.trim(),
+        guardianPhone: row.guardianPhone?.trim(),
+        address: row.address?.trim(),
+        admissionDate: new Date()
+      });
+    }
+
+    if (docsToInsert.length === 0) {
+      logger.info('Student import completed (nothing to insert)', { tenantId, adminEmail, results });
+      return results;
+    }
+
+    // Batch insert in chunks of 100
+    const CHUNK_SIZE = 100;
+    const insertedDocs = [];
+    for (let i = 0; i < docsToInsert.length; i += CHUNK_SIZE) {
+      const chunk = docsToInsert.slice(i, i + CHUNK_SIZE);
       try {
-        // Validate required fields
-        if (!row.name || !row.email || !row.class || !row.rollno) {
-          results.errors.push({
-            row: rowNumber,
-            error: 'Missing required fields: name, email, class, and rollno are required'
+        const inserted = await User.insertMany(chunk, { ordered: false });
+        insertedDocs.push(...inserted);
+        results.created += inserted.length;
+      } catch (bulkErr) {
+        const inserted = bulkErr.insertedDocs || [];
+        insertedDocs.push(...inserted);
+        results.created += inserted.length;
+        if (bulkErr.writeErrors) {
+          bulkErr.writeErrors.forEach(we => {
+            results.errors.push({ row: '?', error: we.errmsg || we.message });
+            results.skipped++;
           });
-          results.skipped++;
-          continue;
         }
+      }
+    }
 
-        // Check if student already exists
-        const existingStudent = await User.findOne({
-          tenantId,
-          $or: [
-            { email: row.email.toLowerCase() },
-            { rollNumber: row.rollno.trim() }
-          ],
-          role: 'student'
-        });
-
-        if (existingStudent) {
-          results.errors.push({
-            row: rowNumber,
-            error: `Student with email ${row.email} or roll number ${row.rollno} already exists`
-          });
-          results.skipped++;
-          continue;
-        }
-
-        // Create student
-        const studentData = {
-          tenantId,
-          name: row.name.trim(),
-          email: row.email.toLowerCase().trim(),
-          password: this.generateTemporaryPassword(),
-          role: 'student',
-          phone: row.phone?.trim(),
-          rollNumber: row.rollno.trim(),
-          guardianName: row.guardianName?.trim(),
-          guardianPhone: row.guardianPhone?.trim(),
-          address: row.address?.trim(),
-          admissionDate: new Date()
-        };
-
-        const student = await User.create(studentData);
-        results.created++;
-
-        // Send invitation email
+    // Fire invitation emails asynchronously after the batch completes
+    Promise.all(
+      insertedDocs.map(student =>
         emailService.sendUserInvitationEmail(
           student.email,
           student.name,
-          'Your School', // This should be fetched from tenant
+          'Your School',
           'student',
           this.generateInvitationToken(student._id)
         ).catch(error => {
           logger.error('Failed to send student invitation email', error, {
-            tenantId,
-            studentId: student._id,
-            email: student.email
+            tenantId, studentId: student._id, email: student.email
           });
-        });
+        })
+      )
+    ).catch(() => {});
 
-        logger.info('Student created successfully', {
-          tenantId,
-          studentId: student._id,
-          email: student.email,
-          row: rowNumber
-        });
-
-      } catch (error) {
-        results.errors.push({
-          row: rowNumber,
-          error: error.message
-        });
-        results.skipped++;
-
-        logger.error('Failed to create student', error, {
-          tenantId,
-          row: rowNumber,
-          email: row.email
-        });
-      }
-    }
-
-    logger.info('Student import completed', {
-      tenantId,
-      adminEmail,
-      results
-    });
-
+    logger.info('Student import completed', { tenantId, adminEmail, results });
     return results;
   }
 

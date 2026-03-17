@@ -240,6 +240,11 @@ const settingsSchema = new mongoose.Schema({
   },
   // Theme Settings
   theme: {
+    mode: {
+      type: String,
+      enum: ['light', 'dark'],
+      default: 'light'
+    },
     primaryColor: {
       type: String,
       default: '#3EC4B1'
@@ -247,6 +252,11 @@ const settingsSchema = new mongoose.Schema({
     secondaryColor: {
       type: String,
       default: '#2355A6'
+    },
+    language: {
+      type: String,
+      enum: ['en', 'hi', 'mr', 'gu', 'ta', 'te'],
+      default: 'en'
     },
     logo: {
       type: String,

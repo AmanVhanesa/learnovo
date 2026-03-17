@@ -153,6 +153,8 @@ notificationSchema.index({ tenantId: 1, userId: 1, isRead: 1, isDeleted: 1 });
 notificationSchema.index({ tenantId: 1, userId: 1, createdAt: -1 });
 notificationSchema.index({ tenantId: 1, category: 1 });
 notificationSchema.index({ tenantId: 1, userId: 1, category: 1, isDeleted: 1 });
+// Deduplication lookups: find recent notification by user+category+title
+notificationSchema.index({ tenantId: 1, userId: 1, category: 1, title: 1, createdAt: -1 });
 
 // Instance methods
 notificationSchema.methods.markAsRead = function () {

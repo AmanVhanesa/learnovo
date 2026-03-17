@@ -47,7 +47,7 @@ const paymentAttemptSchema = new mongoose.Schema({
     // Strict State Machine
     status: {
         type: String,
-        enum: ['INITIATED', 'PROCESSING', 'SUCCESS', 'FAILED', 'PENDING', 'DISPUTED'],
+        enum: ['INITIATED', 'PROCESSING', 'SUCCESS', 'FAILED', 'PENDING', 'DISPUTED', 'UNDER_REVIEW', 'VERIFIED'],
         default: 'INITIATED',
         required: true,
         index: true
@@ -64,7 +64,25 @@ const paymentAttemptSchema = new mongoose.Schema({
     gatewayResponse: {
         type: mongoose.Schema.Types.Mixed,
         default: {}
-    }
+    },
+
+    // Manual payment submission fields (used when gateway is not enabled)
+    paymentMode: {
+        type: String,
+        enum: ['UPI', 'BANK_TRANSFER', 'CASH', 'CHEQUE', 'OTHER', null],
+        default: null
+    },
+    transactionRefId: { type: String, default: null },
+    paymentDate: { type: Date, default: null },
+    proofScreenshotUrl: { type: String, default: null },
+
+    // Who verified/recorded this payment
+    verifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    verifiedAt: { type: Date, default: null }
 }, {
     timestamps: true
 });

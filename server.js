@@ -34,8 +34,8 @@ app.use(requestIdMiddleware);
 // ── CORS configuration (MUST come before helmet and all other middleware) ───
 const allowedOrigins = [
   'https://learnovoapp.vercel.app',
-  ...(process.env.FRONTEND_URL
-    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  ...(process.env.FRONTEND_ORIGIN
+    ? process.env.FRONTEND_ORIGIN.split(',').map(url => url.trim())
     : []),
   // Local development origins
   'http://localhost:3000',
@@ -62,7 +62,7 @@ const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposedHeaders: ['X-Request-ID'],
+  exposedHeaders: ['X-Request-ID', 'Content-Disposition'],
   maxAge: 86400, // Cache preflight for 24 hours
   optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
@@ -174,9 +174,14 @@ app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// ── Request timeout middleware (15 s) ───────────────────────────────────────
+// ── Request timeout middleware ───────────────────────────────────────
 app.use((req, res, next) => {
-  req.setTimeout(15000, () => {
+  // Long-running routes get a generous timeout (3 min)
+  const longRunningPaths = ['/api/invoices/generate-bulk', '/api/invoices/bulk'];
+  const isLongRunning = longRunningPaths.some(p => req.path === p || req.originalUrl === p);
+  const timeout = isLongRunning ? 180000 : 15000;
+
+  req.setTimeout(timeout, () => {
     if (!res.headersSent) {
       res.status(408).json({ success: false, message: 'Request timed out' });
     }
@@ -226,6 +231,12 @@ app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/advance-salary', require('./routes/advanceSalary'));
 app.use('/api/homework', require('./routes/homework'));
 
+// Expense Management
+app.use('/api/expenses', require('./routes/expenses'));
+
+// Backup & Restore (admin-only)
+app.use('/api/admin', require('./routes/backup'));
+
 // Super Admin Routes
 app.use('/api/super-admin/auth', require('./routes/superAdminAuth'));
 app.use('/api/super-admin', require('./routes/superAdmin'));
@@ -244,11 +255,28 @@ try {
   console.error("Failed to start reconciliation job:", e);
 }
 
+try {
+  const backupJob = require('./jobs/backupJob');
+  backupJob.startJob();
+} catch (e) {
+  console.error("Failed to start backup job:", e);
+}
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
 });
+
+// Graceful shutdown — close Puppeteer browser on exit
+const { closeBrowser } = require('./services/pdfService');
+const shutdownHandler = async (signal) => {
+  console.log(`\n${signal} received — closing Puppeteer browser...`);
+  await closeBrowser();
+  process.exit(0);
+};
+process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
+process.on('SIGINT', () => shutdownHandler('SIGINT'));
 
 module.exports = app;

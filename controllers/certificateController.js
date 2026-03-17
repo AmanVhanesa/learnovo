@@ -7,10 +7,44 @@ const Counter = require('../models/Counter');
 const pdfService = require('../services/pdfService');
 const { format } = require('date-fns');
 
-// Helper to convert date to words (simplified)
+// Helper to convert date to words (e.g., "15 March 2025" → "Fifteenth March, Two Thousand Twenty-Five")
 const dateToWords = (dateStr) => {
-    // Ideally use a library like 'date-fns' or 'moment' + custom logic or 'number-to-words'
-    return dateStr; // Placeholder
+    if (!dateStr) return '';
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+        'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty'];
+    const ordinalOnes = ['', 'First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth',
+        'Tenth', 'Eleventh', 'Twelfth', 'Thirteenth', 'Fourteenth', 'Fifteenth', 'Sixteenth', 'Seventeenth', 'Eighteenth', 'Nineteenth'];
+    const ordinalTens = { 'Twenty': 'Twentieth', 'Thirty': 'Thirtieth' };
+
+    const numToOrdinal = (n) => {
+        if (n < 20) return ordinalOnes[n];
+        const t = tens[Math.floor(n / 10)];
+        const o = n % 10;
+        return o === 0 ? ordinalTens[t] : `${t}-${ordinalOnes[o].toLowerCase()}`;
+    };
+
+    const numToWords = (n) => {
+        if (n === 0) return '';
+        if (n < 20) return ones[n];
+        if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? '-' + ones[n % 10].toLowerCase() : '');
+        if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + numToWords(n % 100) : '');
+        if (n < 10000) return ones[Math.floor(n / 1000)] + ' Thousand' + (n % 1000 ? ' ' + numToWords(n % 1000) : '');
+        return String(n);
+    };
+
+    try {
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return dateStr;
+        const day = date.getDate();
+        const months = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        return `${numToOrdinal(day)} ${month}, ${numToWords(year)}`;
+    } catch {
+        return dateStr;
+    }
 };
 
 // Helper to strip existing honorific prefixes from names
@@ -92,14 +126,21 @@ exports.previewCertificate = async (req, res) => {
         // --- Prepare Data ---
         // Format dates
         const dob = student.dateOfBirth ? format(new Date(student.dateOfBirth), 'dd MMM yyyy') : '';
-        const dobWords = student.dateOfBirth ? dateToWords(format(new Date(student.dateOfBirth), 'dd MMMM yyyy')) : '';
+        const dobWords = student.dateOfBirth ? dateToWords(student.dateOfBirth) : '';
         const today = format(new Date(), 'dd MMM yyyy');
 
-        // Get guardian names and strip existing honorifics (PDF service will add them)
+        // Get guardian names from guardians array, falling back to legacy flat fields
         const father = student.guardians?.find(g => g.relation === 'Father');
         const mother = student.guardians?.find(g => g.relation === 'Mother');
-        const fatherName = stripHonorific(student.fatherOrHusbandName || father?.name || '-');
-        const motherName = stripHonorific(mother?.name || '-');
+        const primaryGuardian = student.guardians?.find(g => g.isPrimary) || student.guardians?.[0];
+
+        // Father: guardians array → legacy fatherOrHusbandName → legacy guardianName → fallback
+        const rawFatherName = father?.name || student.fatherOrHusbandName || (primaryGuardian?.relation !== 'Mother' ? primaryGuardian?.name : null) || student.guardianName || '-';
+        const fatherName = stripHonorific(rawFatherName);
+
+        // Mother: guardians array → fallback
+        const rawMotherName = mother?.name || '-';
+        const motherName = stripHonorific(rawMotherName);
 
         const data = {
             studentName: student.fullName,
@@ -114,16 +155,16 @@ exports.previewCertificate = async (req, res) => {
             nationality: 'Indian', // Default or from model
             category: student.category || 'General',
             schoolName: settings.institution.name,
-            schoolAddress: `${settings.institution.address.street}, ${settings.institution.address.city}`,
+            schoolAddress: `${settings.institution.address?.street || ''}, ${settings.institution.address?.city || ''}`,
             affiliationNumber: settings.institution.affiliationNumber || 'AFF-XXXX',
             schoolBoard: settings.institution.board || 'CBSE',
             udiseCode: settings.institution.udiseCode || '-',
-            schoolCode: settings.institution.schoolCode || settings.tenantId.schoolCode || 'SCH-001',
+            schoolCode: settings.institution.schoolCode || settings.tenantId?.schoolCode || 'SCH-001',
             schoolLogo: settings.institution.logo,
             principalSignature: settings.institution.principalSignature,
             schoolPhone: settings.institution.contact?.phone || '',
             schoolEmail: settings.institution.contact?.email || '',
-            place: settings.institution.address.city,
+            place: settings.institution.address?.city || '',
             issueDate: today,
             applicationDate: today, // Default to today
 
@@ -135,7 +176,11 @@ exports.previewCertificate = async (req, res) => {
             feeStatus: 'Paid up to date',
             conduct: 'Good',
             leavingReason: 'Parent Request', // Allow override from frontend
-            remarks: ''
+            remarks: '',
+
+            // New fields for premium templates
+            purpose: 'general purpose', // Bonafide: purpose of certificate
+            srNumber: student.srNumber || student.admissionNumber || '-', // LC: SR/GR number
         };
 
         res.json(data);
@@ -175,8 +220,8 @@ exports.generateCertificate = async (req, res) => {
             ...specificData, // Data passed from frontend confirm step (trusted or re-verified)
             certificateNumber: certNumber,
             schoolName: settings.institution.name,
-            schoolAddress: `${settings.institution.address.street}, ${settings.institution.address.city}`,
-            schoolCode: settings.institution.schoolCode || settings.tenantId.schoolCode || 'SCH-001',
+            schoolAddress: `${settings.institution.address?.street || ''}, ${settings.institution.address?.city || ''}`,
+            schoolCode: settings.institution.schoolCode || settings.tenantId?.schoolCode || 'SCH-001',
             schoolLogo: settings.institution.logo,
             principalSignature: settings.institution.principalSignature,
             schoolBoard: settings.institution.board || 'CBSE',
@@ -220,35 +265,39 @@ exports.generateCertificate = async (req, res) => {
         // 5. Get Template
         const template = await CertificateTemplate.findOne({ tenantId, type }) || { type };
 
-        // 6. Generate PDF
-        const doc = await pdfService.generateCertificate(finalData, template);
+        // 6. Generate PDF (returns Buffer directly)
+        const pdfBuffer = await pdfService.generateCertificate(finalData, template);
 
-        // Buffer and stream to client + S3 (fire-and-forget)
-        const chunks = [];
-        doc.on('data', chunk => chunks.push(chunk));
-        doc.on('end', () => {
-            const pdfBuffer = Buffer.concat(chunks);
-            
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=${type}_${student.admissionNumber}.pdf`);
-            res.setHeader('Content-Length', pdfBuffer.length);
-            res.end(pdfBuffer);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${type}_${student.admissionNumber}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.end(pdfBuffer);
 
-            // Archival to S3 in background (non-blocking)
+        // Archival to S3 in background (non-blocking, isolated try-catch)
+        try {
             const { uploadBufferToS3, buildS3Key } = require('../utils/s3Upload');
             const s3Key = buildS3Key('certificates', tenantId, `${type}_${student.admissionNumber}.pdf`);
             uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf')
                 .catch(err => console.error(`Background S3 upload failed for certificate ${certNumber}:`, err.message));
-        });
-        
-        doc.on('error', (err) => {
-            console.error('PDF generation stream error:', err);
-            if (!res.headersSent) res.status(500).json({ message: 'Error generating certificate PDF' });
-        });
+        } catch (s3Err) {
+            console.error('S3 upload setup error (non-fatal):', s3Err.message);
+        }
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error generating certificate', error: error.message });
+        console.error('Certificate generation error:', error);
+
+        // Rollback certificate counter so the number doesn't get skipped
+        try {
+            const currentYear = new Date().getFullYear().toString();
+            const counterName = req.body.type === 'TC' ? 'cert_tc' : 'cert_bonafide';
+            await Counter.rollbackSequence(counterName, currentYear, req.user.tenantId);
+        } catch (rollbackErr) {
+            console.error('Certificate counter rollback failed:', rollbackErr);
+        }
+
+        if (!res.headersSent) {
+            res.status(500).json({ message: 'Error generating certificate', error: error.message });
+        }
     }
 };
 
@@ -279,35 +328,29 @@ exports.downloadCertificate = async (req, res) => {
             type: cert.type
         }) || { type: cert.type };
 
-        // Generate PDF from stored snapshot
-        const doc = await pdfService.generateCertificate(cert.contentSnapshot, template);
+        // Generate PDF from stored snapshot (returns Buffer directly)
+        const pdfBuffer = await pdfService.generateCertificate(cert.contentSnapshot, template);
 
-        // Buffer and stream to client + S3 (fire-and-forget)
-        const chunks = [];
-        doc.on('data', chunk => chunks.push(chunk));
-        doc.on('end', () => {
-            const pdfBuffer = Buffer.concat(chunks);
-            
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=${cert.type}_${cert.certificateNumber}.pdf`);
-            res.setHeader('Content-Length', pdfBuffer.length);
-            res.end(pdfBuffer);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${cert.type}_${cert.certificateNumber.replace(/\//g, '-')}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.end(pdfBuffer);
 
-            // Archival to S3 in background
+        // Archival to S3 in background (isolated try-catch)
+        try {
             const { uploadBufferToS3, buildS3Key } = require('../utils/s3Upload');
             const s3Key = buildS3Key('certificates', req.user.tenantId, `${cert.type}_${cert.certificateNumber}.pdf`);
             uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf')
                 .catch(err => console.error(`Background S3 upload failed for certificate ${cert.certificateNumber}:`, err.message));
-        });
-
-        doc.on('error', (err) => {
-            console.error('PDF generation stream error:', err);
-            if (!res.headersSent) res.status(500).json({ message: 'Error downloading certificate PDF' });
-        });
+        } catch (s3Err) {
+            console.error('S3 upload setup error (non-fatal):', s3Err.message);
+        }
 
     } catch (error) {
         console.error('Download error:', error);
-        res.status(500).json({ message: 'Error downloading certificate' });
+        if (!res.headersSent) {
+            res.status(500).json({ message: 'Error downloading certificate' });
+        }
     }
 };
 

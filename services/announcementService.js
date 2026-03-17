@@ -35,13 +35,23 @@ async function createAnnouncement({
             isActive: true
         });
 
-        // Broadcast notifications
-        const notificationCount = await broadcastAnnouncementNotifications(announcement);
-
-        // Update announcement with notification count
-        announcement.notificationsSent = notificationCount;
-        announcement.sentAt = new Date();
-        await announcement.save();
+        // Fire-and-forget: broadcast notifications in background
+        // Response returns immediately, notifications are sent async
+        setImmediate(async () => {
+            try {
+                const notificationCount = await broadcastAnnouncementNotifications(announcement);
+                await Announcement.updateOne(
+                    { _id: announcement._id },
+                    { $set: { notificationsSent: notificationCount, sentAt: new Date() } }
+                );
+            } catch (broadcastError) {
+                console.error('Background broadcast failed:', broadcastError.message);
+                await Announcement.updateOne(
+                    { _id: announcement._id },
+                    { $set: { notificationsSent: 0, sentAt: new Date() } }
+                ).catch(() => {});
+            }
+        });
 
         return announcement;
     } catch (error) {
@@ -86,8 +96,8 @@ async function broadcastAnnouncementNotifications(announcement) {
             }
         }
 
-        // Get all targeted users
-        const users = await User.find(userQuery).select('_id');
+        // Get all targeted user IDs only (lean + select for speed)
+        const users = await User.find(userQuery).select('_id').lean();
 
         if (users.length === 0) {
             console.log('No users found matching announcement criteria');
@@ -95,27 +105,33 @@ async function broadcastAnnouncementNotifications(announcement) {
         }
 
         // Determine notification type based on priority
-        const notificationType = priority === 'high' ? 'warning' : priority === 'low' ? 'info' : 'info';
+        const notificationType = priority === 'high' ? 'warning' : 'info';
 
-        // Create notifications for all targeted users
-        const notifications = users.map(user => ({
+        // Build notifications array
+        const notifTitle = `📢 ${title}`;
+        const notifMeta = { announcementId: announcement._id, priority };
+        const notifications = users.map(u => ({
             tenantId,
-            userId: user._id,
-            title: `📢 ${title}`,
+            userId: u._id,
+            title: notifTitle,
             message,
             type: notificationType,
             category: 'announcement',
-            metadata: {
-                announcementId: announcement._id,
-                priority
-            }
+            metadata: notifMeta
         }));
 
-        // Bulk create notifications
-        const createdNotifications = await notificationService.createBulkNotifications(notifications);
+        // Bulk create - batched for very large audiences
+        const BATCH_SIZE = 500;
+        let totalCreated = 0;
 
-        console.log(`Announcement broadcast: ${createdNotifications.length} notifications sent`);
-        return createdNotifications.length;
+        for (let i = 0; i < notifications.length; i += BATCH_SIZE) {
+            const batch = notifications.slice(i, i + BATCH_SIZE);
+            const created = await notificationService.createBulkNotifications(batch);
+            totalCreated += created.length;
+        }
+
+        console.log(`Announcement broadcast: ${totalCreated} notifications sent to ${users.length} users`);
+        return totalCreated;
     } catch (error) {
         console.error('Error broadcasting announcement notifications:', error);
         throw error;
@@ -135,8 +151,13 @@ async function getAnnouncements(tenantId, options = {}) {
 
     const query = { tenantId };
 
-    if (isActive !== null) {
-        query.isActive = isActive;
+    // Default to only showing active announcements unless explicitly set to false/null
+    if (isActive === false) {
+        query.isActive = false;
+    } else if (isActive !== null) {
+        query.isActive = { $ne: false };
+    } else {
+        query.isActive = { $ne: false };
     }
 
     if (!includeExpired) {

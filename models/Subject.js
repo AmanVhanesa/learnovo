@@ -20,6 +20,21 @@ const subjectSchema = new mongoose.Schema({
     trim: true,
     uppercase: true
   },
+  type: {
+    type: String,
+    enum: ['Theory', 'Practical', 'Both'],
+    default: 'Theory'
+  },
+  maxMarks: {
+    type: Number,
+    default: 100,
+    min: 0
+  },
+  passingMarks: {
+    type: Number,
+    default: 33,
+    min: 0
+  },
   description: {
     type: String,
     trim: true

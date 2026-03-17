@@ -193,28 +193,58 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async (req,
             options
         );
 
-        // Enrich with overdue days
-        const enriched = await Promise.all(defaulters.map(async (defaulter) => {
-            // Get oldest unpaid invoice
-            const oldestInvoice = await FeeInvoice.findOne({
+        // Enrich with overdue days, due date, and invoice IDs
+        const now = new Date();
+        const enrichedResults = await Promise.all(defaulters.map(async (defaulter) => {
+            if (!defaulter.studentId) return null;
+
+            // Get all unpaid invoices for this student (sorted by dueDate ascending)
+            const unpaidInvoices = await FeeInvoice.find({
                 tenantId: req.user.tenantId,
                 studentId: defaulter.studentId._id,
+                academicSessionId: academicSessionId || defaulter.academicSessionId?._id,
                 status: { $in: ['Pending', 'Partial', 'Overdue'] }
-            }).sort({ dueDate: 1 });
+            }).sort({ dueDate: 1 }).select('_id dueDate status balanceAmount');
 
-            const overdueDays = oldestInvoice
-                ? Math.floor((new Date() - oldestInvoice.dueDate) / (1000 * 60 * 60 * 24))
+            // Skip if no unpaid invoices exist (balance may be stale)
+            if (unpaidInvoices.length === 0) return null;
+
+            const oldestInvoice = unpaidInvoices[0];
+            const overdueDays = oldestInvoice.dueDate
+                ? Math.max(0, Math.floor((now - oldestInvoice.dueDate) / (1000 * 60 * 60 * 24)))
                 : 0;
+
+            // Compute live balance from unpaid invoices to avoid stale StudentBalance data
+            const liveBalance = unpaidInvoices.reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0);
+
+            // Skip students with zero or negative live balance (already paid)
+            if (liveBalance <= 0) return null;
 
             return {
                 ...defaulter.toObject(),
-                overdueDays: Math.max(0, overdueDays)
+                overdueDays,
+                oldestDueDate: oldestInvoice.dueDate,
+                invoiceIds: unpaidInvoices.map(inv => inv._id),
+                unpaidInvoiceCount: unpaidInvoices.length,
+                liveBalance
             };
         }));
 
+        // Filter out nulls (paid students, missing data)
+        const enriched = enrichedResults.filter(Boolean);
+
+        // Optionally filter by classId on the populated studentId
+        let filtered = enriched;
+        if (classId) {
+            filtered = enriched.filter(d => {
+                const sClassId = d.studentId?.classId;
+                return sClassId && sClassId.toString() === classId;
+            });
+        }
+
         res.json({
             success: true,
-            data: enriched
+            data: filtered
         });
     } catch (error) {
         console.error('Defaulters error:', error);

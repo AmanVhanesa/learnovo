@@ -21,6 +21,9 @@ coverage/
 # MongoDB
 *.db
 
+# Backups
+backups/
+
 # IDE
 .vscode/
 .idea/

@@ -1,31 +1,138 @@
-const PDFDocument = require('pdfkit');
+const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
+// ── Singleton browser instance ──
+let browserInstance = null;
+
+async function getBrowser() {
+    if (!browserInstance || !browserInstance.isConnected()) {
+        browserInstance = await puppeteer.launch({
+            headless: true,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--font-render-hinting=none'
+            ]
+        });
+    }
+    return browserInstance;
+}
+
 /**
- * Fetch an image (from URL or local fallback) and return a Buffer/Path.
+ * Gracefully close the shared browser (call on server shutdown)
  */
-async function fetchImage(imagePath) {
+async function closeBrowser() {
+    if (browserInstance) {
+        try { await browserInstance.close(); } catch (e) { /* ignore */ }
+        browserInstance = null;
+    }
+}
+
+// ── Template helpers ──
+
+function getTemplatePath(type) {
+    const filename = type === 'TC' ? 'leaving-certificate.html' : 'bonafide-certificate.html';
+    return path.join(__dirname, '..', 'templates', 'certificates', filename);
+}
+
+/**
+ * Build the mapping from controller camelCase fields → template {{snake_case}} placeholders
+ */
+function buildPlaceholderMap(data) {
+    return {
+        school_name: data.schoolName || '',
+        school_address: data.schoolAddress || '',
+        school_phone: data.schoolPhone || '',
+        school_email: data.schoolEmail || '',
+        affiliation_no: data.affiliationNumber || '',
+        school_code: data.schoolCode || '',
+        udise_no: data.udiseCode || '',
+        school_board: data.schoolBoard || '',
+        student_name: data.studentName || '',
+        father_name: data.fatherName || '',
+        mother_name: data.motherName || '',
+        dob: data.dob || '',
+        dob_in_words: data.dobWords || data.dob || '',
+        admission_no: data.admissionNumber || '',
+        class: data.class || '',
+        section: data.section || '',
+        academic_year: data.academicYear || '',
+        certificate_number: data.certificateNumber || '',
+        issue_date: data.issueDate || '',
+        place: data.place || '',
+        nationality: data.nationality || 'Indian',
+        category: data.category || 'General',
+        admission_date: data.admissionDate || '',
+        class_last_studied: data.class || '',
+        board_exam_result: data.boardResult || '',
+        promotion_status: data.promotionStatus || '',
+        subjects: data.subjects || '',
+        fee_status: data.feeStatus || '',
+        conduct: data.conduct || 'Good',
+        application_date: data.applicationDate || '',
+        reason_for_leaving: data.leavingReason || '',
+        remarks: data.remarks || '-',
+        purpose: data.purpose || 'general purpose',
+        sr_number: data.srNumber || data.admissionNumber || '-',
+    };
+}
+
+/**
+ * Replace all {{key}} placeholders in the HTML string
+ */
+function fillTemplate(html, placeholderMap) {
+    let result = html;
+    for (const [key, value] of Object.entries(placeholderMap)) {
+        const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+        // Escape HTML special chars in values to prevent XSS
+        const safeValue = String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        result = result.replace(regex, safeValue);
+    }
+    return result;
+}
+
+/**
+ * Fetch an image (URL or local path) and return as base64 data URI
+ */
+async function fetchImageAsDataUri(imagePath) {
     if (!imagePath) return null;
     try {
+        let imageBuffer;
         if (imagePath.startsWith('http')) {
             const response = await axios.get(imagePath, { responseType: 'arraybuffer', timeout: 5000 });
-            return response.data;
+            imageBuffer = Buffer.from(response.data);
         } else {
             let localPath = imagePath;
             if (localPath.startsWith('/')) localPath = path.join(process.cwd(), localPath);
-            if (fs.existsSync(localPath)) return localPath;
-            
-            localPath = path.resolve(process.cwd(), imagePath);
-            if (fs.existsSync(localPath)) return localPath;
-            
-            localPath = path.join(process.cwd(), 'uploads', path.basename(imagePath));
-            if (fs.existsSync(localPath)) return localPath;
-            
-            console.warn(`Image file not found at: ${imagePath} or resolved paths`);
-            return null;
+            if (!fs.existsSync(localPath)) {
+                localPath = path.resolve(process.cwd(), imagePath);
+            }
+            if (!fs.existsSync(localPath)) {
+                localPath = path.join(process.cwd(), 'uploads', path.basename(imagePath));
+            }
+            if (!fs.existsSync(localPath)) {
+                console.warn(`Image file not found at: ${imagePath}`);
+                return null;
+            }
+            imageBuffer = fs.readFileSync(localPath);
         }
+
+        const ext = path.extname(imagePath).toLowerCase();
+        let mimeType = 'image/png';
+        if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+        else if (ext === '.svg') mimeType = 'image/svg+xml';
+        else if (ext === '.webp') mimeType = 'image/webp';
+
+        const base64 = imageBuffer.toString('base64');
+        return `data:${mimeType};base64,${base64}`;
     } catch (err) {
         console.warn(`Failed to load image from ${imagePath}:`, err.message);
         return null;
@@ -33,233 +140,93 @@ async function fetchImage(imagePath) {
 }
 
 /**
- * Service to generate PDF certificates
+ * Inject school logo into the template HTML
+ * Replaces <!-- LOGO_PLACEHOLDER --> with an <img> tag or fallback SVG
+ */
+async function injectLogo(html, logoPath) {
+    const fallbackSvg = '<svg width="50" height="50" viewBox="0 0 50 50" fill="none"><circle cx="25" cy="25" r="20" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/><text x="25" y="30" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="10" font-family="Playfair Display,serif">LOGO</text></svg>';
+
+    if (!logoPath) {
+        return html.replace('<!-- LOGO_PLACEHOLDER -->', fallbackSvg);
+    }
+
+    const dataUri = await fetchImageAsDataUri(logoPath);
+    if (dataUri) {
+        return html.replace('<!-- LOGO_PLACEHOLDER -->', `<img src="${dataUri}" alt="School Logo" />`);
+    }
+
+    return html.replace('<!-- LOGO_PLACEHOLDER -->', fallbackSvg);
+}
+
+/**
+ * Inject principal signature into the template HTML
+ * Replaces <!-- PRINCIPAL_SIGNATURE_PLACEHOLDER --> with an <img> or empty string
+ */
+async function injectPrincipalSignature(html, signaturePath) {
+    if (!signaturePath) {
+        return html.replace('<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', '');
+    }
+
+    const dataUri = await fetchImageAsDataUri(signaturePath);
+    if (dataUri) {
+        return html.replace('<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', `<img class="sig-img" src="${dataUri}" alt="Principal Signature" />`);
+    }
+
+    return html.replace('<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', '');
+}
+
+/**
+ * Service to generate PDF certificates using Puppeteer
  */
 const pdfService = {
     /**
-     * Generate a PDF certificate stream
-     * @param {Object} data - Certificate data
-     * @param {Object} template - Template configuration
-     * @returns {Promise<PDFKit.PDFDocument>}
+     * Generate a PDF certificate buffer
+     * @param {Object} data - Certificate data (camelCase fields from controller)
+     * @param {Object} template - Template configuration ({ type: 'TC' | 'BONAFIDE' })
+     * @returns {Promise<Buffer>} PDF buffer
      */
     generateCertificate: async (data, template) => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const doc = new PDFDocument({
-                    size: 'A4',
-                    margin: 50,
-                    bufferPages: true
-                });
+        // 1. Load HTML template
+        const templatePath = getTemplatePath(template.type);
+        let html = fs.readFileSync(templatePath, 'utf8');
 
-                // Add metadata
-                doc.info['Title'] = `${template.type} - ${data.studentName}`;
-                doc.info['Author'] = data.schoolName;
+        // 2. Inject images (logo + principal signature) as base64
+        html = await injectLogo(html, data.schoolLogo);
+        html = await injectPrincipalSignature(html, data.principalSignature);
 
-                // --- Fetch Images in Parallel ---
-                const [logoImage, signatureImage] = await Promise.all([
-                    fetchImage(data.schoolLogo),
-                    fetchImage(data.principalSignature)
-                ]);
+        // 3. Fill all {{placeholder}} values
+        const placeholders = buildPlaceholderMap(data);
+        html = fillTemplate(html, placeholders);
 
-                // --- Layout Logic ---
+        // 4. Render to PDF via Puppeteer
+        const browser = await getBrowser();
+        const page = await browser.newPage();
 
-                // 1. Header (School Details)
+        try {
+            // Use 'domcontentloaded' — the Google Fonts @import loads async;
+            // 'networkidle0' can timeout waiting for external font requests.
+            await page.setContent(html, {
+                waitUntil: 'domcontentloaded',
+                timeout: 30000
+            });
 
-                // 1. Header (School Details) - New "Professional" Layout
-                const pageWidth = doc.page.width;
-                const pageHeight = doc.page.height;
-                const margin = 50;
+            // Small delay to let fonts/CSS settle
+            await new Promise(r => setTimeout(r, 500));
 
-                // Draw Border around the page
-                doc.rect(20, 20, pageWidth - 40, pageHeight - 40).stroke();
-                doc.rect(25, 25, pageWidth - 50, pageHeight - 50).lineWidth(0.5).stroke();
+            const pdfUint8 = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                preferCSSPageSize: true,
+            });
 
-                let currentY = 50;
-
-                // Logo Logic (Left Aligned)
-                if (logoImage) {
-                    const logoWidth = 70; // Slightly smaller for professionalism
-                    const logoX = 60; // Left margin offset
-                    const logoY = 45;
-
-                    doc.image(logoImage, logoX, logoY, { width: logoWidth });
-                }
-
-                // School Details Logic (Centered)
-                // We move 'y' only slightly to align with logo top
-                doc.y = 45;
-
-                // School Name
-                doc.font('Helvetica-Bold').fontSize(24).fillColor('#000000')
-                    .text(data.schoolName, { align: 'center' });
-
-                doc.moveDown(0.5);
-
-
-                // Address
-                doc.font('Helvetica').fontSize(10).text(data.schoolAddress, { align: 'center' });
-
-                // Contact Details
-                if (data.schoolPhone || data.schoolEmail) {
-                    const contactParts = [];
-                    if (data.schoolPhone) contactParts.push(`Phone: ${data.schoolPhone}`);
-                    if (data.schoolEmail) contactParts.push(`Email: ${data.schoolEmail}`);
-
-                    doc.moveDown(0.2);
-                    doc.text(contactParts.join(' | '), { align: 'center' });
-                }
-
-                doc.moveDown(0.2);
-
-                // Board & Affiliation Details (Combined Line)
-                const boardLine = `${data.schoolBoard} Affiliation No: ${data.affiliationNumber} | School Code: ${data.schoolCode}`;
-                doc.text(boardLine, { align: 'center' });
-
-                // UDISE Code (New Line)
-                if (data.udiseCode) {
-                    doc.moveDown(0.2);
-                    doc.text(`UDISE No: ${data.udiseCode}`, { align: 'center' });
-                }
-
-                doc.moveDown(1.5);
-
-                // Separator Line
-                doc.lineWidth(2).moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-                doc.moveDown(2);
-
-                // 2. Certificate Title
-                const title = template.type === 'TC' ? 'SCHOOL LEAVING CERTIFICATE' : 'BONAFIDE CERTIFICATE';
-                doc.font('Helvetica-Bold').fontSize(18).fillColor('#2355A6').text(title, { align: 'center', underline: true });
-                doc.fillColor('black');
-                doc.moveDown(2);
-
-                // 3. Certificate Details & Body
-                if (template.type === 'TC') {
-                    pdfService.renderTCBody(doc, data);
-                } else {
-                    pdfService.renderBonafideBody(doc, data, template.declarationText);
-                }
-
-                // 4. Footer & Signatures
-                // For bonafide, use current Y position + some spacing to avoid too much empty space
-                // For TC, use fixed bottom position since it has more content
-                let bottomY;
-                if (template.type === 'TC') {
-                    bottomY = doc.page.height - 150;
-                } else {
-                    // For bonafide, place footer very close to content to minimize gap
-                    bottomY = doc.y + 40; // Reduced from 80 to 40 for tighter spacing
-                }
-
-                doc.fontSize(10).text(`Place: ${data.place}`, 50, bottomY);
-                doc.text(`Date: ${data.issueDate}`, 50, bottomY + 15);
-
-                // Class Teacher signature (left)
-                doc.text('Class Teacher', 50, bottomY + 80, { align: 'left' });
-
-                // Principal signature (right) - with image if available
-                const principalX = 420; // Adjusted for better alignment
-                console.log('Rendering signature section. Signature image available:', !!signatureImage);
-
-                if (signatureImage) {
-                    // Render signature image above the "Principal" text
-                    const signatureWidth = 120; // Slightly larger for better visibility
-                    const signatureHeight = 50;
-                    const signatureY = bottomY + 20; // Closer to the text
-
-                    console.log('Attempting to render signature at position:', { x: principalX, y: signatureY });
-
-                    try {
-                        doc.image(signatureImage, principalX, signatureY, {
-                            width: signatureWidth,
-                            height: signatureHeight,
-                            fit: [signatureWidth, signatureHeight]
-                        });
-                        console.log('Signature image rendered successfully');
-                    } catch (err) {
-                        console.error('Failed to render signature image:', err.message, err.stack);
-                    }
-                } else {
-                    console.log('No signature image available to render');
-                }
-                doc.text('Principal', principalX + 30, bottomY + 80, { align: 'left' }); // Centered under signature
-
-                doc.end();
-                resolve(doc);
-
-            } catch (error) {
-                reject(error);
-            }
-        });
+            // Puppeteer 24.x returns Uint8Array — convert to Node Buffer for Express compat
+            return Buffer.from(pdfUint8);
+        } finally {
+            await page.close();
+        }
     },
 
-    /**
-     * Render Bonafide Certificate Body
-     */
-    renderBonafideBody: (doc, data, declarationText) => {
-        doc.fontSize(12).font('Helvetica').text(`Certificate No: ${data.certificateNumber}`, 50, doc.y, { align: 'left' });
-        doc.moveDown(2);
-
-        const text = declarationText || 'This is to certify that the above student is a bonafide student of this institution.';
-        // Replace placeholders if text has them (simple implementations)
-
-        const bodyText = `This is to certify that Master/Miss ${data.studentName}, Son/Daughter of Mr. ${data.fatherName} and Mrs. ${data.motherName}, is a bonafide student of our school studying in Class ${data.class} (Section ${data.section}) for the academic year ${data.academicYear}.
-
-His/Her date of birth as per school records is ${data.dob}.
-
-Admission Number: ${data.admissionNumber}`;
-
-        doc.font('Helvetica').fontSize(14).text(bodyText, {
-            align: 'justify',
-            lineGap: 10
-        });
-    },
-
-    /**
-     * Render TC Body (Table format)
-     */
-    renderTCBody: (doc, data) => {
-        doc.fontSize(10);
-
-        const startX = 50;
-        let currentY = doc.y;
-        const col1X = 50;
-        const col2X = 250;
-        const rowHeight = 25;
-
-        const fields = [
-            { label: '1. Name of the Student', value: data.studentName },
-            { label: '2. Father\'s / Guardian\'s Name', value: data.fatherName },
-            { label: '3. Mother\'s Name', value: data.motherName },
-            { label: '4. Nationality', value: data.nationality },
-            { label: '5. Category (Gen/SC/ST/OBC)', value: data.category },
-            { label: '6. Date of Birth', value: data.dob },
-            { label: '7. Admission Number', value: data.admissionNumber },
-            { label: '8. Date of First Admission', value: data.admissionDate },
-            { label: '9. Class Last Studied', value: data.class },
-            { label: '10. Board / Exam Last Taken', value: data.boardResult },
-            { label: '11. Whether Qualified for Promotion', value: data.promotionStatus },
-            { label: '12. Subjects Studied', value: data.subjects },
-            { label: '13. Month up to which fees paid', value: data.feeStatus },
-            { label: '14. General Conduct', value: data.conduct || 'Good' },
-            { label: '15. Date of Application for Certificate', value: data.applicationDate },
-            { label: '16. Date of Issue of Certificate', value: data.issueDate },
-            { label: '17. Reason for Leaving', value: data.leavingReason },
-            { label: '18. Any other remarks', value: data.remarks || '-' }
-        ];
-
-        fields.forEach(field => {
-            // Check for page break
-            if (currentY > 700) {
-                doc.addPage();
-                currentY = 50;
-            }
-
-            doc.font('Helvetica-Bold').text(field.label, col1X, currentY);
-            doc.font('Helvetica').text(`:  ${field.value}`, col2X, currentY);
-            currentY += rowHeight;
-        });
-    }
+    closeBrowser,
 };
 
 module.exports = pdfService;

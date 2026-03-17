@@ -14,6 +14,10 @@ router.get('/', protect, async(req, res) => {
       filter.isActive = isActive === 'true';
     }
 
+    if (req.user && req.user.tenantId) {
+      filter.tenantId = req.user.tenantId;
+    }
+
     const subjects = await Subject.find(filter).sort({ name: 1 });
 
     res.json({
@@ -74,8 +78,8 @@ router.post('/', [
 
     const { name, subjectCode, description } = req.body;
 
-    // Check if subject code already exists
-    const existingSubject = await Subject.findOne({ subjectCode });
+    // Check if subject code already exists for this tenant
+    const existingSubject = await Subject.findOne({ subjectCode: subjectCode.toUpperCase(), tenantId: req.user.tenantId });
     if (existingSubject) {
       return res.status(400).json({
         success: false,
@@ -83,9 +87,15 @@ router.post('/', [
       });
     }
 
+    const { type, maxMarks, passingMarks } = req.body;
+
     const newSubject = new Subject({
+      tenantId: req.user.tenantId,
       name,
       subjectCode: subjectCode.toUpperCase(),
+      type: type || 'Theory',
+      maxMarks: maxMarks || 100,
+      passingMarks: passingMarks || 33,
       description
     });
 
@@ -123,14 +133,18 @@ router.put('/:id', [
       });
     }
 
-    const { name, subjectCode, description } = req.body;
+    const { name, subjectCode, description, type, maxMarks, passingMarks } = req.body;
     const updates = {};
 
     if (name) updates.name = name;
+    if (type !== undefined) updates.type = type;
+    if (maxMarks !== undefined) updates.maxMarks = maxMarks;
+    if (passingMarks !== undefined) updates.passingMarks = passingMarks;
     if (subjectCode) {
       // Check if new subject code already exists (excluding current subject)
       const existingSubject = await Subject.findOne({
         subjectCode: subjectCode.toUpperCase(),
+        tenantId: req.user.tenantId,
         _id: { $ne: req.params.id }
       });
       if (existingSubject) {

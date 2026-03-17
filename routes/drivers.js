@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, query } = require('express-validator');
 const Driver = require('../models/Driver');
-const Counter = require('../models/Counter');
+
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const ImportExportService = require('../services/importExportService');
@@ -147,9 +147,19 @@ router.post('/', protect, authorize('admin'), [
             });
         }
 
-        // Generate Driver ID
+        // Generate Driver ID based on actual max ID in the database
         const currentYear = new Date().getFullYear().toString();
-        const sequence = await Counter.getNextSequence('driver', currentYear, tenantId);
+        const prefix = `DRV-${currentYear}-`;
+        const lastDriver = await Driver.findOne(
+            { tenantId, driverId: { $regex: `^${prefix}` } },
+            { driverId: 1 },
+            { sort: { driverId: -1 } }
+        );
+        let sequence = 1;
+        if (lastDriver) {
+            const lastSeq = parseInt(lastDriver.driverId.replace(prefix, ''), 10);
+            if (!isNaN(lastSeq)) sequence = lastSeq + 1;
+        }
         const driverId = `DRV-${currentYear}-${String(sequence).padStart(4, '0')}`;
 
         const driverData = {

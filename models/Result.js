@@ -38,6 +38,17 @@ const resultSchema = new mongoose.Schema({
     remarks: {
         type: String,
         trim: true
+    },
+    isPublished: {
+        type: Boolean,
+        default: false
+    },
+    publishedAt: {
+        type: Date
+    },
+    updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
     }
 }, {
     timestamps: true

@@ -3,10 +3,57 @@ const { body, query } = require('express-validator');
 const Exam = require('../models/Exam');
 const Result = require('../models/Result');
 const User = require('../models/User');
+const Class = require('../models/Class');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+let notificationService;
+try { notificationService = require('../services/notificationService'); } catch (e) { /* optional */ }
 
 const router = express.Router();
+
+/**
+ * Resolve class names a teacher is assigned to (all 4 allocation methods).
+ */
+async function resolveTeacherClassNames(teacherId, tenantId) {
+    const classNames = new Set();
+    try {
+        // 1. Class model: classTeacher or subjects[].teacher
+        const directClasses = await Class.find({
+            tenantId,
+            $or: [{ classTeacher: teacherId }, { 'subjects.teacher': teacherId }],
+        }).select('grade').lean();
+        directClasses.forEach(c => c.grade && classNames.add(c.grade));
+
+        // 2. Section model: sectionTeacher
+        const Section = require('../models/Section');
+        const sectionDocs = await Section.find({
+            tenantId, sectionTeacher: teacherId, isActive: true,
+        }).select('classId').lean();
+        if (sectionDocs.length > 0) {
+            const ids = [...new Set(sectionDocs.map(s => s.classId?.toString()).filter(Boolean))];
+            const cls = await Class.find({ _id: { $in: ids }, tenantId }).select('grade').lean();
+            cls.forEach(c => c.grade && classNames.add(c.grade));
+        }
+
+        // 3. TeacherSubjectAssignment
+        const TSA = require('../models/TeacherSubjectAssignment');
+        const tsaDocs = await TSA.find({ teacherId, tenantId, isActive: true }).select('classId').lean();
+        if (tsaDocs.length > 0) {
+            const ids = [...new Set(tsaDocs.map(a => a.classId?.toString()).filter(Boolean))];
+            const cls = await Class.find({ _id: { $in: ids }, tenantId }).select('grade').lean();
+            cls.forEach(c => c.grade && classNames.add(c.grade));
+        }
+
+        // 4. Legacy User.assignedClasses
+        const teacher = await User.findById(teacherId).select('assignedClasses').lean();
+        if (teacher && Array.isArray(teacher.assignedClasses)) {
+            teacher.assignedClasses.forEach(c => c && classNames.add(c));
+        }
+    } catch (e) {
+        console.warn('resolveTeacherClassNames error:', e.message);
+    }
+    return [...classNames];
+}
 
 // Helper: calculate grade from percentage
 function calculateGrade(percentage) {
@@ -48,16 +95,65 @@ router.get('/', protect, [
 
         // Role based filtering
         if (req.user.role === 'student') {
-            filter.class = req.user.class;
+            // Match by classId (preferred) OR class string for robustness
+            const studentClassOr = [];
+            if (req.user.classId) studentClassOr.push({ classId: req.user.classId });
+            if (req.user.class) studentClassOr.push({ class: req.user.class });
+
+            // Also look up the Class document to match by grade/name
+            if (req.user.classId) {
+                try {
+                    const classDoc = await Class.findById(req.user.classId).select('grade name').lean();
+                    if (classDoc) {
+                        if (classDoc.grade) studentClassOr.push({ class: classDoc.grade });
+                        if (classDoc.name && classDoc.name !== classDoc.grade) studentClassOr.push({ class: classDoc.name });
+                    }
+                } catch (_) { /* ignore */ }
+            } else if (req.user.class) {
+                try {
+                    const classDoc = await Class.findOne({
+                        tenantId: req.user.tenantId,
+                        $or: [{ grade: req.user.class }, { name: req.user.class }]
+                    }).select('_id grade name').lean();
+                    if (classDoc) {
+                        studentClassOr.push({ classId: classDoc._id });
+                        if (classDoc.grade && classDoc.grade !== req.user.class) studentClassOr.push({ class: classDoc.grade });
+                        if (classDoc.name && classDoc.name !== req.user.class) studentClassOr.push({ class: classDoc.name });
+                    }
+                } catch (_) { /* ignore */ }
+            }
+
+            if (studentClassOr.length > 0) {
+                // Deduplicate and apply OR filter
+                filter.$or = studentClassOr;
+            } else {
+                // Fallback: no class info on student, return nothing
+                filter._id = null;
+            }
+
+            // Also filter by section if student has one
+            if (req.user.section) {
+                filter.$and = filter.$and || [];
+                filter.$and.push({
+                    $or: [
+                        { section: req.user.section },
+                        { section: { $exists: false } },
+                        { section: null },
+                        { section: '' }
+                    ]
+                });
+            }
         } else if (req.user.role === 'teacher') {
-            if (req.user.assignedClasses && req.user.assignedClasses.length > 0) {
-                filter.class = { $in: req.user.assignedClasses };
+            const teacherClassNames = await resolveTeacherClassNames(req.user._id, req.user.tenantId);
+            if (teacherClassNames.length > 0) {
+                filter.class = { $in: teacherClassNames };
             }
         }
 
-        if (req.query.class) filter.class = req.query.class;
+        // Apply query param filters (skip class override for students — they use $or)
+        if (req.query.class && req.user.role !== 'student') filter.class = req.query.class;
         if (req.query.subject) filter.subject = req.query.subject;
-        if (req.query.section) filter.section = req.query.section;
+        if (req.query.section && req.user.role !== 'student') filter.section = req.query.section;
         if (req.query.status) filter.status = req.query.status;
 
         if (req.query.from || req.query.to) {
@@ -108,17 +204,8 @@ router.post('/', protect, authorize('admin', 'teacher'), [
 
         // For teachers, verify they can only schedule exams for their assigned classes
         if (req.user.role === 'teacher') {
-            const Class = require('../models/Class');
-            const classDoc = await Class.findOne({ grade: cls, tenantId: req.user.tenantId });
-
-            if (!classDoc) {
-                return res.status(404).json({ success: false, message: 'Class not found' });
-            }
-
-            const isClassTeacher = classDoc.classTeacher && classDoc.classTeacher.toString() === req.user._id.toString();
-            const isAssignedToClass = req.user.assignedClasses && req.user.assignedClasses.includes(cls);
-
-            if (!isClassTeacher && !isAssignedToClass) {
+            const teacherClassNames = await resolveTeacherClassNames(req.user._id, req.user.tenantId);
+            if (!teacherClassNames.includes(cls)) {
                 return res.status(403).json({
                     success: false,
                     message: 'You are not authorized to schedule exams for this class'
@@ -177,6 +264,12 @@ router.get('/result-card/:studentId', protect, async (req, res) => {
             tenantId: req.user.tenantId,
             student: studentId
         };
+
+        // Students can only see published results
+        // Admin/teacher requesting another student's card can see all
+        if (req.user.role === 'student') {
+            resultFilter.isPublished = true;
+        }
 
         // Fetch all results for this student
         const results = await Result.find(resultFilter)
@@ -250,6 +343,29 @@ router.get('/result-card/:studentId', protect, async (req, res) => {
         });
     } catch (error) {
         console.error('Get result card error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @desc    Get logged-in student's published results
+// @route   GET /api/exams/my-results
+// @access  Private (Student)
+router.get('/my-results', protect, authorize('student'), async (req, res) => {
+    try {
+        const results = await Result.find({
+            tenantId: req.user.tenantId,
+            student: req.user._id,
+            isPublished: true
+        })
+            .populate({
+                path: 'exam',
+                select: 'name subject class section date totalMarks passingMarks examSeries examType status'
+            })
+            .sort({ createdAt: -1 });
+
+        res.json({ success: true, data: results });
+    } catch (error) {
+        console.error('Get my results error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
@@ -344,7 +460,7 @@ router.delete('/:id', protect, authorize('admin', 'teacher'), async (req, res) =
 // @access  Private (Admin, Teacher)
 router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, res) => {
     try {
-        const exam = await Exam.findById(req.params.id);
+        const exam = await Exam.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
         if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
 
         const resultsToProcess = req.body.results; // Array of { studentId, marks, remarks }
@@ -359,6 +475,13 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
         for (const item of resultsToProcess) {
             try {
                 const marksObtained = Number(item.marks);
+
+                // Validate marks don't exceed total
+                if (marksObtained < 0 || marksObtained > exam.totalMarks) {
+                    errors.push({ studentId: item.studentId, error: `Marks must be between 0 and ${exam.totalMarks}` });
+                    continue;
+                }
+
                 const percentage = exam.totalMarks > 0
                     ? Math.round((marksObtained / exam.totalMarks) * 100 * 10) / 10
                     : 0;
@@ -375,7 +498,8 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
                         grade,
                         isPassed,
                         remarks: item.remarks,
-                        tenantId: req.user.tenantId
+                        tenantId: req.user.tenantId,
+                        updatedBy: req.user._id
                     },
                     { new: true, upsert: true, runValidators: true }
                 );
@@ -383,6 +507,15 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
             } catch (err) {
                 errors.push({ studentId: item.studentId, error: err.message });
             }
+        }
+
+        // Notify students about published results (fire-and-forget)
+        if (processed.length > 0 && notificationService?.notifyResultsPublished) {
+            const studentIds = processed.map(r => r.student);
+            const students = await User.find({ _id: { $in: studentIds } }).select('_id name').lean();
+            notificationService.notifyResultsPublished(exam, students, req.user.tenantId).catch(err => {
+                console.warn('Exam result notification error:', err.message);
+            });
         }
 
         res.json({ success: true, processed: processed.length, errors });
@@ -397,13 +530,58 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
 // @access  Private
 router.get('/:id/results', protect, async (req, res) => {
     try {
-        const results = await Result.find({ exam: req.params.id })
+        const results = await Result.find({ exam: req.params.id, tenantId: req.user.tenantId })
             .populate('student', 'name rollNumber admissionNumber')
             .sort({ 'student.rollNumber': 1 });
 
         res.json({ success: true, data: results });
     } catch (error) {
         console.error('Get results error:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// @desc    Publish/unpublish all results for an exam
+// @route   PUT /api/exams/:id/results/publish
+// @access  Private (Admin, Teacher)
+router.put('/:id/results/publish', protect, authorize('admin', 'teacher'), async (req, res) => {
+    try {
+        const exam = await Exam.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
+        if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+
+        const { isPublished } = req.body;
+        if (typeof isPublished !== 'boolean') {
+            return res.status(400).json({ success: false, message: 'isPublished must be a boolean' });
+        }
+
+        const updateData = {
+            isPublished,
+            updatedBy: req.user._id
+        };
+        if (isPublished) updateData.publishedAt = new Date();
+
+        const result = await Result.updateMany(
+            { exam: req.params.id, tenantId: req.user.tenantId },
+            updateData
+        );
+
+        // Notify students when results are published
+        if (isPublished && result.modifiedCount > 0 && notificationService?.notifyResultsPublished) {
+            const results = await Result.find({ exam: req.params.id, tenantId: req.user.tenantId }).select('student').lean();
+            const studentIds = results.map(r => r.student);
+            const students = await User.find({ _id: { $in: studentIds } }).select('_id name').lean();
+            notificationService.notifyResultsPublished(exam, students, req.user.tenantId).catch(err => {
+                console.warn('Exam result notification error:', err.message);
+            });
+        }
+
+        res.json({
+            success: true,
+            message: `Results ${isPublished ? 'published' : 'unpublished'} successfully`,
+            modifiedCount: result.modifiedCount
+        });
+    } catch (error) {
+        console.error('Publish results error:', error);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });

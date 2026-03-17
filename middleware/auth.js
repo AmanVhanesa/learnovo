@@ -11,6 +11,11 @@ exports.protect = async(req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
     }
 
+    // Fallback: token from query param (for file download/export endpoints)
+    if (!token && req.query.token) {
+      token = req.query.token;
+    }
+
     // Check if token exists
     if (!token) {
       return res.status(401).json({

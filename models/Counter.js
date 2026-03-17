@@ -67,4 +67,29 @@ counterSchema.statics.formatReceiptNumber = (sequence, year) => {
   return `REC-${year}-${paddedSequence}`
 }
 
+/**
+ * Rollback a sequence after a failed document save.
+ * Decrements the counter so the number can be reused.
+ */
+counterSchema.statics.rollbackSequence = async function (name, year, tenantId = null) {
+  const filter = { name, year }
+  if (tenantId) filter.tenantId = tenantId
+
+  await this.findOneAndUpdate(
+    filter,
+    { $inc: { sequence: -1 } }
+  )
+}
+
+/**
+ * Rollback by composite counter name (for receipt/invoice counters
+ * that embed tenantId/year in the name field).
+ */
+counterSchema.statics.rollbackByName = async function (counterName) {
+  await this.findOneAndUpdate(
+    { name: counterName },
+    { $inc: { sequence: -1 } }
+  )
+}
+
 module.exports = mongoose.model('Counter', counterSchema)

@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, query } = require('express-validator');
 const FeeInvoice = require('../models/FeeInvoice');
 const Payment = require('../models/Payment');
@@ -7,6 +8,8 @@ const FeeAuditLog = require('../models/FeeAuditLog');
 const Settings = require('../models/Settings');
 const User = require('../models/User');
 const Tenant = require('../models/Tenant');
+const Receipt = require('../models/Receipt');
+const PaymentAttempt = require('../models/PaymentAttempt');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 
@@ -144,23 +147,27 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
             generatedBy: req.user._id
         });
 
-        // Log action
-        await FeeAuditLog.logAction({
-            tenantId: req.user.tenantId,
-            action: 'INVOICE_GENERATED',
-            entityType: 'FeeInvoice',
-            entityId: invoice._id,
-            userId: req.user._id,
-            userName: req.user.name,
-            userRole: req.user.role,
-            details: {
-                studentId,
-                studentName: student.name,
-                invoiceNumber,
-                totalAmount
-            },
-            ipAddress: req.ip
-        });
+        // Log action (best-effort — never fail the response after invoice is created)
+        try {
+            await FeeAuditLog.logAction({
+                tenantId: req.user.tenantId,
+                action: 'INVOICE_GENERATED',
+                entityType: 'FeeInvoice',
+                entityId: invoice._id,
+                userId: req.user._id,
+                userName: req.user.name,
+                userRole: req.user.role,
+                details: {
+                    studentId,
+                    studentName: student.name,
+                    invoiceNumber,
+                    totalAmount
+                },
+                ipAddress: req.ip
+            });
+        } catch (auditErr) {
+            console.error('Audit log failed (non-fatal):', auditErr.message);
+        }
 
         // Update student balance
         await StudentBalance.updateBalance(req.user.tenantId, studentId, academicSessionId);
@@ -177,6 +184,15 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
             data: populated
         });
     } catch (error) {
+        // Rollback invoice counter so the number doesn't get skipped
+        try {
+            const year = new Date().getFullYear();
+            const Counter = require('../models/Counter');
+            await Counter.rollbackByName(`invoice_${req.user.tenantId}_${year}`);
+        } catch (rollbackErr) {
+            console.error('Invoice counter rollback failed:', rollbackErr);
+        }
+
         console.error('Generate invoice error:', error);
         res.status(500).json({
             success: false,
@@ -366,24 +382,28 @@ router.post('/generate-bulk', protect, authorize('admin'), [
             }
         }
 
-        // Log bulk action
-        await FeeAuditLog.logAction({
-            tenantId: req.user.tenantId,
-            action: 'INVOICE_BULK_GENERATED',
-            entityType: 'FeeInvoice',
-            entityId: null,
-            userId: req.user._id,
-            userName: req.user.name,
-            userRole: req.user.role,
-            details: {
-                classId,
-                sectionId,
-                totalStudents: students.length,
-                successCount: results.length,
-                errorCount: errors.length
-            },
-            ipAddress: req.ip
-        });
+        // Log bulk action (best-effort — never fail the response after invoices are created)
+        try {
+            await FeeAuditLog.logAction({
+                tenantId: req.user.tenantId,
+                action: 'INVOICE_BULK_GENERATED',
+                entityType: 'FeeInvoice',
+                entityId: null,
+                userId: req.user._id,
+                userName: req.user.name,
+                userRole: req.user.role,
+                details: {
+                    classId,
+                    sectionId,
+                    totalStudents: students.length,
+                    successCount: results.length,
+                    errorCount: errors.length
+                },
+                ipAddress: req.ip
+            });
+        } catch (auditErr) {
+            console.error('Audit log failed (non-fatal):', auditErr.message);
+        }
 
         res.status(201).json({
             success: true,
@@ -516,23 +536,27 @@ router.delete('/bulk', protect, authorize('admin'), [
             )
         );
 
-        // Log action
-        await FeeAuditLog.logAction({
-            tenantId: req.user.tenantId,
-            action: 'INVOICE_BULK_DELETED',
-            entityType: 'FeeInvoice',
-            entityId: null,
-            userId: req.user._id,
-            userName: req.user.name,
-            userRole: req.user.role,
-            details: {
-                classId,
-                sectionId,
-                count,
-                academicSessionId
-            },
-            ipAddress: req.ip
-        });
+        // Log action (best-effort)
+        try {
+            await FeeAuditLog.logAction({
+                tenantId: req.user.tenantId,
+                action: 'INVOICE_BULK_DELETED',
+                entityType: 'FeeInvoice',
+                entityId: null,
+                userId: req.user._id,
+                userName: req.user.name,
+                userRole: req.user.role,
+                details: {
+                    classId,
+                    sectionId,
+                    count,
+                    academicSessionId
+                },
+                ipAddress: req.ip
+            });
+        } catch (auditErr) {
+            console.error('Audit log failed (non-fatal):', auditErr.message);
+        }
 
         res.json({
             success: true,
@@ -553,31 +577,110 @@ router.delete('/bulk', protect, authorize('admin'), [
 // @access  Private (Admin, Accountant)
 router.get('/', protect, authorize('admin', 'accountant'), async (req, res) => {
     try {
-        const { studentId, classId, status, academicSessionId, startDate, endDate } = req.query;
-        const filter = { tenantId: req.user.tenantId };
+        const { studentId, classId, status, academicSessionId, startDate, endDate, page, limit, search } = req.query;
 
-        if (studentId) filter.studentId = studentId;
-        if (classId) filter.classId = classId;
-        if (status) filter.status = status;
-        if (academicSessionId) filter.academicSessionId = academicSessionId;
+        // Base filter WITHOUT status — used for stats so tab counts are always accurate
+        const baseFilter = { tenantId: req.user.tenantId };
+        if (studentId) baseFilter.studentId = studentId;
+        if (classId) baseFilter.classId = classId;
+        if (academicSessionId) baseFilter.academicSessionId = academicSessionId;
 
         if (startDate || endDate) {
-            filter.issuedDate = {};
-            if (startDate) filter.issuedDate.$gte = new Date(startDate);
-            if (endDate) filter.issuedDate.$lte = new Date(endDate);
+            baseFilter.issuedDate = {};
+            if (startDate) baseFilter.issuedDate.$gte = new Date(startDate);
+            if (endDate) baseFilter.issuedDate.$lte = new Date(endDate);
         }
 
-        const invoices = await FeeInvoice.find(filter)
-            .populate('studentId', 'name studentId phone email')
-            .populate('classId', 'name grade')
-            .populate('sectionId', 'name')
-            .populate('academicSessionId', 'name')
-            .sort({ issuedDate: -1 })
-            .limit(100);
+        // Query filter includes status for the actual data fetch
+        const queryFilter = { ...baseFilter };
+        if (status) queryFilter.status = status;
+
+        // Stats aggregation — computed WITHOUT status filter so all tab counts are correct
+        const tenantObjId = new mongoose.Types.ObjectId(req.user.tenantId);
+        const statsFilter = { ...baseFilter, tenantId: tenantObjId };
+        if (statsFilter.studentId) statsFilter.studentId = new mongoose.Types.ObjectId(statsFilter.studentId);
+        if (statsFilter.classId) statsFilter.classId = new mongoose.Types.ObjectId(statsFilter.classId);
+        if (statsFilter.academicSessionId) statsFilter.academicSessionId = new mongoose.Types.ObjectId(statsFilter.academicSessionId);
+
+        const [statsResult] = await FeeInvoice.aggregate([
+            { $match: statsFilter },
+            {
+                $group: {
+                    _id: null,
+                    total: { $sum: 1 },
+                    totalAmount: { $sum: { $add: ['$totalAmount', { $ifNull: ['$lateFeeApplied', 0] }] } },
+                    pendingAmount: { $sum: '$balanceAmount' },
+                    pending: { $sum: { $cond: [{ $eq: ['$status', 'Pending'] }, 1, 0] } },
+                    partial: { $sum: { $cond: [{ $eq: ['$status', 'Partial'] }, 1, 0] } },
+                    paid: { $sum: { $cond: [{ $eq: ['$status', 'Paid'] }, 1, 0] } },
+                    overdue: { $sum: { $cond: [{ $eq: ['$status', 'Overdue'] }, 1, 0] } },
+                }
+            }
+        ]);
+
+        const stats = statsResult || { total: 0, totalAmount: 0, pendingAmount: 0, pending: 0, partial: 0, paid: 0, overdue: 0 };
+
+        // Filtered count for pagination (respects status filter)
+        const filteredTotal = status
+            ? (stats[status.toLowerCase()] || 0)
+            : stats.total;
+
+        // Pagination
+        const pageNum = Math.max(1, parseInt(page) || 1);
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+        const skip = (pageNum - 1) * limitNum;
+
+        let invoices;
+        let paginationTotal = filteredTotal;
+
+        if (search) {
+            // Escape regex special chars to prevent ReDoS
+            const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const searchRegex = new RegExp(escaped, 'i');
+            const searchFilter = { ...queryFilter, invoiceNumber: searchRegex };
+
+            const searchCount = await FeeInvoice.countDocuments(searchFilter);
+            paginationTotal = searchCount;
+
+            invoices = await FeeInvoice.find(searchFilter)
+                .populate('studentId', 'name fullName studentId admissionNumber phone email')
+                .populate('classId', 'name grade')
+                .populate('sectionId', 'name')
+                .populate('academicSessionId', 'name')
+                .sort({ issuedDate: -1 })
+                .skip(skip)
+                .limit(limitNum);
+        } else {
+            invoices = await FeeInvoice.find(queryFilter)
+                .populate('studentId', 'name fullName studentId admissionNumber phone email')
+                .populate('classId', 'name grade')
+                .populate('sectionId', 'name')
+                .populate('academicSessionId', 'name')
+                .sort({ issuedDate: -1 })
+                .skip(skip)
+                .limit(limitNum);
+        }
+
+        const totalPages = Math.ceil(paginationTotal / limitNum);
 
         res.json({
             success: true,
-            data: invoices
+            data: invoices,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total: paginationTotal,
+                pages: totalPages
+            },
+            stats: {
+                total: stats.total,
+                totalAmount: stats.totalAmount,
+                pendingAmount: stats.pendingAmount,
+                pending: stats.pending,
+                partial: stats.partial,
+                paid: stats.paid,
+                overdue: stats.overdue
+            }
         });
     } catch (error) {
         console.error('Get invoices error:', error);
@@ -667,23 +770,27 @@ router.put('/:id', protect, authorize('admin', 'accountant'), [
 
         await invoice.save();
 
-        // Log action
-        await FeeAuditLog.logAction({
-            tenantId,
-            action: 'INVOICE_UPDATED',
-            entityType: 'FeeInvoice',
-            entityId: invoice._id,
-            userId: req.user._id,
-            userName: req.user.name,
-            userRole: req.user.role,
-            details: {
-                invoiceNumber: invoice.invoiceNumber,
-                oldTotal,
-                newTotal,
-                itemsCount: updatedItems.length
-            },
-            ipAddress: req.ip
-        });
+        // Log action (best-effort)
+        try {
+            await FeeAuditLog.logAction({
+                tenantId,
+                action: 'INVOICE_UPDATED',
+                entityType: 'FeeInvoice',
+                entityId: invoice._id,
+                userId: req.user._id,
+                userName: req.user.name,
+                userRole: req.user.role,
+                details: {
+                    invoiceNumber: invoice.invoiceNumber,
+                    oldTotal,
+                    newTotal,
+                    itemsCount: updatedItems.length
+                },
+                ipAddress: req.ip
+            });
+        } catch (auditErr) {
+            console.error('Audit log failed (non-fatal):', auditErr.message);
+        }
 
         // Update student balance
         await StudentBalance.updateBalance(tenantId, invoice.studentId, invoice.academicSessionId);
@@ -737,22 +844,26 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async (req, res
         // Delete invoice
         await FeeInvoice.findByIdAndDelete(req.params.id);
 
-        // Log action (using INVOICE_CANCELLED as equivalent to deletion for audit)
-        await FeeAuditLog.logAction({
-            tenantId,
-            action: 'INVOICE_CANCELLED',
-            entityType: 'FeeInvoice',
-            entityId: invoice._id,
-            userId: req.user._id,
-            userName: req.user.name,
-            userRole: req.user.role,
-            details: {
-                invoiceNumber,
-                totalAmount,
-                reason: 'Deleted by user'
-            },
-            ipAddress: req.ip
-        });
+        // Log action (best-effort)
+        try {
+            await FeeAuditLog.logAction({
+                tenantId,
+                action: 'INVOICE_CANCELLED',
+                entityType: 'FeeInvoice',
+                entityId: invoice._id,
+                userId: req.user._id,
+                userName: req.user.name,
+                userRole: req.user.role,
+                details: {
+                    invoiceNumber,
+                    totalAmount,
+                    reason: 'Deleted by user'
+                },
+                ipAddress: req.ip
+            });
+        } catch (auditErr) {
+            console.error('Audit log failed (non-fatal):', auditErr.message);
+        }
 
         // Update student balance
         await StudentBalance.updateBalance(tenantId, studentId, academicSessionId);
@@ -799,21 +910,25 @@ router.put('/:id/apply-late-fee', protect, authorize('admin', 'accountant'), [
 
         await invoice.applyLateFee(amount);
 
-        // Log action
-        await FeeAuditLog.logAction({
-            tenantId: req.user.tenantId,
-            action: 'LATE_FEE_APPLIED',
-            entityType: 'FeeInvoice',
-            entityId: invoice._id,
-            userId: req.user._id,
-            userName: req.user.name,
-            userRole: req.user.role,
-            details: {
-                invoiceNumber: invoice.invoiceNumber,
-                lateFeeAmount: amount
-            },
-            ipAddress: req.ip
-        });
+        // Log action (best-effort)
+        try {
+            await FeeAuditLog.logAction({
+                tenantId: req.user.tenantId,
+                action: 'LATE_FEE_APPLIED',
+                entityType: 'FeeInvoice',
+                entityId: invoice._id,
+                userId: req.user._id,
+                userName: req.user.name,
+                userRole: req.user.role,
+                details: {
+                    invoiceNumber: invoice.invoiceNumber,
+                    lateFeeAmount: amount
+                },
+                ipAddress: req.ip
+            });
+        } catch (auditErr) {
+            console.error('Audit log failed (non-fatal):', auditErr.message);
+        }
 
         // Update balance
         await StudentBalance.updateBalance(req.user.tenantId, invoice.studentId, invoice.academicSessionId);
@@ -895,8 +1010,8 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
         // Update Invoice
         invoice.paidAmount += amount;
 
-        // Recalculate balance to be safe
-        invoice.balanceAmount = invoice.totalAmount - invoice.paidAmount;
+        // Recalculate balance including late fees
+        invoice.balanceAmount = invoice.totalAmount + (invoice.lateFeeApplied || 0) - invoice.paidAmount;
 
         // Update status
         if (invoice.balanceAmount <= 0) {
@@ -908,6 +1023,44 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
 
         await invoice.save();
 
+        // Also create a PaymentAttempt + Receipt so the student can see it in their portal
+        const idempotencyKey = `admin_${invoiceId}_${Date.now()}`;
+        const attempt = new PaymentAttempt({
+            tenantId,
+            idempotencyKey,
+            studentId,
+            invoiceId,
+            amount,
+            status: 'VERIFIED',
+            triggerSource: 'ADMIN_MANUAL',
+            paymentMode: paymentMethod?.toUpperCase() === 'CASH' ? 'CASH'
+                : paymentMethod?.toUpperCase().includes('UPI') ? 'UPI'
+                : paymentMethod?.toUpperCase().includes('BANK') ? 'BANK_TRANSFER'
+                : 'OTHER',
+            transactionRefId: transactionDetails?.referenceNumber || null,
+            paymentDate: new Date(paymentDate),
+            verifiedBy: req.user._id,
+            verifiedAt: new Date(),
+        });
+        await attempt.save();
+
+        const studentReceiptNum = await Receipt.generateReceiptNumber(tenantId);
+        const studentReceipt = new Receipt({
+            tenantId,
+            paymentAttemptId: attempt._id,
+            studentId,
+            invoiceId,
+            receiptNumber: studentReceiptNum,
+            initiatedBy: 'admin',
+            verifiedByUserId: req.user._id,
+            verifiedByName: req.user.name || req.user.fullName || 'Admin',
+            amount,
+            paymentMode: attempt.paymentMode,
+            transactionRefId: transactionDetails?.referenceNumber || null,
+            paymentDate: new Date(paymentDate),
+        });
+        await studentReceipt.save();
+
         res.json({
             success: true,
             message: 'Payment collected successfully',
@@ -918,6 +1071,15 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
         });
 
     } catch (error) {
+        // Rollback receipt counter so the number doesn't get skipped
+        try {
+            const year = new Date().getFullYear();
+            const Counter = require('../models/Counter');
+            await Counter.rollbackByName(`receipt_${req.user.tenantId}_${year}`);
+        } catch (rollbackErr) {
+            console.error('Receipt counter rollback failed:', rollbackErr);
+        }
+
         console.error('Collect payment error:', error);
         res.status(500).json({
             success: false,
@@ -1005,6 +1167,8 @@ router.get('/payments/:id/receipt', protect, async (req, res) => {
             if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
             if (settings.institution.affiliationNumber) schoolData.affiliationNumber = settings.institution.affiliationNumber;
             if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+            // Add logo from Settings (overrides Tenant logo if present)
+            if (settings.institution.logo) schoolData.logo = settings.institution.logo;
             // Add principal signature
             if (settings.institution.principalSignature) schoolData.principalSignature = settings.institution.principalSignature;
         }
@@ -1047,7 +1211,7 @@ router.get('/payments/:id/receipt/pdf', protect, async (req, res) => {
         const payment = await Payment.findOne({ _id: id, tenantId })
             .populate({
                 path: 'studentId',
-                select: 'name fullName admissionNumber studentId class section classId',
+                select: 'name fullName admissionNumber studentId class section parentName classId',
                 populate: { path: 'classId', select: 'name' }
             })
             .populate('invoiceId')
@@ -1068,6 +1232,7 @@ router.get('/payments/:id/receipt/pdf', protect, async (req, res) => {
             }
             if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
             if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+            if (settings.institution.logo) schoolData.logo = settings.institution.logo;
             if (settings.institution.principalSignature) schoolData.principalSignature = settings.institution.principalSignature;
         }
 

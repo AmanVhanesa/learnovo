@@ -8,13 +8,38 @@ const User = require('../models/User');
  */
 
 // ============================================================================
+// DEDUPLICATION
+// ============================================================================
+
+// Time window (ms) within which identical notifications are considered duplicates
+const DEDUP_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Check if a near-identical notification already exists for this user.
+ * Match on tenantId + userId + category + title within the dedup window.
+ * Returns true if a duplicate exists.
+ */
+async function isDuplicate(tenantId, userId, category, title) {
+    const since = new Date(Date.now() - DEDUP_WINDOW_MS);
+    const existing = await Notification.findOne({
+        tenantId,
+        userId,
+        category,
+        title,
+        isDeleted: false,
+        createdAt: { $gte: since }
+    }).lean();
+    return !!existing;
+}
+
+// ============================================================================
 // CORE NOTIFICATION FUNCTIONS
 // ============================================================================
 
 /**
- * Create a single notification
+ * Create a single notification with deduplication
  * @param {Object} params - Notification parameters
- * @returns {Promise<Object>} Created notification
+ * @returns {Promise<Object>} Created notification or null if skipped/duplicate
  */
 async function createNotification({
     tenantId,
@@ -25,18 +50,23 @@ async function createNotification({
     category,
     actionUrl = null,
     actionLabel = null,
-    metadata = {}
+    metadata = {},
+    visibility
 }) {
     try {
         // Check user preferences
         const shouldSend = await NotificationPreference.shouldNotify(userId, tenantId, category, 'inApp');
 
         if (!shouldSend) {
-            console.log(`Notification skipped for user ${userId} - category ${category} disabled`);
             return null;
         }
 
-        const notification = await Notification.create({
+        // Deduplication: skip if an identical notification was created recently
+        if (await isDuplicate(tenantId, userId, category, title)) {
+            return null;
+        }
+
+        const doc = {
             tenantId,
             userId,
             title,
@@ -52,8 +82,10 @@ async function createNotification({
                     deliveredAt: new Date()
                 }
             }
-        });
+        };
+        if (visibility) doc.visibility = visibility;
 
+        const notification = await Notification.create(doc);
         return notification;
     } catch (error) {
         console.error('Error creating notification:', error);
@@ -62,41 +94,92 @@ async function createNotification({
 }
 
 /**
- * Create multiple notifications (bulk)
+ * Create multiple notifications (bulk) with per-user deduplication
+ * Optimized: batch DB queries instead of per-user sequential queries
  * @param {Array} notifications - Array of notification objects
  * @returns {Promise<Array>} Created notifications
  */
 async function createBulkNotifications(notifications) {
     try {
-        // Filter notifications based on user preferences
-        const filteredNotifications = [];
+        if (!notifications || notifications.length === 0) return [];
 
-        for (const notif of notifications) {
-            const shouldSend = await NotificationPreference.shouldNotify(
-                notif.userId,
-                notif.tenantId,
-                notif.category,
-                'inApp'
-            );
+        const tenantId = notifications[0].tenantId;
+        const userIds = [...new Set(notifications.map(n => n.userId.toString()))];
 
-            if (shouldSend) {
-                filteredNotifications.push({
-                    ...notif,
-                    channels: {
-                        inApp: {
-                            enabled: true,
-                            deliveredAt: new Date()
+        // 1. Batch fetch all user preferences in ONE query
+        let suppressedUsers = new Set();
+        try {
+            const prefs = await NotificationPreference.find({
+                userId: { $in: userIds },
+                tenantId
+            }).lean();
+
+            for (const pref of prefs) {
+                for (const notif of notifications) {
+                    if (notif.userId.toString() === pref.userId.toString()) {
+                        const catPref = pref.preferences?.[notif.category];
+                        if (catPref && catPref.inApp === false) {
+                            suppressedUsers.add(`${notif.userId}:${notif.category}`);
                         }
                     }
-                });
+                }
+            }
+        } catch (prefErr) {
+            // If preferences table doesn't exist or query fails, send all
+        }
+
+        // 2. Batch deduplication check in ONE query
+        const since = new Date(Date.now() - DEDUP_WINDOW_MS);
+        const dedupConditions = notifications.map(n => ({
+            tenantId: n.tenantId,
+            userId: n.userId,
+            category: n.category,
+            title: n.title
+        }));
+
+        let existingDups = new Set();
+        if (dedupConditions.length > 0) {
+            const existing = await Notification.find({
+                tenantId,
+                isDeleted: false,
+                createdAt: { $gte: since },
+                $or: dedupConditions.map(c => ({
+                    userId: c.userId,
+                    category: c.category,
+                    title: c.title
+                }))
+            }).select('userId category title').lean();
+
+            for (const e of existing) {
+                existingDups.add(`${e.userId}:${e.category}:${e.title}`);
             }
         }
 
-        if (filteredNotifications.length === 0) {
-            return [];
+        // 3. Filter notifications
+        const now = new Date();
+        const filteredNotifications = [];
+        for (const notif of notifications) {
+            const userCatKey = `${notif.userId}:${notif.category}`;
+            if (suppressedUsers.has(userCatKey)) continue;
+
+            const dedupKey = `${notif.userId}:${notif.category}:${notif.title}`;
+            if (existingDups.has(dedupKey)) continue;
+
+            filteredNotifications.push({
+                ...notif,
+                channels: {
+                    inApp: {
+                        enabled: true,
+                        deliveredAt: now
+                    }
+                }
+            });
         }
 
-        const created = await Notification.insertMany(filteredNotifications);
+        if (filteredNotifications.length === 0) return [];
+
+        // 4. Bulk insert - single DB operation
+        const created = await Notification.insertMany(filteredNotifications, { ordered: false });
         return created;
     } catch (error) {
         console.error('Error creating bulk notifications:', error);
@@ -174,35 +257,35 @@ async function getNotifications(userId, tenantId, options = {}) {
     };
 }
 
+// Track which users have had stale-notification cleanup this process lifetime
+const _cleanedUpUsers = new Set();
+
 /**
  * Get unread notification count.
- * Also auto-cleans any stale notifications that don't match the user's
- * visibility, so phantom badge counts (e.g. admin-only notifs showing for
- * teachers) are permanently resolved on the first call.
+ * Runs a one-time cleanup of stale visibility mismatches per user per
+ * server lifetime, then just returns the count on subsequent calls.
  */
 async function getUnreadCount(userId, tenantId) {
-    try {
-        const user = await User.findById(userId).select('role').lean();
-
-        // For non-admins: soft-delete any notifications that are unread but
-        // NOT visible to this user's role (stale data from previous bugs).
-        if (user && user.role !== 'admin') {
-            await Notification.updateMany(
-                {
-                    userId,
-                    tenantId,
-                    isRead: false,
-                    isDeleted: false,
-                    // visibility array does NOT contain this user's role
-                    visibility: { $nin: [user.role] }
-                },
-                {
-                    $set: { isDeleted: true, deletedAt: new Date() }
-                }
-            );
+    const userKey = `${userId}:${tenantId}`;
+    if (!_cleanedUpUsers.has(userKey)) {
+        try {
+            const user = await User.findById(userId).select('role').lean();
+            if (user && user.role !== 'admin') {
+                await Notification.updateMany(
+                    {
+                        userId,
+                        tenantId,
+                        isRead: false,
+                        isDeleted: false,
+                        visibility: { $nin: [user.role] }
+                    },
+                    { $set: { isDeleted: true, deletedAt: new Date() } }
+                );
+            }
+            _cleanedUpUsers.add(userKey);
+        } catch (cleanupErr) {
+            console.warn('getUnreadCount cleanup warn:', cleanupErr.message);
         }
-    } catch (cleanupErr) {
-        console.warn('getUnreadCount cleanup warn:', cleanupErr.message);
     }
 
     return await Notification.getUnreadCount(userId, tenantId);
@@ -1067,6 +1150,9 @@ module.exports = {
     markAllAsRead,
     deleteNotification,
     cleanupOldNotifications,
+    isDuplicate,
+    // Exposed for testing only
+    _resetCleanupCache: () => _cleanedUpUsers.clear(),
 
     // Admission notifications
     notifyNewAdmission,

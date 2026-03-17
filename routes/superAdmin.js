@@ -1,9 +1,19 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const Tenant = require('../models/Tenant');
 const User = require('../models/User');
+const SuperAdmin = require('../models/SuperAdmin');
 const SuperAdminAuditLog = require('../models/SuperAdminAuditLog');
+const SubscriptionPlan = require('../models/SubscriptionPlan');
+const PlatformInvoice = require('../models/PlatformInvoice');
+const SupportTicket = require('../models/SupportTicket');
+const PlatformAnnouncement = require('../models/PlatformAnnouncement');
+const EmailTemplate = require('../models/EmailTemplate');
+const PlatformSettings = require('../models/PlatformSettings');
+const Coupon = require('../models/Coupon');
+const KnowledgeBaseArticle = require('../models/KnowledgeBaseArticle');
 const superAdminAuth = require('../middleware/superAdminAuth');
 const { PLANS, getPlanConfig, getPlanDisplayName } = require('../utils/planConfig');
 const { logger } = require('../middleware/errorHandler');
@@ -222,11 +232,21 @@ router.patch('/tenants/:id/activate', async (req, res) => {
 /**
  * DELETE /api/super-admin/tenants/:id
  * Soft delete a tenant (set isDeleted: true)
+ * Pass ?hard=true to permanently remove the tenant and all associated data
  */
 router.delete('/tenants/:id', async (req, res) => {
     try {
         const tenant = await Tenant.findById(req.params.id);
         if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        if (req.query.hard === 'true') {
+            // Hard delete: remove tenant and all associated users
+            await User.deleteMany({ tenantId: tenant._id });
+            await Tenant.findByIdAndDelete(tenant._id);
+            await audit(req, 'HARD_DELETE_TENANT', 'Tenant', tenant._id, { schoolName: tenant.schoolName, schoolCode: tenant.schoolCode });
+
+            return res.json({ success: true, message: 'Tenant and all associated data permanently deleted.', requestId: req.requestId });
+        }
 
         tenant.isDeleted = true;
         tenant.isActive = false;
@@ -507,7 +527,7 @@ router.get('/dashboard', async (req, res) => {
         sixMonthsAgo.setDate(1);
         sixMonthsAgo.setHours(0, 0, 0, 0);
 
-        console.log('[DEBUG Dashboard] Starting Promise.all for aggregations...');
+        logger.info('Super admin dashboard: loading stats', { requestId: req.requestId });
         const [
             totalTenants,
             activeTenants,
@@ -545,7 +565,7 @@ router.get('/dashboard', async (req, res) => {
                 { $sort: { "_id.year": 1, "_id.month": 1 } }
             ])
         ]);
-        console.log('[DEBUG Dashboard] Promise.all finished successfully!');
+        logger.info('Super admin dashboard: aggregations complete', { requestId: req.requestId });
 
         // Build plan breakdown as array (matches chart component expectation)
         const allPlans = ['free', 'basic', 'pro', 'enterprise'];
@@ -559,7 +579,7 @@ router.get('/dashboard', async (req, res) => {
         const activePaidTenants = await Tenant.find({
             isDeleted: { $ne: true },
             'subscription.status': 'active',
-            'subscription.plan': { $in: ['basic', 'premium', 'enterprise'] }
+            'subscription.plan': { $in: ['basic', 'pro', 'enterprise'] }
         }).select('subscription.plan subscription.billingCycle').lean();
 
         activePaidTenants.forEach(t => {
@@ -590,7 +610,7 @@ router.get('/dashboard', async (req, res) => {
             curr.setMonth(curr.getMonth() + 1);
         }
 
-        console.log('[DEBUG Dashboard] Before res.json');
+        logger.info('Super admin dashboard: sending response', { requestId: req.requestId });
         return res.json({
             success: true,
             data: {
@@ -656,6 +676,1000 @@ router.get('/audit-logs', async (req, res) => {
     } catch (error) {
         logger.error('Super admin: audit logs error', error, { requestId: req.requestId });
         return res.status(500).json({ success: false, message: 'Server error loading audit logs.', requestId: req.requestId });
+    }
+});
+
+// ─── TENANT CREATION ────────────────────────────────────────────────────────
+
+/**
+ * POST /api/super-admin/tenants
+ * Create a new tenant (school) with admin account
+ */
+router.post('/tenants', async (req, res) => {
+    try {
+        const {
+            schoolName, schoolCode, email, phone, address,
+            logo, adminName, adminEmail, adminPhone,
+            plan, trialDays, modules, settings
+        } = req.body;
+
+        if (!schoolName || !schoolCode || !email) {
+            return res.status(400).json({ success: false, message: 'schoolName, schoolCode, and email are required.', requestId: req.requestId });
+        }
+
+        // Check duplicates
+        const existing = await Tenant.findOne({
+            $or: [
+                { schoolCode: schoolCode.toLowerCase() },
+                { email: email.toLowerCase() }
+            ]
+        });
+        if (existing) {
+            return res.status(409).json({ success: false, message: 'A tenant with this school code or email already exists.', requestId: req.requestId });
+        }
+
+        const trialEndsAt = new Date(Date.now() + (trialDays || 14) * 24 * 60 * 60 * 1000);
+
+        const tenant = await Tenant.create({
+            schoolName,
+            schoolCode: schoolCode.toLowerCase(),
+            email: email.toLowerCase(),
+            phone,
+            address,
+            logo,
+            subscription: {
+                plan: plan || 'free',
+                status: 'trial',
+                trialEndsAt,
+                maxStudents: 100,
+                maxTeachers: 10
+            },
+            settings: settings || {}
+        });
+
+        // Create admin user for the tenant
+        let adminUser = null;
+        if (adminEmail) {
+            const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase() + '@1';
+            const salt = await bcrypt.genSalt(12);
+            const hashedPassword = await bcrypt.hash(tempPassword, salt);
+
+            adminUser = await User.create({
+                name: adminName || 'School Admin',
+                email: adminEmail.toLowerCase(),
+                phone: adminPhone,
+                password: hashedPassword,
+                role: 'admin',
+                tenantId: tenant._id,
+                isActive: true
+            });
+
+            // Send welcome email (non-blocking)
+            try {
+                const emailService = require('../services/emailService');
+                await emailService.sendEmail({
+                    to: adminEmail,
+                    subject: `Welcome to Learnovo - ${schoolName}`,
+                    html: `<p>Hi ${adminName || 'Admin'},</p>
+                           <p>Your school <strong>${schoolName}</strong> has been registered on Learnovo.</p>
+                           <p><strong>Login email:</strong> ${adminEmail}</p>
+                           <p><strong>Temporary password:</strong> <code>${tempPassword}</code></p>
+                           <p><strong>School Code:</strong> ${schoolCode}</p>
+                           <p>Please log in and change your password immediately.</p>`
+                });
+            } catch (emailErr) {
+                logger.warn('Welcome email could not be sent', { requestId: req.requestId, tenantId: tenant._id });
+            }
+        }
+
+        await audit(req, 'CREATE_TENANT', 'Tenant', tenant._id, { schoolName, schoolCode, plan: plan || 'free' });
+
+        return res.status(201).json({
+            success: true,
+            message: 'Tenant created successfully.',
+            data: { tenant, adminUser: adminUser ? { id: adminUser._id, email: adminUser.email } : null },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: create tenant error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error creating tenant.', requestId: req.requestId });
+    }
+});
+
+/**
+ * PATCH /api/super-admin/tenants/:id
+ * Update tenant profile info
+ */
+router.patch('/tenants/:id', async (req, res) => {
+    try {
+        const tenant = await Tenant.findById(req.params.id);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        const allowedFields = ['schoolName', 'email', 'phone', 'address', 'logo', 'primaryColor', 'secondaryColor', 'subdomain'];
+        const changes = {};
+        allowedFields.forEach(field => {
+            if (req.body[field] !== undefined) {
+                changes[field] = { from: tenant[field], to: req.body[field] };
+                tenant[field] = req.body[field];
+            }
+        });
+
+        // Allow updating settings
+        if (req.body.settings && typeof req.body.settings === 'object') {
+            Object.assign(tenant.settings, req.body.settings);
+            changes.settings = req.body.settings;
+        }
+
+        await tenant.save();
+        await audit(req, 'UPDATE_TENANT', 'Tenant', tenant._id, changes);
+
+        return res.json({ success: true, message: 'Tenant updated successfully.', data: tenant, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update tenant error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error updating tenant.', requestId: req.requestId });
+    }
+});
+
+/**
+ * POST /api/super-admin/tenants/bulk-action
+ * Bulk actions: suspend, activate, change plan, export
+ */
+router.post('/tenants/bulk-action', async (req, res) => {
+    try {
+        const { action, tenantIds, plan } = req.body;
+        if (!action || !tenantIds || !Array.isArray(tenantIds) || tenantIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'action and tenantIds[] are required.', requestId: req.requestId });
+        }
+
+        let result;
+        switch (action) {
+            case 'suspend':
+                result = await Tenant.updateMany(
+                    { _id: { $in: tenantIds } },
+                    { 'subscription.status': 'suspended', isActive: false }
+                );
+                break;
+            case 'activate':
+                result = await Tenant.updateMany(
+                    { _id: { $in: tenantIds } },
+                    { 'subscription.status': 'active', isActive: true }
+                );
+                break;
+            case 'change_plan':
+                if (!plan) return res.status(400).json({ success: false, message: 'plan is required for change_plan action.', requestId: req.requestId });
+                result = await Tenant.updateMany(
+                    { _id: { $in: tenantIds } },
+                    { 'subscription.plan': plan }
+                );
+                break;
+            default:
+                return res.status(400).json({ success: false, message: `Unknown action: ${action}`, requestId: req.requestId });
+        }
+
+        await audit(req, `BULK_${action.toUpperCase()}`, 'Tenant', tenantIds[0], { tenantIds, action, count: tenantIds.length });
+
+        return res.json({ success: true, message: `Bulk ${action} completed for ${tenantIds.length} tenants.`, data: result, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: bulk action error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error performing bulk action.', requestId: req.requestId });
+    }
+});
+
+/**
+ * POST /api/super-admin/tenants/:id/impersonate
+ * Generate an impersonation token for a tenant's admin
+ */
+router.post('/tenants/:id/impersonate', async (req, res) => {
+    try {
+        const tenant = await Tenant.findById(req.params.id);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        const admin = await User.findOne({ tenantId: tenant._id, role: 'admin', isActive: true });
+        if (!admin) return res.status(404).json({ success: false, message: 'No active admin found for this tenant.', requestId: req.requestId });
+
+        // Generate impersonation token with limited TTL
+        const impersonationToken = jwt.sign(
+            { id: admin._id, role: admin.role, tenantId: tenant._id, isImpersonation: true, impersonatedBy: req.superAdmin._id },
+            process.env.JWT_SECRET || 'jwt-secret-change-in-production',
+            { expiresIn: '2h' }
+        );
+
+        await audit(req, 'IMPERSONATE_TENANT', 'Tenant', tenant._id, { adminEmail: admin.email });
+
+        return res.json({
+            success: true,
+            message: 'Impersonation token generated.',
+            data: {
+                token: impersonationToken,
+                user: { id: admin._id, name: admin.name, email: admin.email, role: admin.role },
+                tenant: { id: tenant._id, schoolName: tenant.schoolName, schoolCode: tenant.schoolCode }
+            },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: impersonate error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error generating impersonation token.', requestId: req.requestId });
+    }
+});
+
+// ─── USER ROLE DISTRIBUTION ─────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/users/role-distribution
+ * Visual breakdown of users by role
+ */
+router.get('/users/role-distribution', async (req, res) => {
+    try {
+        const distribution = await User.aggregate([
+            { $group: { _id: '$role', count: { $sum: 1 } } },
+            { $sort: { count: -1 } }
+        ]);
+        return res.json({ success: true, data: distribution, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: role distribution error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── SUBSCRIPTION PLAN MANAGEMENT ───────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/plans
+ * List all subscription plans
+ */
+router.get('/plans', async (req, res) => {
+    try {
+        const plans = await SubscriptionPlan.find().sort({ sortOrder: 1 }).lean();
+
+        // Enrich with subscriber counts
+        const enriched = await Promise.all(plans.map(async (plan) => {
+            const subscriberCount = await Tenant.countDocuments({
+                isDeleted: { $ne: true },
+                'subscription.plan': plan.slug
+            });
+            return { ...plan, subscriberCount };
+        }));
+
+        return res.json({ success: true, data: enriched, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: list plans error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * POST /api/super-admin/plans
+ * Create a new subscription plan
+ */
+router.post('/plans', async (req, res) => {
+    try {
+        const plan = await SubscriptionPlan.create(req.body);
+        await audit(req, 'CREATE_PLAN', 'SuperAdmin', req.superAdmin._id, { planName: plan.name, slug: plan.slug });
+        return res.status(201).json({ success: true, data: plan, requestId: req.requestId });
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ success: false, message: 'A plan with this slug already exists.', requestId: req.requestId });
+        logger.error('Super admin: create plan error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * PATCH /api/super-admin/plans/:id
+ * Update a subscription plan
+ */
+router.patch('/plans/:id', async (req, res) => {
+    try {
+        const plan = await SubscriptionPlan.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!plan) return res.status(404).json({ success: false, message: 'Plan not found.', requestId: req.requestId });
+        await audit(req, 'UPDATE_PLAN', 'SuperAdmin', req.superAdmin._id, { planId: plan._id, changes: req.body });
+        return res.json({ success: true, data: plan, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update plan error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * DELETE /api/super-admin/plans/:id
+ */
+router.delete('/plans/:id', async (req, res) => {
+    try {
+        const plan = await SubscriptionPlan.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+        if (!plan) return res.status(404).json({ success: false, message: 'Plan not found.', requestId: req.requestId });
+        await audit(req, 'DEACTIVATE_PLAN', 'SuperAdmin', req.superAdmin._id, { planSlug: plan.slug });
+        return res.json({ success: true, message: 'Plan deactivated.', requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: delete plan error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── COUPON MANAGEMENT ──────────────────────────────────────────────────────
+
+router.get('/coupons', async (req, res) => {
+    try {
+        const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
+        return res.json({ success: true, data: coupons, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: list coupons error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.post('/coupons', async (req, res) => {
+    try {
+        const coupon = await Coupon.create({ ...req.body, createdBy: req.superAdmin._id });
+        await audit(req, 'CREATE_COUPON', 'SuperAdmin', req.superAdmin._id, { code: coupon.code });
+        return res.status(201).json({ success: true, data: coupon, requestId: req.requestId });
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ success: false, message: 'Coupon code already exists.', requestId: req.requestId });
+        logger.error('Super admin: create coupon error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.patch('/coupons/:id', async (req, res) => {
+    try {
+        const coupon = await Coupon.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!coupon) return res.status(404).json({ success: false, message: 'Coupon not found.', requestId: req.requestId });
+        return res.json({ success: true, data: coupon, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update coupon error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.delete('/coupons/:id', async (req, res) => {
+    try {
+        await Coupon.findByIdAndDelete(req.params.id);
+        return res.json({ success: true, message: 'Coupon deleted.', requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: delete coupon error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── BILLING & INVOICES ─────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/billing/dashboard
+ * Billing overview stats
+ */
+router.get('/billing/dashboard', async (req, res) => {
+    try {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+
+        const [totalCollected, totalPending, totalOverdue, upcomingRenewals] = await Promise.all([
+            PlatformInvoice.aggregate([
+                { $match: { status: 'paid', paidAt: { $gte: startOfMonth } } },
+                { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+            ]),
+            PlatformInvoice.aggregate([
+                { $match: { status: { $in: ['sent', 'draft'] } } },
+                { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+            ]),
+            PlatformInvoice.aggregate([
+                { $match: { status: 'overdue' } },
+                { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }
+            ]),
+            Tenant.countDocuments({
+                isDeleted: { $ne: true },
+                'subscription.status': 'active',
+                'subscription.currentPeriodEnd': { $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
+            })
+        ]);
+
+        return res.json({
+            success: true,
+            data: {
+                collectedThisMonth: totalCollected[0]?.total || 0,
+                pending: totalPending[0]?.total || 0,
+                overdue: totalOverdue[0]?.total || 0,
+                overdueCount: totalOverdue[0]?.count || 0,
+                upcomingRenewals
+            },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: billing dashboard error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * GET /api/super-admin/invoices
+ * List all platform invoices
+ */
+router.get('/invoices', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+        if (req.query.status) filter.status = req.query.status;
+        if (req.query.tenantId) filter.tenantId = req.query.tenantId;
+        if (req.query.search) {
+            filter.$or = [
+                { invoiceNumber: { $regex: req.query.search, $options: 'i' } }
+            ];
+        }
+
+        const [invoices, total] = await Promise.all([
+            PlatformInvoice.find(filter)
+                .populate('tenantId', 'schoolName schoolCode email')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            PlatformInvoice.countDocuments(filter)
+        ]);
+
+        return res.json({
+            success: true,
+            data: invoices,
+            pagination: { current: page, pages: Math.ceil(total / limit), total },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: list invoices error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * POST /api/super-admin/invoices
+ * Create a new invoice for a tenant
+ */
+router.post('/invoices', async (req, res) => {
+    try {
+        const invoice = await PlatformInvoice.create(req.body);
+        await audit(req, 'CREATE_INVOICE', 'Tenant', invoice.tenantId, { invoiceNumber: invoice.invoiceNumber, amount: invoice.totalAmount });
+        return res.status(201).json({ success: true, data: invoice, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: create invoice error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * PATCH /api/super-admin/invoices/:id
+ * Update invoice (mark as paid, etc.)
+ */
+router.patch('/invoices/:id', async (req, res) => {
+    try {
+        const invoice = await PlatformInvoice.findById(req.params.id);
+        if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found.', requestId: req.requestId });
+
+        const allowedFields = ['status', 'paymentMethod', 'transactionId', 'paymentReference', 'paidAt', 'notes', 'refundAmount', 'refundReason', 'refundedAt'];
+        allowedFields.forEach(field => {
+            if (req.body[field] !== undefined) invoice[field] = req.body[field];
+        });
+
+        // Auto-set paidAt when marking as paid
+        if (req.body.status === 'paid' && !invoice.paidAt) {
+            invoice.paidAt = new Date();
+        }
+
+        await invoice.save();
+        await audit(req, 'UPDATE_INVOICE', 'Tenant', invoice.tenantId, { invoiceNumber: invoice.invoiceNumber, changes: req.body });
+        return res.json({ success: true, data: invoice, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update invoice error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── COMMUNICATION & ANNOUNCEMENTS ─────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/announcements
+ */
+router.get('/announcements', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const [announcements, total] = await Promise.all([
+            PlatformAnnouncement.find()
+                .populate('createdBy', 'name email')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            PlatformAnnouncement.countDocuments()
+        ]);
+
+        return res.json({
+            success: true,
+            data: announcements,
+            pagination: { current: page, pages: Math.ceil(total / limit), total },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: list announcements error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * POST /api/super-admin/announcements
+ */
+router.post('/announcements', async (req, res) => {
+    try {
+        const announcement = await PlatformAnnouncement.create({
+            ...req.body,
+            createdBy: req.superAdmin._id,
+            status: req.body.scheduledAt ? 'scheduled' : 'sent',
+            sentAt: req.body.scheduledAt ? null : new Date()
+        });
+        await audit(req, 'CREATE_ANNOUNCEMENT', 'SuperAdmin', req.superAdmin._id, { title: announcement.title });
+        return res.status(201).json({ success: true, data: announcement, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: create announcement error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.patch('/announcements/:id', async (req, res) => {
+    try {
+        const announcement = await PlatformAnnouncement.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found.', requestId: req.requestId });
+        return res.json({ success: true, data: announcement, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update announcement error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.delete('/announcements/:id', async (req, res) => {
+    try {
+        await PlatformAnnouncement.findByIdAndDelete(req.params.id);
+        return res.json({ success: true, message: 'Announcement deleted.', requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: delete announcement error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── EMAIL TEMPLATES ────────────────────────────────────────────────────────
+
+router.get('/email-templates', async (req, res) => {
+    try {
+        const templates = await EmailTemplate.find().sort({ type: 1 }).lean();
+        return res.json({ success: true, data: templates, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: list email templates error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.post('/email-templates', async (req, res) => {
+    try {
+        const template = await EmailTemplate.create({ ...req.body, lastEditedBy: req.superAdmin._id });
+        return res.status(201).json({ success: true, data: template, requestId: req.requestId });
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ success: false, message: 'Template with this slug already exists.', requestId: req.requestId });
+        logger.error('Super admin: create email template error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.patch('/email-templates/:id', async (req, res) => {
+    try {
+        const template = await EmailTemplate.findByIdAndUpdate(
+            req.params.id,
+            { ...req.body, lastEditedBy: req.superAdmin._id },
+            { new: true, runValidators: true }
+        );
+        if (!template) return res.status(404).json({ success: false, message: 'Template not found.', requestId: req.requestId });
+        return res.json({ success: true, data: template, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update email template error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.delete('/email-templates/:id', async (req, res) => {
+    try {
+        await EmailTemplate.findByIdAndDelete(req.params.id);
+        return res.json({ success: true, message: 'Template deleted.', requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: delete email template error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── SUPPORT TICKETS ────────────────────────────────────────────────────────
+
+router.get('/support-tickets', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+        if (req.query.status) filter.status = req.query.status;
+        if (req.query.priority) filter.priority = req.query.priority;
+        if (req.query.category) filter.category = req.query.category;
+        if (req.query.tenantId) filter.tenantId = req.query.tenantId;
+
+        const [tickets, total] = await Promise.all([
+            SupportTicket.find(filter)
+                .populate('tenantId', 'schoolName schoolCode')
+                .populate('assignedTo', 'name email')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            SupportTicket.countDocuments(filter)
+        ]);
+
+        return res.json({
+            success: true,
+            data: tickets,
+            pagination: { current: page, pages: Math.ceil(total / limit), total },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: list tickets error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.get('/support-tickets/:id', async (req, res) => {
+    try {
+        const ticket = await SupportTicket.findById(req.params.id)
+            .populate('tenantId', 'schoolName schoolCode email')
+            .populate('assignedTo', 'name email')
+            .populate('createdBy', 'name email role')
+            .lean();
+        if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found.', requestId: req.requestId });
+        return res.json({ success: true, data: ticket, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: get ticket error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.post('/support-tickets', async (req, res) => {
+    try {
+        const ticket = await SupportTicket.create(req.body);
+        return res.status(201).json({ success: true, data: ticket, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: create ticket error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.patch('/support-tickets/:id', async (req, res) => {
+    try {
+        const ticket = await SupportTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found.', requestId: req.requestId });
+
+        const allowedFields = ['status', 'priority', 'category', 'assignedTo', 'tags'];
+        allowedFields.forEach(field => {
+            if (req.body[field] !== undefined) ticket[field] = req.body[field];
+        });
+
+        if (req.body.status === 'resolved' && !ticket.resolvedAt) ticket.resolvedAt = new Date();
+        if (req.body.status === 'closed' && !ticket.closedAt) ticket.closedAt = new Date();
+
+        await ticket.save();
+        return res.json({ success: true, data: ticket, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update ticket error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * POST /api/super-admin/support-tickets/:id/reply
+ * Add a message to a ticket
+ */
+router.post('/support-tickets/:id/reply', async (req, res) => {
+    try {
+        const ticket = await SupportTicket.findById(req.params.id);
+        if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found.', requestId: req.requestId });
+
+        ticket.messages.push({
+            sender: 'superadmin',
+            senderName: req.superAdmin.name,
+            message: req.body.message,
+            attachments: req.body.attachments || [],
+            isInternal: req.body.isInternal || false
+        });
+
+        if (!ticket.firstResponseAt) ticket.firstResponseAt = new Date();
+
+        await ticket.save();
+        return res.json({ success: true, data: ticket, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: reply ticket error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+/**
+ * GET /api/super-admin/support-tickets/stats/summary
+ * SLA Dashboard stats
+ */
+router.get('/support-tickets/stats/summary', async (req, res) => {
+    try {
+        const [statusBreakdown, priorityBreakdown, categoryBreakdown, avgResponseTime] = await Promise.all([
+            SupportTicket.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+            SupportTicket.aggregate([{ $group: { _id: '$priority', count: { $sum: 1 } } }]),
+            SupportTicket.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }]),
+            SupportTicket.aggregate([
+                { $match: { firstResponseAt: { $ne: null } } },
+                { $project: { responseTime: { $subtract: ['$firstResponseAt', '$createdAt'] } } },
+                { $group: { _id: null, avg: { $avg: '$responseTime' } } }
+            ])
+        ]);
+
+        return res.json({
+            success: true,
+            data: {
+                byStatus: statusBreakdown,
+                byPriority: priorityBreakdown,
+                byCategory: categoryBreakdown,
+                avgResponseTimeMs: avgResponseTime[0]?.avg || 0
+            },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: ticket stats error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── KNOWLEDGE BASE ─────────────────────────────────────────────────────────
+
+router.get('/knowledge-base', async (req, res) => {
+    try {
+        const filter = {};
+        if (req.query.category) filter.category = req.query.category;
+        if (req.query.published !== undefined) filter.isPublished = req.query.published === 'true';
+        const articles = await KnowledgeBaseArticle.find(filter).sort({ sortOrder: 1 }).lean();
+        return res.json({ success: true, data: articles, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: list KB articles error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.post('/knowledge-base', async (req, res) => {
+    try {
+        const article = await KnowledgeBaseArticle.create({ ...req.body, createdBy: req.superAdmin._id, lastEditedBy: req.superAdmin._id });
+        return res.status(201).json({ success: true, data: article, requestId: req.requestId });
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ success: false, message: 'Article with this slug already exists.', requestId: req.requestId });
+        logger.error('Super admin: create KB article error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.patch('/knowledge-base/:id', async (req, res) => {
+    try {
+        const article = await KnowledgeBaseArticle.findByIdAndUpdate(
+            req.params.id,
+            { ...req.body, lastEditedBy: req.superAdmin._id },
+            { new: true, runValidators: true }
+        );
+        if (!article) return res.status(404).json({ success: false, message: 'Article not found.', requestId: req.requestId });
+        return res.json({ success: true, data: article, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update KB article error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.delete('/knowledge-base/:id', async (req, res) => {
+    try {
+        await KnowledgeBaseArticle.findByIdAndDelete(req.params.id);
+        return res.json({ success: true, message: 'Article deleted.', requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: delete KB article error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── PLATFORM SETTINGS ──────────────────────────────────────────────────────
+
+router.get('/settings', async (req, res) => {
+    try {
+        let settings = await PlatformSettings.findById('platform_settings').lean();
+        if (!settings) {
+            settings = await PlatformSettings.create({ _id: 'platform_settings' });
+            settings = settings.toObject();
+        }
+        return res.json({ success: true, data: settings, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: get settings error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+router.patch('/settings', async (req, res) => {
+    try {
+        const settings = await PlatformSettings.findByIdAndUpdate(
+            'platform_settings',
+            { $set: req.body },
+            { new: true, upsert: true, runValidators: true }
+        );
+        await audit(req, 'UPDATE_SETTINGS', 'SuperAdmin', req.superAdmin._id, { sections: Object.keys(req.body) });
+        return res.json({ success: true, data: settings, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: update settings error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── MODULE MANAGEMENT ──────────────────────────────────────────────────────
+
+// Master module list (static configuration)
+const MODULES = [
+    { slug: 'sis', name: 'Student Information System', icon: 'Users', status: 'stable', version: '1.0' },
+    { slug: 'staff', name: 'Teacher/Staff Management', icon: 'UserCog', status: 'stable', version: '1.0' },
+    { slug: 'attendance', name: 'Attendance Management', icon: 'ClipboardCheck', status: 'stable', version: '1.0' },
+    { slug: 'timetable', name: 'Timetable / Schedule', icon: 'Calendar', status: 'stable', version: '1.0' },
+    { slug: 'fees', name: 'Fee & Finance Management', icon: 'IndianRupee', status: 'stable', version: '1.0' },
+    { slug: 'exams', name: 'Exam & Grade Management', icon: 'FileText', status: 'stable', version: '1.0' },
+    { slug: 'homework', name: 'Assignment & Homework', icon: 'BookOpen', status: 'stable', version: '1.0' },
+    { slug: 'virtual_classroom', name: 'Online Classes / Virtual Classroom', icon: 'Video', status: 'beta', version: '0.9' },
+    { slug: 'library', name: 'Library Management', icon: 'Library', status: 'coming_soon', version: null },
+    { slug: 'transport', name: 'Transport / Bus Management', icon: 'Bus', status: 'stable', version: '1.0' },
+    { slug: 'hostel', name: 'Hostel / Dormitory Management', icon: 'Building', status: 'coming_soon', version: null },
+    { slug: 'parent_portal', name: 'Parent Portal', icon: 'Heart', status: 'stable', version: '1.0' },
+    { slug: 'student_portal', name: 'Student Portal', icon: 'GraduationCap', status: 'stable', version: '1.0' },
+    { slug: 'hr_payroll', name: 'HR & Payroll', icon: 'Briefcase', status: 'stable', version: '1.0' },
+    { slug: 'inventory', name: 'Inventory / Asset Management', icon: 'Package', status: 'coming_soon', version: null },
+    { slug: 'events', name: 'Event & Calendar Management', icon: 'CalendarDays', status: 'beta', version: '0.8' },
+    { slug: 'notices', name: 'Notice Board / Announcements', icon: 'Megaphone', status: 'stable', version: '1.0' },
+    { slug: 'communication', name: 'SMS & Email Communication', icon: 'MessageSquare', status: 'stable', version: '1.0' },
+    { slug: 'report_cards', name: 'Report Card Generator', icon: 'FileBarChart', status: 'stable', version: '1.0' },
+    { slug: 'certificates', name: 'Certificate Generator', icon: 'Award', status: 'stable', version: '1.0' },
+    { slug: 'admissions', name: 'Admission / Enrollment', icon: 'UserPlus', status: 'stable', version: '1.0' },
+    { slug: 'visitors', name: 'Visitor Management', icon: 'DoorOpen', status: 'coming_soon', version: null },
+    { slug: 'id_cards', name: 'ID Card Generator', icon: 'CreditCard', status: 'coming_soon', version: null },
+    { slug: 'front_office', name: 'Front Office / Reception', icon: 'Headphones', status: 'coming_soon', version: null },
+    { slug: 'complaints', name: 'Complaint / Grievance', icon: 'AlertTriangle', status: 'coming_soon', version: null },
+    { slug: 'gallery', name: 'Gallery / Media Management', icon: 'Image', status: 'beta', version: '0.5' },
+    { slug: 'alumni', name: 'Alumni Management', icon: 'Users2', status: 'coming_soon', version: null },
+    { slug: 'lesson_plans', name: 'Lesson Plan Management', icon: 'NotebookPen', status: 'coming_soon', version: null }
+];
+
+router.get('/modules', async (req, res) => {
+    try {
+        // Enrich with usage stats
+        const moduleUsage = await Promise.all(MODULES.map(async (mod) => {
+            const tenantsUsingModule = await Tenant.countDocuments({
+                isDeleted: { $ne: true },
+                [`settings.features.${mod.slug}`]: true
+            });
+            return { ...mod, tenantsUsing: tenantsUsingModule };
+        }));
+        return res.json({ success: true, data: moduleUsage, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: list modules error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── REPORTS & ANALYTICS ────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/reports/overview
+ * Comprehensive analytics overview
+ */
+router.get('/reports/overview', async (req, res) => {
+    try {
+        const now = new Date();
+        const twelveMonthsAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+
+        const [
+            tenantGrowth,
+            revenueByPlan,
+            usersByRole,
+            tenantsByRegion,
+            monthlyRevenue
+        ] = await Promise.all([
+            // Tenant growth monthly
+            Tenant.aggregate([
+                { $match: { isDeleted: { $ne: true }, createdAt: { $gte: twelveMonthsAgo } } },
+                { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 } } },
+                { $sort: { '_id.year': 1, '_id.month': 1 } }
+            ]),
+            // Revenue by plan
+            Tenant.aggregate([
+                { $match: { isDeleted: { $ne: true }, 'subscription.status': 'active' } },
+                { $group: { _id: '$subscription.plan', count: { $sum: 1 } } }
+            ]),
+            // Users by role
+            User.aggregate([
+                { $match: { isActive: true } },
+                { $group: { _id: '$role', count: { $sum: 1 } } },
+                { $sort: { count: -1 } }
+            ]),
+            // Tenants by region (city)
+            Tenant.aggregate([
+                { $match: { isDeleted: { $ne: true }, 'address.city': { $ne: null } } },
+                { $group: { _id: '$address.city', count: { $sum: 1 } } },
+                { $sort: { count: -1 } },
+                { $limit: 20 }
+            ]),
+            // Monthly revenue estimates
+            PlatformInvoice.aggregate([
+                { $match: { status: 'paid', paidAt: { $gte: twelveMonthsAgo } } },
+                { $group: { _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } }, total: { $sum: '$totalAmount' } } },
+                { $sort: { '_id.year': 1, '_id.month': 1 } }
+            ])
+        ]);
+
+        return res.json({
+            success: true,
+            data: { tenantGrowth, revenueByPlan, usersByRole, tenantsByRegion, monthlyRevenue },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: reports overview error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+    }
+});
+
+// ─── SYSTEM MONITORING ──────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/system/health
+ * System health and monitoring data
+ */
+router.get('/system/health', async (req, res) => {
+    try {
+        const dbStats = await mongoose.connection.db.stats();
+        const adminDb = mongoose.connection.db.admin();
+        const serverStatus = await adminDb.serverStatus().catch(() => null);
+
+        // Per-tenant storage (top 10)
+        const tenantStorage = await Tenant.aggregate([
+            { $match: { isDeleted: { $ne: true } } },
+            { $project: { schoolName: 1, schoolCode: 1 } },
+            { $limit: 10 }
+        ]);
+
+        const memUsage = process.memoryUsage();
+
+        return res.json({
+            success: true,
+            data: {
+                server: {
+                    uptime: process.uptime(),
+                    memoryUsage: {
+                        rss: Math.round(memUsage.rss / 1024 / 1024),
+                        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+                        heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024)
+                    },
+                    nodeVersion: process.version,
+                    platform: process.platform
+                },
+                database: {
+                    totalSize: Math.round((dbStats.dataSize || 0) / 1024 / 1024),
+                    storageSize: Math.round((dbStats.storageSize || 0) / 1024 / 1024),
+                    collections: dbStats.collections,
+                    objects: dbStats.objects,
+                    indexes: dbStats.indexes,
+                    connectionPool: serverStatus?.connections || {}
+                },
+                topTenants: tenantStorage
+            },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: system health error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
     }
 });
 

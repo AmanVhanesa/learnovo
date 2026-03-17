@@ -44,6 +44,30 @@ const receiptSchema = new mongoose.Schema({
         type: String
     },
 
+    // Who initiated the payment: 'student' or 'admin'
+    initiatedBy: {
+        type: String,
+        enum: ['student', 'admin'],
+        default: 'student'
+    },
+
+    // Admin who verified or recorded the payment
+    verifiedByUserId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    verifiedByName: {
+        type: String,
+        default: null
+    },
+
+    // Payment details for the receipt
+    amount: { type: Number, default: 0 },
+    paymentMode: { type: String, default: null },
+    transactionRefId: { type: String, default: null },
+    paymentDate: { type: Date, default: null },
+
     issuedAt: {
         type: Date,
         default: Date.now,

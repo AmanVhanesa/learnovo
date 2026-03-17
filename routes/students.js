@@ -24,14 +24,11 @@ const router = express.Router();
 // @access  Private (Admin, Teacher)
 router.get('/', protect, authorize('admin', 'teacher'), [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  query('limit').optional().isInt({ min: 1, max: 500 }).withMessage('Limit must be between 1 and 500'),
   query('class').optional().trim().notEmpty().withMessage('Class filter cannot be empty'),
   query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
   handleValidationErrors
 ], async (req, res) => {
-  console.log('--- GET /api/students ---');
-  console.log('req.query:', req.query);
-  console.log('req.originalUrl:', req.originalUrl);
   try {
     const { parsePagination, paginatedResponse } = require('../utils/pagination');
     const { page, limit, skip } = parsePagination(req.query);
@@ -121,9 +118,35 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       }
     }
 
-    // Add class filter from query
-    if (req.query.class) {
-      filter.class = req.query.class;
+    // Add class filter from query — match by class string OR classId
+    // Students may store class as name or grade, so we match both ways
+    if (req.query.classId) {
+      if (!filter.$and) filter.$and = [];
+      const classOr = [{ classId: req.query.classId }];
+      if (req.query.class) classOr.push({ class: req.query.class });
+      filter.$and.push({ $or: classOr });
+    } else if (req.query.class) {
+      let classDoc;
+      try {
+        classDoc = await Class.findOne({
+          tenantId: req.user.tenantId,
+          $or: [{ grade: req.query.class }, { name: req.query.class }]
+        }).select('_id name grade').lean();
+      } catch (_) { /* ignore */ }
+
+      if (classDoc) {
+        if (!filter.$and) filter.$and = [];
+        const classOr = [
+          { class: req.query.class },
+          { classId: classDoc._id },
+        ];
+        // Also match by the other name (grade vs name)
+        if (classDoc.name && classDoc.name !== req.query.class) classOr.push({ class: classDoc.name });
+        if (classDoc.grade && classDoc.grade !== req.query.class) classOr.push({ class: classDoc.grade });
+        filter.$and.push({ $or: classOr });
+      } else {
+        filter.class = req.query.class;
+      }
     }
 
     // Add section filter — SIMPLE STRING MATCH ONLY (no sectionId!)
@@ -186,6 +209,8 @@ router.get('/', protect, authorize('admin', 'teacher'), [
 
     const total = await User.countDocuments(filter);
 
+    // 30s private cache — safe for auth endpoints; avoids repeat fetches on quick back-nav
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     res.json(paginatedResponse(students, total, page, limit));
   } catch (error) {
     console.error('GET /students error:', error.name, error.message);
@@ -573,12 +598,15 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
 // @route   POST /api/students/import/execute
 // @access  Private (Admin)
 router.post('/import/execute', protect, authorize('admin'), async (req, res) => {
+  // Extend timeout for large imports (5 minutes)
+  req.setTimeout(300000);
+  res.setTimeout(300000);
+
   try {
     const { validData, options } = req.body;
 
     console.log('=== IMPORT EXECUTE CALLED ===');
     console.log('validData length:', validData ? validData.length : 'undefined');
-    console.log('validData is array:', Array.isArray(validData));
     console.log('================================');
 
     if (!validData || !Array.isArray(validData) || validData.length === 0) {
@@ -596,19 +624,20 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
     const replaceDuplicates = options?.replaceDuplicates || false;
 
     const results = { success: 0, failed: 0, skipped: 0, replaced: 0, errors: [] };
+    // Accumulator arrays — filled during the row loop, flushed in one batch after
+    const docsToInsert = [];
+    const docsToReplace = []; // { id, updateFields }
 
-    // Pre-fetch all existing admission numbers for this tenant (for fast lookup)
+    // ALWAYS pre-fetch existing admission numbers to prevent duplicates
     const existingStudentsMap = new Map();
-    if (skipDuplicates || replaceDuplicates) {
-      const existingStudents = await User.find({ tenantId, role: 'student' })
-        .select('_id admissionNumber')
-        .lean();
-      existingStudents.forEach(s => {
-        if (s.admissionNumber) {
-          existingStudentsMap.set(s.admissionNumber.trim().toUpperCase(), s._id);
-        }
-      });
-    }
+    const existingStudents = await User.find({ tenantId, role: 'student' })
+      .select('_id admissionNumber')
+      .lean();
+    existingStudents.forEach(s => {
+      if (s.admissionNumber) {
+        existingStudentsMap.set(s.admissionNumber.trim().toUpperCase(), s._id);
+      }
+    });
 
     // Pre-cache all classes and drivers for this tenant to avoid N+1 queries in the loop
     const Class = require('../models/Class');
@@ -616,6 +645,39 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
     const allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
     const allDrivers = await Driver.find({ tenantId, isActive: true }).select('_id name').lean();
     const driverCache = new Map(allDrivers.map(d => [d.name.toLowerCase().trim(), d]));
+
+    // Pre-fetch all sections for this tenant (keyed by classId_sectionName)
+    const allSections = await Section.find({ tenantId, isActive: true }).select('_id name classId').lean();
+    const sectionCache = new Map();
+    allSections.forEach(sec => {
+      const key = `${sec.classId.toString()}_${sec.name.toUpperCase()}`;
+      sectionCache.set(key, sec);
+    });
+
+    // Pre-fetch all sub-departments and batch-create any missing ones from the import data
+    const allSubDepts = await SubDepartment.find({ tenantId }).lean();
+    const subDeptCache = new Map(allSubDepts.map(sd => [sd.name.toUpperCase(), sd]));
+    const missingSubDeptNames = new Set();
+    for (const row of validData) {
+      if (row.subDepartment) {
+        const key = row.subDepartment.toString().trim().toUpperCase();
+        if (!subDeptCache.has(key)) missingSubDeptNames.add(key);
+      }
+    }
+    if (missingSubDeptNames.size > 0) {
+      try {
+        const newSubDepts = await SubDepartment.insertMany(
+          [...missingSubDeptNames].map(name => ({ tenantId, name })),
+          { ordered: false }
+        );
+        newSubDepts.forEach(sd => subDeptCache.set(sd.name.toUpperCase(), sd));
+      } catch (sdErr) {
+        console.warn('SubDepartment batch create warning:', sdErr.message);
+      }
+    }
+
+    // Pre-hash the default password once — avoids a bcrypt call per row
+    const defaultPasswordHash = await bcrypt.hash('student123', 10);
 
     for (const row of validData) {
       let studentData = null; // Declare safely for error logging scope
@@ -680,16 +742,12 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           guardians.push({ relation: 'Guardian', name: row.guardianName, phone: row.guardianPhone, isPrimary: true });
         }
 
-        // Handle Sub Department
+        // Handle Sub Department (use pre-fetched cache — no per-row DB call)
         let subDepartmentId = undefined;
         if (row.subDepartment) {
           const subDeptName = row.subDepartment.toString().trim().toUpperCase();
-          let subDept = await SubDepartment.findOne({ tenantId, name: subDeptName });
-          // Auto-create if missing
-          if (!subDept) {
-            subDept = await SubDepartment.create({ tenantId, name: subDeptName });
-          }
-          subDepartmentId = subDept._id;
+          const subDept = subDeptCache.get(subDeptName);
+          if (subDept) subDepartmentId = subDept._id;
         }
 
         // Handle Driver Assignment — use cached drivers
@@ -727,6 +785,8 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           academicYear: row.academicYear || `${currentYear}-${parseInt(currentYear) + 1}`,
           admissionDate: parseDate(row.admissionDate) || new Date(),
           guardians,
+          // Backfill legacy field from guardians for backward compatibility
+          fatherOrHusbandName: guardians.find(g => g.relation === 'Father')?.name || undefined,
           udiseCode: defaultUdiseCode,
           isActive: true
         };
@@ -758,15 +818,17 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
           studentData.lastName = row.lastName.trim();
         }
 
-        // Add email and password only if email exists and is valid
+        // Add email if valid
         if (row.email && row.email.trim()) {
           const emailValue = row.email.trim().toLowerCase();
-          // Basic email validation - very lenient
           if (emailValue.includes('@') && emailValue.includes('.')) {
             studentData.email = emailValue;
-            studentData.password = row.password || 'student123';
           }
         }
+
+        // Always set a password — use provided password or default 'student123'
+        // (admission number can be used as username, default password stays simple)
+        studentData.password = row.password || 'student123';
 
         // Add other optional fields only if they have values
         if (row.class && row.class.trim()) {
@@ -804,7 +866,8 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
             }
 
             if (classDoc) {
-              studentData.class = classDoc.name;
+              // Use grade (consistent with UI student form which stores grade)
+              studentData.class = classDoc.grade || classDoc.name;
               studentData.classId = classDoc._id;
             } else {
               studentData.class = rawClassValue;
@@ -814,23 +877,14 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
             studentData.class = rawClassValue;
           }
 
-          // --- Section lookup (only if class was found) ---
+          // --- Section lookup (use pre-fetched cache — no per-row DB call) ---
           if (classDoc && row.section && row.section.trim()) {
-            try {
-              const sectionName = row.section.trim().toUpperCase();
-              const escapedSection = sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const sectionDoc = await Section.findOne({
-                tenantId,
-                classId: classDoc._id,
-                name: { $regex: new RegExp(`^${escapedSection}$`, 'i') },
-                isActive: true
-              });
-              if (sectionDoc) {
-                studentData.sectionId = sectionDoc._id;
-                studentData.section = sectionDoc.name;
-              }
-            } catch (sectionLookupErr) {
-              console.warn('Section lookup error during import:', sectionLookupErr.message);
+            const sectionName = row.section.trim().toUpperCase();
+            const cacheKey = `${classDoc._id.toString()}_${sectionName}`;
+            const sectionDoc = sectionCache.get(cacheKey);
+            if (sectionDoc) {
+              studentData.sectionId = sectionDoc._id;
+              studentData.section = sectionDoc.name;
             }
           }
         }
@@ -925,31 +979,33 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
         studentData.createdAt = new Date();
         studentData.updatedAt = new Date();
 
-        // Hash password if provided
+        // Hash password — use the pre-hashed default unless a custom one was supplied
         if (studentData.password) {
-          const salt = await bcrypt.genSalt(10);
-          studentData.password = await bcrypt.hash(studentData.password, salt);
+          if (studentData.password !== 'student123') {
+            studentData.password = await bcrypt.hash(studentData.password, 10);
+          } else {
+            studentData.password = defaultPasswordHash;
+          }
         }
 
         // Decide what to do with this row (existingId already computed at top of loop)
         if (existingId && replaceDuplicates) {
-          // REPLACE: update fields on the existing student record
-          // Exclude: role, tenantId (immutable), createdAt (preserve original), updatedAt (set below), password (preserve unless explicitly in CSV)
+          // Replace: update existing student with new data
           const { role, tenantId: _t, createdAt, updatedAt, password, ...updateFields } = studentData;
-          // Only overwrite password if the CSV row provided one explicitly
-          if (row.password && row.password.trim()) {
-            updateFields.password = password; // already hashed above
-          }
+          if (row.password && row.password.trim()) updateFields.password = password;
           updateFields.updatedAt = new Date();
-          await User.findByIdAndUpdate(existingId, { $set: updateFields });
-          results.replaced++;
-        } else if (existingId && skipDuplicates) {
-          // SKIP: do nothing
+          docsToReplace.push({ id: existingId, updateFields });
+        } else if (existingId) {
+          // Skip: student already exists (default behavior — never create duplicates)
           results.skipped++;
         } else {
-          // INSERT: new student
-          await User.collection.insertOne(studentData);
-          results.success++;
+          // New student — remove null/undefined fields to avoid sparse unique index conflicts
+          Object.keys(studentData).forEach(key => {
+            if (studentData[key] === null || studentData[key] === undefined) {
+              delete studentData[key];
+            }
+          });
+          docsToInsert.push(studentData);
         }
 
       } catch (error) {
@@ -973,15 +1029,64 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
       }
     }
 
+    // ── Batch flush: insertMany for new students ──────────────────────────────
+    if (docsToInsert.length > 0) {
+      const CHUNK = 200;
+      for (let i = 0; i < docsToInsert.length; i += CHUNK) {
+        try {
+          const r = await User.collection.insertMany(docsToInsert.slice(i, i + CHUNK), { ordered: false });
+          results.success += r.insertedCount || 0;
+        } catch (bulkErr) {
+          results.success += bulkErr.result?.nInserted || 0;
+          if (bulkErr.writeErrors) {
+            bulkErr.writeErrors.forEach(we => {
+              results.failed++;
+              results.errors.push(`Insert error: ${we.errmsg || we.message}`);
+            });
+          }
+        }
+      }
+    }
+
+    // ── Batch flush: bulkWrite for replace rows ───────────────────────────────
+    if (docsToReplace.length > 0) {
+      const ops = docsToReplace.map(({ id, updateFields }) => ({
+        updateOne: { filter: { _id: id }, update: { $set: updateFields } }
+      }));
+      const CHUNK = 200;
+      for (let i = 0; i < ops.length; i += CHUNK) {
+        try {
+          await User.bulkWrite(ops.slice(i, i + CHUNK), { ordered: false });
+          results.replaced += Math.min(CHUNK, ops.length - i);
+        } catch (bulkErr) {
+          results.replaced += bulkErr.result?.nModified || 0;
+          results.failed += bulkErr.writeErrors?.length || 0;
+        }
+      }
+    }
+
+    // Include first few error messages in response for debugging
+    const errorSample = results.errors.slice(0, 10);
+
     res.json({
       success: true,
       message: `Import completed. Imported: ${results.success}, Replaced: ${results.replaced}, Skipped: ${results.skipped}, Failed: ${results.failed}`,
-      data: results
+      data: {
+        ...results,
+        errorSample
+      }
     });
 
   } catch (error) {
     console.error('Import execute error:', error);
-    res.status(500).json({ success: false, message: 'Server error during import execution' });
+    console.error('Import execute stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during import execution',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      errorType: error.name,
+      stack: process.env.NODE_ENV === 'development' ? error.stack?.split('\n').slice(0, 5) : undefined
+    });
   }
 });
 
@@ -1457,6 +1562,9 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
     // Support both fullName and name (since StudentForm.jsx renames fullName to name)
     const finalName = fullName || name;
 
+    // Default password: use provided password or 'student123'
+    const defaultPassword = password || 'student123';
+
     const studentData = {
       fullName: finalName ? finalName.trim() : undefined,
       name: finalName ? finalName.trim() : undefined,
@@ -1464,7 +1572,7 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
       middleName: middleName ? middleName.trim() : undefined,
       lastName: lastName ? lastName.trim() : undefined,
       email: email && email.trim() ? email.toLowerCase().trim() : undefined,
-      password: (email && email.trim()) ? (password || 'student123') : undefined,
+      password: defaultPassword,
       role: 'student',
       tenantId,
       admissionNumber,
@@ -1475,6 +1583,8 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
       rollNumber,
       admissionDate: admissionDate || new Date(),
       guardians, address, avatar,
+      // Backfill legacy fatherOrHusbandName from guardians for backward compatibility
+      fatherOrHusbandName: guardians?.find(g => g.relation === 'Father')?.name || undefined,
       penNumber: penNumber ? penNumber.trim() : undefined,
       subDepartment,
       udiseCode: udiseCode ? udiseCode.trim() : undefined,
@@ -1483,23 +1593,38 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
     };
 
     const student = await User.create(studentData);
-    const plainPassword = password || 'student123';
 
     res.status(201).json({
       success: true,
       message: 'Student created successfully',
       data: {
         id: student._id,
-        name: student.name, // Virtual or pre-saved full name
+        name: student.name,
         firstName: student.firstName,
         lastName: student.lastName,
         email: student.email,
         admissionNumber: student.admissionNumber,
-        credentials: { email: student.email, password: plainPassword }
+        credentials: {
+          loginId: student.email || student.admissionNumber,
+          password: defaultPassword,
+          note: student.email
+            ? 'Login with email or admission number'
+            : 'Login with admission number'
+        }
       }
     });
 
   } catch (error) {
+    // Rollback admission number counter if we auto-generated one
+    if (!req.body.admissionNumber) {
+      try {
+        const { rollbackAdmissionNumber } = require('../utils/admissionUtils');
+        await rollbackAdmissionNumber(req.user.tenantId);
+      } catch (rollbackErr) {
+        console.error('Admission number rollback failed:', rollbackErr);
+      }
+    }
+
     console.error('Create student error:', error);
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'Duplicate entry detected (Email or Admission No)' });
@@ -1617,9 +1742,13 @@ router.put('/:id', protect, canAccessStudent, [
       updatePayload.category = categoryMap[updatePayload.category] || updatePayload.category;
     }
 
-    // Debug logging
-    console.log('Updating student:', req.params.id);
-    console.log('Update payload:', JSON.stringify(updatePayload, null, 2));
+    // Also backfill fatherOrHusbandName from guardians if guardians are being updated
+    if (updatePayload.guardians && Array.isArray(updatePayload.guardians)) {
+      const fatherGuardian = updatePayload.guardians.find(g => g.relation === 'Father');
+      if (fatherGuardian?.name) {
+        updatePayload.fatherOrHusbandName = fatherGuardian.name;
+      }
+    }
 
     // Look up sectionId if section is being updated
     if (updatePayload.section && !updatePayload.sectionId) {

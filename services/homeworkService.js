@@ -38,8 +38,11 @@ async function resolveStudentClassIds(student, tenantId) {
 
 /**
  * Resolve ObjectId(s) for a teacher's assigned classes using ALL available signals:
- *  1. Class.classTeacher = teacherId  (ObjectId on the Class doc — most reliable)
- *  2. User.assignedClasses / User.classTeacher strings → Class name/grade lookup
+ *  1. Class.classTeacher = teacherId  (ObjectId on the Class doc)
+ *  2. Class.subjects[].teacher = teacherId  (embedded subject assignments)
+ *  3. Section.sectionTeacher = teacherId  (section-level assignment)
+ *  4. TeacherSubjectAssignment.teacherId  (new relation system)
+ *  5. User.assignedClasses / User.classTeacher strings → Class name/grade lookup (legacy)
  * Returns an array of unique Class ObjectIds.
  */
 async function resolveTeacherClassIds(teacherIdOrObj, tenantId) {
@@ -47,18 +50,47 @@ async function resolveTeacherClassIds(teacherIdOrObj, tenantId) {
 
     const teacherId = teacherIdOrObj?._id || teacherIdOrObj;
 
-    // ── Strategy 1: Class docs where classTeacher === this teacher ──────────
+    // ── Strategy 1 & 2: Class docs where classTeacher or subjects[].teacher ─
     try {
-        const byClassTeacher = await Class.find({
+        const byClass = await Class.find({
             tenantId,
-            classTeacher: teacherId
+            $or: [
+                { classTeacher: teacherId },
+                { 'subjects.teacher': teacherId },
+            ]
         }).select('_id').lean();
-        byClassTeacher.forEach(c => ids.set(c._id.toString(), c._id));
+        byClass.forEach(c => ids.set(c._id.toString(), c._id));
     } catch (e) {
-        console.warn('Class.classTeacher lookup failed:', e.message);
+        console.warn('Class teacher lookup failed:', e.message);
     }
 
-    // ── Strategy 2: User.assignedClasses / classTeacher string → name/grade ─
+    // ── Strategy 3: Section.sectionTeacher ──────────────────────────────────
+    try {
+        const Section = require('../models/Section');
+        const sectionDocs = await Section.find({
+            tenantId, sectionTeacher: teacherId, isActive: true,
+        }).select('classId').lean();
+        sectionDocs.forEach(s => {
+            if (s.classId) ids.set(s.classId.toString(), s.classId);
+        });
+    } catch (e) {
+        console.warn('Section.sectionTeacher lookup failed:', e.message);
+    }
+
+    // ── Strategy 4: TeacherSubjectAssignment ────────────────────────────────
+    try {
+        const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
+        const tsaDocs = await TeacherSubjectAssignment.find({
+            teacherId, tenantId, isActive: true,
+        }).select('classId').lean();
+        tsaDocs.forEach(a => {
+            if (a.classId) ids.set(a.classId.toString(), a.classId);
+        });
+    } catch (e) {
+        console.warn('TeacherSubjectAssignment lookup failed:', e.message);
+    }
+
+    // ── Strategy 5: User.assignedClasses / classTeacher string → name/grade (legacy) ─
     try {
         const teacher = await User.findById(teacherId)
             .select('assignedClasses classTeacher')

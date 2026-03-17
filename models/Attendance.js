@@ -59,8 +59,12 @@ const attendanceSchema = new mongoose.Schema({
     },
     status: {
       type: String,
-      enum: ['present', 'absent', 'late'],
+      enum: ['present', 'absent', 'late', 'half_day', 'excused'],
       default: 'present'
+    },
+    remarks: {
+      type: String,
+      trim: true
     },
     markedAt: {
       type: Date,
@@ -80,6 +84,14 @@ const attendanceSchema = new mongoose.Schema({
   totalLate: {
     type: Number,
     default: 0
+  },
+  totalHalfDay: {
+    type: Number,
+    default: 0
+  },
+  totalExcused: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true
@@ -90,6 +102,8 @@ attendanceSchema.pre('save', function(next) {
   this.totalPresent = this.attendanceRecords.filter(r => r.status === 'present').length
   this.totalAbsent = this.attendanceRecords.filter(r => r.status === 'absent').length
   this.totalLate = this.attendanceRecords.filter(r => r.status === 'late').length
+  this.totalHalfDay = this.attendanceRecords.filter(r => r.status === 'half_day').length
+  this.totalExcused = this.attendanceRecords.filter(r => r.status === 'excused').length
   next()
 })
 

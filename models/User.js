@@ -256,6 +256,32 @@ const userSchema = new mongoose.Schema({
   admissionDate: {
     type: Date
   },
+  guardians: [{
+    relation: {
+      type: String,
+      trim: true
+    },
+    name: {
+      type: String,
+      trim: true
+    },
+    phone: {
+      type: String,
+      trim: true
+    },
+    email: {
+      type: String,
+      trim: true
+    },
+    occupation: {
+      type: String,
+      trim: true
+    },
+    isPrimary: {
+      type: Boolean,
+      default: false
+    }
+  }],
   guardianName: {
     type: String,
     trim: true
