@@ -78,7 +78,7 @@ async function createAndUploadBackup(tenantId, performedBy, type = 'manual') {
       storageLocation,
     });
 
-    logger.info('Backup completed', null, {
+    logger.info('Backup completed', {
       tenantId,
       type,
       storageLocation,
