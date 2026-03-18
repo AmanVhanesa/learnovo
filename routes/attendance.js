@@ -947,12 +947,16 @@ router.get('/students-list/:classId', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' })
     }
 
+    // Query by classId (ObjectId ref) OR class name string for backward compatibility
     const students = await User.find({
       role: 'student',
       tenantId: req.user.tenantId,
-      class: classDoc.name,
+      $or: [
+        { classId: classDoc._id },
+        { class: classDoc.name }
+      ],
       isActive: true
-    }).select('name email admissionNumber photo class section').sort({ admissionNumber: 1 })
+    }).select('name email admissionNumber photo class section classId').sort({ name: 1 })
 
     res.json({ success: true, data: { class: classDoc, students } })
   } catch (error) {
