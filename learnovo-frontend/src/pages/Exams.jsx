@@ -12,6 +12,9 @@ import ExamResultsModal from '../components/ExamResultsModal';
 import ResultCard from '../components/ResultCard';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import Select from '../components/ui/Select';
+import DatePicker from '../components/ui/DatePicker';
+import TimePicker from '../components/ui/TimePicker';
 
 const STATUS_COLORS = {
     Scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
@@ -504,18 +507,29 @@ const Exams = () => {
                         onChange={e => setSearchText(e.target.value)}
                     />
                 </div>
-                <select className="input w-full sm:w-auto" value={filterClass} onChange={e => setFilterClass(e.target.value)}>
-                    <option value="">All Classes</option>
-                    {availableClasses.map(c => (
-                        <option key={c._id} value={c.grade}>
-                            {c.name === c.grade ? c.name : `${c.name} (${c.grade})`}
-                        </option>
-                    ))}
-                </select>
-                <select className="input w-full sm:w-auto" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                    <option value="">All Statuses</option>
-                    {EXAM_STATUSES.map(s => <option key={s}>{s}</option>)}
-                </select>
+                <Select
+                    className="w-full sm:w-auto sm:min-w-[140px]"
+                    value={filterClass}
+                    onChange={e => setFilterClass(e.target.value)}
+                    placeholder="All Classes"
+                    options={[
+                        { value: '', label: 'All Classes' },
+                        ...availableClasses.map(c => ({
+                            value: c.grade,
+                            label: c.name === c.grade ? c.name : `${c.name} (${c.grade})`
+                        }))
+                    ]}
+                />
+                <Select
+                    className="w-full sm:w-auto sm:min-w-[130px]"
+                    value={filterStatus}
+                    onChange={e => setFilterStatus(e.target.value)}
+                    placeholder="All Statuses"
+                    options={[
+                        { value: '', label: 'All Statuses' },
+                        ...EXAM_STATUSES.map(s => ({ value: s, label: s }))
+                    ]}
+                />
             </div>
 
             {/* ── Grouped Exam List ── */}
@@ -714,9 +728,11 @@ const Exams = () => {
                                     </div>
                                     <div>
                                         <FieldLabel>Exam Series</FieldLabel>
-                                        <select className="input" value={form.examSeries} onChange={e => handleField('examSeries', e.target.value)}>
-                                            {EXAM_SERIES.map(s => <option key={s}>{s}</option>)}
-                                        </select>
+                                        <Select
+                                            value={form.examSeries}
+                                            onChange={e => handleField('examSeries', e.target.value)}
+                                            options={EXAM_SERIES.map(s => ({ value: s, label: s }))}
+                                        />
                                     </div>
                                 </div>
                             </ModalSection>
@@ -726,33 +742,33 @@ const Exams = () => {
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
                                         <FieldLabel required>Class</FieldLabel>
-                                        <select
-                                            className={`input ${formErrors.class ? 'border-red-400' : ''}`}
+                                        <Select
+                                            error={!!formErrors.class}
                                             value={form.class}
                                             onChange={e => handleField('class', e.target.value)}
-                                        >
-                                            <option value="">Select Class</option>
-                                            {availableClasses.map(cls => (
-                                                <option key={cls._id} value={cls.grade}>
-                                                    {cls.name === cls.grade ? cls.name : `${cls.name} (${cls.grade})`}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            placeholder="Select Class"
+                                            options={[
+                                                { value: '', label: 'Select Class' },
+                                                ...availableClasses.map(cls => ({
+                                                    value: cls.grade,
+                                                    label: cls.name === cls.grade ? cls.name : `${cls.name} (${cls.grade})`
+                                                }))
+                                            ]}
+                                        />
                                         <FieldError msg={formErrors.class} />
                                     </div>
                                     <div>
                                         <FieldLabel>Section</FieldLabel>
-                                        <select
-                                            className="input"
+                                        <Select
                                             value={form.section}
                                             onChange={e => handleField('section', e.target.value)}
                                             disabled={!form.classId}
-                                        >
-                                            <option value="">All / Select</option>
-                                            {sections.map(s => (
-                                                <option key={s._id} value={s.name}>{s.name}</option>
-                                            ))}
-                                        </select>
+                                            placeholder="All / Select"
+                                            options={[
+                                                { value: '', label: 'All / Select' },
+                                                ...sections.map(s => ({ value: s.name, label: s.name }))
+                                            ]}
+                                        />
                                     </div>
                                     <div>
                                         <FieldLabel required>Subject</FieldLabel>
@@ -772,30 +788,26 @@ const Exams = () => {
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                     <div className="col-span-2">
                                         <FieldLabel required>Exam Date</FieldLabel>
-                                        <input
-                                            type="date"
-                                            className={`input ${formErrors.date ? 'border-red-400' : ''}`}
+                                        <DatePicker
                                             value={form.date}
                                             onChange={e => handleField('date', e.target.value)}
+                                            className={formErrors.date ? '[&_button]:border-red-400' : ''}
                                         />
                                         <FieldError msg={formErrors.date} />
                                     </div>
                                     <div>
                                         <FieldLabel>Start Time</FieldLabel>
-                                        <input
-                                            type="time"
-                                            className="input"
+                                        <TimePicker
                                             value={form.startTime}
                                             onChange={e => handleField('startTime', e.target.value)}
                                         />
                                     </div>
                                     <div>
                                         <FieldLabel>End Time</FieldLabel>
-                                        <input
-                                            type="time"
-                                            className={`input ${formErrors.endTime ? 'border-red-400' : ''}`}
+                                        <TimePicker
                                             value={form.endTime}
                                             onChange={e => handleField('endTime', e.target.value)}
+                                            className={formErrors.endTime ? '[&_button]:border-red-400' : ''}
                                         />
                                         <FieldError msg={formErrors.endTime} />
                                     </div>
@@ -849,15 +861,19 @@ const Exams = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <FieldLabel>Exam Type</FieldLabel>
-                                        <select className="input" value={form.examType} onChange={e => handleField('examType', e.target.value)}>
-                                            {EXAM_TYPES.map(t => <option key={t}>{t}</option>)}
-                                        </select>
+                                        <Select
+                                            value={form.examType}
+                                            onChange={e => handleField('examType', e.target.value)}
+                                            options={EXAM_TYPES.map(t => ({ value: t, label: t }))}
+                                        />
                                     </div>
                                     <div>
                                         <FieldLabel>Exam Mode</FieldLabel>
-                                        <select className="input" value={form.examMode} onChange={e => handleField('examMode', e.target.value)}>
-                                            {EXAM_MODES.map(m => <option key={m}>{m}</option>)}
-                                        </select>
+                                        <Select
+                                            value={form.examMode}
+                                            onChange={e => handleField('examMode', e.target.value)}
+                                            options={EXAM_MODES.map(m => ({ value: m, label: m }))}
+                                        />
                                     </div>
                                 </div>
                             </ModalSection>
@@ -867,12 +883,15 @@ const Exams = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <FieldLabel>Exam Supervisor</FieldLabel>
-                                        <select className="input" value={form.supervisor} onChange={e => handleField('supervisor', e.target.value)}>
-                                            <option value="">Select Teacher</option>
-                                            {teachers.map(t => (
-                                                <option key={t._id} value={t._id}>{t.name}</option>
-                                            ))}
-                                        </select>
+                                        <Select
+                                            value={form.supervisor}
+                                            onChange={e => handleField('supervisor', e.target.value)}
+                                            placeholder="Select Teacher"
+                                            options={[
+                                                { value: '', label: 'Select Teacher' },
+                                                ...teachers.map(t => ({ value: t._id, label: t.name }))
+                                            ]}
+                                        />
                                     </div>
                                     <div>
                                         <FieldLabel>Exam Room / Hall</FieldLabel>

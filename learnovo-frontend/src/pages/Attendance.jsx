@@ -163,7 +163,7 @@ const AdminTeacherAttendance = () => {
   const renderTab = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <AttendanceDashboard />
+        return <AttendanceDashboard onTabChange={setActiveTab} />
       case 'markStudents':
         return <MarkStudentAttendance />
       case 'markStaff':

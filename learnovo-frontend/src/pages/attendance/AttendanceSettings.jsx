@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Settings, Save, Clock } from 'lucide-react'
+import TimePicker from '../../components/ui/TimePicker'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
 
@@ -116,31 +117,25 @@ const AttendanceSettings = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">School Start Time</label>
-            <input
-              type="time"
+            <TimePicker
               value={settings.schoolStartTime}
               onChange={(e) => setSettings(s => ({ ...s, schoolStartTime: e.target.value }))}
-              className="input"
             />
             <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">When school starts</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Late Threshold</label>
-            <input
-              type="time"
+            <TimePicker
               value={settings.lateThresholdTime}
               onChange={(e) => setSettings(s => ({ ...s, lateThresholdTime: e.target.value }))}
-              className="input"
             />
             <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">After this time = Late</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Half-Day Threshold</label>
-            <input
-              type="time"
+            <TimePicker
               value={settings.halfDayThreshold}
               onChange={(e) => setSettings(s => ({ ...s, halfDayThreshold: e.target.value }))}
-              className="input"
             />
             <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">After this time = Half Day</p>
           </div>

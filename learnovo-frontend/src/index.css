@@ -8,7 +8,8 @@
 
 @layer base {
   html {
-    scroll-behavior: smooth;
+    overscroll-behavior: none;
+    overflow-x: hidden;
   }
 
   * {
@@ -621,5 +622,219 @@
     box-shadow: none !important;
     border: 1px solid #e5e7eb !important;
     break-inside: avoid;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LANDING PAGE — Animations & Marquee
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Organic floating animations (paper-like drift + rotate + scale) ── */
+
+/* Primary float: vertical drift + gentle rotate + subtle scale */
+@keyframes landingFloat {
+  0%   { transform: translateY(0px) translateX(0px) rotate(0deg) scale(1); }
+  25%  { transform: translateY(-8px) translateX(4px) rotate(1.5deg) scale(1.02); }
+  50%  { transform: translateY(-14px) translateX(-2px) rotate(-1deg) scale(1.01); }
+  75%  { transform: translateY(-6px) translateX(3px) rotate(1deg) scale(1.03); }
+  100% { transform: translateY(0px) translateX(0px) rotate(0deg) scale(1); }
+}
+
+/* Variant 2: wider horizontal drift, opposite rotate */
+@keyframes landingFloat2 {
+  0%   { transform: translateY(0px) translateX(0px) rotate(0deg); }
+  20%  { transform: translateY(-6px) translateX(-6px) rotate(-2deg); }
+  50%  { transform: translateY(-16px) translateX(3px) rotate(1.5deg); }
+  80%  { transform: translateY(-4px) translateX(-4px) rotate(-1deg); }
+  100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+}
+
+/* Variant 3: slow gentle sway — for small dots / accents */
+@keyframes landingFloat3 {
+  0%   { transform: translateY(0px) translateX(0px) scale(1); }
+  33%  { transform: translateY(-10px) translateX(5px) scale(1.08); }
+  66%  { transform: translateY(-5px) translateX(-4px) scale(0.96); }
+  100% { transform: translateY(0px) translateX(0px) scale(1); }
+}
+
+.landing-float {
+  animation: landingFloat 5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.landing-float-2 {
+  animation: landingFloat2 6.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+}
+
+.landing-float-3 {
+  animation: landingFloat3 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform, opacity;
+}
+
+/* ── Section fade-in on scroll (IntersectionObserver) ── */
+.landing-fade-in {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+
+.landing-fade-in.landed-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger children (pricing cards, feature cards) */
+.landing-stagger > * {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+.landed-visible .landing-stagger > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.landed-visible .landing-stagger > *:nth-child(1) { transition-delay: 0s; }
+.landed-visible .landing-stagger > *:nth-child(2) { transition-delay: 0.1s; }
+.landed-visible .landing-stagger > *:nth-child(3) { transition-delay: 0.2s; }
+.landed-visible .landing-stagger > *:nth-child(4) { transition-delay: 0.3s; }
+
+/* Marquee — infinite horizontal scroll */
+@keyframes landingMarquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes landingMarqueeReverse {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+.landing-marquee {
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 35%, black 65%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 35%, black 65%, transparent 100%);
+}
+
+.landing-marquee .landing-marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  white-space: nowrap;
+  animation: landingMarquee 30s linear infinite;
+}
+
+.landing-marquee-reverse {
+  display: flex;
+  overflow: hidden;
+  width: 100%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 35%, black 65%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 35%, black 65%, transparent 100%);
+}
+
+.landing-marquee-reverse .landing-marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  white-space: nowrap;
+  animation: landingMarqueeReverse 35s linear infinite;
+}
+
+/* Pause marquee on hover for accessibility */
+.landing-marquee:hover .landing-marquee-track,
+.landing-marquee-reverse:hover .landing-marquee-track {
+  animation-play-state: paused;
+}
+
+/* ── Logo ticker (school logos auto-scroll) ── */
+@keyframes logoScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.logo-ticker-track {
+  display: flex;
+  flex-shrink: 0;
+  gap: 3rem;
+  animation: logoScroll 25s linear infinite;
+}
+
+.logo-ticker-track:hover {
+  animation-play-state: paused;
+}
+
+/* ── Scroll progress bar ── */
+.scroll-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--color-primary-500, #3EC4B1);
+  z-index: 9999;
+  transition: none;
+}
+
+.dark .scroll-progress-bar {
+  background: #34D399;
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+}
+
+/* ── Device showcase: auto-scroll screenshot inside mockup ── */
+@keyframes autoScrollScreen {
+  0%, 10%  { transform: translateY(0); }
+  90%, 100% { transform: translateY(-30%); }
+}
+
+.auto-scroll-screen {
+  animation: autoScrollScreen 12s ease-in-out infinite alternate;
+}
+
+/* ── Testimonial carousel auto-scroll ── */
+@keyframes testimonialSlide {
+  0%, 30%   { transform: translateX(0); }
+  33%, 63%  { transform: translateX(-100%); }
+  66%, 96%  { transform: translateX(-200%); }
+  100%      { transform: translateX(0); }
+}
+
+/* ── Count-up stat animation trigger ── */
+.landing-stagger > *:nth-child(5) { transition-delay: 0.4s; }
+.landing-stagger > *:nth-child(6) { transition-delay: 0.5s; }
+.landing-stagger > *:nth-child(7) { transition-delay: 0.6s; }
+.landing-stagger > *:nth-child(8) { transition-delay: 0.7s; }
+
+/* ── FAQ accordion ── */
+.faq-answer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease-out;
+}
+
+.faq-answer.faq-open {
+  grid-template-rows: 1fr;
+}
+
+.faq-answer > div {
+  overflow: hidden;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .landing-float,
+  .landing-float-2,
+  .landing-float-3 {
+    animation: none;
+  }
+  .landing-marquee .landing-marquee-track,
+  .landing-marquee-reverse .landing-marquee-track {
+    animation: none;
+  }
+  .logo-ticker-track {
+    animation: none;
+  }
+  .auto-scroll-screen {
+    animation: none;
   }
 }

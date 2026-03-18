@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CheckCircle, XCircle, Clock, Search, Users, Info } from 'lucide-react'
+import DatePicker from '../../components/ui/DatePicker'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
 import { sortByRelevance } from '../../utils/searchRelevance'
@@ -133,12 +134,10 @@ const MarkEmployeeAttendance = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Date</label>
-            <input
-              type="date"
+            <DatePicker
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               max={new Date().toISOString().split('T')[0]}
-              className="input"
             />
           </div>
           <div className="flex items-end">

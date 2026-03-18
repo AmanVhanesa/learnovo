@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { XCircle, Phone, Download, Users, ChevronDown } from 'lucide-react'
+import DatePicker from '../../components/ui/DatePicker'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
 
@@ -64,12 +65,11 @@ const Absentees = () => {
           <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">View absent students and employees</p>
         </div>
         <div className="flex items-center gap-3">
-          <input
-            type="date"
+          <DatePicker
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             max={new Date().toISOString().split('T')[0]}
-            className="input w-auto"
+            className="w-auto min-w-[160px]"
           />
           {activeTab === 'students' && absenteeData.absentees.length > 0 && (
             <button onClick={exportCSV} className="btn btn-outline">

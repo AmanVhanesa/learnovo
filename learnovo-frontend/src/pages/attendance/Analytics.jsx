@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { BarChart3, TrendingUp, AlertTriangle, Phone } from 'lucide-react'
+import Select from '../../components/ui/Select'
 import { useAuth } from '../../contexts/AuthContext'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
@@ -50,14 +51,20 @@ const Analytics = () => {
           <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Trends, patterns, and insights</p>
         </div>
         <div className="flex gap-2">
-          <select value={month} onChange={(e) => setMonth(parseInt(e.target.value))} className="input w-auto">
-            {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-          </select>
-          <select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="input w-auto">
-            {[now.getFullYear() - 1, now.getFullYear()].map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          <Select
+            value={month}
+            onChange={(e) => setMonth(parseInt(e.target.value))}
+            className="w-auto min-w-[130px]"
+            options={months.map(m => ({ value: m.value, label: m.label }))}
+          />
+          <Select
+            value={year}
+            onChange={(e) => setYear(parseInt(e.target.value))}
+            className="w-auto min-w-[90px]"
+            options={[now.getFullYear() - 1, now.getFullYear()].map(y => ({
+              value: y, label: String(y)
+            }))}
+          />
         </div>
       </div>
 

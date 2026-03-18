@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Calendar, Users, CheckCircle, XCircle, Clock, AlertTriangle, ChevronRight, ClipboardList, BarChart3, Settings } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
 
-const AttendanceDashboard = () => {
+const AttendanceDashboard = ({ onTabChange }) => {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [dashboardData, setDashboardData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -95,7 +93,7 @@ const AttendanceDashboard = () => {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <button
-          onClick={() => navigate('/app/attendance/mark')}
+          onClick={() => onTabChange?.('markStudents')}
           className="card p-4 text-left hover:shadow-glass-md transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -113,7 +111,7 @@ const AttendanceDashboard = () => {
         </button>
 
         <button
-          onClick={() => navigate('/app/attendance/absentees')}
+          onClick={() => onTabChange?.('absentees')}
           className="card p-4 text-left hover:shadow-glass-md transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -131,7 +129,7 @@ const AttendanceDashboard = () => {
         </button>
 
         <button
-          onClick={() => navigate('/app/attendance/reports')}
+          onClick={() => onTabChange?.('report')}
           className="card p-4 text-left hover:shadow-glass-md transition-all group"
         >
           <div className="flex items-center justify-between">
@@ -195,7 +193,7 @@ const AttendanceDashboard = () => {
                     )}
                   </div>
                   <button
-                    onClick={() => navigate('/app/attendance/mark')}
+                    onClick={() => onTabChange?.('markStudents')}
                     className="btn btn-sm btn-primary"
                   >
                     Mark
@@ -213,7 +211,7 @@ const AttendanceDashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-semibold text-gray-900 dark:text-white">Today's Absent Students</h3>
             <button
-              onClick={() => navigate('/app/attendance/absentees')}
+              onClick={() => onTabChange?.('absentees')}
               className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
             >
               View All

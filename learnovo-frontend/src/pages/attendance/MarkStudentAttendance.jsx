@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Calendar, CheckCircle, XCircle, Clock, AlertTriangle, Search, Users, ChevronRight, Info } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, AlertTriangle, Search, Users, ChevronRight, Info } from 'lucide-react'
+import DatePicker from '../../components/ui/DatePicker'
+import Select from '../../components/ui/Select'
 import { useAuth } from '../../contexts/AuthContext'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
@@ -15,7 +16,6 @@ const statusConfig = {
 
 const MarkStudentAttendance = () => {
   const { user } = useAuth()
-  const navigate = useNavigate()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [classes, setClasses] = useState([])
   const [selectedClass, setSelectedClass] = useState(null)
@@ -209,31 +209,29 @@ const MarkStudentAttendance = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Date</label>
-            <input
-              type="date"
+            <DatePicker
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               max={new Date().toISOString().split('T')[0]}
-              className="input"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Class</label>
-            <select
+            <Select
               value={selectedClass?._id || ''}
               onChange={(e) => {
                 const cls = classes.find(c => c._id === e.target.value)
                 setSelectedClass(cls || null)
               }}
-              className="input"
-            >
-              <option value="">Select a class</option>
-              {classes.map(cls => (
-                <option key={cls._id} value={cls._id}>
-                  {cls.name} {cls.grade ? `(${cls.grade})` : ''}
-                </option>
-              ))}
-            </select>
+              placeholder="Select a class"
+              options={[
+                { value: '', label: 'Select a class' },
+                ...classes.map(cls => ({
+                  value: cls._id,
+                  label: `${cls.name}${cls.grade ? ` (${cls.grade})` : ''}`
+                }))
+              ]}
+            />
           </div>
           <div className="flex items-end">
             {isExistingRecord ? (

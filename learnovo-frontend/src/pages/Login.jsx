@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { HeroGeometric } from '../components/ui/ShapeLandingHero'
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -13,9 +15,10 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
+  const [formReady, setFormReady] = useState(false)
 
   const { login, isAuthenticated, isLoading: authLoading, error, clearError, user } = useAuth()
-  const { theme } = useTheme()
+  const { theme, toggleMode } = useTheme()
   const isDark = theme?.mode === 'dark'
   const navigate = useNavigate()
 
@@ -47,6 +50,7 @@ const Login = () => {
     clearError()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -95,54 +99,63 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex overflow-hidden">
 
       {/* ── LEFT BRAND PANEL ── */}
-      <div
-        className="hidden lg:flex lg:w-5/12 xl:w-1/2 flex-col justify-between p-12 text-white relative overflow-hidden"
-        style={{ background: 'linear-gradient(145deg, #1a6b6b 0%, #2a9090 40%, #1e7a7a 100%)' }}
+      <motion.div
+        initial={{ opacity: 0, x: '-100%' }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.9, ease: [0.25, 0.4, 0.25, 1] }}
+        className="hidden lg:block lg:w-5/12 xl:w-1/2 relative"
       >
-        {/* Subtle background circles */}
-        <div className="absolute -top-16 -left-16 w-72 h-72 rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, #ffffff 0%, transparent 70%)' }} />
-        <div className="absolute -bottom-24 -right-12 w-96 h-96 rounded-full opacity-10"
-          style={{ background: 'radial-gradient(circle, #ffffff 0%, transparent 70%)' }} />
-
-        {/* Logo top-left */}
-        <div className="flex items-center gap-3 relative z-10">
-          <img src="/logo-icon.png" alt="Learnovo" className="h-10 w-10 object-contain drop-shadow-md" />
-          <span className="text-2xl font-bold tracking-tight text-white">Learnovo</span>
-        </div>
-
-        {/* Center tagline */}
-        <div className="relative z-10">
-          <h1 className="text-4xl xl:text-5xl font-bold leading-tight mb-4 text-white">
-            Manage your<br />school smarter.
-          </h1>
-          <p className="text-white/75 text-lg leading-relaxed max-w-sm">
-            One platform for students, teachers, fees, attendance, and everything in between.
-          </p>
-
+        <HeroGeometric
+          title1="Manage your school"
+          title2="smarter."
+          description="One platform for students, teachers, fees, attendance, and everything in between."
+        >
           {/* Feature pills */}
-          <div className="mt-8 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 justify-center">
             {['Student Management', 'Attendance', 'Fees & Finance', 'Reports'].map(f => (
-              <span key={f} className="px-3 py-1 rounded-full text-sm font-medium"
-                style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}>
+              <span key={f} className="px-3 py-1 rounded-full text-sm font-medium text-white/90"
+                style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(62,196,177,0.3)' }}>
                 {f}
               </span>
             ))}
           </div>
+        </HeroGeometric>
+
+        {/* Logo overlay top-left */}
+        <div className="absolute top-8 left-8 flex items-center gap-3 z-20">
+          <img src="/logo-icon.png" alt="Learnovo" className="h-10 w-10 object-contain drop-shadow-md" />
+          <span className="text-2xl font-bold tracking-tight text-white">Learnovo</span>
         </div>
 
         {/* Bottom caption */}
-        <p className="text-white/50 text-sm relative z-10">© 2025 Learnovo. All rights reserved.</p>
-      </div>
+        <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2025 Learnovo. All rights reserved.</p>
+      </motion.div>
 
       {/* ── RIGHT FORM PANEL ── */}
-      <div
-        className="flex-1 flex flex-col justify-center items-center px-4 sm:px-6 md:px-12 py-8 sm:py-12"
+      <motion.div
+        initial={{ opacity: 0, x: '100%' }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.9, ease: [0.25, 0.4, 0.25, 1] }}
+        className="flex-1 flex flex-col justify-center items-center px-4 sm:px-6 md:px-12 py-8 sm:py-12 relative"
         style={isDark ? { background: '#000000' } : { background: 'linear-gradient(150deg, #f8fffd 0%, #f0faf8 40%, #eaf6f6 100%)' }}
       >
+
+        {/* Dark/Light mode toggle */}
+        <button
+          type="button"
+          onClick={toggleMode}
+          className="absolute top-6 right-6 p-2 rounded-full border transition-all duration-200 hover:scale-105 active:scale-95"
+          style={isDark
+            ? { background: '#1C1C1E', borderColor: '#38383A', color: '#FFD60A' }
+            : { background: '#ffffff', borderColor: '#e5e7eb', color: '#6b7280', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+          }
+          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
 
         {/* Mobile-only logo */}
         <div className="flex lg:hidden items-center gap-2 mb-8">
@@ -150,102 +163,132 @@ const Login = () => {
           <span className="text-xl font-bold text-gray-900 dark:text-white">Learnovo</span>
         </div>
 
-        <div className="w-full max-w-[400px]">
+        <div className="w-full max-w-[380px]">
 
           {/* Card wrapper */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-lg shadow-teal-100/60 dark:shadow-black/20 border border-white/80 dark:border-[#38383A] px-5 sm:px-8 py-6 sm:py-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.9, ease: [0.25, 0.4, 0.25, 1] }}
+            onAnimationComplete={() => setFormReady(true)}
+            className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-lg shadow-teal-100/40 dark:shadow-black/20 border border-gray-100 dark:border-[#38383A] px-6 sm:px-7 py-6 sm:py-7"
+          >
 
             {/* Heading */}
-            <div className="mb-7">
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">Welcome back</h2>
-              <p className="text-gray-400 dark:text-[#8E8E93] text-sm">Sign in to your school account</p>
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Welcome back</h2>
+              <p className="text-gray-400 dark:text-[#8E8E93] text-[13px] mt-1">Sign in to your school account</p>
             </div>
 
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            <form className="space-y-4" onSubmit={handleSubmit}>
 
               {/* School Code */}
               <div>
-                <label htmlFor="schoolCode" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">
+                <label htmlFor="schoolCode" className="block text-[13px] font-medium text-gray-600 dark:text-[#8E8E93] mb-1">
                   School Code
                 </label>
-                <input
-                  id="schoolCode"
-                  name="schoolCode"
-                  type="text"
-                  value={formData.schoolCode}
-                  onChange={handleChange}
-                  className="input"
-                  placeholder="e.g. spis"
-                />
+                {formReady ? (
+                  <input
+                    id="schoolCode"
+                    name="schoolCode"
+                    type="text"
+                    autoFocus
+                    value={formData.schoolCode}
+                    onChange={handleChange}
+                    className="input"
+                    placeholder="e.g. spis"
+                  />
+                ) : (
+                  <div className="input" style={{ minHeight: '42px' }} />
+                )}
               </div>
 
               {/* Email */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">
+                <label htmlFor="email" className="block text-[13px] font-medium text-gray-600 dark:text-[#8E8E93] mb-1">
                   Email or Admission Number
                 </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="text"
-                  autoComplete="email"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="input"
-                  placeholder="Enter email or admission number"
-                />
-                <p className="mt-1.5 text-xs text-gray-400 dark:text-[#636366]">
-                  Students can login with their admission number if email is unavailable.
+                {formReady ? (
+                  <input
+                    id="email"
+                    name="email"
+                    type="text"
+                    autoComplete="email"
+                    required
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="input"
+                    placeholder="Enter email or admission number"
+                  />
+                ) : (
+                  <div className="input" style={{ minHeight: '42px' }} />
+                )}
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-[#636366]">
+                  Students can use their admission number if email is unavailable.
                 </p>
               </div>
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">
+                <label htmlFor="password" className="block text-[13px] font-medium text-gray-600 dark:text-[#8E8E93] mb-1">
                   Password
                 </label>
                 <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    required
-                    value={formData.password}
-                    onChange={handleChange}
-                    className="input pr-10"
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-[#636366] hover:text-gray-600 dark:hover:text-white transition-colors"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                  {formReady ? (
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      required
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="input pr-10"
+                      placeholder="Enter your password"
+                    />
+                  ) : (
+                    <div className="input" style={{ minHeight: '42px' }} />
+                  )}
+                  {formReady && (
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-[#636366] hover:text-gray-600 dark:hover:text-white transition-colors"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  )}
                 </div>
               </div>
 
               {/* Remember me */}
-              <div className="flex items-center">
-                <input
-                  id="remember-me"
-                  name="remember-me"
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-[#38383A] dark:bg-[#1C1C1E] rounded cursor-pointer"
-                />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600 dark:text-[#8E8E93] cursor-pointer">
+              <label htmlFor="remember-me" className="flex items-center gap-2.5 cursor-pointer group py-0.5">
+                <div className="relative flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <div className="h-[18px] w-[18px] rounded-md border-2 border-gray-300 dark:border-[#48484A] bg-white dark:bg-[#2C2C2E] peer-checked:border-[#3EC4B1] peer-checked:bg-[#3EC4B1] transition-all duration-150 flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-[#3EC4B1]/40 peer-focus-visible:ring-offset-1">
+                    {rememberMe && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[13px] text-gray-500 dark:text-[#8E8E93] group-hover:text-gray-700 dark:group-hover:text-white transition-colors select-none">
                   Remember my email and school code
-                </label>
-              </div>
+                </span>
+              </label>
 
               {/* Error */}
               {error && (
-                <div className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-4 py-3">
-                  <p className="text-sm font-medium text-red-700 dark:text-red-400">{error}</p>
+                <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-3.5 py-2.5">
+                  <p className="text-[13px] font-medium text-red-600 dark:text-red-400">{error}</p>
                 </div>
               )}
 
@@ -253,44 +296,52 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3 rounded-xl text-base font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 dark:hover:shadow-teal-900/40 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
-                style={{ background: 'linear-gradient(135deg, #1a9090 0%, #0d7070 60%, #0a5f5f 100%)' }}
+                className="w-full py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 dark:hover:shadow-teal-900/40 active:scale-95 disabled:opacity-50 disabled:pointer-events-none mt-1"
+                style={{ background: 'linear-gradient(135deg, #3EC4B1 0%, #0ea5a3 60%, #0b8f8f 100%)' }}
               >
                 {isLoading ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent mx-auto" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mx-auto" />
                 ) : 'Sign in'}
               </button>
             </form>
-
-            {/* Close card wrapper */}
-          </div>
+          </motion.div>
 
           {/* Demo access */}
-          <div className="mt-8">
-            <div className="relative">
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.2, ease: [0.25, 0.4, 0.25, 1] }}
+            className="mt-6"
+          >
+            <div className="relative mb-4">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200 dark:border-[#38383A]" />
+                <div className="w-full border-t border-gray-200/80 dark:border-[#38383A]" />
               </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-white dark:bg-[#000000] px-3 text-gray-400 dark:text-[#636366] uppercase tracking-wider font-medium">Demo Access</span>
+              <div className="relative flex justify-center">
+                <span
+                  className="px-3 text-[11px] text-gray-400 dark:text-[#636366] uppercase tracking-widest font-medium"
+                  style={isDark ? { background: '#000000' } : { background: '#f3faf9' }}
+                >
+                  Quick Demo
+                </span>
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="flex items-center justify-center gap-2">
               {['admin', 'teacher', 'student', 'parent'].map((role) => (
                 <button
                   key={role}
                   type="button"
                   onClick={() => handleDemoLogin(role)}
-                  className="text-xs py-2 px-1 rounded-lg border border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] font-medium capitalize hover:border-teal-300 dark:hover:border-teal-700 hover:text-teal-700 dark:hover:text-[#3EC4B1] hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-all duration-150"
+                  className="text-[12px] py-1.5 px-3.5 rounded-full border border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] font-medium capitalize hover:border-[#3EC4B1] hover:text-[#0ea5a3] dark:hover:border-[#3EC4B1]/60 dark:hover:text-[#3EC4B1] hover:bg-[#3EC4B1]/[0.06] dark:hover:bg-[#3EC4B1]/10 transition-all duration-150 active:scale-95"
                 >
                   {role}
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }

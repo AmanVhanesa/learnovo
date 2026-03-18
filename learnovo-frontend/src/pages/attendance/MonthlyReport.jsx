@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Download, Printer, BarChart3 } from 'lucide-react'
+import Select from '../../components/ui/Select'
 import { useAuth } from '../../contexts/AuthContext'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
@@ -97,32 +98,33 @@ const MonthlyReport = () => {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Class</label>
-            <select
+            <Select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              className="input"
-            >
-              <option value="">Select Class</option>
-              {classes.map(cls => (
-                <option key={cls._id} value={cls._id}>{cls.name}</option>
-              ))}
-            </select>
+              placeholder="Select Class"
+              options={[
+                { value: '', label: 'Select Class' },
+                ...classes.map(cls => ({ value: cls._id, label: cls.name }))
+              ]}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Month</label>
-            <select value={month} onChange={(e) => setMonth(parseInt(e.target.value))} className="input">
-              {months.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
+            <Select
+              value={month}
+              onChange={(e) => setMonth(parseInt(e.target.value))}
+              options={months.map(m => ({ value: m.value, label: m.label }))}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Year</label>
-            <select value={year} onChange={(e) => setYear(parseInt(e.target.value))} className="input">
-              {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
+            <Select
+              value={year}
+              onChange={(e) => setYear(parseInt(e.target.value))}
+              options={[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map(y => ({
+                value: y, label: String(y)
+              }))}
+            />
           </div>
           <div className="flex items-end">
             <button onClick={generateReport} disabled={isLoading} className="btn btn-primary w-full">

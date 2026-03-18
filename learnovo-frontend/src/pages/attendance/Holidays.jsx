@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Calendar, Plus, Edit2, Trash2, X } from 'lucide-react'
+import DatePicker from '../../components/ui/DatePicker'
+import Select from '../../components/ui/Select'
 import { attendanceService } from '../../services/attendanceService'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -220,12 +222,9 @@ const Holidays = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Date</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={form.date}
                   onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}
-                  className="input"
-                  required
                 />
               </div>
 
@@ -244,20 +243,16 @@ const Holidays = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Start Date</label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={form.startDate}
                       onChange={(e) => setForm(f => ({ ...f, startDate: e.target.value }))}
-                      className="input"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-[#8E8E93] mb-1">End Date</label>
-                    <input
-                      type="date"
+                    <DatePicker
                       value={form.endDate}
                       onChange={(e) => setForm(f => ({ ...f, endDate: e.target.value }))}
-                      className="input"
                     />
                   </div>
                 </div>
@@ -265,29 +260,29 @@ const Holidays = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Type</label>
-                <select
+                <Select
                   value={form.type}
                   onChange={(e) => setForm(f => ({ ...f, type: e.target.value }))}
-                  className="input"
-                >
-                  <option value="public_holiday">Public Holiday</option>
-                  <option value="school_holiday">School Holiday</option>
-                  <option value="exam_break">Exam Break</option>
-                  <option value="vacation">Vacation</option>
-                </select>
+                  options={[
+                    { value: 'public_holiday', label: 'Public Holiday' },
+                    { value: 'school_holiday', label: 'School Holiday' },
+                    { value: 'exam_break', label: 'Exam Break' },
+                    { value: 'vacation', label: 'Vacation' }
+                  ]}
+                />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Applies To</label>
-                <select
+                <Select
                   value={form.appliesTo}
                   onChange={(e) => setForm(f => ({ ...f, appliesTo: e.target.value }))}
-                  className="input"
-                >
-                  <option value="all">Everyone</option>
-                  <option value="students">Students Only</option>
-                  <option value="employees">Employees Only</option>
-                </select>
+                  options={[
+                    { value: 'all', label: 'Everyone' },
+                    { value: 'students', label: 'Students Only' },
+                    { value: 'employees', label: 'Employees Only' }
+                  ]}
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
