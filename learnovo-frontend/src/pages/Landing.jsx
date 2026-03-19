@@ -478,10 +478,10 @@ const Landing = () => {
   ]
 
   const plans = [
-    { name: 'Free Trial', priceMonthly: '₹0', priceAnnual: '₹0', period: '14 days', desc: 'Try the full platform free', features: ['Up to 100 students', 'Up to 10 teachers', 'Basic attendance tracking', 'Fee management', 'Email support', 'Data export'], popular: false, cta: 'Start free trial' },
-    { name: 'Basic', priceMonthly: '₹29', priceAnnual: '₹23', period: '/mo', desc: 'Ideal for small schools', features: ['Up to 500 students', 'Up to 25 teachers', 'Full attendance & grades', 'Basic reports & analytics', 'SMS notifications', 'Priority support'], popular: false, cta: 'Get started' },
-    { name: 'Premium', priceMonthly: '₹79', priceAnnual: '₹63', period: '/mo', desc: 'For growing schools', features: ['Up to 2,000 students', 'Up to 100 teachers', 'Advanced analytics & AI reports', 'Custom report templates', 'API access', 'Multi-branch support', 'Phone support', 'Custom dashboards'], popular: true, cta: 'Get started' },
-    { name: 'Enterprise', priceMonthly: 'Custom', priceAnnual: 'Custom', period: '', desc: 'For large institutions', features: ['Unlimited students', 'Unlimited teachers', 'Custom integrations', 'Dedicated account manager', 'On-premise option', 'SLA guarantee', 'White-label option', 'Priority onboarding'], popular: false, cta: 'Contact Sales' },
+    { name: 'Free Trial', priceMonthly: '₹0', priceAnnual: '₹0', period: '14 days', annualBilled: '', desc: 'Try Learnovo free for 14 days', features: ['Up to 50 students', 'Up to 5 teachers', 'Core Academics', 'Attendance Tracking', 'Timetable Management', 'Email support'], popular: false, cta: 'Start free trial' },
+    { name: 'Basic', priceMonthly: '₹2,999', priceAnnual: '₹2,399', period: '/mo', annualBilled: 'Billed ₹28,788/yr', desc: 'Essential tools for small schools', features: ['Up to 500 students', 'Up to 30 teachers', 'Grades & Exams', 'Fees & Finance', 'Basic Reports', 'CSV Import', 'Parent Portal Access'], popular: false, cta: 'Get started' },
+    { name: 'Pro', priceMonthly: '₹6,999', priceAnnual: '₹5,599', period: '/mo', annualBilled: 'Billed ₹67,188/yr', desc: 'Full-featured ERP for growing schools', features: ['Up to 2,000 students', 'Up to 100 teachers', 'Advanced Analytics', 'Custom Reports', 'API Access', 'Payment Gateway Integration', 'SMS & WhatsApp Alerts', 'Priority & Phone support'], popular: true, cta: 'Get started' },
+    { name: 'Enterprise', priceMonthly: 'Custom', priceAnnual: 'Custom', period: '/yr', annualBilled: '', desc: 'Unlimited capacity & custom integrations', features: ['Unlimited students', 'Unlimited teachers', 'Custom integrations', 'Dedicated account manager', 'All Pro features', 'SLA guarantee', 'White-label option', 'On-premise deployment'], popular: false, cta: 'Contact Sales' },
   ]
 
   const faqs = [
@@ -559,7 +559,7 @@ const Landing = () => {
             backdropFilter: 'blur(6px)',
             WebkitBackdropFilter: 'blur(6px)',
             backgroundColor: isDark
-              ? (scrolled ? 'rgba(11, 15, 25, 0.88)' : 'rgba(11, 15, 25, 0.6)')
+              ? (scrolled ? 'rgba(10, 10, 10, 0.88)' : 'rgba(10, 10, 10, 0.6)')
               : (scrolled ? 'rgba(255, 255, 255, 0.88)' : 'rgba(255, 255, 255, 0.6)'),
             borderRadius: '100px',
             boxShadow: isDark
@@ -1104,7 +1104,7 @@ const Landing = () => {
                 <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${annual ? 'translate-x-6' : 'translate-x-0.5'}`} />
               </button>
               <span className={`text-sm ${annual ? 'text-gray-900 dark:text-white font-semibold' : 'text-gray-500 dark:text-[#9CA3AF]'}`}>Annual</span>
-              {annual && <span className="bg-primary-100 dark:bg-[#34D399]/20 text-primary-700 dark:text-[#34D399] text-xs font-semibold px-2 py-0.5 rounded-full">Save 20%</span>}
+              <span className="bg-primary-100 dark:bg-[#34D399]/20 text-primary-700 dark:text-[#34D399] text-xs font-semibold px-2 py-0.5 rounded-full">Save 20%</span>
             </div>
           </div>
 
@@ -1127,6 +1127,7 @@ const Landing = () => {
                     <span className="text-4xl font-bold text-gray-900 dark:text-white">{annual ? plan.priceAnnual : plan.priceMonthly}</span>
                     {plan.period && <span className="text-sm text-gray-400 dark:text-[#9CA3AF]">{plan.period}</span>}
                   </div>
+                  {annual && plan.annualBilled && <p className="text-[11px] text-gray-400 dark:text-[#636366] mt-1">{plan.annualBilled}</p>}
                 </div>
                 <Link to={plan.cta === 'Contact Sales' ? '#' : '/register'} className={`block w-full text-center py-2.5 rounded-full text-sm font-semibold mb-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
                   plan.popular

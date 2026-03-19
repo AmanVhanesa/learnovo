@@ -80,7 +80,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
 
     return (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-            <div className="modal-content max-w-3xl p-0">
+            <div className="modal-content !max-w-3xl p-0">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-4 sm:p-6">
                     <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
@@ -293,7 +293,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                             <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Personal Information</h4>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
+                                <div className="min-w-0">
                                     <label className="label">Father/Husband Name</label>
                                     <input
                                         className="input"
@@ -302,7 +302,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                     />
                                 </div>
 
-                                <div>
+                                <div className="min-w-0">
                                     <label className="label">Gender</label>
                                     <select
                                         className="input"
@@ -315,17 +315,17 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                     </select>
                                 </div>
 
-                                <div>
+                                <div className="min-w-0">
                                     <label className="label">Date of Birth</label>
                                     <input
                                         type="date"
-                                        className="input"
+                                        className="input max-w-full"
                                         value={form.dateOfBirth}
                                         onChange={(e) => updateField('dateOfBirth', e.target.value)}
                                     />
                                 </div>
 
-                                <div>
+                                <div className="min-w-0">
                                     <label className="label">Religion</label>
                                     <input
                                         className="input"
@@ -334,7 +334,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                     />
                                 </div>
 
-                                <div>
+                                <div className="min-w-0">
                                     <label className="label">Blood Group</label>
                                     <select
                                         className="input"
@@ -353,7 +353,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                     </select>
                                 </div>
 
-                                <div>
+                                <div className="min-w-0">
                                     <label className="label">National ID (Aadhaar/SSN)</label>
                                     <input
                                         className="input"
@@ -362,7 +362,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                     />
                                 </div>
 
-                                <div>
+                                <div className="min-w-0">
                                     <label className="label">Education</label>
                                     <input
                                         className="input"
@@ -372,7 +372,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                     />
                                 </div>
 
-                                <div>
+                                <div className="min-w-0">
                                     <label className="label">Experience (years)</label>
                                     <input
                                         type="number"

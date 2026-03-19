@@ -27,7 +27,9 @@ import {
   BookCheck,
   List,
   Megaphone,
-  ReceiptText
+  ReceiptText,
+  CalendarClock,
+  LayoutGrid
 } from 'lucide-react'
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -75,6 +77,8 @@ const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Homework', href: '/app/homework', icon: BookCheck, roles: ['admin', 'teacher', 'student'] },
       { name: 'Assignments', href: '/app/assignments', icon: BookOpen, roles: ['admin', 'teacher', 'student'] },
       { name: 'Exams & Results', href: '/app/exams', icon: ClipboardList, roles: ['admin', 'teacher', 'student', 'parent'] },
+      { name: 'Timetable', href: '/app/timetable', icon: CalendarClock, roles: ['admin', 'teacher', 'student', 'parent'], end: true },
+      { name: 'Timetable Builder', href: '/app/timetable/builder', icon: LayoutGrid, roles: ['admin'] },
     ].filter(i => i.roles.includes(r))
 
     if (academicItems.length > 0) {
@@ -176,10 +180,15 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </p>
               )}
               <div className="space-y-1">
-                {section.items.map((item) => (
+                {section.items.map((item) => {
+                  // Use "end" match for items whose paths are prefixes of other items
+                  // e.g. /app/timetable should not stay active when on /app/timetable/builder
+                  const useEnd = item.end || false
+                  return (
                   <NavLink
                     key={item.name}
                     to={item.href}
+                    end={useEnd}
                     className={({ isActive }) =>
                       `group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 ${isActive
                         ? 'bg-primary-50 dark:bg-[rgba(62,196,177,0.12)] text-primary-700 dark:text-[#3EC4B1] shadow-sm ring-1 ring-primary-100 dark:ring-[rgba(62,196,177,0.2)]'
@@ -193,14 +202,15 @@ const Sidebar = ({ isOpen, onClose }) => {
                     }}
                   >
                     <item.icon
-                      className={`mr-3 h-5 w-5 flex-shrink-0 ${location.pathname === item.href || location.pathname.startsWith(item.href + '/')
+                      className={`mr-3 h-5 w-5 flex-shrink-0 ${location.pathname === item.href
                         ? 'text-[#3EC4B1]'
                         : 'text-gray-400 dark:text-[#8E8E93] group-hover:text-gray-500 dark:group-hover:text-white'
                         }`}
                     />
                     {item.name}
                   </NavLink>
-                ))}
+                  )
+                })}
               </div>
             </div>
           ))}

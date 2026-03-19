@@ -80,6 +80,12 @@ const Search = lazy(() => import('./pages/Search'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Profile = lazy(() => import('./pages/Profile'))
 
+// Timetable Module
+const TimetableSchedule = lazy(() => import('./pages/timetable/TimetableSchedule'))
+const TimetableBuilder = lazy(() => import('./pages/timetable/TimetableBuilder'))
+const Substitutions = lazy(() => import('./pages/timetable/Substitutions'))
+const SpecialDays = lazy(() => import('./pages/timetable/SpecialDays'))
+
 // ── Minimal fallback shown while a lazy chunk loads
 const PageLoader = () => (
   <div className="flex items-center justify-center h-64">
@@ -189,6 +195,24 @@ function App() {
                       <Route path="certificates" element={<CertificateManager />} />
                       <Route path="certificates/generate" element={<CertificateGeneration />} />
                       <Route path="certificates/templates" element={<TemplateSettings />} />
+
+                      {/* Timetable Module */}
+                      <Route path="timetable" element={<TimetableSchedule />} />
+                      <Route path="timetable/builder" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <TimetableBuilder />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="timetable/substitutions" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                          <Substitutions />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="timetable/special-days" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <SpecialDays />
+                        </ProtectedRoute>
+                      } />
 
                       <Route path="search" element={<Search />} />
                       <Route path="settings" element={<Settings />} />

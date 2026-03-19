@@ -58,5 +58,15 @@ export const examsService = {
         if (filters.class) params.append('class', filters.class)
         const res = await api.get(`/exams/result-card/${studentId}?${params.toString()}`)
         return res.data
+    },
+
+    downloadReportCardPDF: async (studentId, filters = {}) => {
+        const params = new URLSearchParams()
+        if (filters.examSeries) params.append('examSeries', filters.examSeries)
+        if (filters.class) params.append('class', filters.class)
+        const res = await api.get(`/exams/result-card/${studentId}/pdf?${params.toString()}`, {
+            responseType: 'blob'
+        })
+        return res.data
     }
 }

@@ -5,3 +5,6 @@ config.env
 test_output.log
 uploads/
 .claude/
+
+# Debug/check scripts (may contain hardcoded credentials)
+check-*.js

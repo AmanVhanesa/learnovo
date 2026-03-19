@@ -46,8 +46,8 @@ const PLANS = [
     {
         id: 'basic',
         name: 'Basic',
-        price: 2499,
-        priceDisplay: '₹2,499',
+        price: 2999,
+        priceDisplay: '₹2,999',
         period: '/ month',
         description: 'Essential tools for small schools to go fully digital.',
         color: 'text-blue-700 bg-blue-50',
@@ -80,8 +80,8 @@ const PLANS = [
     {
         id: 'pro',
         name: 'Pro',
-        price: 5999,
-        priceDisplay: '₹5,999',
+        price: 6999,
+        priceDisplay: '₹6,999',
         period: '/ month',
         description: 'Full-featured ERP for growing schools and institutions.',
         color: 'text-violet-700 bg-violet-50',

@@ -1,7 +1,7 @@
 import React, { useRef } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import { Save, Camera, Loader } from 'lucide-react'
+import { Save, Camera, Loader, User, BookOpen, Briefcase, Heart, ShieldCheck } from 'lucide-react'
 import api from '../services/authService'
 import toast from 'react-hot-toast'
 
@@ -16,6 +16,16 @@ const Profile = () => {
     email: '',
     phone: '',
     address: '',
+    dateOfBirth: '',
+    gender: '',
+    bloodGroup: '',
+    religion: '',
+    category: '',
+    fatherOrHusbandName: '',
+    homeAddress: '',
+    nationalId: '',
+    education: '',
+    experience: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -29,10 +39,24 @@ const Profile = () => {
         name: user.fullName || user.name || '',
         email: user.email || '',
         phone: user.phone || '',
-        address: user.address || ''
+        address: user.address || '',
+        dateOfBirth: user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '',
+        gender: user.gender || '',
+        bloodGroup: user.bloodGroup || '',
+        religion: user.religion || '',
+        category: user.category || '',
+        fatherOrHusbandName: user.fatherOrHusbandName || '',
+        homeAddress: user.homeAddress || '',
+        nationalId: user.nationalId || '',
+        education: user.education || '',
+        experience: user.experience || ''
       }))
     }
   }, [user])
+
+  const isStudent = user?.role === 'student'
+  const isTeacher = user?.role === 'teacher'
+  const isEmployee = user?.role === 'teacher' || user?.role === 'staff' || user?.role === 'employee'
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -75,16 +99,37 @@ const Profile = () => {
 
   const profileMutation = useMutation({
     mutationFn: async () => {
-      const response = await api.put('/auth/profile', {
+      const payload = {
         name: formData.name,
         phone: formData.phone,
-        address: formData.address
-      })
+        address: formData.address,
+        dateOfBirth: formData.dateOfBirth || undefined,
+        gender: formData.gender || undefined,
+        bloodGroup: formData.bloodGroup || undefined,
+        religion: formData.religion || undefined,
+        category: formData.category || undefined,
+        fatherOrHusbandName: formData.fatherOrHusbandName || undefined,
+        homeAddress: formData.homeAddress || undefined
+      }
+
+      // Include employee-specific fields
+      if (isEmployee) {
+        payload.nationalId = formData.nationalId || undefined
+        payload.education = formData.education || undefined
+        payload.experience = formData.experience || undefined
+      }
+
+      const response = await api.put('/auth/profile', payload)
       return response.data
     },
     onSuccess: (data) => {
       if (data.success) {
         toast.success('Profile updated successfully')
+        // Update user in auth context
+        if (data.user) {
+          const updatedUser = { ...user, ...data.user }
+          localStorage.setItem('user', JSON.stringify(updatedUser))
+        }
       } else {
         toast.error(data.message || 'Failed to update profile')
       }
@@ -172,6 +217,16 @@ const Profile = () => {
           <div>
             <p className="text-sm font-medium text-gray-900 dark:text-white">{displayName}</p>
             <p className="text-sm text-gray-500 dark:text-[#8E8E93] capitalize">{user?.role}</p>
+            {isStudent && user?.admissionNumber && (
+              <p className="text-sm text-primary-600 dark:text-primary-400 font-medium mt-0.5">
+                Admission No: {user.admissionNumber}
+              </p>
+            )}
+            {isEmployee && user?.employeeId && (
+              <p className="text-sm text-primary-600 dark:text-primary-400 font-medium mt-0.5">
+                Employee ID: {user.employeeId}
+              </p>
+            )}
             <button
               onClick={handlePhotoClick}
               disabled={uploading}
@@ -196,11 +251,55 @@ const Profile = () => {
         />
       </div>
 
+      {/* Identity Card - Read-only info */}
+      {(isStudent || isEmployee) && (
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldCheck className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              {isStudent ? 'Academic Information' : 'Employment Information'}
+            </h3>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-[#8E8E93] mb-4">
+            These details are managed by the school administration and cannot be edited.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {isStudent && (
+              <>
+                <ReadOnlyField label="Admission Number" value={user?.admissionNumber} />
+                <ReadOnlyField label="Roll Number" value={user?.rollNumber} />
+                <ReadOnlyField label="Class" value={user?.class} />
+                <ReadOnlyField label="Section" value={user?.section} />
+                <ReadOnlyField label="PEN Number" value={user?.penNumber} />
+                <ReadOnlyField
+                  label="Admission Date"
+                  value={user?.admissionDate ? new Date(user.admissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null}
+                />
+              </>
+            )}
+            {isEmployee && (
+              <>
+                <ReadOnlyField label="Employee ID" value={user?.employeeId} />
+                <ReadOnlyField label="Designation" value={user?.designation} />
+                <ReadOnlyField label="Department" value={user?.department} />
+                <ReadOnlyField
+                  label="Date of Joining"
+                  value={user?.dateOfJoining ? new Date(user.dateOfJoining).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Personal Information */}
         <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Personal Information</h3>
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Personal Information</h3>
+            </div>
             <button
               className="btn btn-primary btn-sm w-full sm:w-auto"
               onClick={() => profileMutation.mutate()}
@@ -243,6 +342,92 @@ const Profile = () => {
               />
             </div>
             <div>
+              <label className="label">Father / Husband Name</label>
+              <input
+                type="text"
+                name="fatherOrHusbandName"
+                className="input"
+                value={formData.fatherOrHusbandName}
+                onChange={handleChange}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Date of Birth</label>
+                <input
+                  type="date"
+                  name="dateOfBirth"
+                  className="input"
+                  value={formData.dateOfBirth}
+                  onChange={handleChange}
+                />
+              </div>
+              <div>
+                <label className="label">Gender</label>
+                <select
+                  name="gender"
+                  className="input"
+                  value={formData.gender}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Blood Group</label>
+                <select
+                  name="bloodGroup"
+                  className="input"
+                  value={formData.bloodGroup}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Blood Group</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Religion</label>
+                <input
+                  type="text"
+                  name="religion"
+                  className="input"
+                  value={formData.religion}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+            {isStudent && (
+              <div>
+                <label className="label">Category</label>
+                <select
+                  name="category"
+                  className="input"
+                  value={formData.category}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Category</option>
+                  <option value="General">General</option>
+                  <option value="OBC">OBC</option>
+                  <option value="SC">SC</option>
+                  <option value="ST">ST</option>
+                  <option value="EWS">EWS</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            )}
+            <div>
               <label className="label">Address</label>
               <textarea
                 name="address"
@@ -258,49 +443,140 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Change Password */}
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">Change Password</h3>
-            <button
-              className="btn btn-primary btn-sm w-full sm:w-auto"
-              onClick={() => passwordMutation.mutate()}
-              disabled={loading}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Update Password
-            </button>
-          </div>
-          <div className="space-y-4">
-            <div>
-              <label className="label">Current Password</label>
-              <input
-                type="password"
-                name="currentPassword"
-                className="input"
-                value={formData.currentPassword}
-                onChange={handleChange}
-              />
+        {/* Right Column */}
+        <div className="space-y-6">
+          {/* Employee-specific: Professional & Additional Info */}
+          {isEmployee && (
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Briefcase className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Additional Information</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="label">National ID / Aadhaar</label>
+                  <input
+                    type="text"
+                    name="nationalId"
+                    className="input"
+                    value={formData.nationalId}
+                    onChange={handleChange}
+                  />
+                </div>
+                <div>
+                  <label className="label">Education / Qualifications</label>
+                  <input
+                    type="text"
+                    name="education"
+                    className="input"
+                    value={formData.education}
+                    onChange={handleChange}
+                    placeholder="e.g. B.Ed, M.Sc"
+                  />
+                </div>
+                <div>
+                  <label className="label">Experience</label>
+                  <input
+                    type="text"
+                    name="experience"
+                    className="input"
+                    value={formData.experience}
+                    onChange={handleChange}
+                    placeholder="e.g. 5 years"
+                  />
+                </div>
+                <div>
+                  <label className="label">Home Address</label>
+                  <textarea
+                    name="homeAddress"
+                    className="input min-h-[80px]"
+                    value={formData.homeAddress}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="label">New Password</label>
-              <input
-                type="password"
-                name="newPassword"
-                className="input"
-                value={formData.newPassword}
-                onChange={handleChange}
-              />
+          )}
+
+          {/* Guardian Information - Read only for students */}
+          {isStudent && user?.guardians && user.guardians.length > 0 && (
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Heart className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Guardian Information</h3>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-[#8E8E93] mb-4">
+                Guardian details are managed by the school administration.
+              </p>
+              <div className="space-y-4">
+                {user.guardians.map((guardian, idx) => (
+                  <div key={idx} className="p-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <ReadOnlyField label="Name" value={guardian.name} compact />
+                      <ReadOnlyField label="Relation" value={guardian.relation} compact />
+                      <ReadOnlyField label="Phone" value={guardian.phone} compact />
+                      <ReadOnlyField label="Email" value={guardian.email} compact />
+                      {guardian.occupation && (
+                        <ReadOnlyField label="Occupation" value={guardian.occupation} compact />
+                      )}
+                      {guardian.isPrimary && (
+                        <div className="flex items-center">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                            Primary Guardian
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div>
-              <label className="label">Confirm New Password</label>
-              <input
-                type="password"
-                name="confirmPassword"
-                className="input"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
+          )}
+
+          {/* Change Password */}
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Change Password</h3>
+              <button
+                className="btn btn-primary btn-sm w-full sm:w-auto"
+                onClick={() => passwordMutation.mutate()}
+                disabled={loading}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Update Password
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="label">Current Password</label>
+                <input
+                  type="password"
+                  name="currentPassword"
+                  className="input"
+                  value={formData.currentPassword}
+                  onChange={handleChange}
+                />
+              </div>
+              <div>
+                <label className="label">New Password</label>
+                <input
+                  type="password"
+                  name="newPassword"
+                  className="input"
+                  value={formData.newPassword}
+                  onChange={handleChange}
+                />
+              </div>
+              <div>
+                <label className="label">Confirm New Password</label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  className="input"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -308,6 +584,17 @@ const Profile = () => {
     </div>
   )
 }
+
+const ReadOnlyField = ({ label, value, compact = false }) => (
+  <div>
+    <label className={`block text-xs font-medium text-gray-500 dark:text-[#8E8E93] ${compact ? 'mb-0.5' : 'mb-1'}`}>
+      {label}
+    </label>
+    <p className={`${compact ? 'text-sm' : 'text-sm px-3 py-2 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg'} font-medium text-gray-900 dark:text-white`}>
+      {value || '—'}
+    </p>
+  </div>
+)
 
 const ProfileAvatar = ({ avatarUrl, initials, name }) => {
   const [imgFailed, setImgFailed] = React.useState(false)
