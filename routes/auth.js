@@ -310,7 +310,31 @@ router.post('/login', [
         phone: user.phone,
         address: user.address,
         lastLogin: user.lastLogin,
-        tenantId: tenantId ? tenantId.toString() : null
+        tenantId: tenantId ? tenantId.toString() : null,
+        // Student-specific fields
+        admissionNumber: user.admissionNumber,
+        rollNumber: user.rollNumber,
+        class: user.class,
+        section: user.section,
+        admissionDate: user.admissionDate,
+        penNumber: user.penNumber,
+        // Employee/Teacher-specific fields
+        employeeId: user.employeeId,
+        designation: user.designation,
+        department: user.department,
+        dateOfJoining: user.dateOfJoining,
+        // Common personal fields
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        religion: user.religion,
+        category: user.category,
+        fatherOrHusbandName: user.fatherOrHusbandName,
+        homeAddress: user.homeAddress,
+        nationalId: user.nationalId,
+        education: user.education,
+        experience: user.experience,
+        guardians: user.guardians
       },
       tenant: tenant ? {
         id: tenant._id,
@@ -355,9 +379,34 @@ router.get('/me', protect, async (req, res) => {
         avatar: user.avatar,
         photo: user.photo,
         phone: user.phone,
+        address: user.address,
         tenantId: user.tenantId,
         lastLogin: user.lastLogin,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        // Student-specific fields
+        admissionNumber: user.admissionNumber,
+        rollNumber: user.rollNumber,
+        class: user.class,
+        section: user.section,
+        admissionDate: user.admissionDate,
+        penNumber: user.penNumber,
+        // Employee/Teacher-specific fields
+        employeeId: user.employeeId,
+        designation: user.designation,
+        department: user.department,
+        dateOfJoining: user.dateOfJoining,
+        // Common personal fields
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        religion: user.religion,
+        category: user.category,
+        fatherOrHusbandName: user.fatherOrHusbandName,
+        homeAddress: user.homeAddress,
+        nationalId: user.nationalId,
+        education: user.education,
+        experience: user.experience,
+        guardians: user.guardians
       }
     });
   } catch (error) {
@@ -375,10 +424,13 @@ router.get('/me', protect, async (req, res) => {
 router.put('/profile', protect, [
   body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
+  body('dateOfBirth').optional().isISO8601().withMessage('Please provide a valid date of birth'),
+  body('gender').optional().isIn(['Male', 'Female', 'Other']).withMessage('Gender must be Male, Female or Other'),
+  body('bloodGroup').optional().isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', '']).withMessage('Invalid blood group'),
   handleValidationErrors
 ], async (req, res) => {
   try {
-    const { name, phone, address } = req.body;
+    const { name, phone, address, dateOfBirth, gender, bloodGroup, religion, fatherOrHusbandName, homeAddress, nationalId, education, experience, category } = req.body;
     const userId = req.user.id;
 
     const updateData = {};
@@ -388,6 +440,16 @@ router.put('/profile', protect, [
     }
     if (phone !== undefined) updateData.phone = phone;
     if (address !== undefined) updateData.address = address;
+    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth;
+    if (gender !== undefined) updateData.gender = gender;
+    if (bloodGroup !== undefined) updateData.bloodGroup = bloodGroup;
+    if (religion !== undefined) updateData.religion = religion;
+    if (fatherOrHusbandName !== undefined) updateData.fatherOrHusbandName = fatherOrHusbandName;
+    if (homeAddress !== undefined) updateData.homeAddress = homeAddress;
+    if (nationalId !== undefined) updateData.nationalId = nationalId;
+    if (education !== undefined) updateData.education = education;
+    if (experience !== undefined) updateData.experience = experience;
+    if (category !== undefined) updateData.category = category;
 
     const user = await User.findByIdAndUpdate(
       userId,
@@ -408,7 +470,25 @@ router.put('/profile', protect, [
         photo: user.photo,
         phone: user.phone,
         address: user.address,
-        tenantId: user.tenantId
+        tenantId: user.tenantId,
+        admissionNumber: user.admissionNumber,
+        rollNumber: user.rollNumber,
+        class: user.class,
+        section: user.section,
+        employeeId: user.employeeId,
+        designation: user.designation,
+        department: user.department,
+        dateOfBirth: user.dateOfBirth,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        religion: user.religion,
+        category: user.category,
+        fatherOrHusbandName: user.fatherOrHusbandName,
+        homeAddress: user.homeAddress,
+        nationalId: user.nationalId,
+        education: user.education,
+        experience: user.experience,
+        guardians: user.guardians
       }
     });
   } catch (error) {

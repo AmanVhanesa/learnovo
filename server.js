@@ -234,6 +234,9 @@ app.use('/api/homework', require('./routes/homework'));
 // Expense Management
 app.use('/api/expenses', require('./routes/expenses'));
 
+// Timetable Management
+app.use('/api/timetable', require('./routes/timetable'));
+
 // Backup & Restore (admin-only)
 app.use('/api/admin', require('./routes/backup'));
 

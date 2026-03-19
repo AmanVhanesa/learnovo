@@ -347,6 +347,137 @@ router.get('/result-card/:studentId', protect, async (req, res) => {
     }
 });
 
+// @desc    Download report card PDF for a student
+// @route   GET /api/exams/result-card/:studentId/pdf
+// @access  Private
+router.get('/result-card/:studentId/pdf', protect, async (req, res) => {
+    try {
+        const { studentId } = req.params;
+        const { examSeries, class: className } = req.query;
+
+        // Build result filter
+        const resultFilter = {
+            tenantId: req.user.tenantId,
+            student: studentId
+        };
+
+        if (req.user.role === 'student') {
+            resultFilter.isPublished = true;
+        }
+
+        const results = await Result.find(resultFilter)
+            .populate({
+                path: 'exam',
+                select: 'name subject class section date totalMarks passingMarks examSeries examType status'
+            })
+            .populate('student', 'name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName photo')
+            .sort({ 'exam.date': 1 });
+
+        if (!results.length) {
+            return res.status(404).json({ success: false, message: 'No results found for this student' });
+        }
+
+        let filtered = results.filter(r => r.exam);
+        if (examSeries) filtered = filtered.filter(r => r.exam.examSeries === examSeries);
+        if (className) filtered = filtered.filter(r => r.exam.class === className);
+
+        if (!filtered.length) {
+            return res.status(404).json({ success: false, message: 'No results found for the given filters' });
+        }
+
+        const subjects = filtered.map(r => ({
+            name: r.exam.subject,
+            subject: r.exam.subject,
+            examName: r.exam.name,
+            date: r.exam.date,
+            totalMarks: r.exam.totalMarks,
+            marksObtained: r.marksObtained,
+            percentage: r.percentage,
+            grade: r.grade,
+            isPassed: r.isPassed,
+            remarks: r.remarks || ''
+        }));
+
+        const grandTotal = subjects.reduce((acc, s) => acc + s.totalMarks, 0);
+        const grandObtained = subjects.reduce((acc, s) => acc + s.marksObtained, 0);
+        const overallPercentage = grandTotal > 0
+            ? Math.round((grandObtained / grandTotal) * 100 * 10) / 10
+            : 0;
+        const overallGrade = calculateGrade(overallPercentage);
+        const overallPassed = subjects.every(s => s.isPassed);
+        const passCount = subjects.filter(s => s.isPassed).length;
+
+        const student = results[0].student;
+
+        // Get school settings
+        const Settings = require('../models/Settings');
+        const settings = await Settings.findOne({ tenantId: req.user.tenantId });
+        const inst = settings?.institution || {};
+
+        const addressParts = [inst.address?.street, inst.address?.city, inst.address?.state].filter(Boolean);
+
+        const pdfData = {
+            school: {
+                name: inst.name || 'School',
+                address: addressParts.join(', '),
+                phone: inst.contact?.phone || '',
+                email: inst.contact?.email || '',
+                board: inst.board || '',
+                affiliation: inst.affiliationNumber || '',
+                udise: inst.udiseCode || '',
+                logo: inst.logo || null,
+                brand_color: inst.brandColor || '#1E3A5F',
+            },
+            student: {
+                name: student.fullName || student.name || '',
+                admissionNumber: student.admissionNumber || '',
+                class: student.class || filtered[0]?.exam?.class || '',
+                section: student.section || filtered[0]?.exam?.section || '',
+                rollNumber: student.rollNumber || '',
+                dob: student.dateOfBirth || '',
+                fatherOrHusbandName: student.fatherOrHusbandName || '',
+                guardianName: student.guardianName || '',
+            },
+            exam: {
+                type: examSeries || filtered[0]?.exam?.examSeries || 'Mid Term',
+                academicYear: settings?.academicYear || '',
+                date_issued: new Date().toISOString(),
+            },
+            subjects,
+            summary: {
+                grandTotal,
+                grandObtained,
+                overallPercentage,
+                overallGrade,
+                overallPassed,
+                passCount,
+                totalSubjects: subjects.length,
+            },
+            attendance: null,
+            signatures: {
+                principal: inst.principalSignature || null,
+                class_teacher: null,
+            },
+        };
+
+        const pdfService = require('../services/pdfService');
+        const pdfBuffer = await pdfService.generateReportCard(pdfData);
+
+        const filename = `Report_Card_${(student.name || 'Student').replace(/\s+/g, '_')}_${examSeries || 'All'}.pdf`;
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${filename}"`,
+            'Content-Length': pdfBuffer.length,
+        });
+
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error('Generate report card PDF error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate report card PDF' });
+    }
+});
+
 // @desc    Get logged-in student's published results
 // @route   GET /api/exams/my-results
 // @access  Private (Student)

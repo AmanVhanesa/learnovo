@@ -35,6 +35,9 @@ async function closeBrowser() {
 // ── Template helpers ──
 
 function getTemplatePath(type) {
+    if (type === 'REPORT_CARD') {
+        return path.join(__dirname, '..', 'templates', 'report-cards', 'report-card.html');
+    }
     const filename = type === 'TC' ? 'leaving-certificate.html' : 'bonafide-certificate.html';
     return path.join(__dirname, '..', 'templates', 'certificates', filename);
 }
@@ -175,6 +178,174 @@ async function injectPrincipalSignature(html, signaturePath) {
     return html.replace('<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', '');
 }
 
+// ── Report Card helpers ──
+
+function getGradeClass(grade) {
+    const g = (grade || '').toUpperCase();
+    if (g === 'A+' || g === 'A') return 'excellent';
+    if (g === 'B+' || g === 'B') return 'good';
+    if (g === 'C+' || g === 'C') return 'average';
+    return 'poor';
+}
+
+function buildSubjectRow(subject) {
+    const gradeClass = getGradeClass(subject.grade);
+    const resultClass = subject.isPassed ? 'pass-text' : 'fail-text';
+    const resultText = subject.isPassed ? 'Pass' : 'Fail';
+    const examDate = subject.date
+        ? new Date(subject.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '';
+    const examDetail = [subject.examName, examDate].filter(Boolean).join(' \u00B7 ');
+    const remarks = subject.remarks || '\u2014';
+
+    return `<tr>
+        <td class="subject-name">${escapeHtml(subject.subject || subject.name || '')}<span class="exam-detail">${escapeHtml(examDetail)}</span></td>
+        <td class="num">${subject.totalMarks}</td>
+        <td class="num" style="font-weight:600">${subject.marksObtained}</td>
+        <td class="num">${subject.percentage}%</td>
+        <td class="center"><span class="grade-display"><span class="grade-dot ${gradeClass}"></span> ${escapeHtml(subject.grade)}</span></td>
+        <td class="center"><span class="${resultClass}">${resultText}</span></td>
+        <td style="font-size:9px; color: var(--rc-text-muted)">${escapeHtml(remarks)}</td>
+    </tr>`;
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function buildReportCardPlaceholders(data) {
+    const { school, student, exam, subjects, summary, attendance } = data;
+    const brandColor = school.brand_color || school.brandColor || '#1E3A5F';
+
+    // Build address line
+    const addressParts = [school.address, school.phone ? `Phone: ${school.phone}` : '', school.email].filter(Boolean);
+    const addressLine = addressParts.join(' \u00B7 ');
+
+    // Build meta line (board, affiliation, UDISE)
+    const metaParts = [school.board, school.affiliation ? `Affil: ${school.affiliation}` : '', school.udise ? `UDISE: ${school.udise}` : ''].filter(Boolean);
+    const metaLine = metaParts.join(' \u00B7 ');
+
+    // Build subject rows HTML
+    const subjectRowsHtml = (subjects || []).map(s => buildSubjectRow(s)).join('\n');
+
+    // Format date
+    const dateIssued = exam.date_issued
+        ? new Date(exam.date_issued).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+        : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+
+    // Format DOB
+    const dob = student.dob
+        ? new Date(student.dob).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+        : '\u2014';
+
+    const overallResult = summary.overall_result === 'PASS' || summary.overallPassed ? 'PASS' : 'FAIL';
+    const isPassed = overallResult === 'PASS';
+    const overallGrade = summary.overall_grade || summary.overallGrade || '\u2014';
+
+    return {
+        brand_color: brandColor,
+        brand_color_light: `${brandColor}0A`,
+        school_name: school.name || '',
+        school_address: addressLine,
+        school_meta: metaLine,
+        exam_type: exam.type || exam.examSeries || 'Mid Term',
+        academic_year: exam.academic_year || exam.academicYear || '',
+        date_issued: dateIssued,
+        student_name: student.name || student.fullName || '',
+        adm_number: student.adm_number || student.admissionNumber || '\u2014',
+        class_section: student.class_section || `${student.class || ''}${student.section ? ' \u2014 ' + student.section : ''}`,
+        roll_number: student.roll_number || student.rollNumber || '\u2014',
+        dob: dob,
+        parent_name: student.parent_name || student.guardianName || student.fatherOrHusbandName || '\u2014',
+        subject_rows: subjectRowsHtml,
+        grand_total_max: summary.total_max || summary.grandTotal || 0,
+        grand_total_obtained: summary.total_obtained || summary.grandObtained || 0,
+        overall_percentage: summary.overall_percentage || summary.overallPercentage || 0,
+        overall_grade: overallGrade,
+        overall_grade_class: getGradeClass(overallGrade),
+        overall_result: overallResult,
+        overall_result_color: isPassed ? 'pass' : 'fail',
+        result_banner_class: isPassed ? 'pass' : 'fail',
+        result_text: isPassed ? 'PASSED' : 'FAILED',
+        performance_tag: summary.performance_tag || summary.performanceTag || (isPassed ? 'Satisfactory Performance' : 'Needs Improvement'),
+        result_stats: `${summary.subjects_passed || summary.passCount || 0} of ${summary.total_subjects || summary.totalSubjects || 0} subjects passed \u00B7 Overall: ${summary.overall_percentage || summary.overallPercentage || 0}% \u00B7 Grade: ${overallGrade}`,
+    };
+}
+
+async function injectReportCardLogo(html, logoPath, brandColor) {
+    const initial = brandColor ? `style="background:${brandColor}"` : '';
+    const fallback = `<div class="school-logo-fallback" ${initial}>S</div>`;
+
+    if (!logoPath) {
+        return html.replace('<!-- LOGO_PLACEHOLDER -->', fallback);
+    }
+
+    const dataUri = await fetchImageAsDataUri(logoPath);
+    if (dataUri) {
+        return html.replace('<!-- LOGO_PLACEHOLDER -->', `<div class="school-logo"><img src="${dataUri}" alt="School Logo" /></div>`);
+    }
+
+    return html.replace('<!-- LOGO_PLACEHOLDER -->', fallback);
+}
+
+function injectAttendanceSection(html, attendance) {
+    if (!attendance || !attendance.working_days) {
+        return html.replace('<!-- ATTENDANCE_SECTION -->', '');
+    }
+
+    const section = `
+    <div class="attendance-section">
+        <div class="section-label">Attendance</div>
+        <div class="attendance-row">
+            <div class="att-card">
+                <div class="att-value">${attendance.working_days || 0}</div>
+                <div class="att-label">Working Days</div>
+            </div>
+            <div class="att-card">
+                <div class="att-value">${attendance.days_present || 0}</div>
+                <div class="att-label">Days Present</div>
+            </div>
+            <div class="att-card">
+                <div class="att-value">${attendance.percentage || 0}%</div>
+                <div class="att-label">Attendance</div>
+            </div>
+        </div>
+    </div>`;
+
+    return html.replace('<!-- ATTENDANCE_SECTION -->', section);
+}
+
+function injectRemarksSection(html, remarks) {
+    if (!remarks) {
+        return html.replace('<!-- REMARKS_SECTION -->', '');
+    }
+
+    const section = `
+    <div class="remarks-section">
+        <div class="section-label">Teacher's Remarks</div>
+        <div class="remarks-text">${escapeHtml(remarks)}</div>
+    </div>`;
+
+    return html.replace('<!-- REMARKS_SECTION -->', section);
+}
+
+async function injectSignature(html, placeholder, signaturePath) {
+    if (!signaturePath) {
+        return html.replace(placeholder, '');
+    }
+
+    const dataUri = await fetchImageAsDataUri(signaturePath);
+    if (dataUri) {
+        return html.replace(placeholder, `<img class="sig-img" src="${dataUri}" alt="Signature" />`);
+    }
+
+    return html.replace(placeholder, '');
+}
+
 /**
  * Service to generate PDF certificates using Puppeteer
  */
@@ -220,6 +391,60 @@ const pdfService = {
             });
 
             // Puppeteer 24.x returns Uint8Array — convert to Node Buffer for Express compat
+            return Buffer.from(pdfUint8);
+        } finally {
+            await page.close();
+        }
+    },
+
+    /**
+     * Generate a report card PDF buffer
+     * @param {Object} data - Report card data payload (school, student, exam, subjects, summary, attendance, signatures)
+     * @returns {Promise<Buffer>} PDF buffer
+     */
+    generateReportCard: async (data) => {
+        // 1. Load HTML template
+        const templatePath = getTemplatePath('REPORT_CARD');
+        let html = fs.readFileSync(templatePath, 'utf8');
+
+        // 2. Build and fill placeholders
+        const placeholders = buildReportCardPlaceholders(data);
+
+        // Subject rows contain raw HTML — inject before fillTemplate (which escapes HTML)
+        html = html.replace('{{subject_rows}}', placeholders.subject_rows);
+        delete placeholders.subject_rows;
+
+        html = fillTemplate(html, placeholders);
+
+        // 3. Inject images
+        const brandColor = data.school?.brand_color || data.school?.brandColor || '#1E3A5F';
+        html = await injectReportCardLogo(html, data.school?.logo_url || data.school?.logo, brandColor);
+        html = await injectSignature(html, '<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', data.signatures?.principal);
+        html = await injectSignature(html, '<!-- CLASS_TEACHER_SIGNATURE_PLACEHOLDER -->', data.signatures?.class_teacher);
+
+        // 4. Inject conditional sections
+        html = injectAttendanceSection(html, data.attendance);
+        html = injectRemarksSection(html, data.summary?.teacher_remarks || data.summary?.teacherRemarks);
+
+        // 5. Render to PDF via Puppeteer
+        const browser = await getBrowser();
+        const page = await browser.newPage();
+
+        try {
+            await page.setContent(html, {
+                waitUntil: 'domcontentloaded',
+                timeout: 30000
+            });
+
+            await new Promise(r => setTimeout(r, 500));
+
+            const pdfUint8 = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                preferCSSPageSize: true,
+                margin: { top: 0, right: 0, bottom: 0, left: 0 },
+            });
+
             return Buffer.from(pdfUint8);
         } finally {
             await page.close();
