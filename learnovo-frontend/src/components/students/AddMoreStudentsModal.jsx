@@ -54,7 +54,6 @@ const AddMoreStudentsModal = ({ isOpen, onClose, onSuccess, listId }) => {
                 toast.error(res.message || 'Failed to add students');
             }
         } catch (error) {
-            console.error('Error adding students to list:', error);
             toast.error(error.response?.data?.message || 'Server error while adding students');
         } finally {
             setIsLoading(false);

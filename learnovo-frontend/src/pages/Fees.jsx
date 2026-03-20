@@ -279,7 +279,7 @@ const Fees = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
           <div className="flex items-center">
             <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
             <p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || 'Failed to load fees. Please check your connection and try again.'}</p>
@@ -402,7 +402,7 @@ const Fees = () => {
       )}
 
       {/* Filters */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-3 sm:p-4">
+      <div className="card p-3 sm:p-4">
         <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4">
           <div className="flex-1">
             <div className="relative">
@@ -505,7 +505,7 @@ const Fees = () => {
       )}
 
       {/* Fees table */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm overflow-hidden">
+      <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table min-w-[700px]">
           <thead>

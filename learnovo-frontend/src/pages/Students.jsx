@@ -374,7 +374,6 @@ const Students = () => {
       }
       toast.success(`${selectedFormat.toUpperCase()} downloaded!`, { id: exportId })
     } catch (err) {
-      console.error(`${selectedFormat} export error:`, err)
       toast.error(`Failed to generate ${selectedFormat.toUpperCase()}`, { id: exportId })
     }
 

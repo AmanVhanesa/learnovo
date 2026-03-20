@@ -22,7 +22,7 @@ const ThemeLanguageSection = ({ form, updateField }) => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Theme Mode */}
-                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">Theme Mode</h3>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -61,7 +61,7 @@ const ThemeLanguageSection = ({ form, updateField }) => {
                 </div>
 
                 {/* Language */}
-                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">Language</h3>
                     <div>
                         <label className="label dark:text-[#8E8E93]">Interface Language</label>

@@ -238,7 +238,7 @@ const SpecialDays = () => {
       </div>
 
       {/* Calendar */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A]">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A]">
         {/* Month Navigation */}
         <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-[#38383A]">
           <button
@@ -333,7 +333,7 @@ const SpecialDays = () => {
       </div>
 
       {/* Upcoming Overrides Table */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A]">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A]">
         <div className="p-4 border-b border-gray-100 dark:border-[#38383A]">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">
             Upcoming Overrides

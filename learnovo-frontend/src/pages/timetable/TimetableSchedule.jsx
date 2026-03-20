@@ -407,7 +407,7 @@ const TimetableSchedule = () => {
       )}
 
       {/* Filters Row */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           {/* Admin: Class View Filters */}
           {isAdmin && activeView === 'class' && (
@@ -509,7 +509,7 @@ const TimetableSchedule = () => {
 
       {/* Today's Schedule Card */}
       {weekOffset === 0 && todayIndex >= 0 && shouldFetch && (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
           <div className="flex items-center gap-2 mb-3">
             <div className="p-1.5 rounded-lg bg-primary-50 dark:bg-primary-900/20">
               <Clock className="w-4 h-4 text-primary-600 dark:text-primary-400" />
@@ -573,7 +573,7 @@ const TimetableSchedule = () => {
       {weekLoading ? (
         <ScheduleLoadingSkeleton />
       ) : !shouldFetch ? (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-8">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-8">
           <div className="flex flex-col items-center justify-center py-8">
             <Eye className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -582,13 +582,13 @@ const TimetableSchedule = () => {
           </div>
         </div>
       ) : entries.length === 0 ? (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-8">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-8">
           <EmptyState />
         </div>
       ) : (
         <>
           {/* Desktop Grid */}
-          <div className="hidden md:block bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
+          <div className="hidden md:block bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
             <TimetableGrid
               entries={entries}
               timings={timings}

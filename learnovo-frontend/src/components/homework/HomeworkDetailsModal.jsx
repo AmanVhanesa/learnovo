@@ -25,7 +25,6 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
                 setSubmissions(response.data || []);
             }
         } catch (error) {
-            console.error('Error fetching submissions:', error);
         } finally {
             setIsLoading(false);
         }

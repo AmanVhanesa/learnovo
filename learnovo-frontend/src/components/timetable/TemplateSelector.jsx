@@ -81,7 +81,7 @@ const TemplateSelector = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-sm hover:bg-gray-50 dark:hover:bg-[#2C2C2E] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all max-w-xs"
+        className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl shadow-glass hover:bg-gray-50 dark:hover:bg-[#2C2C2E] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all max-w-xs"
       >
         <FileText className="h-4 w-4 text-gray-400 dark:text-[#636366] flex-shrink-0" />
         <span className="text-sm font-medium text-gray-700 dark:text-white truncate">

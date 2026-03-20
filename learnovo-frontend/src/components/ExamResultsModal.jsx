@@ -60,7 +60,6 @@ const ExamResultsModal = ({ exam, onClose }) => {
             setRemarks(rmks);
             setIsPublished(published);
         } catch (err) {
-            console.error('Fetch results error:', err);
             toast.error('Failed to load data');
         } finally { setLoading(false); }
     };

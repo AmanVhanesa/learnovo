@@ -94,7 +94,7 @@ const TimetableGrid = ({
   // Skeleton loading state
   if (loading) {
     return (
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden animate-pulse">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden animate-pulse">
         <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-[#38383A]">
           {[...Array(7)].map((_, i) => (
             <div key={i} className="bg-gray-50 dark:bg-[#2C2C2E] h-10" />
@@ -184,7 +184,7 @@ const TimetableGrid = ({
 
   // ── Desktop grid ──────────────────────────────────────────
   const renderDesktop = () => (
-    <div className="hidden md:block bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden">
+    <div className="hidden md:block bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -254,7 +254,7 @@ const TimetableGrid = ({
     const activeDayKey = workingDays[mobileDay]
 
     return (
-      <div className="md:hidden bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden">
+      <div className="md:hidden bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden">
         {/* Day tabs / navigation */}
         <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-[#2C2C2E] border-b border-gray-200 dark:border-[#38383A]">
           <button

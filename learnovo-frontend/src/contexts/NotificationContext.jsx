@@ -30,7 +30,6 @@ export function NotificationProvider({ children }) {
       }
     } catch (error) {
       if (error?.response?.status !== 404) {
-        console.error('Error fetching unread count:', error)
       }
     } finally {
       inflightRef.current = false
@@ -46,7 +45,6 @@ export function NotificationProvider({ children }) {
         setRecentNotifications(response.data || [])
       }
     } catch (error) {
-      console.error('Error fetching recent notifications:', error)
     }
   }, [isAuthenticated])
 
@@ -69,7 +67,6 @@ export function NotificationProvider({ children }) {
     try {
       await notificationsService.markAsRead(notificationId)
     } catch (error) {
-      console.error('Error marking notification as read:', error)
       // Rollback on failure
       optimisticReadIds.current.delete(notificationId)
       setUnreadCount(prev => prev + 1)
@@ -92,7 +89,6 @@ export function NotificationProvider({ children }) {
     try {
       await notificationsService.markAllAsRead()
     } catch (error) {
-      console.error('Error marking all as read:', error)
       // Rollback on failure
       setUnreadCount(previousCount)
       setRecentNotifications(previousNotifications)

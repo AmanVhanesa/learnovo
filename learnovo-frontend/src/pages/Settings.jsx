@@ -142,7 +142,6 @@ const Settings = () => {
       }
     },
     onError: (error) => {
-      console.error('Error saving settings:', error)
       toast.error(error.response?.data?.message || 'Failed to save settings')
     }
   })
@@ -180,7 +179,6 @@ const Settings = () => {
         toast.error('Upload failed')
       }
     } catch (err) {
-      console.error(err)
       toast.error('Error uploading logo')
     }
   }
@@ -199,7 +197,6 @@ const Settings = () => {
         toast.error('Upload failed')
       }
     } catch (err) {
-      console.error(err)
       toast.error('Error uploading signature')
     }
   }
@@ -253,7 +250,7 @@ const Settings = () => {
 
       {/* Tab Content */}
       <form onSubmit={handleSave}>
-        <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-lg shadow-sm p-4 sm:p-6">
+        <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-2xl shadow-glass p-4 sm:p-6">
           {activeTab === 'institute' && (
             <InstituteProfileSection
               form={form}

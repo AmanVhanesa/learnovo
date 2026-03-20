@@ -42,7 +42,7 @@ const StudentDetail = () => {
                 const historyRes = await studentsService.getClassHistory(id)
                 history = historyRes.data || []
                 admClass = historyRes.admissionClass || 'N/A'
-            } catch (e) { console.error('History fetch error', e) }
+            } catch { /* class history not available */ }
             return { student: response.data, classHistory: history, admissionClassInfo: admClass }
         },
     })
@@ -808,7 +808,7 @@ const StudentDetail = () => {
                                 <button type="button" onClick={() => { setShowPasswordModal(false); setPasswordForm({ newPassword: '', confirmPassword: '' }) }} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-xl">
                                     Cancel
                                 </button>
-                                <button type="submit" disabled={resetPasswordMutation.isPending} className="px-6 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-sm disabled:opacity-50">
+                                <button type="submit" disabled={resetPasswordMutation.isPending} className="px-6 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-2xl shadow-glass disabled:opacity-50">
                                     {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}
                                 </button>
                             </div>
@@ -854,7 +854,7 @@ const StudentDetail = () => {
                                 <button
                                     onClick={() => handleToggleStatus(deactivateReason)}
                                     disabled={!deactivateReason.trim() || toggleStatusMutation.isPending}
-                                    className="px-6 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm disabled:opacity-50"
+                                    className="px-6 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-2xl shadow-glass disabled:opacity-50"
                                 >
                                     {toggleStatusMutation.isPending ? 'Deactivating...' : 'Deactivate Student'}
                                 </button>

@@ -43,7 +43,6 @@ const SuperAdminLogin = () => {
                 setIsLoading(false)
             }
         } catch (err) {
-            console.error('Super Admin Login error:', err)
             setIsLoading(false)
         }
     }

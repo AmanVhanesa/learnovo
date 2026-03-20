@@ -97,7 +97,6 @@ const StudentLists = () => {
             }
             toast.success(`${format.toUpperCase()} downloaded!`, { id: exportId });
         } catch (err) {
-            console.error(`${format} export error:`, err);
             toast.error(`Failed to generate ${format.toUpperCase()}`, { id: exportId });
         }
     };

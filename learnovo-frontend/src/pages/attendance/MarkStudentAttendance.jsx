@@ -77,7 +77,6 @@ const MarkStudentAttendance = () => {
         setClasses(response?.data || [])
       }
     } catch (error) {
-      console.error('Error fetching classes:', error)
       setClasses([])
     } finally {
       setIsLoading(false)
@@ -100,7 +99,6 @@ const MarkStudentAttendance = () => {
       setIsExistingRecord(false)
       setHasUnsavedChanges(false)
     } catch (error) {
-      console.error('Error:', error)
       setStudents([])
     } finally {
       setIsLoading(false)

@@ -80,7 +80,6 @@ const EmployeeDetail = () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] })
         },
         onError: (error) => {
-            console.error('Update employee error:', error)
             toast.error(error.response?.data?.message || 'Failed to update employee')
         },
     })
@@ -98,7 +97,6 @@ const EmployeeDetail = () => {
         },
         onError: (error) => {
             const action = employee?.isActive ? 'deactivate' : 'activate'
-            console.error('Toggle status error:', error)
             toast.error(`Failed to ${action} employee`)
         },
     })
@@ -118,7 +116,6 @@ const EmployeeDetail = () => {
             }
         },
         onError: (error) => {
-            console.error('Reset password error:', error)
             toast.error('Failed to reset password')
         },
     })
@@ -139,7 +136,6 @@ const EmployeeDetail = () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] })
         },
         onError: (error) => {
-            console.error('Toggle login error:', error)
             toast.error('Failed to toggle login')
         },
     })

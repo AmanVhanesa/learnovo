@@ -22,7 +22,6 @@ const Absentees = () => {
       const response = await attendanceService.getAbsentees(selectedDate)
       setAbsenteeData(response?.data || { absentees: [], grouped: [], totalAbsent: 0 })
     } catch (error) {
-      console.error('Error:', error)
     } finally {
       setIsLoading(false)
     }
@@ -35,7 +34,6 @@ const Absentees = () => {
       const employees = response?.data || []
       setEmployeeAbsentees(employees.filter(e => e.attendance?.status === 'absent'))
     } catch (error) {
-      console.error('Error:', error)
       setEmployeeAbsentees([])
     } finally {
       setIsLoading(false)

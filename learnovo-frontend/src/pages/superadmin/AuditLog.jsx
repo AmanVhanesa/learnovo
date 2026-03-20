@@ -61,9 +61,9 @@ const SuperAdminAuditLog = () => {
                 <div><h1 className="text-2xl font-bold text-gray-900 dark:text-white">Security & Audit Log</h1><p className="mt-1 text-sm text-gray-500 dark:text-[#8E8E93]">Track all actions performed by Super Admins across the platform.</p></div>
             </div>
 
-            {error && (<div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 flex items-center"><AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" /><p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || error.message || 'Failed to load audit logs'}</p></div>)}
+            {error && (<div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 flex items-center"><AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" /><p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || error.message || 'Failed to load audit logs'}</p></div>)}
 
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
                 <div className="flex flex-wrap gap-4 items-center">
                     <div className="flex items-center text-sm font-medium text-gray-700 dark:text-[#8E8E93] mr-2"><Filter className="h-4 w-4 mr-2 text-gray-400 dark:text-[#636366]" /> Filters:</div>
                     <select value={targetTypeFilter} onChange={(e) => { setTargetTypeFilter(e.target.value); setPage(1); }} className="block pl-3 pr-10 py-1.5 text-sm border-gray-300 dark:border-[#38383A] dark:bg-[#1C1C1E] dark:text-white focus:ring-primary-500 focus:border-primary-500 rounded-lg"><option value="">All Resource Types</option><option value="tenant">Schools / Tenants</option><option value="user">Users</option><option value="system">System / Plans</option><option value="auth">Authentication</option></select>
@@ -72,7 +72,7 @@ const SuperAdminAuditLog = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-6">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-6">
                 {isLoading ? (
                     <div className="py-12 flex justify-center items-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>
                 ) : Object.keys(groupedLogs).length === 0 ? (

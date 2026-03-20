@@ -96,7 +96,6 @@ const ImportModal = ({
 
             toast.success('Template downloaded successfully');
         } catch (error) {
-            console.error('Download template error:', error);
             toast.error('Failed to download template');
         }
     };
@@ -130,7 +129,6 @@ const ImportModal = ({
                 toast.error(response.data.message || 'Validation failed');
             }
         } catch (error) {
-            console.error('Preview error:', error);
             toast.error(error.response?.data?.message || 'Failed to validate file');
         } finally {
             setImporting(false);
@@ -190,7 +188,6 @@ const ImportModal = ({
                 setStep('preview');
             }
         } catch (error) {
-            console.error('Execute import error:', error);
             const errData = error.response?.data;
             const errMsg = errData?.message || 'Failed to import data';
             const errDetail = errData?.error;
@@ -276,7 +273,7 @@ const ImportModal = ({
                     {step === 'upload' && (
                         <div className="space-y-6">
                             {/* Instructions */}
-                            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-md p-4">
+                            <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-2xl p-4">
                                 <h3 className="text-sm font-medium text-blue-900 dark:text-blue-400 mb-2">Instructions:</h3>
                                 <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
                                     <li>Upload a CSV file with {module} details.</li>
@@ -372,7 +369,7 @@ const ImportModal = ({
 
                             {/* Duplicates Warning & Action Choice */}
                             {previewData.summary.duplicatesInDB > 0 && (
-                                <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-md p-4">
+                                <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-2xl p-4">
                                     <div className="flex items-start">
                                         <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2 mt-0.5" />
                                         <div className="flex-1">
@@ -433,7 +430,7 @@ const ImportModal = ({
 
                             {/* Errors */}
                             {previewData.errors && previewData.errors.length > 0 && (
-                                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-md p-4">
+                                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl p-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center">
                                             <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />

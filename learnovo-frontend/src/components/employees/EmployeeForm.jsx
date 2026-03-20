@@ -270,7 +270,6 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                 updateField('photo', result.data.url)
                 setPhotoPreview(result.data.url)
             } catch (error) {
-                console.error('Photo upload error:', error)
                 setPhotoError('Upload failed, photo will be saved on form submit')
             } finally {
                 setPhotoUploading(false)

@@ -36,9 +36,6 @@ export const tenantService = {
       const response = await api.post('/schools/register', tenantData)
       return response.data
     } catch (error) {
-      console.error('Registration API error:', error)
-      console.error('Error response:', error.response?.data)
-      console.error('Error status:', error.response?.status)
       // Re-throw with more context
       if (error.response?.data) {
         throw error // Already has response data

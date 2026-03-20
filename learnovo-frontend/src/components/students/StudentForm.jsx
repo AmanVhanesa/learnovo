@@ -91,7 +91,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                     setSubDepartmentOptions(response.data.data)
                 }
             } catch (error) {
-                console.error('Error fetching sub-departments', error)
             }
         }
 
@@ -102,7 +101,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                     setDriverOptions(response.data)
                 }
             } catch (error) {
-                console.error('Error fetching drivers', error)
             }
         }
 
@@ -114,7 +112,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                     setClassOptions(response.data.data)
                 }
             } catch (error) {
-                console.error('Error fetching classes', error)
             } finally {
                 setClassesLoading(false)
             }
@@ -140,7 +137,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                     }
                 }
             } catch (error) {
-                console.error('Error fetching academic years', error)
                 setAcademicYearsError('Failed to load academic years')
             } finally {
                 setAcademicYearsLoading(false)
@@ -169,7 +165,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                     setSectionOptions(sectionsResponse.data.data)
                 }
             } catch (error) {
-                console.error('Error fetching sections:', error)
                 setSectionOptions([])
             } finally {
                 setLoadingSections(false)

@@ -77,7 +77,6 @@ const MarkEmployeeAttendance = () => {
       setRemarks(initialRemarks)
       setIsExistingRecord(hasExisting)
     } catch (error) {
-      console.error('Error:', error)
       setEmployees([])
     } finally {
       setIsLoading(false)

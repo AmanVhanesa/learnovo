@@ -30,7 +30,6 @@ const BulkImportModal = ({ onClose, onSuccess }) => {
                 onSuccess && onSuccess();
             }
         } catch (error) {
-            console.error('Import error:', error);
             toast.error(error.response?.data?.message || 'Failed to import students');
         } finally {
             setIsUploading(false);

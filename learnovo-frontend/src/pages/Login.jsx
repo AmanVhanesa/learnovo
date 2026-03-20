@@ -41,7 +41,6 @@ const Login = () => {
         setFormData(prev => ({ ...prev, email: email || '', schoolCode: schoolCode || '' }))
         setRememberMe(true)
       } catch (e) {
-        console.error('Error loading saved credentials:', e)
       }
     }
   }, [])
@@ -82,7 +81,6 @@ const Login = () => {
         setIsLoading(false)
       }
     } catch (err) {
-      console.error('Login error:', err)
       setIsLoading(false)
     }
   }

@@ -23,7 +23,7 @@ const AccountSettingsSection = ({ form, updateField }) => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Timezone */}
-                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6">
                     <div className="flex items-center gap-2 mb-4">
                         <Globe className="h-5 w-5 text-gray-600 dark:text-[#8E8E93]" />
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white">Timezone</h3>
@@ -45,7 +45,7 @@ const AccountSettingsSection = ({ form, updateField }) => {
                 </div>
 
                 {/* Date Format */}
-                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6">
                     <div className="flex items-center gap-2 mb-4">
                         <Calendar className="h-5 w-5 text-gray-600 dark:text-[#8E8E93]" />
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white">Date Format</h3>
@@ -65,13 +65,13 @@ const AccountSettingsSection = ({ form, updateField }) => {
                 </div>
 
                 {/* Time Format */}
-                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6">
                     <div className="flex items-center gap-2 mb-4">
                         <Clock className="h-5 w-5 text-gray-600 dark:text-[#8E8E93]" />
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white">Time Format</h3>
                     </div>
                     <div className="space-y-3">
-                        <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-[#38383A] rounded-lg cursor-pointer hover:border-primary-500 transition-colors">
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-[#38383A] rounded-xl cursor-pointer hover:border-primary-500 transition-colors">
                             <input
                                 type="radio"
                                 name="timeFormat"
@@ -85,7 +85,7 @@ const AccountSettingsSection = ({ form, updateField }) => {
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93]">2:30 PM</p>
                             </div>
                         </label>
-                        <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-[#38383A] rounded-lg cursor-pointer hover:border-primary-500 transition-colors">
+                        <label className="flex items-center gap-3 p-3 border border-gray-200 dark:border-[#38383A] rounded-xl cursor-pointer hover:border-primary-500 transition-colors">
                             <input
                                 type="radio"
                                 name="timeFormat"
@@ -103,7 +103,7 @@ const AccountSettingsSection = ({ form, updateField }) => {
                 </div>
 
                 {/* Currency (from existing settings) */}
-                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">Currency</h3>
                     <div className="space-y-3">
                         <div>
@@ -146,7 +146,7 @@ const AccountSettingsSection = ({ form, updateField }) => {
                 </div>
             </div>
 
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-4">
                 <p className="text-sm text-yellow-800 dark:text-yellow-300">
                     <strong>Important:</strong> Changing timezone or date format affects how data is displayed system-wide. Existing records are not modified.
                 </p>

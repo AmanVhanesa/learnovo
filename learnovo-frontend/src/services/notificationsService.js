@@ -35,7 +35,6 @@ const notificationsService = {
             const response = await api.get(`/notifications?${params.toString()}`);
             return response.data;
         } catch (error) {
-            console.error('Get notifications error:', error);
             throw error;
         }
     },
@@ -48,7 +47,6 @@ const notificationsService = {
             const response = await api.get('/notifications/unread-count');
             return response.data;
         } catch (error) {
-            console.error('Get unread count error:', error);
             throw error;
         }
     },
@@ -61,7 +59,6 @@ const notificationsService = {
             const response = await api.get(`/notifications/${notificationId}`);
             return response.data;
         } catch (error) {
-            console.error('Get notification error:', error);
             throw error;
         }
     },
@@ -74,7 +71,6 @@ const notificationsService = {
             const response = await api.patch(`/notifications/${notificationId}/read`);
             return response.data;
         } catch (error) {
-            console.error('Mark as read error:', error);
             throw error;
         }
     },
@@ -87,7 +83,6 @@ const notificationsService = {
             const response = await api.patch(`/notifications/${notificationId}/unread`);
             return response.data;
         } catch (error) {
-            console.error('Mark as unread error:', error);
             throw error;
         }
     },
@@ -100,7 +95,6 @@ const notificationsService = {
             const response = await api.patch('/notifications/mark-all-read');
             return response.data;
         } catch (error) {
-            console.error('Mark all as read error:', error);
             throw error;
         }
     },
@@ -113,7 +107,6 @@ const notificationsService = {
             const response = await api.delete(`/notifications/${notificationId}`);
             return response.data;
         } catch (error) {
-            console.error('Delete notification error:', error);
             throw error;
         }
     },
@@ -128,7 +121,6 @@ const notificationsService = {
             });
             return response.data;
         } catch (error) {
-            console.error('Bulk delete error:', error);
             throw error;
         }
     },
@@ -141,7 +133,6 @@ const notificationsService = {
             const response = await api.get('/notifications/preferences');
             return response.data;
         } catch (error) {
-            console.error('Get preferences error:', error);
             throw error;
         }
     },
@@ -154,7 +145,6 @@ const notificationsService = {
             const response = await api.put('/notifications/preferences', { preferences });
             return response.data;
         } catch (error) {
-            console.error('Update preferences error:', error);
             throw error;
         }
     }

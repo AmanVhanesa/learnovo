@@ -78,7 +78,7 @@ const MarksGradingSection = ({ form, updateField }) => {
             </div>
 
             {!validation.valid && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-4 flex items-start gap-3">
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-4 flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
                     <div>
                         <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Validation Warning</p>
@@ -88,7 +88,7 @@ const MarksGradingSection = ({ form, updateField }) => {
             )}
 
             {/* Existing Grades Table */}
-            <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg overflow-hidden">
+            <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-[#38383A]">
                     <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
@@ -155,7 +155,7 @@ const MarksGradingSection = ({ form, updateField }) => {
             </div>
 
             {/* Add New Grade */}
-            <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4">
+            <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4">
                 <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">Add New Grade</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
                     <div>
@@ -216,7 +216,7 @@ const MarksGradingSection = ({ form, updateField }) => {
                 </div>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
                 <p className="text-sm text-blue-800 dark:text-blue-300">
                     <strong>Note:</strong> Grading rules affect exam results, report cards, and analytics. Ensure ranges cover 0-100% without overlaps.
                 </p>

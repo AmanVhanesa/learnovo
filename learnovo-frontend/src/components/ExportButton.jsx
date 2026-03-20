@@ -48,7 +48,6 @@ const ExportButton = ({
 
             toast.success(`${module} exported successfully`);
         } catch (error) {
-            console.error('Export error:', error);
             toast.error(error.response?.data?.message || 'Failed to export data');
         } finally {
             setExporting(false);

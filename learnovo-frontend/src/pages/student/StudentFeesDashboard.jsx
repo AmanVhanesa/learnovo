@@ -252,7 +252,7 @@ const StudentFeesDashboard = () => {
                             {invoices.length === 0 && <p className="col-span-full py-10 text-center text-gray-500 dark:text-[#8E8E93]">No invoices have been assigned to you yet.</p>}
 
                             {invoices.map(invoice => (
-                                <div key={invoice._id} className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden hover:shadow-md transition-shadow">
+                                <div key={invoice._id} className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden hover:shadow-md transition-shadow">
                                     <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-start">
                                         <div>
                                             <h3 className="font-semibold text-lg text-gray-900 dark:text-white">{invoice.invoiceNumber}</h3>
@@ -295,7 +295,7 @@ const StudentFeesDashboard = () => {
 
                     {/* HISTORY TAB */}
                     {activeTab === 'history' && (
-                        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden animate-fade-in text-gray-900 dark:text-white">
+                        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden animate-fade-in text-gray-900 dark:text-white">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead className="bg-gray-50 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] font-medium border-b border-gray-200 dark:border-[#38383A]">
@@ -348,7 +348,7 @@ const StudentFeesDashboard = () => {
 
                     {/* RECEIPTS TAB */}
                     {activeTab === 'receipts' && (
-                        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden animate-fade-in text-gray-900 dark:text-white">
+                        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden animate-fade-in text-gray-900 dark:text-white">
                             {receiptsLoading ? (
                                 <div className="py-16 text-center"><div className="loading loading-spinner text-indigo-600 loading-lg"></div></div>
                             ) : receipts.length === 0 ? (
@@ -547,7 +547,7 @@ const StudentFeesDashboard = () => {
                                 <button type="button" onClick={() => setDisputeModal({ isOpen: false })} className="w-full sm:w-auto px-4 py-2 font-medium text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-xl">
                                     Cancel
                                 </button>
-                                <button type="submit" disabled={submitDisputeMutation.isPending} className="w-full sm:w-auto px-6 py-2 font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-sm disabled:opacity-50">
+                                <button type="submit" disabled={submitDisputeMutation.isPending} className="w-full sm:w-auto px-6 py-2 font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-2xl shadow-glass disabled:opacity-50">
                                     {submitDisputeMutation.isPending ? 'Submitting...' : 'Submit Dispute'}
                                 </button>
                             </div>
@@ -636,7 +636,7 @@ const StudentFeesDashboard = () => {
                                 <button type="button" onClick={() => setPaymentModal({ isOpen: false, invoice: null })} className="w-full sm:w-auto px-4 py-2 font-medium text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-xl">
                                     Cancel
                                 </button>
-                                <button type="submit" disabled={submitPaymentMutation.isPending} className="w-full sm:w-auto px-6 py-2.5 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                                <button type="submit" disabled={submitPaymentMutation.isPending} className="w-full sm:w-auto px-6 py-2.5 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-glass disabled:opacity-50 flex items-center justify-center gap-2">
                                     {submitPaymentMutation.isPending ? (
                                         <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Submitting...</>
                                     ) : (
@@ -662,7 +662,7 @@ const StudentFeesDashboard = () => {
                         </p>
                         <button
                             onClick={() => { setPaymentConfirmation(false); setActiveTab('history'); }}
-                            className="mt-6 w-full px-6 py-2.5 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm"
+                            className="mt-6 w-full px-6 py-2.5 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-glass"
                         >
                             View Payment History
                         </button>

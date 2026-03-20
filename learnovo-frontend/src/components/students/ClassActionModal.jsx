@@ -28,7 +28,6 @@ const ClassActionModal = ({ isOpen, onClose, onConfirm, type, student, isLoading
                     setSectionOptions(response.data.sections || []);
                 }
             } catch (e) {
-                console.error('Error fetching filters:', e);
             }
         };
         fetchFilters();

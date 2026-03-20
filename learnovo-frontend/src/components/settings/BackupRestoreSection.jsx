@@ -320,7 +320,7 @@ const BackupRestoreSection = () => {
 
             {/* Restore from Cloud */}
             {cloudStatus.configured && cloudStatus.file && (
-              <div className="p-4 bg-white dark:bg-[#1C1C1E] rounded-lg border border-gray-200 dark:border-[#38383A] space-y-3">
+              <div className="p-4 bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] space-y-3">
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <Cloud className="h-4 w-4 text-blue-500" /> Restore from Google Drive
                 </h4>
@@ -356,7 +356,7 @@ const BackupRestoreSection = () => {
             )}
 
             {/* Restore from File */}
-            <div className="p-4 bg-white dark:bg-[#1C1C1E] rounded-lg border border-gray-200 dark:border-[#38383A] space-y-3">
+            <div className="p-4 bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] space-y-3">
               <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <Upload className="h-4 w-4 text-gray-500" /> Restore from File
               </h4>

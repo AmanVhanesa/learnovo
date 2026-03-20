@@ -232,7 +232,7 @@ const BulkPromotion = () => {
                 {/* SETTINGS PANEL */}
                 <div className="lg:col-span-1 space-y-6">
                     {/* Source Selection */}
-                    <div className="bg-white dark:bg-[#1C1C1E] p-4 sm:p-6 rounded-lg border border-gray-200 dark:border-[#38383A] shadow-sm">
+                    <div className="card p-4 sm:p-6">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                             Step 1: Select Source
                         </h2>
@@ -267,7 +267,7 @@ const BulkPromotion = () => {
                     </div>
 
                     {/* Target Selection */}
-                    <div className="bg-white dark:bg-[#1C1C1E] p-4 sm:p-6 rounded-lg border border-gray-200 dark:border-[#38383A] shadow-sm">
+                    <div className="card p-4 sm:p-6">
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                             Step 2: Configure Target
                         </h2>
@@ -403,7 +403,7 @@ const BulkPromotion = () => {
                         </div>
                     )}
 
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-lg border border-gray-200 dark:border-[#38383A] shadow-sm overflow-hidden">
+                    <div className="card overflow-hidden">
                         <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E]">
                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                                 <h2 className="text-lg font-medium text-gray-900 dark:text-white">

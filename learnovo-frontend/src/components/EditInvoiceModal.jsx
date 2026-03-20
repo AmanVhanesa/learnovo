@@ -61,7 +61,6 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
             toast.success('Invoice updated successfully')
             onSuccess()
         } catch (error) {
-            console.error('Update error:', error)
             toast.error(error.response?.data?.message || 'Failed to update invoice')
         } finally {
             setIsSaving(false)

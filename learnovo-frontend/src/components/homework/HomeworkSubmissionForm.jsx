@@ -67,7 +67,6 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
             toast.success('Homework submitted successfully');
             onSuccess();
         } catch (error) {
-            console.error('Error submitting homework:', error);
             toast.error(error.message || 'Failed to submit homework');
         } finally {
             setIsLoading(false);

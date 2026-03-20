@@ -37,7 +37,7 @@ const RulesRegulationsSection = ({ form, updateField }) => {
             </div>
 
             {form.rulesAndRegulations?.version && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3 flex items-center justify-between">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-3 flex items-center justify-between">
                     <div className="text-sm text-blue-800 dark:text-blue-300">
                         <span className="font-medium">Version:</span> {form.rulesAndRegulations.version}
                         {form.rulesAndRegulations.lastUpdatedAt && (
@@ -81,7 +81,7 @@ Example:
                     </div>
                 </div>
             ) : (
-                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-6">
+                <div className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-6">
                     {form.rulesAndRegulations?.content ? (
                         <div className="prose prose-sm max-w-none">
                             <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 dark:text-[#8E8E93]">
@@ -98,7 +98,7 @@ Example:
                 </div>
             )}
 
-            <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-md p-4">
+            <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4">
                 <p className="text-sm text-gray-700 dark:text-[#8E8E93]">
                     <strong>Note:</strong> Rules and regulations are version-controlled. Each update increments the version number.
                 </p>

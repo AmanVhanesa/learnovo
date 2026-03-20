@@ -42,7 +42,6 @@ const Holidays = () => {
       const response = await attendanceService.getHolidays()
       setHolidays(response?.data || [])
     } catch (error) {
-      console.error('Error:', error)
     } finally {
       setIsLoading(false)
     }

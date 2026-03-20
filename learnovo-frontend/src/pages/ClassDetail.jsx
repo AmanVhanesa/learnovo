@@ -171,7 +171,7 @@ const ClassDetail = () => {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm">
+      <div className="card">
         <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto">
           <nav className="flex space-x-8 px-4 sm:px-6 whitespace-nowrap">
             <button

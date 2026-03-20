@@ -109,7 +109,6 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
             if (classesRes.success) setClasses(classesRes.data || []);
             if (subjectsRes.success) setSubjects(subjectsRes.data || []);
         } catch (error) {
-            console.error('Error fetching options:', error);
             toast.error('Failed to load class/subject options');
         }
     };
@@ -191,7 +190,6 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
             onSuccess();
         } catch (error) {
-            console.error('Error saving homework:', error);
             toast.error(error.message || 'Failed to save homework');
         } finally {
             setIsLoading(false);

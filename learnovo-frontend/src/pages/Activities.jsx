@@ -168,7 +168,6 @@ const Activities = () => {
             toast.dismiss()
             toast.success(`Exported ${res.data.length} activities to ${filename}`)
         } catch (error) {
-            console.error('Export error:', error)
             toast.dismiss()
             toast.error('Failed to export activities')
         }

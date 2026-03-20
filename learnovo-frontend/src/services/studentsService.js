@@ -22,8 +22,6 @@ export const studentsService = {
       const res = await api.get(url)
       return res.data
     } catch (error) {
-      console.error('🌐 studentsService.list() error:', error)
-      console.error('🌐 Error response:', error.response?.data)
       throw error
     }
   },

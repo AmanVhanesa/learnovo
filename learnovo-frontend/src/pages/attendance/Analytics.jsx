@@ -23,7 +23,6 @@ const Analytics = () => {
       const response = await attendanceService.getAnalytics({ month, year })
       setAnalyticsData(response?.data || null)
     } catch (error) {
-      console.error('Error:', error)
     } finally {
       setIsLoading(false)
     }

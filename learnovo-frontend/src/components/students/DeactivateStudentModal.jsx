@@ -40,7 +40,7 @@ const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => 
                 <form onSubmit={handleSubmit}>
                     <div className="p-6 space-y-4">
                         {/* Student Info */}
-                        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+                        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-800 rounded-2xl p-3">
                             <p className="text-sm font-medium text-blue-900 dark:text-blue-300">{student.fullName || student.name}</p>
                             <p className="text-xs text-blue-700 dark:text-blue-400">
                                 {student.class && student.section ? `${student.class}-${student.section}` : student.class || 'N/A'} •
@@ -105,7 +105,7 @@ const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => 
                         </div>
 
                         {/* Warning */}
-                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3 flex gap-2">
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-3 flex gap-2">
                             <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
                             <div className="text-sm text-yellow-800 dark:text-yellow-300">
                                 <p className="font-medium">This will mark the student as inactive</p>

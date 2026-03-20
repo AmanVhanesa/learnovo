@@ -135,7 +135,6 @@ const Profile = () => {
       }
     },
     onError: (error) => {
-      console.error('Error updating profile:', error)
       const errData = error.response?.data
       if (errData?.errors?.length) {
         errData.errors.forEach(e => toast.error(e.msg || e.message || e))
@@ -174,7 +173,6 @@ const Profile = () => {
         toast.error('New passwords do not match')
         return
       }
-      console.error('Error updating password:', error)
       const errData = error.response?.data
       if (errData?.errors?.length) {
         errData.errors.forEach(e => toast.error(e.msg || e.message || e))
@@ -193,7 +191,7 @@ const Profile = () => {
       </div>
 
       {/* Profile Photo Card */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+      <div className="card p-4 sm:p-6">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Profile Photo</h3>
         <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
           {/* Avatar */}
@@ -253,7 +251,7 @@ const Profile = () => {
 
       {/* Identity Card - Read-only info */}
       {(isStudent || isEmployee) && (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+        <div className="card p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-4">
             <ShieldCheck className="h-5 w-5 text-primary-600 dark:text-primary-400" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
@@ -294,7 +292,7 @@ const Profile = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Personal Information */}
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+        <div className="card p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -447,7 +445,7 @@ const Profile = () => {
         <div className="space-y-6">
           {/* Employee-specific: Professional & Additional Info */}
           {isEmployee && (
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="card p-4 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Briefcase className="h-5 w-5 text-primary-600 dark:text-primary-400" />
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Additional Information</h3>
@@ -500,7 +498,7 @@ const Profile = () => {
 
           {/* Guardian Information - Read only for students */}
           {isStudent && user?.guardians && user.guardians.length > 0 && (
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="card p-4 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Heart className="h-5 w-5 text-primary-600 dark:text-primary-400" />
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Guardian Information</h3>
@@ -534,7 +532,7 @@ const Profile = () => {
           )}
 
           {/* Change Password */}
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 sm:p-6">
+          <div className="card p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Change Password</h3>
               <button

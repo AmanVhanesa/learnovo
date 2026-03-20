@@ -101,7 +101,7 @@ const AdminPaymentDisputes = () => {
                     )}
 
                     {/* Active Disputes Section */}
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden">
                         <div className="p-5 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center bg-gray-50/50 dark:bg-[#2C2C2E]">
                             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Active Student Claims</h2>
                         </div>
@@ -214,7 +214,7 @@ const AdminPaymentDisputes = () => {
 
                             <div className="pt-2 flex justify-end gap-3">
                                 <button type="button" onClick={() => setResolveModal({ isOpen: false, dispute: null })} className="px-4 py-2 font-medium text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-xl">Cancel</button>
-                                <button type="submit" disabled={isSubmitting} className="px-6 py-2 font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm disabled:opacity-50">
+                                <button type="submit" disabled={isSubmitting} className="px-6 py-2 font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-glass disabled:opacity-50">
                                     {isSubmitting ? 'Saving...' : 'Confirm Resolution'}
                                 </button>
                             </div>

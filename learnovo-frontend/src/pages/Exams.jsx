@@ -333,28 +333,28 @@ const Exams = () => {
                 ) : mySummary ? (
                     <>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4 text-center">
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 text-center">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-500/20 mx-auto mb-2">
                                     <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium">Overall %</p>
                                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{mySummary.overallPercentage}%</p>
                             </div>
-                            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4 text-center">
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 text-center">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-500/20 mx-auto mb-2">
                                     <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium">Grade</p>
                                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{mySummary.overallGrade}</p>
                             </div>
-                            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4 text-center">
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 text-center">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 dark:bg-green-500/20 mx-auto mb-2">
                                     <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium">Passed</p>
                                 <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{mySummary.passCount}/{mySummary.totalSubjects}</p>
                             </div>
-                            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4 text-center">
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 text-center">
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-500/20 mx-auto mb-2">
                                     <TrendingUp className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                                 </div>
@@ -364,7 +364,7 @@ const Exams = () => {
                         </div>
 
                         {/* Subject-wise Results */}
-                        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
                             <div className="px-5 py-3.5 border-b border-gray-100 dark:border-[#38383A]">
                                 <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Subject-wise Results</h2>
                             </div>
@@ -412,7 +412,7 @@ const Exams = () => {
                         </div>
                     </>
                 ) : (
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] flex flex-col items-center py-16 text-gray-400 dark:text-[#636366]">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] flex flex-col items-center py-16 text-gray-400 dark:text-[#636366]">
                         <Award className="h-10 w-10 mb-3 opacity-30" />
                         <p className="font-medium">No results published yet</p>
                         <p className="text-sm mt-1">Your exam results will appear here once your teacher publishes them.</p>
@@ -421,7 +421,7 @@ const Exams = () => {
 
                 {/* Upcoming Exams for student */}
                 {!loading && exams.length > 0 && (
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
                         <div className="px-5 py-3.5 border-b border-gray-100 dark:border-[#38383A]">
                             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">My Exams Schedule</h2>
                         </div>
@@ -547,7 +547,7 @@ const Exams = () => {
                     const isClassCollapsed = collapsedClasses.has(cls);
                     const totalInClass = Object.values(sectionMap).reduce((a, arr) => a + arr.length, 0);
                     return (
-                        <div key={cls} className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-[#38383A]">
+                        <div key={cls} className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass overflow-hidden border border-gray-100 dark:border-[#38383A]">
                             {/* Class header */}
                             <button
                                 className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-50 dark:bg-[#000000] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors border-b border-gray-200 dark:border-[#38383A]"

@@ -48,7 +48,6 @@ const FeeDetailsModal = ({ isOpen, onClose, initialDate }) => {
                 setData(result.data)
             }
         } catch (err) {
-            console.error("Failed to fetch fee details", err)
             setError("Failed to load data")
         } finally {
             setLoading(false)

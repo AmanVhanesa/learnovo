@@ -26,7 +26,6 @@ const SubDepartmentsSection = () => {
                 setSubDepartments(response.data.data)
             }
         } catch (error) {
-            console.error('Error fetching sub-departments:', error)
             toast.error('Failed to load sub-departments')
         } finally {
             setIsLoading(false)
@@ -114,7 +113,7 @@ const SubDepartmentsSection = () => {
 
             {/* Add/Edit Form */}
             {isAdding && (
-                <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
                         {editingId ? 'Edit Sub Department' : 'Add New Sub Department'}
                     </h3>
@@ -160,12 +159,12 @@ const SubDepartmentsSection = () => {
                 {isLoading ? (
                     <div className="text-center py-4 dark:text-[#8E8E93]">Loading...</div>
                 ) : subDepartments.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg border border-gray-200 dark:border-[#38383A]">
+                    <div className="text-center py-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-200 dark:border-[#38383A]">
                         <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                         <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No sub-departments found</p>
                     </div>
                 ) : (
-                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 dark:ring-[#38383A] rounded-lg overflow-x-auto">
+                    <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 dark:ring-[#38383A] rounded-2xl overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-300 dark:divide-[#38383A]">
                             <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
                                 <tr>

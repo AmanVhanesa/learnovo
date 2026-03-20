@@ -410,7 +410,6 @@ const TimetableBuilder = () => {
       queryClient.invalidateQueries(['timetable-entries'])
       toast.success('Timetable generated successfully!')
     } catch (err) {
-      console.error('Generate error:', err)
       const errors = err?.errors || []
       if (errors.length > 0) {
         toast.error(errors.join(', '), { duration: 6000 })
@@ -1124,7 +1123,7 @@ const TimetableBuilder = () => {
       ) : entriesLoading || timingsLoading ? (
         <div className="h-96 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-xl" />
       ) : (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
           <TimetableGrid
             entries={entries}
             timings={timings}
@@ -1159,7 +1158,7 @@ const TimetableBuilder = () => {
 
       {/* Template Selector (for all tabs except Templates) */}
       {activeTab !== 'templates' && (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
           <TemplateSelector
             templates={templates}
             selectedId={selectedTemplateId}
@@ -1170,7 +1169,7 @@ const TimetableBuilder = () => {
       )}
 
       {/* Tabs */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A]">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A]">
         <div className="flex overflow-x-auto border-b border-gray-100 dark:border-[#38383A] scrollbar-hide">
           {TABS.map(tab => {
             const Icon = tab.icon

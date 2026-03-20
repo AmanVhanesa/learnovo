@@ -59,7 +59,6 @@ const Teachers = () => {
       queryClient.invalidateQueries({ queryKey: ['teachers'] })
     },
     onError: (err) => {
-      console.error('Save teacher error:', err)
       alert(err?.response?.data?.message || 'Failed to add teacher')
     },
   })
@@ -73,7 +72,6 @@ const Teachers = () => {
       queryClient.invalidateQueries({ queryKey: ['teachers'] })
     },
     onError: (err) => {
-      console.error('Delete teacher error:', err)
       alert(err?.response?.data?.message || 'Failed to delete teacher')
     },
   })
@@ -156,7 +154,7 @@ const Teachers = () => {
 
       {/* Error Message */}
       {errorMessage && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4">
           <div className="flex items-center">
             <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
             <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
@@ -170,7 +168,7 @@ const Teachers = () => {
         </div>
       )}
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm overflow-hidden">
+      <div className="card overflow-hidden">
         <div className="overflow-x-auto table-scroll">
         <table className="table min-w-[600px]">
           <thead>

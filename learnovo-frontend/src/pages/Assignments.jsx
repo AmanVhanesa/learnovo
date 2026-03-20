@@ -279,7 +279,7 @@ const Assignments = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-4">
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-2xl p-4">
           <div className="flex items-center">
             <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
             <p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || error.message || 'Failed to load assignments.'}</p>
@@ -324,7 +324,7 @@ const Assignments = () => {
               placeholder="Search assignments..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+              className="w-full pl-10 pr-4 py-2 input"
             />
           </div>
           {!isStudent && (
@@ -332,7 +332,7 @@ const Assignments = () => {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full sm:w-40 px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                className="w-full sm:w-40 px-3 py-2 input"
               >
                 <option value="">All Status</option>
                 <option value="active">Active</option>
@@ -342,7 +342,7 @@ const Assignments = () => {
               <select
                 value={classFilter}
                 onChange={(e) => setClassFilter(e.target.value)}
-                className="w-full sm:w-40 px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                className="w-full sm:w-40 px-3 py-2 input"
               >
                 <option value="">All Classes</option>
                 {classNamesInAssignments.map(name => (
@@ -505,7 +505,7 @@ const Assignments = () => {
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                  className="w-full px-3 py-2 input"
                   placeholder="Enter assignment title"
                   required
                 />
@@ -518,7 +518,7 @@ const Assignments = () => {
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                  className="w-full px-3 py-2 input"
                   rows={3}
                   placeholder="Describe the assignment"
                   required
@@ -533,7 +533,7 @@ const Assignments = () => {
                   <select
                     value={form.class}
                     onChange={(e) => handleClassChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                    className="w-full px-3 py-2 input"
                     required
                   >
                     <option value="">Select Class</option>
@@ -549,7 +549,7 @@ const Assignments = () => {
                   <select
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                    className="w-full px-3 py-2 input"
                     required
                   >
                     <option value="">Select Subject</option>
@@ -569,7 +569,7 @@ const Assignments = () => {
                     type="date"
                     value={form.dueDate}
                     onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                    className="w-full px-3 py-2 input"
                     min={new Date().toISOString().split('T')[0]}
                     required
                   />
@@ -582,7 +582,7 @@ const Assignments = () => {
                     type="number"
                     value={form.totalMarks}
                     onChange={(e) => setForm({ ...form, totalMarks: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                    className="w-full px-3 py-2 input"
                     min="1"
                   />
                 </div>
@@ -595,7 +595,7 @@ const Assignments = () => {
                 <textarea
                   value={form.instructions}
                   onChange={(e) => setForm({ ...form, instructions: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                  className="w-full px-3 py-2 input"
                   rows={2}
                   placeholder="Additional instructions for students..."
                 />

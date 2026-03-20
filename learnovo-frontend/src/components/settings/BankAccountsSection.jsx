@@ -81,7 +81,7 @@ const BankAccountsSection = ({ form, updateField, settingsService }) => {
 
             {/* Add/Edit Form */}
             {isAdding && (
-                <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6">
+                <div className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
                         {editingId !== null ? 'Edit Bank Account' : 'Add New Bank Account'}
                     </h3>
@@ -166,7 +166,7 @@ const BankAccountsSection = ({ form, updateField, settingsService }) => {
             {/* Bank Accounts List */}
             <div className="space-y-4">
                 {(form.bankAccounts || []).length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg border border-gray-200 dark:border-[#38383A]">
+                    <div className="text-center py-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-200 dark:border-[#38383A]">
                         <Banknote className="h-12 w-12 text-gray-400 mx-auto mb-3" />
                         <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No bank accounts added yet</p>
                         <p className="text-xs text-gray-400 mt-1">Add your first bank account to get started</p>
@@ -175,7 +175,7 @@ const BankAccountsSection = ({ form, updateField, settingsService }) => {
                     (form.bankAccounts || []).map((account, index) => (
                         <div
                             key={index}
-                            className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg p-4 sm:p-6 hover:shadow-md transition-shadow"
+                            className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-2xl p-4 sm:p-6 hover:shadow-md transition-shadow"
                         >
                             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                 <div className="flex-1">

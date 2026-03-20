@@ -63,7 +63,6 @@ const CreateStudentListModal = ({ isOpen, onClose, onSuccess }) => {
                 toast.error(res.message || 'Failed to create list');
             }
         } catch (error) {
-            console.error('Error creating list:', error);
             toast.error(error.response?.data?.message || 'Server error while creating list');
         } finally {
             setIsLoading(false);

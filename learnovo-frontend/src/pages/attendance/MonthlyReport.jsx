@@ -39,7 +39,6 @@ const MonthlyReport = () => {
       }
       setClasses(response?.data || [])
     } catch (error) {
-      console.error('Error:', error)
     }
   }
 

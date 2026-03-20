@@ -36,7 +36,6 @@ const StudentSearchDropdown = ({ onSelect }) => {
                     setIsOpen(true);
                 }
             } catch (error) {
-                console.error('Error searching students:', error);
             } finally {
                 setIsLoading(false);
             }

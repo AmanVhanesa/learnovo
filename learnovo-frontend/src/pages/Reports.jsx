@@ -28,7 +28,7 @@ function exportCSV(rows, filename) {
 }
 
 const StatCard = ({ icon: Icon, label, value, sub, color }) => (
-  <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-5 flex items-start gap-4">
+  <div className="stat-card flex items-start gap-4">
     <div className={`p-3 rounded-xl ${color}`}><Icon className="h-5 w-5 text-white" /></div>
     <div className="min-w-0">
       <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium uppercase tracking-wide">{label}</p>
@@ -186,10 +186,10 @@ const Reports = () => {
 
       {loadingDashboard ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (<div key={i} className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-5 h-24 animate-pulse" />))}
+          {[...Array(4)].map((_, i) => (<div key={i} className="skeleton p-5 h-24" />))}
         </div>
       ) : dashboardErrorMsg ? (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex gap-3 items-center text-red-700 dark:text-red-400">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 flex gap-3 items-center text-red-700 dark:text-red-400">
           <AlertCircle className="h-5 w-5 shrink-0" /><span className="text-sm">{dashboardErrorMsg}</span>
         </div>
       ) : dashboard && (
@@ -201,8 +201,8 @@ const Reports = () => {
         </div>
       )}
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
-        <div className="border-b border-gray-100 dark:border-[#38383A] px-4">
+      <div className="card overflow-hidden">
+        <div className="border-b border-gray-100 dark:border-[#2C2C2E] px-4">
           <nav className="flex gap-1 overflow-x-auto">
             {tabs.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -302,7 +302,7 @@ const Reports = () => {
                 </div>
               </div>
               {fees.collectedToday > 0 && (
-                <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-xl p-3 text-sm text-green-700 dark:text-green-400">
+                <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-2xl p-3 text-sm text-green-700 dark:text-green-400">
                   <CheckCircle className="h-4 w-4 shrink-0" /><span><strong>{fmt(fees.collectedToday)}</strong> collected today</span>
                 </div>
               )}
@@ -320,16 +320,16 @@ const Reports = () => {
               {loadingAttendance ? (
                 <div className="py-16 flex justify-center"><RefreshCw className="h-6 w-6 animate-spin text-teal-500" /></div>
               ) : attendanceErrorMsg ? (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800 rounded-xl p-4 text-sm text-yellow-700 dark:text-yellow-400 flex gap-2 items-center"><AlertCircle className="h-4 w-4 shrink-0" />{attendanceErrorMsg}</div>
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800 rounded-2xl p-4 text-sm text-yellow-700 dark:text-yellow-400 flex gap-2 items-center"><AlertCircle className="h-4 w-4 shrink-0" />{attendanceErrorMsg}</div>
               ) : attendanceReport.length === 0 ? (
                 <div className="py-16 text-center text-gray-400 text-sm"><Calendar className="h-10 w-10 mx-auto mb-3 opacity-40" />No attendance records found for the selected period.</div>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-[#38383A]">
-                  <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-gray-50 dark:bg-[#2C2C2E] text-xs text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">
-                      <tr>{['Student', 'Class', 'Present', 'Absent', 'Late', 'Attendance %'].map(h => (<th key={h} className="px-4 py-3 text-left font-medium">{h}</th>))}</tr>
+                <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass">
+                  <table className="table">
+                    <thead>
+                      <tr>{['Student', 'Class', 'Present', 'Absent', 'Late', 'Attendance %'].map(h => (<th key={h}>{h}</th>))}</tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50 dark:divide-[#38383A]">
+                    <tbody>
                       {attendanceReport.map((row, i) => {
                         const pct = parseFloat(row.percentage || row.attendancePercentage || 0)
                         return (
@@ -360,7 +360,7 @@ const Reports = () => {
               {loadingActivities ? (
                 <div className="py-16 flex justify-center"><RefreshCw className="h-6 w-6 animate-spin text-teal-500" /></div>
               ) : activitiesErrorMsg ? (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl p-4 text-sm text-red-700 dark:text-red-400 flex gap-2 items-center"><AlertCircle className="h-4 w-4 shrink-0" />{activitiesErrorMsg}</div>
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl p-4 text-sm text-red-700 dark:text-red-400 flex gap-2 items-center"><AlertCircle className="h-4 w-4 shrink-0" />{activitiesErrorMsg}</div>
               ) : activities.length === 0 ? (
                 <div className="py-16 text-center text-gray-400 text-sm"><Activity className="h-10 w-10 mx-auto mb-3 opacity-40" />No activity records found for the selected period.</div>
               ) : (
@@ -400,16 +400,16 @@ const Reports = () => {
               {loadingPromotions ? (
                 <div className="py-16 flex justify-center"><RefreshCw className="h-6 w-6 animate-spin text-teal-500" /></div>
               ) : promotionsErrorMsg ? (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800 rounded-xl p-4 text-sm text-yellow-700 dark:text-yellow-400 flex gap-2 items-center"><AlertCircle className="h-4 w-4 shrink-0" />{promotionsErrorMsg}</div>
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-800 rounded-2xl p-4 text-sm text-yellow-700 dark:text-yellow-400 flex gap-2 items-center"><AlertCircle className="h-4 w-4 shrink-0" />{promotionsErrorMsg}</div>
               ) : promotionsReport.length === 0 ? (
                 <div className="py-16 text-center text-gray-400 text-sm"><RefreshCw className="h-10 w-10 mx-auto mb-3 opacity-40" />No class action records found for the selected period.</div>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-[#38383A]">
-                  <table className="w-full text-sm min-w-[600px]">
-                    <thead className="bg-gray-50 dark:bg-[#2C2C2E] text-xs text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">
-                      <tr>{['Date', 'Student', 'Action', 'From Class', 'To Class', 'A.Y', 'Performed By'].map(h => (<th key={h} className="px-4 py-3 text-left font-medium">{h}</th>))}</tr>
+                <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass">
+                  <table className="table">
+                    <thead>
+                      <tr>{['Date', 'Student', 'Action', 'From Class', 'To Class', 'A.Y', 'Performed By'].map(h => (<th key={h}>{h}</th>))}</tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50 dark:divide-[#38383A]">
+                    <tbody>
                       {promotionsReport.map((row, i) => (
                         <tr key={row._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
                           <td className="px-4 py-3 text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{fmtDate(row.createdAt)}</td>

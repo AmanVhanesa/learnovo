@@ -122,21 +122,13 @@ export function AuthProvider({ children }) {
       dispatch({ type: 'AUTH_START' })
 
       const response = await authService.login(loginData)
-      console.log('AuthService login response:', response)
 
       // Handle both response formats (direct response.data or nested)
       const token = response.token || response.data?.token
       const user = response.user || response.data?.user
       const tenant = response.tenant || response.data?.tenant
 
-      console.log('Extracted values:', {
-        hasToken: !!token,
-        hasUser: !!user,
-        hasTenant: !!tenant
-      })
-
       if (!token) {
-        console.error('No token in response:', response)
         throw new Error('No token received from server')
       }
 
@@ -145,21 +137,15 @@ export function AuthProvider({ children }) {
       if (user) localStorage.setItem('user', JSON.stringify(user))
       if (tenant) localStorage.setItem('tenant', JSON.stringify(tenant))
 
-      console.log('Stored token in localStorage')
-
       // Update auth state
       dispatch({
         type: 'AUTH_SUCCESS',
         payload: { user, tenant, token }
       })
 
-      console.log('Auth state updated, user authenticated:', !!user)
       toast.success('Login successful!')
       return { success: true, user, tenant, token }
     } catch (error) {
-      console.error('Login error details:', error)
-      console.error('Error response:', error.response?.data)
-      console.error('Error status:', error.response?.status)
 
       let message = 'Login failed'
 

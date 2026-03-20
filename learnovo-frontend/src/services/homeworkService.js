@@ -120,7 +120,6 @@ class HomeworkService {
                     fileSize: file.size
                 });
             } catch (error) {
-                console.error('Error processing file:', error);
                 throw new Error(`Failed to process file: ${file.name}`);
             }
         }

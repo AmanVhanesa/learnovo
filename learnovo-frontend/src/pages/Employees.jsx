@@ -115,7 +115,6 @@ const Employees = () => {
                     try {
                         await employeesService.uploadPhoto(response.data.id, pendingPhotoFile)
                     } catch (photoErr) {
-                        console.error('Pending photo upload failed:', photoErr)
                         toast.error('Employee saved but photo upload failed. You can re-upload by editing the employee.')
                     }
                 }
@@ -137,7 +136,6 @@ const Employees = () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] })
         },
         onError: (error) => {
-            console.error('Save employee error:', error)
             toast.error(error.response?.data?.message || 'Failed to save employee')
         },
     })
@@ -152,7 +150,6 @@ const Employees = () => {
             queryClient.invalidateQueries({ queryKey: ['employees'] })
         },
         onError: (error, variables) => {
-            console.error('Toggle status error:', error)
             toast.error(`Failed to ${variables.action} employee`)
         },
     })
@@ -172,7 +169,6 @@ const Employees = () => {
             }
         },
         onError: (error) => {
-            console.error('Reset password error:', error)
             toast.error('Failed to reset password')
         },
     })

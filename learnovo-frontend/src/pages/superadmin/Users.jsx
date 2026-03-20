@@ -66,8 +66,8 @@ const SuperAdminUsers = () => {
                     <p className="mt-1 text-sm text-gray-500 dark:text-[#8E8E93]">Manage all users across all schools on the platform.</p>
                 </div>
             </div>
-            {error && (<div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4 flex items-center"><AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" /><p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || error.message || 'Failed to load users'}</p></div>)}
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+            {error && (<div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 flex items-center"><AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" /><p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || error.message || 'Failed to load users'}</p></div>)}
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
                 <div className="flex flex-col lg:flex-row gap-4">
                     <form onSubmit={handleSearch} className="flex-1">
                         <div className="relative">
@@ -89,7 +89,7 @@ const SuperAdminUsers = () => {
                     </div>
                 </div>
             </div>
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
                 <div className="overflow-x-auto min-h-[400px] relative">
                     <table className="min-w-full min-w-[700px] divide-y divide-gray-200 dark:divide-[#38383A]">
                         <thead className="bg-gray-50 dark:bg-[#2C2C2E]">

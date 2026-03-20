@@ -73,7 +73,6 @@ const Register = () => {
         }))
       }
     } catch (error) {
-      console.error('Error checking availability:', error)
     }
   }
 
@@ -155,7 +154,6 @@ const Register = () => {
         setErrors({ submit: data.message })
       }
     } catch (error) {
-      console.error('Registration error:', error)
 
       let errorMessage = 'Registration failed. Please try again.'
 

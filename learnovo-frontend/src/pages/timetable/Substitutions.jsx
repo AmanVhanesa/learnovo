@@ -268,7 +268,7 @@ const Substitutions = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-gray-400" />
@@ -299,28 +299,28 @@ const Substitutions = () => {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
           <div className="flex items-center justify-between mb-2">
             <AlertCircle className="w-5 h-5 text-amber-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pending}</p>
           <p className="text-xs text-gray-400 dark:text-gray-500 uppercase mt-0.5">Pending</p>
         </div>
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
           <div className="flex items-center justify-between mb-2">
             <Users className="w-5 h-5 text-blue-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.assigned}</p>
           <p className="text-xs text-gray-400 dark:text-gray-500 uppercase mt-0.5">Assigned</p>
         </div>
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
           <div className="flex items-center justify-between mb-2">
             <CheckCircle className="w-5 h-5 text-emerald-500" />
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.completed}</p>
           <p className="text-xs text-gray-400 dark:text-gray-500 uppercase mt-0.5">Completed</p>
         </div>
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] p-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
           <div className="flex items-center justify-between mb-2">
             <Clock className="w-5 h-5 text-gray-400" />
           </div>
@@ -360,7 +360,7 @@ const Substitutions = () => {
       )}
 
       {/* Substitutions Table */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-100 dark:border-[#38383A] overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
         {subsLoading ? (
           <div className="p-6 space-y-3">
             {Array.from({ length: 5 }).map((_, i) => (

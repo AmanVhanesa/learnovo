@@ -37,7 +37,6 @@ const NotificationPreferences = () => {
                 const response = await notificationsService.getPreferences();
                 return response.data || { preferences: DEFAULT_PREFERENCES };
             } catch {
-                console.warn('Preferences endpoint not available, using defaults');
                 return { preferences: DEFAULT_PREFERENCES };
             }
         },

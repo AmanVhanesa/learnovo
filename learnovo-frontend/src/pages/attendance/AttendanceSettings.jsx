@@ -41,7 +41,6 @@ const AttendanceSettings = () => {
         setSettings(prev => ({ ...prev, ...response.data }))
       }
     } catch (error) {
-      console.error('Error:', error)
     } finally {
       setIsLoading(false)
     }

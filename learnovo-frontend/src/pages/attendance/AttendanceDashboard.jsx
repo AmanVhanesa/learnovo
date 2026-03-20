@@ -19,7 +19,6 @@ const AttendanceDashboard = ({ onTabChange }) => {
       const response = await attendanceService.getDashboard()
       setDashboardData(response?.data || null)
     } catch (error) {
-      console.error('Error:', error)
       toast.error('Failed to load dashboard')
     } finally {
       setIsLoading(false)
