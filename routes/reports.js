@@ -458,7 +458,31 @@ router.get('/dashboard', protect, async (req, res) => {
               });
             }
 
-            return Array.from(classMap.values());
+            // Count students per class
+            const classList = Array.from(classMap.values());
+            if (classList.length > 0) {
+              const classIds = classList.map(c => c.id);
+              const classNames = classList.map(c => c.name);
+              const studentCounts = await User.aggregate([
+                { $match: {
+                  role: 'student', tenantId, isActive: true,
+                  $or: [
+                    { classId: { $in: classIds } },
+                    { class: { $in: classNames } }
+                  ]
+                }},
+                { $group: {
+                  _id: { $ifNull: ['$classId', '$class'] },
+                  count: { $sum: 1 }
+                }}
+              ]);
+              const countMap = {};
+              studentCounts.forEach(sc => { countMap[sc._id?.toString()] = sc.count; });
+              classList.forEach(c => {
+                c.studentCount = countMap[c.id?.toString()] || countMap[c.name] || 0;
+              });
+            }
+            return classList;
           } catch { return []; }
         })(),
       ]);

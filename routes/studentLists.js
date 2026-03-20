@@ -63,18 +63,19 @@ router.post('/', protect, async (req, res) => {
     }
 });
 
-// @desc    Get all student lists for the tenant
+// @desc    Get all student lists for the tenant (teachers see only their own lists)
 // @route   GET /api/student-lists
 // @access  Private
 router.get('/', protect, async (req, res) => {
     try {
-        const lists = await StudentList.find({ tenantId: req.user.tenantId })
-            .select('-students') // Exclude heavy student array for the listing
-            .sort({ createdAt: -1 });
+        const filter = { tenantId: req.user.tenantId };
+        // Teachers can only see lists they created
+        if (req.user.role === 'teacher') {
+            filter.createdBy = req.user._id;
+        }
 
-        // We also need student counts, but since we didn't populate, let's just get the lengths or we can aggregate
         const listsWithCounts = await StudentList.aggregate([
-            { $match: { tenantId: req.user.tenantId } },
+            { $match: filter },
             {
                 $project: {
                     name: 1,
@@ -102,7 +103,10 @@ router.get('/', protect, async (req, res) => {
 // @access  Private
 router.get('/:id', protect, async (req, res) => {
     try {
-        const list = await StudentList.findOne({ _id: req.params.id, tenantId: req.user.tenantId })
+        const filter = { _id: req.params.id, tenantId: req.user.tenantId };
+        if (req.user.role === 'teacher') filter.createdBy = req.user._id;
+
+        const list = await StudentList.findOne(filter)
             .populate('students', 'admissionNumber name fullName class section phone rollNumber email');
 
         if (!list) {
@@ -189,7 +193,9 @@ router.patch('/:id/remove-student/:studentId', protect, async (req, res) => {
 // @access  Private
 router.delete('/:id', protect, async (req, res) => {
     try {
-        const list = await StudentList.findOneAndDelete({ _id: req.params.id, tenantId: req.user.tenantId });
+        const filter = { _id: req.params.id, tenantId: req.user.tenantId };
+        if (req.user.role === 'teacher') filter.createdBy = req.user._id;
+        const list = await StudentList.findOneAndDelete(filter);
 
         if (!list) {
             return res.status(404).json({ success: false, message: 'Student list not found' });
