@@ -24,11 +24,7 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated && !authLoading && !isLoading) {
-      if (user?.role === 'student') {
-        navigate('/app/student/fees', { replace: true })
-      } else {
-        navigate('/app/dashboard', { replace: true })
-      }
+      navigate('/app/dashboard', { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, authLoading, isLoading, user])
@@ -75,7 +71,7 @@ const Login = () => {
       const result = await login(loginData)
       if (result && result.success) {
         setIsLoading(false)
-        const targetRoute = result?.user?.role === 'student' ? '/app/student/fees' : '/app/dashboard'
+        const targetRoute = '/app/dashboard'
         setTimeout(() => navigate(targetRoute, { replace: true }), 300)
       } else {
         setIsLoading(false)

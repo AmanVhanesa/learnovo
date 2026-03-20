@@ -26,11 +26,20 @@ const TabLoader = () => (
 
 // ── Student / Parent read-only view ─────────────────────────────────────────
 const StudentAttendanceView = () => {
+  const { user } = useAuth()
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
+
   const { data: attendanceData, isLoading } = useQuery({
-    queryKey: ['my-attendance'],
+    queryKey: ['my-attendance', selectedMonth],
     queryFn: async () => {
-      const res = await attendanceService.getAttendanceReport({})
-      return res.data || res || { summary: null, records: [] }
+      const [year, month] = selectedMonth.split('-')
+      const startDate = `${year}-${month}-01`
+      const endDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0]
+      const res = await attendanceService.getAttendanceReport({ startDate, endDate })
+      return res.data || res || { statistics: null, records: [] }
     },
   })
 
@@ -42,17 +51,37 @@ const StudentAttendanceView = () => {
     )
   }
 
-  const summary = attendanceData?.summary
-  const records = attendanceData?.records || []
-  const totalDays = summary?.totalDays || 0
-  const presentDays = summary?.present || 0
-  const absentDays = summary?.absent || 0
-  const lateDays = summary?.late || 0
-  const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0
+  // Backend returns { records, statistics } — map to local vars
+  const stats = attendanceData?.statistics
+  const rawRecords = attendanceData?.records || []
+  const totalDays = stats?.totalDays || 0
+  const presentDays = stats?.presentCount || 0
+  const absentDays = stats?.absentCount || 0
+  const lateDays = stats?.lateCount || 0
+  const attendanceRate = stats?.attendanceRate || (totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0)
+
+  // Flatten nested attendance records into a flat list for display
+  const records = rawRecords.flatMap(record =>
+    (record.attendanceRecords || []).map(ar => ({
+      date: record.date,
+      status: ar.status,
+      subject: record.classId?.name || '',
+      remarks: ar.remarks || '',
+    }))
+  ).sort((a, b) => new Date(b.date) - new Date(a.date))
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">My Attendance</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">My Attendance</h1>
+        <input
+          type="month"
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+          className="input w-auto"
+          max={`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`}
+        />
+      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

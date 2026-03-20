@@ -417,6 +417,8 @@ const Dashboard = () => {
             // Map title to navigation route
             const getRoute = (title) => {
               const lowerTitle = title.toLowerCase()
+              // Student/Parent: "My Profile" goes to profile page, not student list
+              if (lowerTitle === 'my profile') return '/app/profile'
               if (lowerTitle.includes('student')) return '/app/students'
               if (lowerTitle.includes('teacher') || lowerTitle.includes('employee')) return '/app/teachers'
               // Redirect Admin to Advanced Fees & Finance dashboard
@@ -435,7 +437,10 @@ const Dashboard = () => {
 
               if (lowerTitle.includes('assignment') || lowerTitle.includes('submission')) return '/app/assignments'
               if (lowerTitle.includes('class')) return '/app/students'
-              if (lowerTitle.includes('notification')) return '/app/notifications'
+              // Students/Parents see announcements, not the admin notification page
+              if (lowerTitle.includes('notification')) {
+                return (user?.role === 'student' || user?.role === 'parent') ? '/app/announcements' : '/app/notifications'
+              }
               if (lowerTitle.includes('attendance')) return '/app/attendance'
               return '/app/dashboard'
             }
