@@ -6,6 +6,25 @@
    LEARNOVO DESIGN SYSTEM — Glass-Inspired Modern UI
    ═══════════════════════════════════════════════════════════════ */
 
+/* Prevent iOS auto-zoom on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Prevent zoom on input focus on iOS (font-size < 16px triggers zoom) */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+/* Spinner animation for loading buttons */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 @layer base {
   html {
     overscroll-behavior: none;
@@ -410,6 +429,7 @@
            animate-scale-in
            dark:bg-[#1C1C1E] dark:ring-white/[0.06]
            rounded-t-2xl sm:rounded-2xl sm:mx-4;
+    -webkit-overflow-scrolling: touch;
     -webkit-mask-image: -webkit-radial-gradient(white, black);
     mask-image: radial-gradient(white, black);
   }
@@ -420,6 +440,7 @@
            ring-1 ring-black/[0.03]
            dark:bg-[#1C1C1E] dark:ring-white/[0.06]
            rounded-t-2xl sm:rounded-2xl sm:mx-4 md:mx-auto md:w-[90%];
+    -webkit-overflow-scrolling: touch;
     -webkit-mask-image: -webkit-radial-gradient(white, black);
     mask-image: radial-gradient(white, black);
   }

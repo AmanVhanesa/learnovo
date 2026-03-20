@@ -501,8 +501,18 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                             type="submit"
                             disabled={loading}
                             className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                            style={{ minWidth: '120px' }}
                         >
-                            {loading ? 'Saving...' : assignment ? 'Update Assignment' : 'Assign Student'}
+                            {loading ? (
+                                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="31.4" strokeDashoffset="10" />
+                                    </svg>
+                                    Saving...
+                                </span>
+                            ) : (
+                                assignment ? 'Update Assignment' : 'Assign Student'
+                            )}
                         </button>
                     </div>
                 </form>
