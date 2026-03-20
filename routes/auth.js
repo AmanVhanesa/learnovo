@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { body } = require('express-validator');
 const User = require('../models/User');
 const Tenant = require('../models/Tenant');
@@ -7,8 +8,19 @@ const { handleValidationErrors } = require('../middleware/validation');
 const { getTenantFromRequest } = require('../middleware/tenant');
 const upload = require('../middleware/upload');
 const cloudinaryService = require('../services/cloudinaryService');
+const emailService = require('../services/emailService');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
+
+// Rate limiter for password reset: 5 requests per 15 minutes per IP
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many password reset attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // @desc    Register user (within a tenant)
 // @route   POST /api/auth/register
@@ -631,31 +643,49 @@ router.post('/logout', protect, (req, res) => {
 // @desc    Forgot password
 // @route   POST /api/auth/forgot-password
 // @access  Public
-router.post('/forgot-password', [
+router.post('/forgot-password', forgotPasswordLimiter, [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   handleValidationErrors
 ], async (req, res) => {
   try {
     const { email } = req.body;
 
-    const user = await User.findOne({ email });
+    // Always return the same response to prevent user enumeration
+    const successMessage = 'If an account with that email exists, password reset instructions have been sent';
+
+    const user = await User.findOne({ email }).select('+resetPasswordToken +resetPasswordExpire');
     if (!user) {
-      return res.status(404).json({
+      return res.json({ success: true, message: successMessage });
+    }
+
+    // Generate cryptographically secure reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+
+    // Hash token before storing in DB (so a DB leak doesn't expose valid tokens)
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpire = Date.now() + 60 * 60 * 1000; // 1 hour
+    await user.save({ validateBeforeSave: false });
+
+    // Send reset email with the unhashed token (user receives this in the link)
+    try {
+      const userName = user.name || user.fullName || user.firstName || 'User';
+      await emailService.sendPasswordResetEmail(user.email, resetToken, userName);
+    } catch (emailError) {
+      // If email fails, clear the token so user can retry
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+
+      console.error('Failed to send password reset email:', emailError);
+      return res.status(500).json({
         success: false,
-        message: 'User not found with this email'
+        message: 'Failed to send reset email. Please try again later.'
       });
     }
 
-    // Generate reset token (in production, use crypto.randomBytes)
-    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
-    // In production, save reset token to database with expiration
-    // For now, just send a response
-    res.json({
-      success: true,
-      message: 'Password reset instructions sent to your email',
-      resetToken // Remove this in production
-    });
+    res.json({ success: true, message: successMessage });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({
@@ -676,8 +706,28 @@ router.put('/reset-password', [
   try {
     const { token, password } = req.body;
 
-    // In production, verify token and check expiration
-    // For now, just update password if token is provided
+    // Hash the incoming token to compare against the stored hash
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find user with matching token that hasn't expired
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    }).select('+resetPasswordToken +resetPasswordExpire +password');
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    // Set new password (pre-save hook will hash it)
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
     res.json({
       success: true,
       message: 'Password reset successfully'

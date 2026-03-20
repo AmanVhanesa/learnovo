@@ -376,6 +376,16 @@ const userSchema = new mongoose.Schema({
   removalNotes: {
     type: String,
     trim: true
+  },
+
+  // ── Password reset fields ────────────────────────────────────────
+  resetPasswordToken: {
+    type: String,
+    select: false
+  },
+  resetPasswordExpire: {
+    type: Date,
+    select: false
   }
 }, {
   timestamps: true
