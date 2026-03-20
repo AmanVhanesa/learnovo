@@ -38,7 +38,7 @@ router.get('/:id', protect, async(req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
 
-    if (!subject) {
+    if (!subject || subject.tenantId.toString() !== req.user.tenantId.toString()) {
       return res.status(404).json({
         success: false,
         message: 'Subject not found'
@@ -133,6 +133,12 @@ router.put('/:id', [
       });
     }
 
+    // Verify tenant ownership
+    const existingSubject = await Subject.findById(req.params.id);
+    if (!existingSubject || existingSubject.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
     const { name, subjectCode, description, type, maxMarks, passingMarks } = req.body;
     const updates = {};
 
@@ -140,6 +146,13 @@ router.put('/:id', [
     if (type !== undefined) updates.type = type;
     if (maxMarks !== undefined) updates.maxMarks = maxMarks;
     if (passingMarks !== undefined) updates.passingMarks = passingMarks;
+
+    // Validate passingMarks <= maxMarks
+    const effectiveMax = maxMarks !== undefined ? maxMarks : existingSubject.maxMarks;
+    const effectivePass = passingMarks !== undefined ? passingMarks : existingSubject.passingMarks;
+    if (effectivePass > effectiveMax) {
+      return res.status(400).json({ success: false, message: 'Passing marks cannot exceed max marks' });
+    }
     if (subjectCode) {
       // Check if new subject code already exists (excluding current subject)
       const existingSubject = await Subject.findOne({
@@ -187,6 +200,14 @@ router.put('/:id', [
 // Delete a subject
 router.delete('/:id', [protect, authorize('admin')], async(req, res) => {
   try {
+    const subject = await Subject.findById(req.params.id);
+    if (!subject || subject.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(404).json({
+        success: false,
+        message: 'Subject not found'
+      });
+    }
+
     const deletedSubject = await Subject.findByIdAndDelete(req.params.id);
 
     if (!deletedSubject) {
@@ -214,7 +235,7 @@ router.patch('/:id/toggle', [protect, authorize('admin')], async(req, res) => {
   try {
     const subject = await Subject.findById(req.params.id);
 
-    if (!subject) {
+    if (!subject || subject.tenantId.toString() !== req.user.tenantId.toString()) {
       return res.status(404).json({
         success: false,
         message: 'Subject not found'

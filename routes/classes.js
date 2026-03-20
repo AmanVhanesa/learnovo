@@ -230,6 +230,12 @@ router.put('/:id', [
       }
     }
 
+    // Verify tenant ownership before update
+    const existingClass = await Class.findById(req.params.id);
+    if (!existingClass || existingClass.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+
     const updateData = {};
     if (name !== undefined) updateData.name = name;
     if (grade !== undefined) updateData.grade = grade;
@@ -318,6 +324,12 @@ router.put('/:id', [
 // Delete a class
 router.delete('/:id', [protect, authorize('admin')], async (req, res) => {
   try {
+    // Verify tenant ownership
+    const classToDelete = await Class.findById(req.params.id);
+    if (!classToDelete || classToDelete.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+
     // Check if class has students
     const studentCount = await User.countDocuments({
       classId: req.params.id,
@@ -382,9 +394,16 @@ router.get('/:id/sections', protect, async (req, res) => {
 // Get students in a class
 router.get('/:id/students', protect, async (req, res) => {
   try {
+    // Verify tenant ownership
+    const classItem = await Class.findById(req.params.id);
+    if (!classItem || classItem.tenantId.toString() !== req.user.tenantId.toString()) {
+      return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+
     const students = await User.find({
       classId: req.params.id,
-      role: 'student'
+      role: 'student',
+      tenantId: req.user.tenantId
     }).select('name email studentId rollNumber admissionDate guardianName guardianPhone');
 
     res.json({
@@ -420,18 +439,18 @@ router.post('/:id/students', [
     const { studentIds } = req.body;
     const classId = req.params.id;
 
-    // Check if class exists
+    // Check if class exists and belongs to tenant
     const classItem = await Class.findById(classId);
-    if (!classItem) {
+    if (!classItem || classItem.tenantId.toString() !== req.user.tenantId.toString()) {
       return res.status(404).json({
         success: false,
         message: 'Class not found'
       });
     }
 
-    // Update students' classId
+    // Update students' classId (only for students in same tenant)
     const result = await User.updateMany(
-      { _id: { $in: studentIds }, role: 'student' },
+      { _id: { $in: studentIds }, role: 'student', tenantId: req.user.tenantId },
       { classId }
     );
 
@@ -456,7 +475,7 @@ router.get('/:id/subjects', protect, async (req, res) => {
       .populate('subjects.subject', 'name subjectCode')
       .populate('subjects.teacher', 'name email');
 
-    if (!classItem) {
+    if (!classItem || classItem.tenantId.toString() !== req.user.tenantId.toString()) {
       return res.status(404).json({
         success: false,
         message: 'Class not found'
@@ -496,9 +515,9 @@ router.post('/:id/subjects', [
     const { subjectId, teacherId } = req.body;
     const classId = req.params.id;
 
-    // Check if class exists
+    // Check if class exists and belongs to tenant
     const classItem = await Class.findById(classId);
-    if (!classItem) {
+    if (!classItem || classItem.tenantId.toString() !== req.user.tenantId.toString()) {
       return res.status(404).json({
         success: false,
         message: 'Class not found'
@@ -563,7 +582,7 @@ router.delete('/:id/subjects/:subjectId', [protect, authorize('admin')], async (
     const { id, subjectId } = req.params;
 
     const classItem = await Class.findById(id);
-    if (!classItem) {
+    if (!classItem || classItem.tenantId.toString() !== req.user.tenantId.toString()) {
       return res.status(404).json({
         success: false,
         message: 'Class not found'

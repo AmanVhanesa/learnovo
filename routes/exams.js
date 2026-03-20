@@ -265,9 +265,11 @@ router.get('/result-card/:studentId', protect, async (req, res) => {
             student: studentId
         };
 
-        // Students can only see published results
-        // Admin/teacher requesting another student's card can see all
+        // Students can only see their own published results
         if (req.user.role === 'student') {
+            if (studentId !== req.user._id.toString()) {
+                return res.status(403).json({ success: false, message: 'Access denied' });
+            }
             resultFilter.isPublished = true;
         }
 
