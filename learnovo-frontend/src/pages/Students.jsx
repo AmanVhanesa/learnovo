@@ -444,7 +444,7 @@ const Students = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4">
+      <div className="card p-4">
         {/* Search Bar */}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
@@ -795,7 +795,7 @@ const Students = () => {
       </div>
 
       {/* Students Table */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm overflow-hidden">
+      <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="table min-w-[700px]">
             <thead>
@@ -863,9 +863,9 @@ const Students = () => {
                     <td className="text-sm text-gray-900 dark:text-white">{student.section || '-'}</td>
                     <td>
                       <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${student.isActive
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                        className={`status-badge ${student.isActive
+                          ? 'status-active'
+                          : 'status-inactive'
                           }`}
                       >
                         {student.isActive ? 'Active' : 'Inactive'}

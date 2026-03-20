@@ -69,6 +69,45 @@ export const employeesService = {
             headers: { 'Content-Type': 'multipart/form-data' }
         })
         return res.data
+    },
+
+    getLeaveBalance: async (id) => {
+        const res = await api.get(`/employees/${id}/leave-balance`)
+        return res.data
+    },
+
+    updateLeaveBalance: async (id, data) => {
+        const res = await api.patch(`/employees/${id}/leave-balance`, data)
+        return res.data
+    },
+
+    exportCSV: async (filters = {}) => {
+        const params = new URLSearchParams()
+        if (filters.role) params.append('role', filters.role)
+        if (filters.department) params.append('department', filters.department)
+        if (filters.status) params.append('status', filters.status)
+        const url = `/employees/export${params.toString() ? `?${params.toString()}` : ''}`
+        const res = await api.get(url, { responseType: 'blob' })
+        return res.data
+    },
+
+    importTemplate: async () => {
+        const res = await api.get('/employees/import/template', { responseType: 'blob' })
+        return res.data
+    },
+
+    importPreview: async (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await api.post('/employees/import/preview', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        return res.data
+    },
+
+    importExecute: async (validData, options) => {
+        const res = await api.post('/employees/import/execute', { validData, options })
+        return res.data
     }
 }
 

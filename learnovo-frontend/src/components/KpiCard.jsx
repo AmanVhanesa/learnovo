@@ -7,11 +7,11 @@ const TREND_CONFIG = {
   flat: { color: 'text-gray-500', bg: 'bg-gray-50 dark:bg-gray-500/10', Icon: null },
 }
 
-const KpiCard = ({ title, value, Icon, delta, trend = 'flat', primaryLabel, onPrimary, secondaryLabel, onSecondary, isRefetching }) => {
+const KpiCard = ({ title, value, Icon, delta, trend = 'flat', primaryLabel, onPrimary, secondaryLabel, onSecondary, isRefetching, glass }) => {
   const tc = TREND_CONFIG[trend] || TREND_CONFIG.flat
 
   return (
-    <section className="stat-card group relative">
+    <section className={`${glass ? 'stat-card-glass' : 'stat-card'} group relative`}>
       {isRefetching && (
         <div className="absolute top-2.5 right-2.5 z-10">
           <Loader2 className="h-3.5 w-3.5 text-primary-500 dark:text-[#3EC4B1] animate-spin" />

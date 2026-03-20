@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2 } from 'lucide-react'
+import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2, Loader2 } from 'lucide-react'
 import api from '../../services/authService'
 import transportService from '../../services/transportService'
 import { SERVER_URL } from '../../constants/config'
 
 const currentYear = new Date().getFullYear()
 const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
+const FALLBACK_ACADEMIC_YEAR = defaultAcademicYear
 
 const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     const [activeSection, setActiveSection] = useState(0)
@@ -62,6 +63,9 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         // Medical & Additional
         medicalConditions: student?.medicalConditions || '',
         allergies: student?.allergies || '',
+        doctorName: student?.doctorName || '',
+        doctorPhone: student?.doctorPhone || '',
+        nationality: student?.nationality || '',
         notes: student?.notes || '',
 
         // Login (for new students)
@@ -75,6 +79,9 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     const [classesLoading, setClassesLoading] = useState(false)
     const [sectionOptions, setSectionOptions] = useState([])
     const [loadingSections, setLoadingSections] = useState(false)
+    const [academicYearOptions, setAcademicYearOptions] = useState([])
+    const [academicYearsLoading, setAcademicYearsLoading] = useState(false)
+    const [academicYearsError, setAcademicYearsError] = useState(null)
 
     useEffect(() => {
         const fetchSubDepartments = async () => {
@@ -113,9 +120,37 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             }
         }
 
+        const fetchAcademicYears = async () => {
+            try {
+                setAcademicYearsLoading(true)
+                setAcademicYearsError(null)
+                const response = await api.get('/academic-sessions')
+                if (response.data.success && response.data.data) {
+                    const sessions = response.data.data
+                    setAcademicYearOptions(sessions)
+                    // Auto-select the active year if not editing an existing student
+                    if (!student) {
+                        const activeSession = sessions.find(s => s.isActive)
+                        if (activeSession) {
+                            setForm(prev => ({ ...prev, academicYear: activeSession.name }))
+                        } else if (sessions.length > 0) {
+                            // Fall back to the most recent session
+                            setForm(prev => ({ ...prev, academicYear: sessions[0].name }))
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching academic years', error)
+                setAcademicYearsError('Failed to load academic years')
+            } finally {
+                setAcademicYearsLoading(false)
+            }
+        }
+
         fetchSubDepartments()
         fetchDrivers()
         fetchClasses()
+        fetchAcademicYears()
     }, [])
 
     // Fetch sections when class changes
@@ -169,8 +204,100 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         }))
     }
 
+    const [formErrors, setFormErrors] = useState({})
+
+    const validateForm = () => {
+        const errors = {}
+        if (!form.fullName?.trim()) errors.fullName = 'Student name is required'
+        if (!form.classId && !form.class) errors.class = 'Class is required'
+        if (!form.academicYear) errors.academicYear = 'Academic year is required'
+
+        // Email validation
+        if (form.email && !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(form.email)) {
+            errors.email = 'Invalid email format'
+        }
+        // Email required if creating login
+        if (form.createLogin && !student && !form.email?.trim()) {
+            errors.email = 'Email is required when creating login credentials'
+        }
+
+        // Phone validation - 10-digit Indian format
+        if (form.phone) {
+            const phoneDigits = form.phone.replace(/[\s\-\+]/g, '')
+            if (!/^\d{10,12}$/.test(phoneDigits)) {
+                errors.phone = 'Enter a valid 10-digit phone number'
+            }
+        }
+
+        // Date of birth - student must be under 25
+        if (form.dateOfBirth) {
+            const dob = new Date(form.dateOfBirth)
+            const today = new Date()
+            const age = today.getFullYear() - dob.getFullYear()
+            if (age > 25) {
+                errors.dateOfBirth = 'Student age cannot exceed 25 years'
+            }
+            if (dob > today) {
+                errors.dateOfBirth = 'Date of birth cannot be in the future'
+            }
+        }
+
+        // Admission date - no future dates
+        if (form.admissionDate && new Date(form.admissionDate) > new Date()) {
+            errors.admissionDate = 'Admission date cannot be in the future'
+        }
+
+        // Guardian validation - at least one contact required
+        if (form.guardians && form.guardians.length > 0) {
+            const primaryGuardian = form.guardians.find(g => g.isPrimary)
+            if (primaryGuardian) {
+                if (!primaryGuardian.name?.trim()) {
+                    errors.guardianName = 'Primary guardian name is required'
+                }
+                if (!primaryGuardian.phone?.trim()) {
+                    errors.guardianPhone = 'Primary guardian phone is required'
+                } else {
+                    const gPhone = primaryGuardian.phone.replace(/[\s\-\+]/g, '')
+                    if (!/^\d{10,12}$/.test(gPhone)) {
+                        errors.guardianPhone = 'Enter a valid guardian phone number'
+                    }
+                }
+            }
+            // Validate guardian emails if provided
+            form.guardians.forEach((g, i) => {
+                if (g.email && !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(g.email)) {
+                    errors[`guardianEmail${i}`] = `Guardian ${i + 1} has an invalid email`
+                }
+                if (g.phone) {
+                    const gp = g.phone.replace(/[\s\-\+]/g, '')
+                    if (!/^\d{10,12}$/.test(gp)) {
+                        errors[`guardianPhone${i}`] = `Guardian ${i + 1} has an invalid phone number`
+                    }
+                }
+            })
+        }
+
+        return errors
+    }
+
     const handleSubmit = (e) => {
         e.preventDefault()
+
+        // Validate before submitting
+        const errors = validateForm()
+        if (Object.keys(errors).length > 0) {
+            setFormErrors(errors)
+            // Navigate to the first tab with errors
+            if (errors.fullName || errors.email || errors.phone || errors.class || errors.academicYear || errors.admissionDate) {
+                setActiveSection(0)
+            } else if (errors.dateOfBirth) {
+                setActiveSection(1)
+            } else if (errors.guardianName || errors.guardianPhone || Object.keys(errors).some(k => k.startsWith('guardian'))) {
+                setActiveSection(3)
+            }
+            return
+        }
+        setFormErrors({})
 
         // Transform form data to match backend expectations
         const submitData = { ...form }
@@ -321,35 +448,45 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                 <div>
                                     <label className="label">Student Name *</label>
                                     <input
-                                        className="input"
+                                        className={`input ${formErrors.fullName ? 'border-red-500' : ''}`}
                                         value={form.fullName}
-                                        onChange={(e) => updateField('fullName', e.target.value)}
+                                        onChange={(e) => { updateField('fullName', e.target.value); setFormErrors(prev => ({ ...prev, fullName: undefined })) }}
                                         required
                                         placeholder="Enter full name"
                                     />
-                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Enter the complete name as it should appear on records</p>
+                                    {formErrors.fullName ? (
+                                        <p className="text-xs text-red-500 mt-1">{formErrors.fullName}</p>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Enter the complete name as it should appear on records</p>
+                                    )}
                                 </div>
 
                                 {/* Contact & Login */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="label">Email *</label>
+                                        <label className="label">Email {form.createLogin && !student && <span className="text-red-500">*</span>}</label>
                                         <input
                                             type="email"
-                                            className="input"
+                                            className={`input ${formErrors.email ? 'border-red-500' : ''}`}
                                             value={form.email}
-                                            onChange={(e) => updateField('email', e.target.value)}
-                                            required={!student}
+                                            onChange={(e) => { updateField('email', e.target.value); setFormErrors(prev => ({ ...prev, email: undefined })) }}
+                                            required={form.createLogin && !student}
                                         />
+                                        {formErrors.email && (
+                                            <p className="text-xs text-red-500 mt-1">{formErrors.email}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="label">Phone</label>
                                         <input
-                                            className="input"
+                                            className={`input ${formErrors.phone ? 'border-red-500' : ''}`}
                                             value={form.phone}
                                             onChange={(e) => updateField('phone', e.target.value)}
-                                            placeholder="+919876543210"
+                                            placeholder="9876543210"
                                         />
+                                        {formErrors.phone && (
+                                            <p className="text-xs text-red-500 mt-1">{formErrors.phone}</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -385,13 +522,34 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                                         <div>
                                             <label className="label">Academic Year *</label>
-                                            <input
+                                            <select
                                                 className="input"
                                                 value={form.academicYear}
                                                 onChange={(e) => updateField('academicYear', e.target.value)}
                                                 required
-                                                placeholder="2025-2026"
-                                            />
+                                                disabled={academicYearsLoading}
+                                            >
+                                                {academicYearsLoading ? (
+                                                    <option value="">Loading...</option>
+                                                ) : academicYearOptions.length > 0 ? (
+                                                    <>
+                                                        <option value="">Select Academic Year</option>
+                                                        {academicYearOptions.map(session => (
+                                                            <option key={session._id} value={session.name}>
+                                                                {session.name}{session.isActive ? ' (Active)' : ''}
+                                                            </option>
+                                                        ))}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <option value="">No academic years found</option>
+                                                        <option value={FALLBACK_ACADEMIC_YEAR}>{FALLBACK_ACADEMIC_YEAR}</option>
+                                                    </>
+                                                )}
+                                            </select>
+                                            {academicYearsError && (
+                                                <p className="text-xs text-red-500 mt-1">{academicYearsError}</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="label">Class *</label>
@@ -460,10 +618,14 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             <label className="label">Admission Date</label>
                                             <input
                                                 type="date"
-                                                className="input"
+                                                className={`input ${formErrors.admissionDate ? 'border-red-500' : ''}`}
                                                 value={form.admissionDate}
                                                 onChange={(e) => updateField('admissionDate', e.target.value)}
+                                                max={new Date().toISOString().split('T')[0]}
                                             />
+                                            {formErrors.admissionDate && (
+                                                <p className="text-xs text-red-500 mt-1">{formErrors.admissionDate}</p>
+                                            )}
                                         </div>
                                         {student && (
                                             <div>
@@ -798,6 +960,37 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     />
                                 </div>
 
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="label">Doctor Name</label>
+                                        <input
+                                            className="input"
+                                            value={form.doctorName}
+                                            onChange={(e) => updateField('doctorName', e.target.value)}
+                                            placeholder="Family doctor or pediatrician"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="label">Doctor Phone</label>
+                                        <input
+                                            className="input"
+                                            value={form.doctorPhone}
+                                            onChange={(e) => updateField('doctorPhone', e.target.value)}
+                                            placeholder="Doctor's contact number"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="label">Nationality</label>
+                                    <input
+                                        className="input"
+                                        value={form.nationality}
+                                        onChange={(e) => updateField('nationality', e.target.value)}
+                                        placeholder="e.g., Indian"
+                                    />
+                                </div>
+
                                 <div>
                                     <label className="label">Additional Notes</label>
                                     <textarea
@@ -844,9 +1037,10 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                             ) : (
                                 <button
                                     type="submit"
-                                    className="btn btn-primary w-full sm:w-auto"
+                                    className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
                                     disabled={isLoading}
                                 >
+                                    {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                                     {isLoading ? 'Saving...' : student ? 'Update Student' : 'Add Student'}
                                 </button>
                             )}

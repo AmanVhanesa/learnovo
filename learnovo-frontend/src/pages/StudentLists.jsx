@@ -240,7 +240,7 @@ const StudentLists = () => {
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                                 </div>
                             ) : activeListData.students.length > 0 ? (
-                                <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden">
+                                <div className="card overflow-hidden">
                                     <div className="overflow-x-auto">
                                         <table className="min-w-full min-w-[500px] divide-y divide-gray-200 dark:divide-[#38383A]">
                                             <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
@@ -308,7 +308,7 @@ const StudentLists = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="text-center bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-12">
+                                <div className="text-center card p-12">
                                     <div className="mx-auto w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mb-4">
                                         <Users className="w-6 h-6 text-gray-400 dark:text-[#636366]" />
                                     </div>

@@ -1,12 +1,39 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Download, Eye, Power, PowerOff, Edit, Key } from 'lucide-react'
+import { Plus, Search, Download, Eye, Power, PowerOff, Edit, Key, Users } from 'lucide-react'
 import { employeesService } from '../services/employeesService'
 import { exportCSV } from '../utils/exportHelpers'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import EmployeeForm from '../components/employees/EmployeeForm'
 import toast from 'react-hot-toast'
+import { SERVER_URL } from '../constants/config'
+
+const EmployeePhotoCell = ({ employee }) => {
+    const [imgFailed, setImgFailed] = React.useState(false)
+    const photoUrl = employee.photo
+        ? (employee.photo.startsWith('http') ? employee.photo : `${SERVER_URL}${employee.photo}`)
+        : null
+
+    if (photoUrl && !imgFailed) {
+        return (
+            <img
+                src={photoUrl}
+                alt={employee.name}
+                className="h-10 w-10 rounded-full object-cover"
+                onError={() => setImgFailed(true)}
+            />
+        )
+    }
+
+    return (
+        <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center">
+            <span className="text-sm font-semibold text-white">
+                {employee.name?.charAt(0).toUpperCase() || 'E'}
+            </span>
+        </div>
+    )
+}
 
 const Employees = () => {
     const { user } = useAuth()
@@ -19,6 +46,10 @@ const Employees = () => {
     const [roleFilter, setRoleFilter] = useState('')
     const [departmentFilter, setDepartmentFilter] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1)
+    const [perPage, setPerPage] = useState(50)
 
     // UI state
     const [showAddModal, setShowAddModal] = useState(false)
@@ -33,6 +64,11 @@ const Employees = () => {
         return () => clearTimeout(timer)
     }, [searchQuery])
 
+    // Reset page on filter change
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [debouncedSearchQuery, roleFilter, departmentFilter, statusFilter])
+
     // Fetch filter options
     const { data: filterOptions = { roles: [], departments: [] } } = useQuery({
         queryKey: ['employees-filters'],
@@ -43,21 +79,29 @@ const Employees = () => {
     })
 
     // Fetch employees
-    const { data: employees = [], isLoading } = useQuery({
-        queryKey: ['employees', debouncedSearchQuery, roleFilter, departmentFilter, statusFilter],
+    const { data: employeesResponse, isLoading } = useQuery({
+        queryKey: ['employees', debouncedSearchQuery, roleFilter, departmentFilter, statusFilter, currentPage, perPage],
         queryFn: async () => {
             const filters = {
                 search: debouncedSearchQuery,
                 role: roleFilter,
                 department: departmentFilter,
                 status: statusFilter,
-                limit: 100
+                page: currentPage,
+                limit: perPage
             }
-            const response = await employeesService.list(filters)
-            const employeesData = response?.data || []
-            return Array.isArray(employeesData) ? employeesData : []
+            return await employeesService.list(filters)
         },
+        placeholderData: (prev) => prev,
     })
+
+    const employees = useMemo(() => {
+        const data = employeesResponse?.data || []
+        return Array.isArray(data) ? data : []
+    }, [employeesResponse])
+
+    const totalEmployees = employeesResponse?.pagination?.total || employees.length
+    const totalPages = employeesResponse?.pagination?.pages || 1
 
     // Save employee mutation
     const saveEmployeeMutation = useMutation({
@@ -188,12 +232,26 @@ const Employees = () => {
 
     const getRoleBadgeColor = (role) => {
         const colors = {
-            admin: 'bg-purple-100 text-purple-800',
-            teacher: 'bg-blue-100 text-blue-800',
-            accountant: 'bg-green-100 text-green-800',
-            staff: 'bg-gray-100 text-gray-800'
+            admin: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+            teacher: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+            accountant: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+            librarian: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+            driver: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+            support_staff: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
+            principal: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+            vice_principal: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+            staff: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
         }
-        return colors[role] || 'bg-gray-100 text-gray-800'
+        return colors[role] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+    }
+
+    const formatRoleName = (role) => {
+        const names = {
+            admin: 'Admin', teacher: 'Teacher', accountant: 'Accountant',
+            librarian: 'Librarian', driver: 'Driver', support_staff: 'Support Staff',
+            principal: 'Principal', vice_principal: 'Vice Principal', staff: 'Staff'
+        }
+        return names[role] || role?.charAt(0).toUpperCase() + role?.slice(1)
     }
 
     if (isLoading) {
@@ -211,7 +269,7 @@ const Employees = () => {
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Employees</h1>
                     <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
-                        {employees.length} employee{employees.length !== 1 ? 's' : ''} found
+                        {totalEmployees} employee{totalEmployees !== 1 ? 's' : ''} found
                     </p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
@@ -231,7 +289,7 @@ const Employees = () => {
             </div>
 
             {/* Filters */}
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-3 sm:p-4">
+            <div className="card p-3 sm:p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4">
                     {/* Search */}
                     <div className="flex-1">
@@ -298,7 +356,7 @@ const Employees = () => {
             </div>
 
             {/* Employees Table */}
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm overflow-hidden">
+            <div className="card overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="table min-w-[600px]">
                         <thead>
@@ -317,8 +375,14 @@ const Employees = () => {
                         <tbody>
                             {employees.length === 0 ? (
                                 <tr>
-                                    <td colSpan="9" className="text-center py-12 text-gray-500 dark:text-[#8E8E93]">
-                                        No employees found
+                                    <td colSpan="9" className="text-center py-12">
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mb-3">
+                                                <Users className="w-6 h-6 text-gray-400 dark:text-[#636366]" />
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">No employees found</p>
+                                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Try adjusting your filters or add a new employee.</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
@@ -330,19 +394,7 @@ const Employees = () => {
                                             </span>
                                         </td>
                                         <td>
-                                            {employee.photo ? (
-                                                <img
-                                                    src={employee.photo}
-                                                    alt={employee.name}
-                                                    className="h-10 w-10 rounded-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center">
-                                                    <span className="text-sm font-semibold text-white">
-                                                        {employee.name?.charAt(0).toUpperCase()}
-                                                    </span>
-                                                </div>
-                                            )}
+                                            <EmployeePhotoCell employee={employee} />
                                         </td>
                                         <td>
                                             <div>
@@ -352,7 +404,7 @@ const Employees = () => {
                                         </td>
                                         <td>
                                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(employee.role)}`}>
-                                                {employee.role?.charAt(0).toUpperCase() + employee.role?.slice(1)}
+                                                {formatRoleName(employee.role)}
                                             </span>
                                         </td>
                                         <td className="text-sm text-gray-900 dark:text-white">{employee.phone || '-'}</td>
@@ -362,9 +414,9 @@ const Employees = () => {
                                         </td>
                                         <td>
                                             <span
-                                                className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${employee.isActive
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : 'bg-red-100 text-red-800'
+                                                className={`status-badge ${employee.isActive
+                                                    ? 'status-active'
+                                                    : 'status-inactive'
                                                     }`}
                                             >
                                                 {employee.isActive ? 'Active' : 'Inactive'}
@@ -400,7 +452,7 @@ const Employees = () => {
                                                         </button>
                                                         <button
                                                             onClick={() => handleToggleStatus(employee)}
-                                                            className={`p-1 text-gray-400 hover:${employee.isActive ? 'text-red-600' : 'text-green-600'}`}
+                                                            className={`btn-icon ${employee.isActive ? 'hover:text-red-600' : 'hover:text-green-600'}`}
                                                             title={employee.isActive ? 'Deactivate' : 'Activate'}
                                                         >
                                                             {employee.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
@@ -416,6 +468,44 @@ const Employees = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-1">
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-[#8E8E93]">
+                        <span>
+                            Showing {((currentPage - 1) * perPage) + 1}–{Math.min(currentPage * perPage, totalEmployees)} of <strong>{totalEmployees}</strong> employees
+                        </span>
+                        <select
+                            value={perPage}
+                            onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1) }}
+                            className="border border-gray-300 dark:border-[#38383A] rounded px-2 py-1 text-sm dark:bg-[#1C1C1E] dark:text-white"
+                        >
+                            <option value={50}>50 / page</option>
+                            <option value={100}>100 / page</option>
+                        </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="btn btn-sm btn-ghost"
+                        >
+                            ← Previous
+                        </button>
+                        <span className="text-sm text-gray-600 dark:text-[#8E8E93]">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                            className="btn btn-sm btn-ghost"
+                        >
+                            Next →
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Employee Form Modal */}
             {showAddModal && (

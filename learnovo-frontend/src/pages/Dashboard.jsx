@@ -54,7 +54,7 @@ ChartJS.register(
 )
 
 const Dashboard = () => {
-  const { user } = useAuth()
+  const { user, tenant } = useAuth()
   const { formatCurrency } = useSettings()
   const navigate = useNavigate()
 
@@ -385,6 +385,9 @@ const Dashboard = () => {
             Welcome back, {user?.name || user?.fullName || user?.firstName || ''}
           </h1>
           <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
+            {tenant?.schoolName || tenant?.name
+              ? <>{tenant.schoolName || tenant.name} &mdash; </>
+              : null}
             Here's what's happening with your {user?.role === 'admin' ? 'school' : user?.role === 'teacher' ? 'classes' : 'account'} today.
           </p>
         </div>
@@ -472,6 +475,7 @@ const Dashboard = () => {
                 secondaryLabel="Export"
                 onSecondary={handleExport}
                 isRefetching={isFetching && !isLoading}
+                glass
               />
             )
           })
@@ -591,12 +595,12 @@ const Dashboard = () => {
       {/* Admin specific widgets */}
       {user?.role === 'admin' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-lg shadow-sm p-4 sm:p-6">
+          <div className="card p-4 sm:p-6">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Upcoming Exams & Deadlines</h3>
             {stats.upcomingExams && stats.upcomingExams.length > 0 ? (
               <div className="space-y-3">
                 {stats.upcomingExams.map((exam, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
+                  <div key={index} className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl">
                     <div>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{exam.name || 'Exam'}</p>
                       <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{exam.subject?.name} • {exam.class?.name}</p>
@@ -620,7 +624,7 @@ const Dashboard = () => {
       {user?.role === 'teacher' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Upcoming Assignment Deadlines */}
-          <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-lg shadow-sm p-4 sm:p-6">
+          <div className="card p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Upcoming Assignment Deadlines</h3>
               <button
@@ -663,7 +667,7 @@ const Dashboard = () => {
           </div>
 
           {/* My Assigned Classes */}
-          <div className="bg-white dark:bg-[#1C1C1E] dark:border dark:border-[#38383A] rounded-lg shadow-sm p-4 sm:p-6">
+          <div className="card p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">My Assigned Classes</h3>
               <button
@@ -676,7 +680,7 @@ const Dashboard = () => {
             {stats.teacher?.assignedClasses && stats.teacher.assignedClasses.length > 0 ? (
               <div className="space-y-3">
                 {stats.teacher.assignedClasses.map((cls, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg">
+                  <div key={index} className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
                         <School className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
