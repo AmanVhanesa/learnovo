@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { roundToRupee } = require('../utils/money');
 
 const studentBalanceSchema = new mongoose.Schema({
     // Multi-tenant support
@@ -93,7 +94,7 @@ studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId
         }
     ]);
 
-    const totalInvoiced = invoiceAgg.length > 0 ? invoiceAgg[0].total : 0;
+    const totalInvoiced = roundToRupee(invoiceAgg.length > 0 ? invoiceAgg[0].total : 0);
 
     // Calculate total paid
     const paymentAgg = await Payment.aggregate([
@@ -129,7 +130,7 @@ studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId
         }
     ]);
 
-    const totalPaid = paymentAgg.length > 0 ? paymentAgg[0].total : 0;
+    const totalPaid = roundToRupee(paymentAgg.length > 0 ? paymentAgg[0].total : 0);
 
     // Get last payment
     const lastPayment = await Payment.findOne({
@@ -146,7 +147,7 @@ studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId
             $set: {
                 totalInvoiced,
                 totalPaid,
-                totalBalance: totalInvoiced - totalPaid,
+                totalBalance: roundToRupee(totalInvoiced - totalPaid),
                 lastPaymentDate: lastPayment?.paymentDate,
                 lastPaymentAmount: lastPayment?.amount
             }

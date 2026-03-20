@@ -4,6 +4,8 @@ const FeeInvoice = require('../models/FeeInvoice');
 const Payment = require('../models/Payment');
 const StudentBalance = require('../models/StudentBalance');
 const { protect, authorize } = require('../middleware/auth');
+const { logger } = require('../middleware/errorHandler');
+const { toNumber, roundToRupee, sumMoney } = require('../utils/money');
 
 const router = express.Router();
 
@@ -137,12 +139,7 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async (req, 
             .limit(10)
             .lean();
 
-        console.log('Dashboard Recent Invoices Sample:', recentInvoices.length > 0 ? {
-            id: recentInvoices[0]._id,
-            student: recentInvoices[0].studentId,
-            studentName: recentInvoices[0].studentId?.name,
-            studentFullName: recentInvoices[0].studentId?.fullName
-        } : 'No recent invoices');
+        logger.info('Dashboard data fetched', { recentInvoiceCount: recentInvoices.length });
 
         const response = {
             success: true,
@@ -159,17 +156,9 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async (req, 
             }
         };
 
-        console.log('=== DASHBOARD RESPONSE ===');
-        console.log('Total Collected:', totalCollected);
-        console.log('Total Pending:', totalPending);
-        console.log('Total Overdue:', totalOverdue);
-        console.log('This Month:', thisMonthCollection);
-        console.log('Recent Invoices:', recentInvoices.length);
-        console.log('=========================');
-
         res.json(response);
     } catch (error) {
-        console.error('Dashboard error:', error);
+        logger.error('Dashboard error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while fetching dashboard data'
@@ -215,7 +204,7 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async (req,
                 : 0;
 
             // Compute live balance from unpaid invoices to avoid stale StudentBalance data
-            const liveBalance = unpaidInvoices.reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0);
+            const liveBalance = sumMoney(unpaidInvoices.map(inv => inv.balanceAmount || 0));
 
             // Skip students with zero or negative live balance (already paid)
             if (liveBalance <= 0) return null;
@@ -247,7 +236,7 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async (req,
             data: filtered
         });
     } catch (error) {
-        console.error('Defaulters error:', error);
+        logger.error('Defaulters error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while fetching defaulters'
@@ -276,11 +265,18 @@ router.get('/collection-report', protect, authorize('admin', 'accountant'), asyn
 
         if (paymentMethod) filter.paymentMethod = paymentMethod;
 
+        // Pagination
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 100));
+        const skip = (page - 1) * limit;
+
         const payments = await Payment.find(filter)
             .populate('studentId', 'name studentId classId sectionId')
             .populate('invoiceId', 'invoiceNumber')
             .populate('collectedBy', 'name')
-            .sort({ paymentDate: -1 });
+            .sort({ paymentDate: -1 })
+            .skip(skip)
+            .limit(limit);
 
         // Filter by class if needed
         let filteredPayments = payments;
@@ -289,7 +285,7 @@ router.get('/collection-report', protect, authorize('admin', 'accountant'), asyn
         }
 
         // Calculate totals
-        const totalAmount = filteredPayments.reduce((sum, p) => sum + p.amount, 0);
+        const totalAmount = sumMoney(filteredPayments.map(p => p.amount));
 
         // Group by date
         const byDate = {};
@@ -298,7 +294,7 @@ router.get('/collection-report', protect, authorize('admin', 'accountant'), asyn
             if (!byDate[date]) {
                 byDate[date] = { date, amount: 0, count: 0 };
             }
-            byDate[date].amount += payment.amount;
+            byDate[date].amount += toNumber(payment.amount);
             byDate[date].count += 1;
         });
 
@@ -314,7 +310,7 @@ router.get('/collection-report', protect, authorize('admin', 'accountant'), asyn
             }
         });
     } catch (error) {
-        console.error('Collection report error:', error);
+        logger.error('Collection report error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while generating collection report'
@@ -337,13 +333,20 @@ router.get('/pending-report', protect, authorize('admin', 'accountant'), async (
         if (academicSessionId) filter.academicSessionId = academicSessionId;
         if (classId) filter.classId = classId;
 
+        // Pagination
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 100));
+        const skip = (page - 1) * limit;
+
         const invoices = await FeeInvoice.find(filter)
             .populate('studentId', 'name studentId phone email')
             .populate('classId', 'name grade')
             .populate('sectionId', 'name')
-            .sort({ dueDate: 1 });
+            .sort({ dueDate: 1 })
+            .skip(skip)
+            .limit(limit);
 
-        const totalPending = invoices.reduce((sum, inv) => sum + inv.balanceAmount, 0);
+        const totalPending = sumMoney(invoices.map(inv => inv.balanceAmount));
 
         // Group by class
         const byClass = {};
@@ -352,7 +355,7 @@ router.get('/pending-report', protect, authorize('admin', 'accountant'), async (
             if (!byClass[className]) {
                 byClass[className] = { className, amount: 0, count: 0 };
             }
-            byClass[className].amount += invoice.balanceAmount;
+            byClass[className].amount += toNumber(invoice.balanceAmount);
             byClass[className].count += 1;
         });
 
@@ -368,7 +371,7 @@ router.get('/pending-report', protect, authorize('admin', 'accountant'), async (
             }
         });
     } catch (error) {
-        console.error('Pending report error:', error);
+        logger.error('Pending report error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while generating pending report'
@@ -386,11 +389,11 @@ router.get('/class-wise-report', protect, authorize('admin', 'accountant'), asyn
         const filter = { tenantId: req.user.tenantId };
         if (academicSessionId) filter.academicSessionId = academicSessionId;
 
-        // Get all invoices
+        // Use aggregation instead of loading all documents into memory
         const invoices = await FeeInvoice.find(filter)
-            .populate('classId', 'name grade');
+            .populate('classId', 'name grade')
+            .lean();
 
-        // Get all payments
         const payments = await Payment.find({
             tenantId: req.user.tenantId,
             isConfirmed: true,
@@ -398,7 +401,7 @@ router.get('/class-wise-report', protect, authorize('admin', 'accountant'), asyn
         }).populate({
             path: 'invoiceId',
             populate: { path: 'classId', select: 'name grade' }
-        });
+        }).lean();
 
         // Group by class
         const classData = {};
@@ -414,21 +417,24 @@ router.get('/class-wise-report', protect, authorize('admin', 'accountant'), asyn
                     studentCount: new Set()
                 };
             }
-            classData[className].totalInvoiced += invoice.totalAmount + invoice.lateFeeApplied;
-            classData[className].totalPending += invoice.balanceAmount;
+            classData[className].totalInvoiced += toNumber(invoice.totalAmount) + toNumber(invoice.lateFeeApplied);
+            classData[className].totalPending += toNumber(invoice.balanceAmount);
             classData[className].studentCount.add(invoice.studentId.toString());
         });
 
         payments.forEach(payment => {
             const className = payment.invoiceId?.classId?.name || 'Unknown';
             if (classData[className]) {
-                classData[className].totalCollected += payment.amount;
+                classData[className].totalCollected += toNumber(payment.amount);
             }
         });
 
-        // Convert Set to count
+        // Convert Set to count and round accumulated amounts
         Object.values(classData).forEach(data => {
             data.studentCount = data.studentCount.size;
+            data.totalInvoiced = roundToRupee(data.totalInvoiced);
+            data.totalCollected = roundToRupee(data.totalCollected);
+            data.totalPending = roundToRupee(data.totalPending);
         });
 
         res.json({
@@ -436,7 +442,7 @@ router.get('/class-wise-report', protect, authorize('admin', 'accountant'), asyn
             data: Object.values(classData)
         });
     } catch (error) {
-        console.error('Class-wise report error:', error);
+        logger.error('Class-wise report error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while generating class-wise report'

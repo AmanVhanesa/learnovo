@@ -4,7 +4,6 @@ const User = require('../models/User');
 const Counter = require('../models/Counter');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
-const Settings = require('../models/Settings');
 const notificationService = require('../services/notificationService');
 
 const router = express.Router();
@@ -25,7 +24,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
 
         // Build filter for employees (non-student, non-parent roles)
         const filter = {
-            role: { $in: ['admin', 'teacher', 'accountant', 'staff'] },
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] },
             tenantId: req.user.tenantId
         };
 
@@ -84,13 +83,13 @@ router.get('/filters', protect, authorize('admin'), async (req, res) => {
 
         // Get unique roles
         const roles = await User.distinct('role', {
-            role: { $in: ['admin', 'teacher', 'accountant', 'staff'] },
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] },
             tenantId
         });
 
         // Get unique departments
         const departments = await User.distinct('department', {
-            role: { $in: ['admin', 'teacher', 'accountant', 'staff'] },
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] },
             tenantId,
             department: { $ne: null }
         });
@@ -116,9 +115,13 @@ router.get('/filters', protect, authorize('admin'), async (req, res) => {
 // @access  Private (Admin, Self)
 router.get('/:id', protect, async (req, res) => {
     try {
-        const employee = await User.findById(req.params.id).select('-password');
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        }).select('-password');
 
-        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+        if (!employee) {
             return res.status(404).json({
                 success: false,
                 message: 'Employee not found'
@@ -153,15 +156,18 @@ router.post('/', protect, authorize('admin'), [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('phone').trim().notEmpty().withMessage('Phone is required'),
     body('email').optional().isEmail().withMessage('Valid email required'),
-    body('role').isIn(['admin', 'teacher', 'accountant', 'staff']).withMessage('Invalid role'),
+    body('role').isIn(['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal']).withMessage('Invalid role'),
     body('salary').optional().isFloat({ min: 0 }).withMessage('Salary must be >= 0'),
     handleValidationErrors
 ], async (req, res) => {
     try {
         const {
-            name, phone, email, role, salary, dateOfJoining, designation, department,
+            name, phone, email, role, salary, leaveDeductionPerDay, dateOfJoining, designation, department,
             fatherOrHusbandName, gender, dateOfBirth, religion, bloodGroup, nationalId,
-            education, experience, homeAddress, photo, password
+            education, experience, homeAddress, photo, password,
+            bankName, accountNumber, ifscCode,
+            subjects, emergencyContact,
+            createLogin
         } = req.body;
 
         const tenantId = req.user.tenantId;
@@ -187,6 +193,55 @@ router.post('/', protect, authorize('admin'), [
         const sequence = await Counter.getNextSequence('employee', currentYear, tenantId);
         const employeeId = `EMP${currentYear}${String(sequence).padStart(4, '0')}`;
 
+        // Validate IFSC code format if provided
+        if (ifscCode && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode.toUpperCase())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid IFSC code format. Expected format: ABCD0123456'
+            });
+        }
+
+        // Validate Aadhaar (nationalId) if provided - must be 12 digits
+        if (nationalId && !/^\d{12}$/.test(nationalId.replace(/\s/g, ''))) {
+            return res.status(400).json({
+                success: false,
+                message: 'National ID (Aadhaar) must be exactly 12 digits'
+            });
+        }
+
+        // Validate account number if provided - 9-18 digits
+        if (accountNumber && !/^\d{9,18}$/.test(accountNumber.replace(/\s/g, ''))) {
+            return res.status(400).json({
+                success: false,
+                message: 'Account number must be 9-18 digits'
+            });
+        }
+
+        // Validate date of birth - employee must be 18+
+        if (dateOfBirth) {
+            const dob = new Date(dateOfBirth);
+            const today = new Date();
+            const age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            const effectiveAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate()) ? age - 1 : age;
+            if (effectiveAge < 18) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Employee must be at least 18 years old'
+                });
+            }
+        }
+
+        // Validate date of joining - cannot be in the future
+        if (dateOfJoining && new Date(dateOfJoining) > new Date()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Date of joining cannot be in the future'
+            });
+        }
+
+        const shouldCreateLogin = createLogin !== false; // Default true for backward compat
+
         const employeeData = {
             name: name.trim(),
             phone: phone.trim(),
@@ -196,6 +251,7 @@ router.post('/', protect, authorize('admin'), [
             tenantId,
             employeeId,
             salary,
+            leaveDeductionPerDay,
             dateOfJoining: dateOfJoining || new Date(),
             designation,
             department,
@@ -204,13 +260,19 @@ router.post('/', protect, authorize('admin'), [
             dateOfBirth,
             religion,
             bloodGroup,
-            nationalId,
+            nationalId: nationalId ? nationalId.replace(/\s/g, '') : undefined,
             education,
             experience,
             homeAddress,
             photo,
+            bankName,
+            accountNumber: accountNumber ? accountNumber.replace(/\s/g, '') : undefined,
+            ifscCode: ifscCode ? ifscCode.toUpperCase() : undefined,
+            subjects: role === 'teacher' ? subjects : undefined,
+            emergencyContact,
+            leaveBalance: { casual: 12, sick: 12, earned: 15 },
             isActive: true,
-            loginEnabled: true
+            loginEnabled: shouldCreateLogin
         };
 
         const employee = await User.create(employeeData);
@@ -273,9 +335,13 @@ router.put('/:id', protect, authorize('admin'), [
     handleValidationErrors
 ], async (req, res) => {
     try {
-        const employee = await User.findById(req.params.id);
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        });
 
-        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+        if (!employee) {
             return res.status(404).json({
                 success: false,
                 message: 'Employee not found'
@@ -343,9 +409,13 @@ router.put('/:id', protect, authorize('admin'), [
 // @access  Private (Admin)
 router.delete('/:id', protect, authorize('admin'), async (req, res) => {
     try {
-        const employee = await User.findById(req.params.id);
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        });
 
-        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+        if (!employee) {
             return res.status(404).json({
                 success: false,
                 message: 'Employee not found'
@@ -379,9 +449,13 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
 router.put('/:id/toggle-status', protect, authorize('admin'), async (req, res) => {
     try {
         const { reason } = req.body;
-        const employee = await User.findById(req.params.id);
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        });
 
-        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+        if (!employee) {
             return res.status(404).json({
                 success: false,
                 message: 'Employee not found'
@@ -425,9 +499,13 @@ router.put('/:id/toggle-status', protect, authorize('admin'), async (req, res) =
 router.put('/:id/reset-password', protect, authorize('admin'), async (req, res) => {
     try {
         const { newPassword, forceChange } = req.body;
-        const employee = await User.findById(req.params.id);
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        });
 
-        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+        if (!employee) {
             return res.status(404).json({
                 success: false,
                 message: 'Employee not found'
@@ -461,9 +539,13 @@ router.put('/:id/reset-password', protect, authorize('admin'), async (req, res) 
 router.post('/:id/create-login', protect, authorize('admin'), async (req, res) => {
     try {
         const { email, password } = req.body;
-        const employee = await User.findById(req.params.id);
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        });
 
-        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+        if (!employee) {
             return res.status(404).json({
                 success: false,
                 message: 'Employee not found'
@@ -514,9 +596,13 @@ router.post('/:id/create-login', protect, authorize('admin'), async (req, res) =
 // @access  Private (Admin)
 router.put('/:id/disable-login', protect, authorize('admin'), async (req, res) => {
     try {
-        const employee = await User.findById(req.params.id);
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        });
 
-        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+        if (!employee) {
             return res.status(404).json({
                 success: false,
                 message: 'Employee not found'
@@ -536,6 +622,77 @@ router.put('/:id/disable-login', protect, authorize('admin'), async (req, res) =
             success: false,
             message: 'Server error while disabling login'
         });
+    }
+});
+
+// @desc    Get employee leave balance
+// @route   GET /api/employees/:id/leave-balance
+// @access  Private (Admin, Self)
+router.get('/:id/leave-balance', protect, async (req, res) => {
+    try {
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        }).select('name employeeId leaveBalance');
+
+        if (!employee) {
+            return res.status(404).json({ success: false, message: 'Employee not found' });
+        }
+
+        // Check access: admin or self
+        if (req.user.role !== 'admin' && req.user._id.toString() !== employee._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                employeeId: employee.employeeId,
+                name: employee.name,
+                leaveBalance: employee.leaveBalance || { casual: 12, sick: 12, earned: 15 }
+            }
+        });
+    } catch (error) {
+        console.error('Get leave balance error:', error);
+        res.status(500).json({ success: false, message: 'Server error while fetching leave balance' });
+    }
+});
+
+// @desc    Update employee leave balance
+// @route   PATCH /api/employees/:id/leave-balance
+// @access  Private (Admin only)
+router.patch('/:id/leave-balance', protect, authorize('admin'), async (req, res) => {
+    try {
+        const { casual, sick, earned } = req.body;
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        });
+
+        if (!employee) {
+            return res.status(404).json({ success: false, message: 'Employee not found' });
+        }
+
+        if (!employee.leaveBalance) {
+            employee.leaveBalance = { casual: 12, sick: 12, earned: 15 };
+        }
+
+        if (casual !== undefined) employee.leaveBalance.casual = Math.max(0, Number(casual));
+        if (sick !== undefined) employee.leaveBalance.sick = Math.max(0, Number(sick));
+        if (earned !== undefined) employee.leaveBalance.earned = Math.max(0, Number(earned));
+
+        await employee.save();
+
+        res.json({
+            success: true,
+            message: 'Leave balance updated successfully',
+            data: { leaveBalance: employee.leaveBalance }
+        });
+    } catch (error) {
+        console.error('Update leave balance error:', error);
+        res.status(500).json({ success: false, message: 'Server error while updating leave balance' });
     }
 });
 
@@ -609,7 +766,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
 router.get('/export', protect, authorize('admin'), async (req, res) => {
     try {
         const filter = {
-            role: { $in: ['admin', 'teacher', 'accountant', 'staff'] },
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] },
             tenantId: req.user.tenantId
         };
 
@@ -654,9 +811,13 @@ router.post('/:id/upload-photo', protect, authorize('admin'), upload.single('pho
             return res.status(400).json({ success: false, message: 'No photo uploaded' });
         }
 
-        const employee = await User.findById(req.params.id);
+        const employee = await User.findOne({
+            _id: req.params.id,
+            tenantId: req.user.tenantId,
+            role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+        });
 
-        if (!employee || !['admin', 'teacher', 'accountant', 'staff'].includes(employee.role)) {
+        if (!employee) {
             return res.status(404).json({ success: false, message: 'Employee not found' });
         }
 

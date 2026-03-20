@@ -5,7 +5,9 @@ const FeeInvoice = require('../models/FeeInvoice');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const PaymentAuditLog = require('../models/PaymentAuditLog');
 const PaymentDispute = require('../models/PaymentDispute');
+const StudentBalance = require('../models/StudentBalance');
 const { protect, authorize } = require('../middleware/auth');
+const { toNumber, roundToRupee } = require('../utils/money');
 
 const router = express.Router();
 
@@ -117,9 +119,8 @@ router.post('/:id/resolve', protect, authorize('admin'), [
                 if (resolutionAction === 'APPROVE') {
                     const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
                     if (invoice) {
-                        invoice.paidAmount += attempt.amount;
-                        invoice.balanceAmount = invoice.totalAmount + invoice.lateFeeApplied - invoice.paidAmount;
-                        invoice.status = invoice.balanceAmount <= 0 ? 'Paid' : 'Partial';
+                        // Safe rounding — pre-save hook handles balance + status
+                        invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
                         await invoice.save({ session });
                     }
                 }
@@ -128,6 +129,25 @@ router.post('/:id/resolve', protect, authorize('admin'), [
 
         await session.commitTransaction();
         session.endSession();
+
+        // Update student balance after dispute resolution (best effort, outside transaction)
+        if (resolutionAction === 'APPROVE' && dispute.paymentAttemptId) {
+            try {
+                const resolvedAttempt = await PaymentAttempt.findById(dispute.paymentAttemptId);
+                if (resolvedAttempt) {
+                    const invoice = await FeeInvoice.findById(resolvedAttempt.invoiceId);
+                    if (invoice) {
+                        await StudentBalance.updateBalance(
+                            req.user.tenantId,
+                            resolvedAttempt.studentId,
+                            invoice.academicSessionId
+                        );
+                    }
+                }
+            } catch (balErr) {
+                console.error('Balance update after dispute resolution failed (non-fatal):', balErr.message);
+            }
+        }
 
         res.json({
             success: true,

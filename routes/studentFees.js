@@ -2,6 +2,7 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const { toNumber, roundToRupee, calcBalance, isFullyPaid } = require('../utils/money');
 const FeeInvoice = require('../models/FeeInvoice');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const PaymentAuditLog = require('../models/PaymentAuditLog');
@@ -20,16 +21,16 @@ const router = express.Router();
  * Helper to log state transitions strictly
  */
 async function createAuditLog(paymentAttemptId, session, tenantId, previousStatus, newStatus, triggerSource, note = '') {
-    const log = new PaymentAuditLog({
-        tenantId,
-        paymentAttemptId,
-        previousStatus,
-        newStatus,
-        triggerSource,
-        note
-    });
+  const log = new PaymentAuditLog({
+    tenantId,
+    paymentAttemptId,
+    previousStatus,
+    newStatus,
+    triggerSource,
+    note
+  });
     // Can optionally run against a session if provided
-    return session ? log.save({ session }) : log.save();
+  return session ? log.save({ session }) : log.save();
 }
 
 /**
@@ -37,23 +38,23 @@ async function createAuditLog(paymentAttemptId, session, tenantId, previousStatu
  * @route   GET /api/student-fees
  * @access  Private (Student)
  */
-router.get('/', protect, authorize('student'), async (req, res) => {
-    try {
-        const invoices = await FeeInvoice.find({
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        })
-            .populate('feeStructureId', 'name academicYear')
-            .sort({ dueDate: 1 });
+router.get('/', protect, authorize('student'), async(req, res) => {
+  try {
+    const invoices = await FeeInvoice.find({
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    })
+      .populate('feeStructureId', 'name academicYear')
+      .sort({ dueDate: 1 });
 
-        res.json({
-            success: true,
-            data: invoices
-        });
-    } catch (error) {
-        console.error('Error fetching student fees:', error);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
+    res.json({
+      success: true,
+      data: invoices
+    });
+  } catch (error) {
+    console.error('Error fetching student fees:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 /**
@@ -61,22 +62,22 @@ router.get('/', protect, authorize('student'), async (req, res) => {
  * @route   GET /api/student-fees/history
  * @access  Private (Student)
  */
-router.get('/history', protect, authorize('student'), async (req, res) => {
-    try {
-        const attempts = await PaymentAttempt.find({
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        })
-            .populate('invoiceId', 'invoiceNumber totalAmount status dueDate')
-            .sort({ createdAt: -1 });
+router.get('/history', protect, authorize('student'), async(req, res) => {
+  try {
+    const attempts = await PaymentAttempt.find({
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    })
+      .populate('invoiceId', 'invoiceNumber totalAmount status dueDate')
+      .sort({ createdAt: -1 });
 
-        res.json({
-            success: true,
-            data: attempts
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error fetching history' });
-    }
+    res.json({
+      success: true,
+      data: attempts
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching history' });
+  }
 });
 
 /**
@@ -84,29 +85,29 @@ router.get('/history', protect, authorize('student'), async (req, res) => {
  * @route   GET /api/student-fees/:id
  * @access  Private (Student)
  */
-router.get('/:id', protect, authorize('student'), async (req, res) => {
-    try {
-        const invoice = await FeeInvoice.findOne({
-            _id: req.params.id,
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        });
+router.get('/:id', protect, authorize('student'), async(req, res) => {
+  try {
+    const invoice = await FeeInvoice.findOne({
+      _id: req.params.id,
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    });
 
-        if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
+    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
 
-        const history = await PaymentAttempt.find({ invoiceId: invoice._id }).sort({ createdAt: -1 });
+    const history = await PaymentAttempt.find({ invoiceId: invoice._id }).sort({ createdAt: -1 });
 
-        // Add virtual wrapper
-        res.json({
-            success: true,
-            data: {
-                invoice,
-                history
-            }
-        });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
+    // Add virtual wrapper
+    res.json({
+      success: true,
+      data: {
+        invoice,
+        history
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 /**
@@ -114,99 +115,101 @@ router.get('/:id', protect, authorize('student'), async (req, res) => {
  * @route   POST /api/student-fees/:id/pay
  * @access  Private (Student)
  */
-router.post('/:id/pay', protect, authorize('student'), async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-    try {
-        const invoice = await FeeInvoice.findOne({
-            _id: req.params.id,
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        }).session(session);
+  try {
+    const invoice = await FeeInvoice.findOne({
+      _id: req.params.id,
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    }).session(session);
 
-        if (!invoice) throw new Error('Invoice not found');
+    if (!invoice) throw new Error('Invoice not found');
 
-        // Rule: If already Paid, block
-        if (invoice.status === 'Paid') {
-            throw new Error('This invoice is already fully paid.');
-        }
-
-        // Check if there is already a PENDING or PROCESSING payment for this
-        const stuckAttempt = await PaymentAttempt.findOne({
-            invoiceId: invoice._id,
-            status: { $in: ['PENDING', 'PROCESSING'] }
-        }).session(session);
-
-        if (stuckAttempt) {
-            throw new Error('You already have a payment undergoing verification for this invoice. Please wait or check your history.');
-        }
-
-        // Generate Idempotency Key combining invoice and time to prevent immediate duplicate mashes
-        const idempotencyKey = `idmp_${invoice._id}_${Date.now()}`;
-        const amountToPay = invoice.balanceAmount;
-
-        // 1. Create INITIATED attempt record FIRST before calling gateway
-        const attempt = new PaymentAttempt({
-            tenantId: req.user.tenantId,
-            idempotencyKey,
-            studentId: req.user._id,
-            invoiceId: invoice._id,
-            amount: amountToPay,
-            status: 'INITIATED',
-            triggerSource: 'STUDENT_PORTAL'
-        });
-
-        await attempt.save({ session });
-        await createAuditLog(attempt._id, session, req.user.tenantId, null, 'INITIATED', 'STUDENT_PORTAL', 'Started payment flow');
-
-        await session.commitTransaction();
-        session.endSession();
-
-        // 2. Safely call external gateway now that our DB knows an attempt started
-        let gatewayResult;
-        try {
-            gatewayResult = await gateway.initiatePayment({
-                amount: amountToPay,
-                currency: 'INR',
-                reference: idempotencyKey,
-                customerInfo: { name: req.user.fullName, email: req.user.email }
-            });
-
-            // Success call update status isolated
-            await PaymentAttempt.findByIdAndUpdate(attempt._id, {
-                status: 'PROCESSING',
-                gatewayRefId: gatewayResult.gatewayRefId,
-                gatewayResponse: gatewayResult.raw
-            });
-            await createAuditLog(attempt._id, null, req.user.tenantId, 'INITIATED', 'PROCESSING', 'STUDENT_PORTAL', 'Gateway returned checkout UI URL');
-
-            return res.json({
-                success: true,
-                message: 'Payment tracking started. Redirecting to gateway.',
-                data: {
-                    paymentAttemptId: attempt._id,
-                    paymentUrl: gatewayResult.paymentUrl,
-                    gatewayRefId: gatewayResult.gatewayRefId
-                }
-            });
-
-        } catch (gatewayErr) {
-            // Failsafe if the API call flat out crashed/timed out prior to UI Generation
-            await PaymentAttempt.findByIdAndUpdate(attempt._id, {
-                status: 'FAILED',
-                gatewayResponse: { error: gatewayErr.message }
-            });
-            await createAuditLog(attempt._id, null, req.user.tenantId, 'INITIATED', 'FAILED', 'STUDENT_PORTAL', 'Gateway error establishing session');
-
-            res.status(502).json({ success: false, message: 'Payment gateway could not be reached right now. Try again later.' });
-        }
-
-    } catch (error) {
-        await session.abortTransaction();
-        session.endSession();
-        res.status(400).json({ success: false, message: error.message || 'Payment initiation failed' });
+    // Rule: If already Paid, block
+    if (invoice.status === 'Paid') {
+      throw new Error('This invoice is already fully paid.');
     }
+
+    // Check if there is already a PENDING or PROCESSING payment for this
+    const stuckAttempt = await PaymentAttempt.findOne({
+      invoiceId: invoice._id,
+      status: { $in: ['PENDING', 'PROCESSING'] }
+    }).session(session);
+
+    if (stuckAttempt) {
+      throw new Error('You already have a payment undergoing verification for this invoice. Please wait or check your history.');
+    }
+
+    // Idempotency key: unique per attempt. The stuck-attempt check above is the
+    // real idempotency guard (blocks if PENDING/PROCESSING exists). This key just
+    // prevents MongoDB-level race conditions on concurrent inserts.
+    const idempotencyKey = `idmp_${invoice._id}_${req.user._id}_${Date.now()}`;
+    const amountToPay = invoice.balanceAmount;
+
+    // 1. Create INITIATED attempt record FIRST before calling gateway
+    const attempt = new PaymentAttempt({
+      tenantId: req.user.tenantId,
+      idempotencyKey,
+      studentId: req.user._id,
+      invoiceId: invoice._id,
+      amount: amountToPay,
+      status: 'INITIATED',
+      triggerSource: 'STUDENT_PORTAL'
+    });
+
+    await attempt.save({ session });
+    await createAuditLog(attempt._id, session, req.user.tenantId, null, 'INITIATED', 'STUDENT_PORTAL', 'Started payment flow');
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // 2. Safely call external gateway now that our DB knows an attempt started
+    let gatewayResult;
+    try {
+      gatewayResult = await gateway.initiatePayment({
+        amount: amountToPay,
+        currency: 'INR',
+        reference: idempotencyKey,
+        customerInfo: { name: req.user.fullName, email: req.user.email }
+      });
+
+      // Success call update status isolated
+      await PaymentAttempt.findByIdAndUpdate(attempt._id, {
+        status: 'PROCESSING',
+        gatewayRefId: gatewayResult.gatewayRefId,
+        gatewayResponse: gatewayResult.raw
+      });
+      await createAuditLog(attempt._id, null, req.user.tenantId, 'INITIATED', 'PROCESSING', 'STUDENT_PORTAL', 'Gateway returned checkout UI URL');
+
+      return res.json({
+        success: true,
+        message: 'Payment tracking started. Redirecting to gateway.',
+        data: {
+          paymentAttemptId: attempt._id,
+          paymentUrl: gatewayResult.paymentUrl,
+          gatewayRefId: gatewayResult.gatewayRefId
+        }
+      });
+
+    } catch (gatewayErr) {
+      // Failsafe if the API call flat out crashed/timed out prior to UI Generation
+      await PaymentAttempt.findByIdAndUpdate(attempt._id, {
+        status: 'FAILED',
+        gatewayResponse: { error: gatewayErr.message }
+      });
+      await createAuditLog(attempt._id, null, req.user.tenantId, 'INITIATED', 'FAILED', 'STUDENT_PORTAL', 'Gateway error establishing session');
+
+      res.status(502).json({ success: false, message: 'Payment gateway could not be reached right now. Try again later.' });
+    }
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(400).json({ success: false, message: error.message || 'Payment initiation failed' });
+  }
 });
 
 /**
@@ -215,75 +218,77 @@ router.post('/:id/pay', protect, authorize('student'), async (req, res) => {
  * @access  Private (Student)
  */
 router.post('/:id/submit-payment', protect, authorize('student'), [
-    body('paymentMode').isIn(['UPI', 'BANK_TRANSFER', 'CASH', 'CHEQUE', 'OTHER']).withMessage('Invalid payment mode'),
-    body('amount').isNumeric().custom(v => v > 0).withMessage('Amount must be positive'),
-    body('paymentDate').isISO8601().withMessage('Valid payment date required'),
-    body('transactionRefId').optional({ nullable: true }),
-    body('proofScreenshotUrl').optional({ nullable: true }),
-], handleValidationErrors, async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+  body('paymentMode').isIn(['UPI', 'BANK_TRANSFER', 'CASH', 'CHEQUE', 'OTHER']).withMessage('Invalid payment mode'),
+  body('amount').isNumeric().custom(v => v > 0).withMessage('Amount must be positive'),
+  body('paymentDate').isISO8601().withMessage('Valid payment date required'),
+  body('transactionRefId').optional({ nullable: true }),
+  body('proofScreenshotUrl').optional({ nullable: true })
+], handleValidationErrors, async(req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-    try {
-        const invoice = await FeeInvoice.findOne({
-            _id: req.params.id,
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        }).session(session);
+  try {
+    const invoice = await FeeInvoice.findOne({
+      _id: req.params.id,
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    }).session(session);
 
-        if (!invoice) throw new Error('Invoice not found');
-        if (invoice.status === 'Paid') throw new Error('This invoice is already fully paid.');
+    if (!invoice) throw new Error('Invoice not found');
+    if (invoice.status === 'Paid') throw new Error('This invoice is already fully paid.');
 
-        // Block if there is already a pending submission for this invoice
-        const existingPending = await PaymentAttempt.findOne({
-            invoiceId: invoice._id,
-            studentId: req.user._id,
-            status: { $in: ['PENDING', 'PROCESSING', 'INITIATED', 'UNDER_REVIEW'] }
-        }).session(session);
+    // Block if there is already a pending submission for this invoice
+    const existingPending = await PaymentAttempt.findOne({
+      invoiceId: invoice._id,
+      studentId: req.user._id,
+      status: { $in: ['PENDING', 'PROCESSING', 'INITIATED', 'UNDER_REVIEW'] }
+    }).session(session);
 
-        if (existingPending) {
-            throw new Error('You already have a payment awaiting verification for this invoice.');
-        }
-
-        const { paymentMode, amount, paymentDate, transactionRefId, proofScreenshotUrl } = req.body;
-
-        // Amount cannot exceed balance
-        if (amount > invoice.balanceAmount) {
-            throw new Error(`Amount (${amount}) exceeds balance due (${invoice.balanceAmount}).`);
-        }
-
-        const idempotencyKey = `manual_${invoice._id}_${Date.now()}`;
-
-        const attempt = new PaymentAttempt({
-            tenantId: req.user.tenantId,
-            idempotencyKey,
-            studentId: req.user._id,
-            invoiceId: invoice._id,
-            amount,
-            status: 'PENDING',
-            triggerSource: 'STUDENT_PORTAL',
-            paymentMode,
-            transactionRefId: transactionRefId || null,
-            paymentDate: new Date(paymentDate),
-            proofScreenshotUrl: proofScreenshotUrl || null,
-        });
-
-        await attempt.save({ session });
-        await createAuditLog(attempt._id, session, req.user.tenantId, null, 'PENDING', 'STUDENT_PORTAL', `Manual payment submitted: ${paymentMode}`);
-
-        await session.commitTransaction();
-        session.endSession();
-
-        res.status(201).json({
-            success: true,
-            message: 'Your payment has been submitted for verification. You will be notified once it is approved.',
-            data: { paymentAttemptId: attempt._id, status: 'PENDING' }
-        });
-    } catch (error) {
-        await session.abortTransaction();
-        session.endSession();
-        res.status(400).json({ success: false, message: error.message || 'Payment submission failed' });
+    if (existingPending) {
+      throw new Error('You already have a payment awaiting verification for this invoice.');
     }
+
+    const { paymentMode, amount, paymentDate, transactionRefId, proofScreenshotUrl } = req.body;
+
+    // Amount cannot exceed balance (with tolerance)
+    if (toNumber(amount) > toNumber(invoice.balanceAmount) + 0.01) {
+      throw new Error(`Amount (${amount}) exceeds balance due (${roundToRupee(invoice.balanceAmount)}).`);
+    }
+
+    // Unique key per attempt. The existingPending check above is the real
+    // idempotency guard (blocks if non-terminal attempt exists).
+    const idempotencyKey = `manual_${invoice._id}_${req.user._id}_${Date.now()}`;
+
+    const attempt = new PaymentAttempt({
+      tenantId: req.user.tenantId,
+      idempotencyKey,
+      studentId: req.user._id,
+      invoiceId: invoice._id,
+      amount,
+      status: 'PENDING',
+      triggerSource: 'STUDENT_PORTAL',
+      paymentMode,
+      transactionRefId: transactionRefId || null,
+      paymentDate: new Date(paymentDate),
+      proofScreenshotUrl: proofScreenshotUrl || null
+    });
+
+    await attempt.save({ session });
+    await createAuditLog(attempt._id, session, req.user.tenantId, null, 'PENDING', 'STUDENT_PORTAL', `Manual payment submitted: ${paymentMode}`);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.status(201).json({
+      success: true,
+      message: 'Your payment has been submitted for verification. You will be notified once it is approved.',
+      data: { paymentAttemptId: attempt._id, status: 'PENDING' }
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(400).json({ success: false, message: error.message || 'Payment submission failed' });
+  }
 });
 
 /**
@@ -291,72 +296,83 @@ router.post('/:id/submit-payment', protect, authorize('student'), [
  * @route   GET /api/student-fees/payment/:id/status
  * @access  Private (Student)
  */
-router.get('/payment/:id/status', protect, authorize('student'), async (req, res) => {
-    try {
-        const attempt = await PaymentAttempt.findOne({
-            _id: req.params.id,
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        });
+router.get('/payment/:id/status', protect, authorize('student'), async(req, res) => {
+  try {
+    const attempt = await PaymentAttempt.findOne({
+      _id: req.params.id,
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    });
 
-        if (!attempt) return res.status(404).json({ success: false, message: 'Payment attempt not found' });
+    if (!attempt) return res.status(404).json({ success: false, message: 'Payment attempt not found' });
 
-        // If it's already terminal, don't ping the gateway, just return
-        if (['SUCCESS', 'FAILED', 'DISPUTED'].includes(attempt.status)) {
-            return res.json({ success: true, data: attempt });
-        }
-
-        // It is PENDING or PROCESSING, we must verify with gateway
-        const gwResult = await gateway.checkStatus(attempt.gatewayRefId);
-
-        if (gwResult.status !== attempt.status) {
-            // State evolved
-            const previousStatus = attempt.status;
-            attempt.status = gwResult.status;
-
-            // If it resolved to SUCCESS, we MUST update the invoice to Paid
-            if (gwResult.status === 'SUCCESS') {
-                const invoice = await FeeInvoice.findById(attempt.invoiceId);
-                invoice.paidAmount += attempt.amount;
-                invoice.balanceAmount = invoice.totalAmount + invoice.lateFeeApplied - invoice.paidAmount;
-
-                if (invoice.balanceAmount <= 0) invoice.status = 'Paid';
-                else invoice.status = 'Partial';
-
-                await invoice.save();
-
-                // Generate Receipt
-                const receiptNum = await Receipt.generateReceiptNumber(req.user.tenantId);
-                const receipt = new Receipt({
-                    tenantId: req.user.tenantId,
-                    paymentAttemptId: attempt._id,
-                    studentId: req.user._id,
-                    invoiceId: invoice._id,
-                    receiptNumber: receiptNum
-                });
-                await receipt.save();
-            }
-
-            await attempt.save();
-            await createAuditLog(
-                attempt._id,
-                null,
-                req.user.tenantId,
-                previousStatus,
-                gwResult.status,
-                'STUDENT_PORTAL',
-                'Student manually polled status update.'
-            );
-        }
-
-        res.json({
-            success: true,
-            data: attempt
-        });
-
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error checking status' });
+    // If it's already terminal, don't ping the gateway, just return
+    if (['SUCCESS', 'FAILED', 'DISPUTED', 'VERIFIED'].includes(attempt.status)) {
+      return res.json({ success: true, data: attempt });
     }
+
+    // Skip gateway poll for manual payments (no gatewayRefId)
+    if (!attempt.gatewayRefId) {
+      return res.json({ success: true, data: attempt });
+    }
+
+    // It is PENDING or PROCESSING, verify with gateway
+    const gwResult = await gateway.checkStatus(attempt.gatewayRefId);
+
+    if (gwResult.status !== attempt.status && ['SUCCESS', 'FAILED'].includes(gwResult.status)) {
+      const previousStatus = attempt.status;
+
+      if (gwResult.status === 'SUCCESS') {
+        // Use transaction for SUCCESS path to ensure atomicity
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+          attempt.status = 'SUCCESS';
+          await attempt.save({ session });
+
+          const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
+          if (invoice) {
+            // Safe rounding — pre-save hook handles balance + status
+            invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
+            await invoice.save({ session });
+          }
+
+          // Generate Receipt
+          const receiptNum = await Receipt.generateReceiptNumber(req.user.tenantId);
+          await Receipt.create([{
+            tenantId: req.user.tenantId,
+            paymentAttemptId: attempt._id,
+            studentId: req.user._id,
+            invoiceId: attempt.invoiceId,
+            receiptNumber: receiptNum
+          }], { session });
+
+          await createAuditLog(attempt._id, session, req.user.tenantId, previousStatus, 'SUCCESS', 'STUDENT_PORTAL', 'Status resolved via student poll.');
+
+          await session.commitTransaction();
+          session.endSession();
+        } catch (txErr) {
+          await session.abortTransaction();
+          session.endSession();
+          throw txErr;
+        }
+      } else {
+        // FAILED path — no invoice update needed
+        attempt.status = gwResult.status;
+        await attempt.save();
+        await createAuditLog(attempt._id, null, req.user.tenantId, previousStatus, gwResult.status, 'STUDENT_PORTAL', 'Status resolved via student poll.');
+      }
+    }
+
+    res.json({
+      success: true,
+      data: attempt
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error checking status' });
+  }
 });
 
 /**
@@ -365,41 +381,41 @@ router.get('/payment/:id/status', protect, authorize('student'), async (req, res
  * @access  Private (Student)
  */
 router.post('/dispute', protect, authorize('student'), [
-    body('invoiceId').notEmpty(),
-    body('amount').isNumeric(),
-    body('studentNote').notEmpty()
-], async (req, res) => {
-    try {
-        const { invoiceId, paymentAttemptId, transactionId, bankReferenceNumber, amount, studentNote } = req.body;
+  body('invoiceId').notEmpty().withMessage('Invoice ID is required'),
+  body('amount').isNumeric().custom(v => v > 0).withMessage('Valid positive amount is required'),
+  body('studentNote').notEmpty().withMessage('Please describe the issue')
+], handleValidationErrors, async(req, res) => {
+  try {
+    const { invoiceId, paymentAttemptId, transactionId, bankReferenceNumber, amount, studentNote } = req.body;
 
-        // Ensure invoice belongs to student
-        const invoice = await FeeInvoice.findOne({ _id: invoiceId, studentId: req.user._id });
-        if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
+    // Ensure invoice belongs to student
+    const invoice = await FeeInvoice.findOne({ _id: invoiceId, studentId: req.user._id });
+    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });
 
-        const dispute = new PaymentDispute({
-            tenantId: req.user.tenantId,
-            studentId: req.user._id,
-            invoiceId,
-            paymentAttemptId, // optional if they don't know which attempt it was
-            transactionId,
-            bankReferenceNumber,
-            amount,
-            studentNote,
-            status: 'RAISED'
-        });
+    const dispute = new PaymentDispute({
+      tenantId: req.user.tenantId,
+      studentId: req.user._id,
+      invoiceId,
+      paymentAttemptId, // optional if they don't know which attempt it was
+      transactionId,
+      bankReferenceNumber,
+      amount,
+      studentNote,
+      status: 'RAISED'
+    });
 
-        await dispute.save();
+    await dispute.save();
 
-        if (paymentAttemptId) {
-            // Lock the attempt and log it
-            await PaymentAttempt.findByIdAndUpdate(paymentAttemptId, { status: 'DISPUTED' });
-            await createAuditLog(paymentAttemptId, null, req.user.tenantId, null, 'DISPUTED', 'STUDENT_PORTAL', 'Student raised a dispute');
-        }
-
-        res.status(201).json({ success: true, message: 'Dispute raised successfully. Admin will review.', data: dispute });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Failed to raise dispute' });
+    if (paymentAttemptId) {
+      // Lock the attempt and log it
+      await PaymentAttempt.findByIdAndUpdate(paymentAttemptId, { status: 'DISPUTED' });
+      await createAuditLog(paymentAttemptId, null, req.user.tenantId, null, 'DISPUTED', 'STUDENT_PORTAL', 'Student raised a dispute');
     }
+
+    res.status(201).json({ success: true, message: 'Dispute raised successfully. Admin will review.', data: dispute });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to raise dispute' });
+  }
 });
 
 /**
@@ -407,20 +423,20 @@ router.post('/dispute', protect, authorize('student'), [
  * @route   GET /api/student-fees/dispute/:id
  * @access  Private (Student)
  */
-router.get('/dispute/:id', protect, authorize('student'), async (req, res) => {
-    try {
-        const dispute = await PaymentDispute.findOne({
-            _id: req.params.id,
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        }).populate('invoiceId', 'invoiceNumber totalAmount');
+router.get('/dispute/:id', protect, authorize('student'), async(req, res) => {
+  try {
+    const dispute = await PaymentDispute.findOne({
+      _id: req.params.id,
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    }).populate('invoiceId', 'invoiceNumber totalAmount');
 
-        if (!dispute) return res.status(404).json({ success: false, message: 'Dispute not found' });
+    if (!dispute) return res.status(404).json({ success: false, message: 'Dispute not found' });
 
-        res.json({ success: true, data: dispute });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
+    res.json({ success: true, data: dispute });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 /**
@@ -428,21 +444,21 @@ router.get('/dispute/:id', protect, authorize('student'), async (req, res) => {
  * @route   GET /api/student-fees/receipts
  * @access  Private (Student)
  */
-router.get('/receipts', protect, authorize('student'), async (req, res) => {
-    try {
-        const receipts = await Receipt.find({
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        })
-            .populate('invoiceId', 'invoiceNumber totalAmount items')
-            .populate('paymentAttemptId', 'gatewayRefId amount status paymentMode transactionRefId paymentDate triggerSource')
-            .populate('verifiedByUserId', 'name fullName')
-            .sort({ issuedAt: -1 });
+router.get('/receipts', protect, authorize('student'), async(req, res) => {
+  try {
+    const receipts = await Receipt.find({
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    })
+      .populate('invoiceId', 'invoiceNumber totalAmount items')
+      .populate('paymentAttemptId', 'gatewayRefId amount status paymentMode transactionRefId paymentDate triggerSource')
+      .populate('verifiedByUserId', 'name fullName')
+      .sort({ issuedAt: -1 });
 
-        res.json({ success: true, data: receipts });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error fetching receipts' });
-    }
+    res.json({ success: true, data: receipts });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error fetching receipts' });
+  }
 });
 
 /**
@@ -450,39 +466,39 @@ router.get('/receipts', protect, authorize('student'), async (req, res) => {
  * @route   GET /api/student-fees/receipt/:id
  * @access  Private (Student)
  */
-router.get('/receipt/:id', protect, authorize('student'), async (req, res) => {
-    try {
-        // Try by receipt _id first, then by paymentAttemptId
-        let receipt = await Receipt.findOne({
-            _id: req.params.id,
-            studentId: req.user._id,
-            tenantId: req.user.tenantId
-        });
+router.get('/receipt/:id', protect, authorize('student'), async(req, res) => {
+  try {
+    // Try by receipt _id first, then by paymentAttemptId
+    let receipt = await Receipt.findOne({
+      _id: req.params.id,
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    });
 
-        if (!receipt) {
-            receipt = await Receipt.findOne({
-                paymentAttemptId: req.params.id,
-                studentId: req.user._id,
-                tenantId: req.user.tenantId
-            });
-        }
-
-        if (!receipt) return res.status(404).json({ success: false, message: 'Receipt not found' });
-
-        await receipt.populate('invoiceId', 'invoiceNumber totalAmount items billingPeriod');
-        await receipt.populate('paymentAttemptId', 'gatewayRefId amount status paymentMode transactionRefId paymentDate triggerSource');
-        await receipt.populate('studentId', 'name fullName admissionNumber classId section parentName');
-        await receipt.populate('verifiedByUserId', 'name fullName');
-
-        // Populate student's classId
-        if (receipt.studentId?.classId) {
-            await receipt.populate('studentId.classId', 'name grade');
-        }
-
-        res.json({ success: true, data: receipt });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error' });
+    if (!receipt) {
+      receipt = await Receipt.findOne({
+        paymentAttemptId: req.params.id,
+        studentId: req.user._id,
+        tenantId: req.user.tenantId
+      });
     }
+
+    if (!receipt) return res.status(404).json({ success: false, message: 'Receipt not found' });
+
+    await receipt.populate('invoiceId', 'invoiceNumber totalAmount items billingPeriod');
+    await receipt.populate('paymentAttemptId', 'gatewayRefId amount status paymentMode transactionRefId paymentDate triggerSource');
+    await receipt.populate('studentId', 'name fullName admissionNumber classId section parentName');
+    await receipt.populate('verifiedByUserId', 'name fullName');
+
+    // Populate student's classId
+    if (receipt.studentId?.classId) {
+      await receipt.populate('studentId.classId', 'name grade');
+    }
+
+    res.json({ success: true, data: receipt });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 /**
@@ -490,71 +506,173 @@ router.get('/receipt/:id', protect, authorize('student'), async (req, res) => {
  * @route   POST /api/student-fees/admin/verify-payment/:attemptId
  * @access  Private (Admin)
  */
-router.post('/admin/verify-payment/:attemptId', protect, authorize('admin', 'accountant'), async (req, res) => {
+router.post('/admin/verify-payment/:attemptId', protect, authorize('admin', 'accountant'), async(req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const attempt = await PaymentAttempt.findOne({
+      _id: req.params.attemptId,
+      tenantId: req.user.tenantId
+    }).session(session);
+
+    if (!attempt) throw new Error('Payment attempt not found');
+    if (['SUCCESS', 'VERIFIED', 'FAILED'].includes(attempt.status)) {
+      throw new Error(`Payment is already ${attempt.status}. Cannot verify again.`);
+    }
+
+    // Mark as VERIFIED
+    const previousStatus = attempt.status;
+    attempt.status = 'VERIFIED';
+    attempt.verifiedBy = req.user._id;
+    attempt.verifiedAt = new Date();
+    await attempt.save({ session });
+
+    // Update invoice
+    const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
+    if (invoice) {
+      // Safe rounding — pre-save hook handles balance + status
+      invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
+      await invoice.save({ session });
+    }
+
+    // Generate Receipt
+    const receiptNum = await Receipt.generateReceiptNumber(req.user.tenantId);
+    const receipt = new Receipt({
+      tenantId: req.user.tenantId,
+      paymentAttemptId: attempt._id,
+      studentId: attempt.studentId,
+      invoiceId: attempt.invoiceId,
+      receiptNumber: receiptNum,
+      initiatedBy: attempt.triggerSource === 'ADMIN_MANUAL' ? 'admin' : 'student',
+      verifiedByUserId: req.user._id,
+      verifiedByName: req.user.name || req.user.fullName || 'Admin',
+      amount: attempt.amount,
+      paymentMode: attempt.paymentMode || 'OTHER',
+      transactionRefId: attempt.transactionRefId || null,
+      paymentDate: attempt.paymentDate || attempt.createdAt
+    });
+    await receipt.save({ session });
+
+    await createAuditLog(attempt._id, session, req.user.tenantId, previousStatus, 'VERIFIED', 'ADMIN_MANUAL', `Verified by ${req.user.name || 'Admin'}`);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: 'Payment verified and receipt generated.',
+      data: { attempt, receipt }
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(400).json({ success: false, message: error.message || 'Verification failed' });
+  }
+});
+
+/**
+ * @desc    Payment gateway webhook/notify endpoint
+ * @route   POST /api/student-fees/payment/notify
+ * @access  Public (called by payment gateway — NO auth required)
+ *
+ * This endpoint is called by the bank/payment gateway (HDFC, CCAvenue, Razorpay, etc.)
+ * to notify the system of payment status changes. The request is verified using
+ * the gateway's webhook signature before any state changes are made.
+ */
+router.post('/payment/notify', async(req, res) => {
+  try {
+    const { gatewayRefId, status } = req.body;
+
+    if (!gatewayRefId) {
+      return res.status(400).json({ success: false, message: 'Missing gatewayRefId' });
+    }
+
+    // Find the payment attempt by gateway reference
+    const attempt = await PaymentAttempt.findOne({ gatewayRefId });
+    if (!attempt) {
+      console.warn(`[webhook] Unknown gatewayRefId: ${gatewayRefId}`);
+      // Return 200 so the gateway doesn't keep retrying for unknown refs
+      return res.status(200).json({ success: false, message: 'Unknown payment reference' });
+    }
+
+    // Verify webhook signature using the gateway adapter
+    const isValid = gateway.verifyWebhookSignature(req.headers, JSON.stringify(req.body));
+    if (!isValid) {
+      console.error(`[webhook] Invalid signature for gatewayRefId: ${gatewayRefId}`);
+      return res.status(403).json({ success: false, message: 'Invalid webhook signature' });
+    }
+
+    // Prevent re-processing terminal states
+    if (['SUCCESS', 'FAILED', 'REFUNDED'].includes(attempt.status)) {
+      return res.status(200).json({ success: true, message: 'Already processed' });
+    }
+
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const attempt = await PaymentAttempt.findOne({
-            _id: req.params.attemptId,
-            tenantId: req.user.tenantId
-        }).session(session);
+      const previousStatus = attempt.status;
+      const newStatus = status === 'SUCCESS' ? 'SUCCESS' : 'FAILED';
 
-        if (!attempt) throw new Error('Payment attempt not found');
-        if (['SUCCESS', 'VERIFIED', 'FAILED'].includes(attempt.status)) {
-            throw new Error(`Payment is already ${attempt.status}. Cannot verify again.`);
-        }
+      // Update payment attempt
+      attempt.status = newStatus;
+      attempt.gatewayResponse = req.body;
+      await attempt.save({ session });
 
-        // Mark as VERIFIED
-        const previousStatus = attempt.status;
-        attempt.status = 'VERIFIED';
-        attempt.verifiedBy = req.user._id;
-        attempt.verifiedAt = new Date();
-        await attempt.save({ session });
+      await createAuditLog(
+        attempt._id, session, attempt.tenantId,
+        previousStatus, newStatus, 'WEBHOOK',
+        `Gateway webhook: ${status}`
+      );
 
-        // Update invoice
+      // If payment succeeded, update the invoice
+      if (newStatus === 'SUCCESS') {
         const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
         if (invoice) {
-            invoice.paidAmount += attempt.amount;
-            invoice.balanceAmount = invoice.totalAmount + (invoice.lateFeeApplied || 0) - invoice.paidAmount;
-            if (invoice.balanceAmount <= 0) { invoice.status = 'Paid'; invoice.balanceAmount = 0; }
-            else { invoice.status = 'Partial'; }
-            await invoice.save({ session });
-        }
+          const newPaid = toNumber(invoice.paidAmount) + toNumber(attempt.amount);
+          invoice.paidAmount = roundToRupee(newPaid);
+          invoice.balanceAmount = roundToRupee(toNumber(invoice.totalAmount) - newPaid);
 
-        // Generate Receipt
-        const receiptNum = await Receipt.generateReceiptNumber(req.user.tenantId);
-        const receipt = new Receipt({
-            tenantId: req.user.tenantId,
-            paymentAttemptId: attempt._id,
+          if (isFullyPaid(invoice.totalAmount, newPaid)) {
+            invoice.status = 'Paid';
+            invoice.paidDate = new Date();
+          } else {
+            invoice.status = 'Partially Paid';
+          }
+
+          await invoice.save({ session });
+
+          // Generate receipt
+          const receipt = new Receipt({
+            tenantId: attempt.tenantId,
+            invoiceId: invoice._id,
             studentId: attempt.studentId,
-            invoiceId: attempt.invoiceId,
-            receiptNumber: receiptNum,
-            initiatedBy: attempt.triggerSource === 'ADMIN_MANUAL' ? 'admin' : 'student',
-            verifiedByUserId: req.user._id,
-            verifiedByName: req.user.name || req.user.fullName || 'Admin',
+            paymentAttemptId: attempt._id,
             amount: attempt.amount,
-            paymentMode: attempt.paymentMode || 'OTHER',
-            transactionRefId: attempt.transactionRefId || null,
-            paymentDate: attempt.paymentDate || attempt.createdAt,
-        });
-        await receipt.save({ session });
+            receiptNumber: `RCP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+            paymentMode: 'ONLINE',
+            paymentDate: new Date()
+          });
+          await receipt.save({ session });
+        }
+      }
 
-        await createAuditLog(attempt._id, session, req.user.tenantId, previousStatus, 'VERIFIED', 'ADMIN_MANUAL', `Verified by ${req.user.name || 'Admin'}`);
+      await session.commitTransaction();
+      session.endSession();
 
-        await session.commitTransaction();
-        session.endSession();
-
-        res.json({
-            success: true,
-            message: 'Payment verified and receipt generated.',
-            data: { attempt, receipt }
-        });
-    } catch (error) {
-        await session.abortTransaction();
-        session.endSession();
-        res.status(400).json({ success: false, message: error.message || 'Verification failed' });
+      // Always return 200 to acknowledge receipt to the gateway
+      res.status(200).json({ success: true, message: `Payment ${newStatus.toLowerCase()}` });
+    } catch (txnError) {
+      await session.abortTransaction();
+      session.endSession();
+      throw txnError;
     }
+  } catch (error) {
+    console.error('[webhook] Payment notify error:', error);
+    // Return 500 so the gateway retries
+    res.status(500).json({ success: false, message: 'Webhook processing failed' });
+  }
 });
 
 module.exports = router;

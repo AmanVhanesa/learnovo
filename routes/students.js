@@ -16,6 +16,7 @@ const fs = require('fs');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const Class = require('../models/Class');
 const Driver = require('../models/Driver');
+const { logger } = require('../middleware/errorHandler');
 
 const router = express.Router();
 
@@ -112,7 +113,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
           filter.$and.push({ _id: null }); // Force empty
         }
       } catch (err) {
-        console.error('Teacher filter error:', err);
+        logger.error('Teacher filter error', err, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
         if (!filter.$and) filter.$and = [];
         filter.$and.push({ _id: null });
       }
@@ -178,6 +179,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.$or = [
         { name: { $regex: req.query.search, $options: 'i' } },
         { fullName: { $regex: req.query.search, $options: 'i' } },
+        { email: { $regex: req.query.search, $options: 'i' } },
         { admissionNumber: { $regex: req.query.search, $options: 'i' } },
         { rollNumber: { $regex: req.query.search, $options: 'i' } },
         { studentId: { $regex: req.query.search, $options: 'i' } },
@@ -198,7 +200,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
         .lean();
     } catch (populateError) {
       // Populate failed (e.g. ref model not loaded) — retry without populates
-      console.error('GET /students populate error (retrying without populate):', populateError.name, populateError.message);
+      logger.error('GET /students populate error (retrying without populate)', populateError, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
       students = await User.find(filter)
         .select('-password')
         .sort({ createdAt: -1 })
@@ -213,8 +215,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
     res.json(paginatedResponse(students, total, page, limit));
   } catch (error) {
-    console.error('GET /students error:', error.name, error.message);
-    console.error('GET /students stack:', error.stack);
+    logger.error('GET /students error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while fetching students',
@@ -255,7 +256,7 @@ router.get('/import/template', protect, authorize('admin'), (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.csv');
     res.status(200).send(csvContent);
   } catch (error) {
-    console.error('Download template error:', error);
+    logger.error('Download template error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error generating template' });
   }
 });
@@ -331,7 +332,7 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
     res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.xlsx');
     res.status(200).send(excelBuffer);
   } catch (error) {
-    console.error('Download Excel template error:', error);
+    logger.error('Download Excel template error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error generating Excel template' });
   }
 });
@@ -583,8 +584,7 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
     });
 
   } catch (error) {
-    console.error('Import preview error:', error);
-    console.error('Error stack:', error.stack);
+    logger.error('Import preview error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     // No local file cleanup needed — file is in memory buffer only
     res.status(500).json({
       success: false,
@@ -605,9 +605,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
   try {
     const { validData, options } = req.body;
 
-    console.log('=== IMPORT EXECUTE CALLED ===');
-    console.log('validData length:', validData ? validData.length : 'undefined');
-    console.log('================================');
+    logger.info('Import execute called', { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email, validDataLength: validData ? validData.length : 'undefined' });
 
     if (!validData || !Array.isArray(validData) || validData.length === 0) {
       return res.status(400).json({ success: false, message: 'No valid data to import' });
@@ -672,7 +670,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
         );
         newSubDepts.forEach(sd => subDeptCache.set(sd.name.toUpperCase(), sd));
       } catch (sdErr) {
-        console.warn('SubDepartment batch create warning:', sdErr.message);
+        logger.warn('SubDepartment batch create warning', { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email, error: sdErr.message });
       }
     }
 
@@ -764,7 +762,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
               driverId = driver._id;
               transportMode = 'School Transport';
             } else {
-              console.warn(`Import: Driver not found: ${driverName}`);
+              logger.warn(`Import: Driver not found: ${driverName}`, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
             }
           }
         }
@@ -873,7 +871,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
               studentData.class = rawClassValue;
             }
           } catch (classLookupErr) {
-            console.warn('Class lookup error during import:', classLookupErr.message);
+            logger.warn('Class lookup error during import', { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email, error: classLookupErr.message });
             studentData.class = rawClassValue;
           }
 
@@ -1010,12 +1008,12 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
 
       } catch (error) {
         results.failed++;
-        console.error(`Import error for row ${rowNum}:`, error.message);
+        logger.error(`Import error for row ${rowNum}`, error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email, rowNum });
 
         // Safely log data (prevent circular dependency/undefined errors)
         try {
-          if (studentData) console.error('Student data payload:', JSON.stringify(studentData, null, 2));
-        } catch (logErr) { console.error('Failed to log payload:', logErr.message); }
+          if (studentData) logger.error('Student data payload', new Error(JSON.stringify(studentData, null, 2)), { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId });
+        } catch (logErr) { logger.error('Failed to log payload', logErr, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId }); }
 
         // Capture validation errors if present
         if (error.errors) {
@@ -1078,8 +1076,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
     });
 
   } catch (error) {
-    console.error('Import execute error:', error);
-    console.error('Import execute stack:', error.stack);
+    logger.error('Import execute error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error during import execution',
@@ -1121,7 +1118,7 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async (req, res) 
       }
     });
   } catch (error) {
-    console.error('Filter options error:', error);
+    logger.error('Filter options error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -1203,7 +1200,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
           filter.$and.push({ _id: null });
         }
       } catch (err) {
-        console.error('Teacher export filter error:', err);
+        logger.error('Teacher export filter error', err, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
         if (!filter.$and) filter.$and = [];
         filter.$and.push({ _id: null });
       }
@@ -1401,7 +1398,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
     res.status(400).json({ success: false, message: `Unsupported format: ${format}` });
 
   } catch (error) {
-    console.error('Export error:', error);
+    logger.error('Export error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error during export' });
   }
 });
@@ -1411,11 +1408,17 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
 // @access  Private
 router.get('/:id', protect, canAccessStudent, async (req, res) => {
   try {
-    const student = await User.findById(req.params.id)
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: 'student',
+      tenantId: req.user.tenantId
+    })
       .select('-password')
-      .populate('subDepartment', 'name');
+      .populate('subDepartment', 'name')
+      .populate('driverId', 'name phone')
+      .populate('classId', 'name grade');
 
-    if (!student || student.role !== 'student') {
+    if (!student) {
       return res.status(404).json({
         success: false,
         message: 'Student not found'
@@ -1450,13 +1453,15 @@ router.get('/:id', protect, canAccessStudent, async (req, res) => {
           pending: await formatCurrencyWithSettings(pendingFees),
           overdue: await formatCurrencyWithSettings(overdueFees)
         }
-      }
+      },
+      requestId: req.requestId
     });
   } catch (error) {
-    console.error('Get student error:', error);
+    logger.error('Get student error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
-      message: 'Server error while fetching student'
+      message: 'Server error while fetching student',
+      requestId: req.requestId
     });
   }
 });
@@ -1472,10 +1477,15 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
 
     const {
       fullName, name, firstName, middleName, lastName, email, phone, password,
-      class: studentClass, section, academicYear, rollNumber, admissionDate,
+      classId, class: studentClass, section, academicYear, rollNumber, admissionDate,
       guardians, address, avatar,
-      penNumber, subDepartment, udiseCode, // Legacy fields
-      transportMode, driverId
+      penNumber, subDepartment, udiseCode,
+      transportMode, driverId,
+      // Student personal/medical fields from form
+      dateOfBirth, gender, bloodGroup, religion, category,
+      identificationMark, isOrphan, nationality,
+      previousSchool, previousBoard, previousRollNumber, transferNotes,
+      medicalConditions, allergies, doctorName, doctorPhone, notes
     } = req.body;
 
     // Handle Transport Mode Logic
@@ -1554,7 +1564,7 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
           }
         }
       } catch (err) {
-        console.error('Error looking up sectionId:', err);
+        logger.error('Error looking up sectionId', err, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
         // Continue without sectionId - will save section string only
       }
     }
@@ -1576,9 +1586,10 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
       role: 'student',
       tenantId,
       admissionNumber,
+      classId: classId || undefined,
       class: studentClass,
       section,
-      sectionId,  // Add sectionId
+      sectionId,
       academicYear,
       rollNumber,
       admissionDate: admissionDate || new Date(),
@@ -1589,7 +1600,14 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
       subDepartment,
       udiseCode: udiseCode ? udiseCode.trim() : undefined,
       transportMode: finalTransportMode,
-      driverId: finalDriverId
+      driverId: finalDriverId,
+      // Personal details
+      dateOfBirth, gender, bloodGroup, religion, category,
+      identificationMark, isOrphan, nationality,
+      // Academic background
+      previousSchool, previousBoard, previousRollNumber, transferNotes,
+      // Medical & notes
+      medicalConditions, allergies, doctorName, doctorPhone, notes
     };
 
     const student = await User.create(studentData);
@@ -1597,6 +1615,7 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
     res.status(201).json({
       success: true,
       message: 'Student created successfully',
+      requestId: req.requestId,
       data: {
         id: student._id,
         name: student.name,
@@ -1621,11 +1640,11 @@ router.post('/', protect, authorize('admin'), validateStudent, handleValidationE
         const { rollbackAdmissionNumber } = require('../utils/admissionUtils');
         await rollbackAdmissionNumber(req.user.tenantId);
       } catch (rollbackErr) {
-        console.error('Admission number rollback failed:', rollbackErr);
+        logger.error('Admission number rollback failed', rollbackErr, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
       }
     }
 
-    console.error('Create student error:', error);
+    logger.error('Create student error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     if (error.code === 11000) {
       return res.status(409).json({ success: false, message: 'Duplicate entry detected (Email or Admission No)' });
     }
@@ -1662,9 +1681,13 @@ router.put('/:id', protect, canAccessStudent, [
   handleValidationErrors
 ], async (req, res) => {
   try {
-    const student = await User.findById(req.params.id);
+    const student = await User.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+      role: 'student'
+    });
 
-    if (!student || student.role !== 'student') {
+    if (!student) {
       return res.status(404).json({
         success: false,
         message: 'Student not found'
@@ -1691,13 +1714,15 @@ router.put('/:id', protect, canAccessStudent, [
       const existingRollNumber = await User.findOne({
         rollNumber: req.body.rollNumber?.trim(),
         class: req.body.class?.trim(),
+        section: req.body.section ? req.body.section.trim() : undefined,
         role: 'student',
+        tenantId: req.user.tenantId,
         _id: { $ne: req.params.id }
       });
       if (existingRollNumber) {
         return res.status(400).json({
           success: false,
-          message: 'Roll number already exists in this class'
+          message: 'Roll number already exists in this class/section'
         });
       }
     }
@@ -1777,7 +1802,7 @@ router.put('/:id', protect, canAccessStudent, [
           }
         }
       } catch (err) {
-        console.error('Error looking up sectionId during update:', err);
+        logger.error('Error looking up sectionId during update', err, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
         // Continue without sectionId - will save section string only
       }
     }
@@ -1794,9 +1819,7 @@ router.put('/:id', protect, canAccessStudent, [
       data: updatedStudent
     });
   } catch (error) {
-    console.error('Update student error:', error);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
+    logger.error('Update student error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
       return res.status(409).json({ success: false, message: `Duplicate entry detected for ${field}` });
@@ -1819,9 +1842,13 @@ router.put('/:id/deactivate', protect, authorize('admin'), [
   handleValidationErrors
 ], async (req, res) => {
   try {
-    const student = await User.findById(req.params.id);
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: 'student',
+      tenantId: req.user.tenantId
+    });
 
-    if (!student || student.role !== 'student') {
+    if (!student) {
       return res.status(404).json({
         success: false,
         message: 'Student not found'
@@ -1857,7 +1884,7 @@ router.put('/:id/deactivate', protect, authorize('admin'), [
       data: updatedStudent
     });
   } catch (error) {
-    console.error('Deactivate student error:', error);
+    logger.error('Deactivate student error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while deactivating student',
@@ -1871,9 +1898,13 @@ router.put('/:id/deactivate', protect, authorize('admin'), [
 // @access  Private (Admin)
 router.put('/:id/reactivate', protect, authorize('admin'), async (req, res) => {
   try {
-    const student = await User.findById(req.params.id);
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: 'student',
+      tenantId: req.user.tenantId
+    });
 
-    if (!student || student.role !== 'student') {
+    if (!student) {
       return res.status(404).json({
         success: false,
         message: 'Student not found'
@@ -1909,7 +1940,7 @@ router.put('/:id/reactivate', protect, authorize('admin'), async (req, res) => {
       data: updatedStudent
     });
   } catch (error) {
-    console.error('Reactivate student error:', error);
+    logger.error('Reactivate student error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while reactivating student',
@@ -1973,7 +2004,7 @@ router.delete('/bulk-delete', protect, authorize('admin'), async (req, res) => {
       data: { count: result.deletedCount }
     });
   } catch (error) {
-    console.error('Bulk delete students error:', error);
+    logger.error('Bulk delete students error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while deleting students'
@@ -1986,33 +2017,33 @@ router.delete('/bulk-delete', protect, authorize('admin'), async (req, res) => {
 // @access  Private (Admin)
 router.delete('/:id', protect, authorize('admin'), async (req, res) => {
   try {
-    const student = await User.findById(req.params.id);
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: 'student',
+      tenantId: req.user.tenantId
+    });
 
-    if (!student || student.role !== 'student') {
+    if (!student) {
       return res.status(404).json({
         success: false,
         message: 'Student not found'
       });
     }
 
-    // Check if student has fees
-    const hasFees = await Fee.exists({ student: req.params.id });
-    if (hasFees) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete student with existing fees. Please clear all fees first.'
-      });
-    }
-
-    // Delete student
-    await User.findByIdAndDelete(req.params.id);
+    // Soft delete - set status to inactive
+    student.isActive = false;
+    student.loginEnabled = false;
+    student.inactiveReason = 'Deleted by admin';
+    student.inactivatedAt = new Date();
+    student.inactivatedBy = req.user._id;
+    await student.save();
 
     res.json({
       success: true,
-      message: 'Student deleted successfully'
+      message: 'Student deactivated successfully'
     });
   } catch (error) {
-    console.error('Delete student error:', error);
+    logger.error('Delete student error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while deleting student'
@@ -2050,7 +2081,7 @@ router.get('/:id/fees', protect, canAccessStudent, async (req, res) => {
       data: formattedFees
     });
   } catch (error) {
-    console.error('Get student fees error:', error);
+    logger.error('Get student fees error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while fetching student fees'
@@ -2096,7 +2127,7 @@ router.get('/:id/statistics', protect, canAccessStudent, async (req, res) => {
       data: statistics
     });
   } catch (error) {
-    console.error('Get student statistics error:', error);
+    logger.error('Get student statistics error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while fetching student statistics'
@@ -2104,68 +2135,19 @@ router.get('/:id/statistics', protect, canAccessStudent, async (req, res) => {
   }
 });
 
-// @desc    Get filter options (classes, sections, academic years)
-// @route   GET /api/students/filters
-// @access  Private (Admin, Teacher)
-router.get('/filters', protect, authorize('admin', 'teacher'), async (req, res) => {
-  try {
-    const tenantId = req.user.tenantId;
-
-    // Get unique classes - filter out null, undefined, and empty strings
-    const classes = await User.distinct('class', {
-      role: 'student',
-      tenantId,
-      class: { $exists: true, $ne: null, $ne: '' }
-    });
-
-    // Get unique sections - filter out null, undefined, and empty strings
-    const sections = await User.distinct('section', {
-      role: 'student',
-      tenantId,
-      section: { $exists: true, $ne: null, $ne: '' }
-    });
-
-    // Get unique academic years - filter out null, undefined, and empty strings
-    const academicYears = await User.distinct('academicYear', {
-      role: 'student',
-      tenantId,
-      academicYear: { $exists: true, $ne: null, $ne: '' }
-    });
-
-    // Get active drivers for this tenant
-    const drivers = await Driver.find({ tenantId, isActive: true })
-      .select('_id name')
-      .sort({ name: 1 });
-
-    res.json({
-      success: true,
-      data: {
-        classes: classes.filter(Boolean).sort(),
-        sections: sections.filter(Boolean).sort(),
-        academicYears: academicYears.filter(Boolean).sort().reverse(),
-        drivers: drivers.map(d => ({ _id: d._id, name: d.name }))
-      }
-    });
-  } catch (error) {
-    console.error('Get filters error:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while fetching filters'
-    });
-  }
-});
-
-
 // @desc    Toggle student active/inactive status
 // @route   PUT /api/students/:id/toggle-status
 // @access  Private (Admin)
 router.put('/:id/toggle-status', protect, authorize('admin'), async (req, res) => {
   try {
     const { reason } = req.body;
-    const student = await User.findById(req.params.id);
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: 'student',
+      tenantId: req.user.tenantId
+    });
 
-    if (!student || student.role !== 'student') {
+    if (!student) {
       return res.status(404).json({
         success: false,
         message: 'Student not found'
@@ -2195,7 +2177,7 @@ router.put('/:id/toggle-status', protect, authorize('admin'), async (req, res) =
       data: student
     });
   } catch (error) {
-    console.error('Toggle status error:', error);
+    logger.error('Toggle status error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while toggling student status'
@@ -2209,9 +2191,13 @@ router.put('/:id/toggle-status', protect, authorize('admin'), async (req, res) =
 router.put('/:id/reset-password', protect, authorize('admin'), async (req, res) => {
   try {
     const { newPassword, forceChange } = req.body;
-    const student = await User.findById(req.params.id);
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: 'student',
+      tenantId: req.user.tenantId
+    }).select('+password');
 
-    if (!student || student.role !== 'student') {
+    if (!student) {
       return res.status(404).json({
         success: false,
         message: 'Student not found'
@@ -2233,7 +2219,7 @@ router.put('/:id/reset-password', protect, authorize('admin'), async (req, res) 
       }
     });
   } catch (error) {
-    console.error('Reset password error:', error);
+    logger.error('Reset password error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while resetting password'
@@ -2274,7 +2260,7 @@ router.post('/bulk-activate', protect, authorize('admin'), async (req, res) => {
       data: { count: result.modifiedCount }
     });
   } catch (error) {
-    console.error('Bulk activate error:', error);
+    logger.error('Bulk activate error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while activating students'
@@ -2315,7 +2301,7 @@ router.post('/bulk-deactivate', protect, authorize('admin'), async (req, res) =>
       data: { count: result.modifiedCount }
     });
   } catch (error) {
-    console.error('Bulk deactivate error:', error);
+    logger.error('Bulk deactivate error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while deactivating students'
@@ -2372,7 +2358,7 @@ router.post('/promote', protect, authorize('admin'), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Promote students error:', error);
+    logger.error('Promote students error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while promoting students'
@@ -2399,7 +2385,7 @@ router.get('/import/template', protect, authorize('admin'), async (req, res) => 
     res.setHeader('Content-Disposition', 'attachment; filename=student_import_template.csv');
     res.send(template);
   } catch (error) {
-    console.error('Generate template error:', error);
+    logger.error('Generate template error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while generating template'
@@ -2437,7 +2423,7 @@ router.post('/import/preview', protect, authorize('admin'), (req, res) => {
 
       res.json(result);
     } catch (error) {
-      console.error('Preview import error:', error);
+      logger.error('Preview import error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
 
       res.status(500).json({
         success: false,
@@ -2473,7 +2459,7 @@ router.post('/import/execute', protect, authorize('admin'), async (req, res) => 
       data: result
     });
   } catch (error) {
-    console.error('Execute import error:', error);
+    logger.error('Execute import error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: error.message || 'Server error during import execution'
@@ -2565,7 +2551,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
     res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
     res.send(buffer);
   } catch (error) {
-    console.error('Export students error:', error);
+    logger.error('Export students error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({
       success: false,
       message: 'Server error while exporting students'
@@ -2622,7 +2608,7 @@ router.get('/promotions/report', protect, authorize('admin', 'principal'), async
       data: history
     });
   } catch (error) {
-    console.error('Get promotions report error:', error);
+    logger.error('Get promotions report error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error fetching promotion report' });
   }
 });
@@ -2648,7 +2634,7 @@ router.get('/:id/class-history', protect, authorize('admin', 'teacher'), async (
       admissionClass: student?.admissionClass || 'N/A'
     });
   } catch (error) {
-    console.error('Get class history error:', error);
+    logger.error('Get class history error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error fetching class history' });
   }
 });
@@ -2710,7 +2696,7 @@ router.post('/:id/promote', protect, authorize('admin', 'principal'), async (req
 
     res.json({ success: true, message: 'Student promoted successfully', data: student });
   } catch (error) {
-    console.error('Promote student error:', error);
+    logger.error('Promote student error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error during promotion' });
   }
 });
@@ -2769,7 +2755,7 @@ router.post('/:id/demote', protect, authorize('admin', 'principal'), async (req,
 
     res.json({ success: true, message: 'Student demoted successfully', data: student });
   } catch (error) {
-    console.error('Demote student error:', error);
+    logger.error('Demote student error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error during demotion' });
   }
 });
@@ -2852,7 +2838,7 @@ router.post('/bulk-class-action', protect, authorize('admin', 'principal'), asyn
       errors
     });
   } catch (error) {
-    console.error('Bulk class action error:', error);
+    logger.error('Bulk class action error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error during bulk operation' });
   }
 });

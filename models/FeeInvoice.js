@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Counter = require('./Counter');
+const { toNumber, calcBalance, isFullyPaid, roundToRupee } = require('../utils/money');
 
 const feeInvoiceSchema = new mongoose.Schema({
     // Multi-tenant support
@@ -70,7 +71,7 @@ const feeInvoiceSchema = new mongoose.Schema({
     totalAmount: {
         type: Number,
         required: true,
-        min: 0
+        min: [0.01, 'Invoice total must be greater than zero']
     },
 
     paidAmount: {
@@ -158,14 +159,18 @@ feeInvoiceSchema.index({ tenantId: 1, studentId: 1, status: 1 });
 feeInvoiceSchema.index({ tenantId: 1, academicSessionId: 1, status: 1 });
 feeInvoiceSchema.index({ tenantId: 1, dueDate: 1, status: 1 });
 
-// Pre-save: Calculate balance amount
+// Pre-save: Calculate balance amount with safe rounding
 feeInvoiceSchema.pre('save', function (next) {
-    this.balanceAmount = this.totalAmount + this.lateFeeApplied - this.paidAmount;
+    // Skip status recalculation for cancelled invoices
+    if (this.status === 'Cancelled') return next();
 
-    // Update status based on payment
-    if (this.balanceAmount === 0) {
+    this.balanceAmount = calcBalance(this.totalAmount, this.lateFeeApplied, this.paidAmount);
+
+    // Update status based on payment (use tolerance-based comparison)
+    if (isFullyPaid(this.paidAmount, toNumber(this.totalAmount) + toNumber(this.lateFeeApplied))) {
         this.status = 'Paid';
-    } else if (this.paidAmount > 0 && this.balanceAmount > 0) {
+        this.balanceAmount = 0; // Clamp to exactly 0
+    } else if (toNumber(this.paidAmount) > 0 && this.balanceAmount > 0) {
         this.status = 'Partial';
     } else if (this.dueDate < new Date() && this.balanceAmount > 0) {
         this.status = 'Overdue';
@@ -230,14 +235,14 @@ feeInvoiceSchema.statics.calculateBillingPeriod = function (date, frequency) {
 
 // Method to apply late fee
 feeInvoiceSchema.methods.applyLateFee = function (amount) {
-    this.lateFeeApplied += amount;
+    this.lateFeeApplied = roundToRupee(toNumber(this.lateFeeApplied) + toNumber(amount));
     this.lateFeeAppliedDate = new Date();
     return this.save();
 };
 
 // Method to record payment
 feeInvoiceSchema.methods.recordPayment = function (amount) {
-    this.paidAmount += amount;
+    this.paidAmount = roundToRupee(toNumber(this.paidAmount) + toNumber(amount));
     return this.save();
 };
 

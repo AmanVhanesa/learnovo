@@ -78,7 +78,8 @@ exports.authorize = (...roles) => {
 // Check if user can access student data
 exports.canAccessStudent = async(req, res, next) => {
   try {
-    const { studentId } = req.params;
+    // Support both :studentId and :id param names
+    const studentId = req.params.studentId || req.params.id;
     const user = req.user;
 
     // Admin can access all students

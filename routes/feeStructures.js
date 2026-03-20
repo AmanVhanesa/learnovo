@@ -29,7 +29,7 @@ router.get('/', protect, authorize('admin', 'accountant'), async (req, res) => {
             data: feeStructures
         });
     } catch (error) {
-        console.error('Get fee structures error:', error);
+        // Error handled by response below
         res.status(500).json({
             success: false,
             message: 'Server error while fetching fee structures'
@@ -63,7 +63,7 @@ router.get('/:id', protect, authorize('admin', 'accountant'), async (req, res) =
             data: feeStructure
         });
     } catch (error) {
-        console.error('Get fee structure error:', error);
+        // Error handled by response below
         res.status(500).json({
             success: false,
             message: 'Server error while fetching fee structure'
@@ -137,7 +137,7 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
             data: feeStructure
         });
     } catch (error) {
-        console.error('Create fee structure error:', error);
+        // Error handled by response below
         res.status(500).json({
             success: false,
             message: error.message || 'Server error while creating fee structure'
@@ -191,7 +191,7 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
             data: feeStructure
         });
     } catch (error) {
-        console.error('Update fee structure error:', error);
+        // Error handled by response below
         res.status(500).json({
             success: false,
             message: error.message || 'Server error while updating fee structure'
@@ -236,7 +236,7 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
             message: 'Fee structure deleted successfully'
         });
     } catch (error) {
-        console.error('Delete fee structure error:', error);
+        // Error handled by response below
         res.status(500).json({
             success: false,
             message: 'Server error while deleting fee structure'

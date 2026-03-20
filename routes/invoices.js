@@ -12,6 +12,8 @@ const Receipt = require('../models/Receipt');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const { logger } = require('../middleware/errorHandler');
+const { toNumber, roundToRupee, calcBalance, isFullyPaid, sumMoney, validateAmount } = require('../utils/money');
 
 const router = express.Router();
 
@@ -84,8 +86,11 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
             });
         }
 
-        // Calculate total
-        const totalAmount = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
+        // Calculate total and validate each item amount
+        for (const item of invoiceItems) {
+            validateAmount(item.amount, { field: item.feeHeadName || 'fee item' });
+        }
+        const totalAmount = sumMoney(invoiceItems.map(item => item.amount));
 
         // Generate invoice number
         const invoiceNumber = await FeeInvoice.generateInvoiceNumber(req.user.tenantId);
@@ -193,7 +198,7 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
             console.error('Invoice counter rollback failed:', rollbackErr);
         }
 
-        console.error('Generate invoice error:', error);
+        logger.error('Generate invoice error', error);
         res.status(500).json({
             success: false,
             message: error.message || 'Server error while generating invoice'
@@ -213,14 +218,10 @@ router.post('/generate-bulk', protect, authorize('admin'), [
     try {
         const { classId, sectionId, academicSessionId, items, dueDate, feeStructureId } = req.body;
 
-        console.log('\n=== BULK INVOICE DEBUG ===');
-        console.log('classId:', classId);
-        console.log('sectionId:', sectionId);
-        console.log('tenantId:', req.user.tenantId);
+        logger.info('Bulk invoice generation started', { classId, sectionId, tenantId: req.user.tenantId });
 
         // Get all students in class/section
         // Support both classId (ObjectId) and class (string) fields
-        // Try to find students by classId first, then fall back to finding by class name
         const query = {
             tenantId: req.user.tenantId,
             role: 'student',
@@ -238,20 +239,16 @@ router.post('/generate-bulk', protect, authorize('admin'), [
                 tenantId: req.user.tenantId
             });
 
-            console.log('Class found:', classDoc ? `${classDoc.name} (${classDoc._id})` : 'NOT FOUND');
-
             if (classDoc && classDoc.name) {
                 classConditions.push({ class: classDoc.name });
 
-                // Extract grade number (e.g., "Class 1" -> "1")
                 const gradeMatch = classDoc.name.match(/(\d+)/);
                 if (gradeMatch) {
                     classConditions.push({ class: gradeMatch[1] });
-                    console.log('Added grade number condition:', gradeMatch[1]);
                 }
             }
         } catch (error) {
-            console.log('Could not fetch class document, will query by classId only:', error.message);
+            logger.warn('Could not fetch class document, querying by classId only', { error: error.message });
         }
 
         query.$or = classConditions;
@@ -260,13 +257,8 @@ router.post('/generate-bulk', protect, authorize('admin'), [
             query.sectionId = sectionId;
         }
 
-        console.log('Bulk invoice query:', JSON.stringify(query, null, 2));
         const students = await User.find(query);
-        console.log(`Found ${students.length} students`);
-        if (students.length > 0) {
-            console.log('Sample student:', { name: students[0].name, class: students[0].class, classId: students[0].classId });
-        }
-        console.log('=== END DEBUG ===\n');
+        logger.info(`Bulk invoice: found ${students.length} students`, { classId });
 
         if (students.length === 0) {
             return res.status(404).json({
@@ -318,7 +310,11 @@ router.post('/generate-bulk', protect, authorize('admin'), [
             });
         }
 
-        const totalAmount = invoiceItems.reduce((sum, item) => sum + item.amount, 0);
+        // Validate item amounts
+        for (const item of invoiceItems) {
+            validateAmount(item.amount, { field: item.feeHeadName || 'fee item' });
+        }
+        const totalAmount = sumMoney(invoiceItems.map(item => item.amount));
         const results = [];
         const errors = [];
 
@@ -415,7 +411,7 @@ router.post('/generate-bulk', protect, authorize('admin'), [
             }
         });
     } catch (error) {
-        console.error('Bulk generate error:', error);
+        logger.error('Bulk generate error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while generating bulk invoices'
@@ -433,7 +429,7 @@ router.delete('/bulk', protect, authorize('admin'), [
 ], async (req, res) => {
     try {
         const { classId, sectionId, academicSessionId } = req.body;
-        console.log('Bulk delete request:', { classId, sectionId, academicSessionId });
+        logger.info('Bulk delete request', { classId, sectionId, academicSessionId });
 
         const query = {
             tenantId: req.user.tenantId,
@@ -461,7 +457,7 @@ router.delete('/bulk', protect, authorize('admin'), [
             query.sectionId = sectionId;
         }
 
-        console.log('Initial bulk delete query:', query);
+        logger.info('Bulk delete query', { query });
 
         // Find invoices to be deleted to log them or get count
         let invoicesToDelete = await FeeInvoice.find(query);
@@ -469,7 +465,7 @@ router.delete('/bulk', protect, authorize('admin'), [
         // FALLBACK: If no invoices found by classId, try finding by students in that class
         // This handles cases where invoices were generated without classId or with wrong classId
         if (invoicesToDelete.length === 0) {
-            console.log('No invoices found by classId directly. Trying via Student lookup...');
+            logger.info('No invoices found by classId directly, trying via student lookup');
 
             const User = require('../models/User');
             const studentQuery = {
@@ -494,24 +490,23 @@ router.delete('/bulk', protect, authorize('admin'), [
                     studentId: { $in: studentIds }
                 };
 
-                console.log('Fallback query:', fallbackQuery);
+                logger.info('Bulk delete fallback query', { fallbackQuery });
                 invoicesToDelete = await FeeInvoice.find(fallbackQuery);
 
-                // If we found invoices this way, update the query to use for deletion
+                // Soft delete: cancel invoices found via fallback
                 if (invoicesToDelete.length > 0) {
-                    // We can't use the original query anymore for deleteMany
-                    // We must delete by ID or by the fallback query
-                    // Let's use ID for safety
                     const invoiceIds = invoicesToDelete.map(inv => inv._id);
-                    await FeeInvoice.deleteMany({ _id: { $in: invoiceIds } });
-
-                    // Skip the standard deleteMany below since we just did it
-                    query._id = { $in: [] }; // Prevent double deletion attempt
+                    await FeeInvoice.updateMany(
+                        { _id: { $in: invoiceIds } },
+                        { $set: { status: 'Cancelled', balanceAmount: 0 } }
+                    );
+                    // Mark as already handled so standard path is skipped
+                    query._id = { $in: [] };
                 }
             }
         } else {
-            // Standard deletion
-            await FeeInvoice.deleteMany(query);
+            // Soft delete: cancel matching invoices
+            await FeeInvoice.updateMany(query, { $set: { status: 'Cancelled', balanceAmount: 0 } });
         }
 
         const count = invoicesToDelete.length;
@@ -564,7 +559,7 @@ router.delete('/bulk', protect, authorize('admin'), [
         });
 
     } catch (error) {
-        console.error('Bulk delete error:', error);
+        logger.error('Bulk delete error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while deleting invoices'
@@ -683,7 +678,7 @@ router.get('/', protect, authorize('admin', 'accountant'), async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Get invoices error:', error);
+        logger.error('Get invoices error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while fetching invoices'
@@ -708,7 +703,7 @@ router.get('/student/:studentId', protect, authorize('admin', 'accountant'), asy
             data: invoices
         });
     } catch (error) {
-        console.error('Get student invoices error:', error);
+        logger.error('Get student invoices error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while fetching student invoices'
@@ -739,11 +734,11 @@ router.put('/:id', protect, authorize('admin', 'accountant'), [
             });
         }
 
-        // Calculate new total
-        const newTotal = items.reduce((sum, item) => sum + item.amount, 0);
+        // Calculate new total with safe rounding
+        const newTotal = sumMoney(items.map(item => item.amount));
 
         // Validate constraint: Cannot reduce total below paid amount
-        if (newTotal < invoice.paidAmount) {
+        if (newTotal < toNumber(invoice.paidAmount)) {
             return res.status(400).json({
                 success: false,
                 message: `New total (${newTotal}) cannot be less than already paid amount (${invoice.paidAmount})`
@@ -808,7 +803,7 @@ router.put('/:id', protect, authorize('admin', 'accountant'), [
         });
 
     } catch (error) {
-        console.error('Update invoice error:', error);
+        logger.error('Update invoice error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while updating invoice'
@@ -841,8 +836,11 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async (req, res
 
         const { studentId, academicSessionId, invoiceNumber, totalAmount } = invoice;
 
-        // Delete invoice
-        await FeeInvoice.findByIdAndDelete(req.params.id);
+        // Soft delete: Cancel the invoice instead of hard deleting
+        // Financial records should never be permanently deleted for audit trail integrity
+        invoice.status = 'Cancelled';
+        invoice.balanceAmount = 0;
+        await invoice.save();
 
         // Log action (best-effort)
         try {
@@ -870,14 +868,14 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async (req, res
 
         res.json({
             success: true,
-            message: 'Invoice deleted successfully'
+            message: 'Invoice cancelled successfully'
         });
 
     } catch (error) {
-        console.error('Delete invoice error:', error);
+        logger.error('Cancel invoice error', error);
         res.status(500).json({
             success: false,
-            message: 'Server error while deleting invoice'
+            message: 'Server error while cancelling invoice'
         });
     }
 });
@@ -886,7 +884,7 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async (req, res
 // @route   PUT /api/invoices/:id/apply-late-fee
 // @access  Private (Admin, Accountant)
 router.put('/:id/apply-late-fee', protect, authorize('admin', 'accountant'), [
-    body('amount').isNumeric().withMessage('Late fee amount is required'),
+    body('amount').isNumeric().custom(v => v > 0).withMessage('Late fee amount must be a positive number'),
     handleValidationErrors
 ], async (req, res) => {
     try {
@@ -939,7 +937,7 @@ router.put('/:id/apply-late-fee', protect, authorize('admin', 'accountant'), [
             data: invoice
         });
     } catch (error) {
-        console.error('Apply late fee error:', error);
+        logger.error('Apply late fee error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while applying late fee'
@@ -954,34 +952,48 @@ router.put('/:id/apply-late-fee', protect, authorize('admin', 'accountant'), [
 router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
     body('studentId').notEmpty().withMessage('Student ID is required'),
     body('invoiceId').notEmpty().withMessage('Invoice ID is required'),
-    body('amount').isNumeric().toFloat().withMessage('Valid amount is required'),
+    body('amount').isNumeric().toFloat().custom(v => v > 0).withMessage('Valid positive amount is required'),
     body('paymentMethod').notEmpty().withMessage('Payment method is required'),
     body('paymentDate').isISO8601().withMessage('Valid payment date is required'),
     handleValidationErrors
 ], async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
         const { studentId, invoiceId, amount, paymentMethod, paymentDate, transactionDetails, remarks } = req.body;
         const tenantId = req.user.tenantId;
 
-        // Verify invoice exists
+        // Verify invoice exists (within transaction for consistency)
         const invoice = await FeeInvoice.findOne({
             _id: invoiceId,
             tenantId
-        });
+        }).session(session);
 
         if (!invoice) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).json({
                 success: false,
                 message: 'Invoice not found'
             });
         }
 
-        // Check if amount exceeds balance + buffer? No, strict check for now.
-        // Actually, sometimes people pay more. But let's stick to balance for safety.
-        if (amount > invoice.balanceAmount) {
+        if (invoice.status === 'Paid') {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({
                 success: false,
-                message: `Amount exceeds pending balance of ${invoice.balanceAmount}`
+                message: 'This invoice is already fully paid'
+            });
+        }
+
+        if (toNumber(amount) > toNumber(invoice.balanceAmount) + 0.01) {
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(400).json({
+                success: false,
+                message: `Amount exceeds pending balance of ${roundToRupee(invoice.balanceAmount)}`
             });
         }
 
@@ -999,32 +1011,20 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
             transactionDetails,
             remarks,
             receiptNumber,
-            isConfirmed: true, // Auto-confirm direct collection
+            isConfirmed: true,
             confirmedAt: new Date(),
             confirmedBy: req.user._id,
             collectedBy: req.user._id
         });
 
-        await payment.save();
+        await payment.save({ session });
 
-        // Update Invoice
-        invoice.paidAmount += amount;
+        // Update Invoice — use safe rounding; pre-save hook handles balance + status
+        invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(amount));
+        await invoice.save({ session });
 
-        // Recalculate balance including late fees
-        invoice.balanceAmount = invoice.totalAmount + (invoice.lateFeeApplied || 0) - invoice.paidAmount;
-
-        // Update status
-        if (invoice.balanceAmount <= 0) {
-            invoice.status = 'Paid';
-            invoice.balanceAmount = 0; // Ensure no negative balance
-        } else {
-            invoice.status = 'Partial';
-        }
-
-        await invoice.save();
-
-        // Also create a PaymentAttempt + Receipt so the student can see it in their portal
-        const idempotencyKey = `admin_${invoiceId}_${Date.now()}`;
+        // Create PaymentAttempt + Receipt so student can see it in their portal
+        const idempotencyKey = `admin_${invoiceId}_${payment._id}`;
         const attempt = new PaymentAttempt({
             tenantId,
             idempotencyKey,
@@ -1042,7 +1042,7 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
             verifiedBy: req.user._id,
             verifiedAt: new Date(),
         });
-        await attempt.save();
+        await attempt.save({ session });
 
         const studentReceiptNum = await Receipt.generateReceiptNumber(tenantId);
         const studentReceipt = new Receipt({
@@ -1059,7 +1059,36 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
             transactionRefId: transactionDetails?.referenceNumber || null,
             paymentDate: new Date(paymentDate),
         });
-        await studentReceipt.save();
+        await studentReceipt.save({ session });
+
+        // Audit log (within transaction)
+        await FeeAuditLog.logAction({
+            tenantId,
+            action: 'PAYMENT_COLLECTED',
+            entityType: 'Payment',
+            entityId: payment._id,
+            userId: req.user._id,
+            userName: req.user.name,
+            userRole: req.user.role,
+            details: {
+                invoiceNumber: invoice.invoiceNumber,
+                receiptNumber,
+                amount,
+                paymentMethod,
+                studentId
+            },
+            ipAddress: req.ip
+        });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        // Update student balance (outside transaction — best effort)
+        try {
+            await StudentBalance.updateBalance(tenantId, studentId, invoice.academicSessionId);
+        } catch (balanceErr) {
+            console.error('Balance update failed (non-fatal):', balanceErr.message);
+        }
 
         res.json({
             success: true,
@@ -1071,16 +1100,10 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
         });
 
     } catch (error) {
-        // Rollback receipt counter so the number doesn't get skipped
-        try {
-            const year = new Date().getFullYear();
-            const Counter = require('../models/Counter');
-            await Counter.rollbackByName(`receipt_${req.user.tenantId}_${year}`);
-        } catch (rollbackErr) {
-            console.error('Receipt counter rollback failed:', rollbackErr);
-        }
+        await session.abortTransaction();
+        session.endSession();
 
-        console.error('Collect payment error:', error);
+        logger.error('Collect payment error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while collecting payment'
@@ -1090,8 +1113,8 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
 
 // @desc    Get payments list
 // @route   GET /api/invoices/payments
-// @access  Private
-router.get('/payments', protect, async (req, res) => {
+// @access  Private (Admin, Accountant)
+router.get('/payments', protect, authorize('admin', 'accountant'), async (req, res) => {
     try {
         const { studentId, invoiceId, startDate, endDate, paymentMethod } = req.query;
         const tenantId = req.user.tenantId;
@@ -1120,7 +1143,7 @@ router.get('/payments', protect, async (req, res) => {
             data: payments
         });
     } catch (error) {
-        console.error('Get payments error:', error);
+        logger.error('Get payments error', error);
         res.status(500).json({
             success: false,
             message: 'Server error while fetching payments'
@@ -1131,8 +1154,8 @@ router.get('/payments', protect, async (req, res) => {
 
 // @desc    Get payment receipt details
 // @route   GET /api/invoices/payments/:id/receipt
-// @access  Private
-router.get('/payments/:id/receipt', protect, async (req, res) => {
+// @access  Private (Admin, Accountant)
+router.get('/payments/:id/receipt', protect, authorize('admin', 'accountant'), async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.user.tenantId;

@@ -197,6 +197,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/students', require('./routes/students'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/academic-sessions', require('./routes/academicSessions'));
+app.use('/api/academic-years', require('./routes/academicSessions')); // Alias for frontend compatibility
 app.use('/api/teachers', require('./routes/teachers'));
 app.use('/api/classes', require('./routes/classes'));
 app.use('/api/subjects', require('./routes/subjects'));

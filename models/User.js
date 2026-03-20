@@ -46,7 +46,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'teacher', 'student', 'parent', 'accountant', 'staff'],
+    enum: ['admin', 'teacher', 'student', 'parent', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'],
     required: [true, 'Role is required']
   },
   phone: {
@@ -144,8 +144,30 @@ const userSchema = new mongoose.Schema({
   },
   ifscCode: {
     type: String,
+    trim: true,
+    uppercase: true
+  },
+
+  // ── Employee emergency contact ──────────────────────────────────
+  emergencyContact: {
+    name: { type: String, trim: true },
+    phone: { type: String, trim: true },
+    relation: { type: String, trim: true }
+  },
+
+  // ── Employee leave balance ──────────────────────────────────────
+  leaveBalance: {
+    casual: { type: Number, default: 12, min: 0 },
+    sick: { type: Number, default: 12, min: 0 },
+    earned: { type: Number, default: 15, min: 0 }
+  },
+
+  // ── Employee joining letter ─────────────────────────────────────
+  joiningLetter: {
+    type: String,
     trim: true
   },
+
   inactiveReason: {
     type: String,
     trim: true
@@ -293,6 +315,67 @@ const userSchema = new mongoose.Schema({
   address: {
     type: String,
     trim: true
+  },
+
+  // ── Student additional fields ──────────────────────────────────────
+  previousSchool: {
+    type: String,
+    trim: true
+  },
+  previousBoard: {
+    type: String,
+    trim: true
+  },
+  previousRollNumber: {
+    type: String,
+    trim: true
+  },
+  transferNotes: {
+    type: String,
+    trim: true
+  },
+  identificationMark: {
+    type: String,
+    trim: true
+  },
+  isOrphan: {
+    type: Boolean,
+    default: false
+  },
+  nationality: {
+    type: String,
+    trim: true
+  },
+  medicalConditions: {
+    type: String,
+    trim: true
+  },
+  allergies: {
+    type: String,
+    trim: true
+  },
+  doctorName: {
+    type: String,
+    trim: true
+  },
+  doctorPhone: {
+    type: String,
+    trim: true
+  },
+  notes: {
+    type: String
+  },
+  removalDate: {
+    type: Date
+  },
+  removalReason: {
+    type: String,
+    enum: ['', 'Graduated', 'Transferred', 'Withdrawn', 'Expelled', 'Other'],
+    default: ''
+  },
+  removalNotes: {
+    type: String,
+    trim: true
   }
 }, {
   timestamps: true
@@ -303,6 +386,15 @@ userSchema.index({ email: 1, tenantId: 1 }, { unique: true, sparse: true }); // 
 userSchema.index({ role: 1, tenantId: 1 });
 userSchema.index({ tenantId: 1 });
 userSchema.index({ tenantId: 1, admissionNumber: 1 });
+// Student query optimization indexes
+userSchema.index({ tenantId: 1, role: 1, class: 1, section: 1 });
+userSchema.index({ tenantId: 1, rollNumber: 1 });
+userSchema.index({ tenantId: 1, penNumber: 1 }, { sparse: true });
+userSchema.index({ tenantId: 1, classId: 1 });
+userSchema.index({ tenantId: 1, driverId: 1 }, { sparse: true });
+// Employee query optimization indexes
+userSchema.index({ tenantId: 1, employeeId: 1 }, { sparse: true });
+userSchema.index({ tenantId: 1, isActive: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
