@@ -198,14 +198,15 @@ const StudentDetail = () => {
         return classActionMutation.mutateAsync(data)
     }
 
-    const tabs = [
+    const allTabs = [
         { id: 'profile', label: 'Profile' },
-        { id: 'fees', label: 'Fees' },
+        { id: 'fees', label: 'Fees', adminOnly: true },
         { id: 'attendance', label: 'Attendance' },
         { id: 'exams', label: 'Exams' },
         { id: 'history', label: 'Class History' },
-        { id: 'activity', label: 'Activity Log' }
+        { id: 'activity', label: 'Activity Log', adminOnly: true }
     ]
+    const tabs = user?.role === 'admin' ? allTabs : allTabs.filter(t => !t.adminOnly)
 
     if (isLoading) {
         return (

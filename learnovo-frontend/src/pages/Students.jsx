@@ -3,7 +3,7 @@ import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingU
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import StudentForm from '../components/students/StudentForm'
 import ImportModal from '../components/ImportModal'
 import DeactivateStudentModal from '../components/students/DeactivateStudentModal'
@@ -42,13 +42,14 @@ const StudentPhotoCell = ({ student }) => {
 const Students = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { settings } = useSettings()
 
   const queryClient = useQueryClient()
 
-  // Filter state
+  // Filter state — initialize from URL params (e.g. ?class=5A from dashboard)
   const [searchQuery, setSearchQuery] = useState('')
-  const [classFilter, setClassFilter] = useState('')
+  const [classFilter, setClassFilter] = useState(searchParams.get('class') || '')
   const [sectionFilter, setSectionFilter] = useState('')
   const [yearFilter, setYearFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('') // active/inactive
@@ -764,8 +765,8 @@ const Students = () => {
           </div>
         )}
 
-        {/* Bulk Actions */}
-        {selectedStudents.length > 0 && (
+        {/* Bulk Actions — Admin only */}
+        {user?.role === 'admin' && selectedStudents.length > 0 && (
           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
               {selectedStudents.length} student{selectedStudents.length !== 1 ? 's' : ''} selected
@@ -779,15 +780,13 @@ const Students = () => {
                 <PowerOff className="h-4 w-4 mr-1" />
                 Deactivate
               </button>
-              {user?.role === 'admin' && (
-                <button
-                  onClick={handleBulkDelete}
-                  className="btn btn-sm bg-red-600 text-white hover:bg-red-700 border-red-600 w-full sm:w-auto"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete Selected
-                </button>
-              )}
+              <button
+                onClick={handleBulkDelete}
+                className="btn btn-sm bg-red-600 text-white hover:bg-red-700 border-red-600 w-full sm:w-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete Selected
+              </button>
             </div>
           </div>
         )}
@@ -799,14 +798,16 @@ const Students = () => {
           <table className="table min-w-[700px]">
             <thead>
               <tr>
-                <th className="w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedStudents.length === students.length && students.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-gray-300 dark:border-[#38383A]"
-                  />
-                </th>
+                {user?.role === 'admin' && (
+                  <th className="w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.length === students.length && students.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 dark:border-[#38383A]"
+                    />
+                  </th>
+                )}
                 <th>Admission No.</th>
                 <th>Photo</th>
                 <th>Name</th>
@@ -820,7 +821,7 @@ const Students = () => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan="9" className="text-center py-12">
+                  <td colSpan={user?.role === 'admin' ? 9 : 8} className="text-center py-12">
                     <div className="flex justify-center">
                       <div className="loading-spinner"></div>
                     </div>
@@ -828,21 +829,23 @@ const Students = () => {
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="text-center py-12 text-gray-500 dark:text-[#8E8E93]">
+                  <td colSpan={user?.role === 'admin' ? 9 : 8} className="text-center py-12 text-gray-500 dark:text-[#8E8E93]">
                     No students found
                   </td>
                 </tr>
               ) : (
                 students.map((student) => (
                   <tr key={student._id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedSet.has(student._id)}
-                        onChange={() => handleSelectStudent(student._id)}
-                        className="rounded border-gray-300 dark:border-[#38383A]"
-                      />
-                    </td>
+                    {user?.role === 'admin' && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedSet.has(student._id)}
+                          onChange={() => handleSelectStudent(student._id)}
+                          className="rounded border-gray-300 dark:border-[#38383A]"
+                        />
+                      </td>
+                    )}
                     <td>
                       <span className="font-mono text-sm font-semibold text-teal-600">
                         {student.admissionNumber || 'N/A'}

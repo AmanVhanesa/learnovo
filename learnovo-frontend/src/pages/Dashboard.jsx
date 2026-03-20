@@ -162,7 +162,10 @@ const Dashboard = () => {
             bgColor: 'bg-yellow-100'
           }
         ]
-      case 'teacher':
+      case 'teacher': {
+        const attPct = stats.teacher?.attendanceToday || 0
+        const attColor = attPct >= 80 ? 'text-green-600' : attPct >= 60 ? 'text-yellow-600' : 'text-red-600'
+        const attBg = attPct >= 80 ? 'bg-green-100' : attPct >= 60 ? 'bg-yellow-100' : 'bg-red-100'
         return [
           {
             title: 'My Students',
@@ -180,10 +183,10 @@ const Dashboard = () => {
           },
           {
             title: "Today's Attendance",
-            value: `${stats.teacher?.attendanceToday || 0}%`,
+            value: `${attPct}%`,
             icon: TrendingUp,
-            color: 'text-green-600',
-            bgColor: 'bg-green-100'
+            color: attColor,
+            bgColor: attBg
           },
           {
             title: 'Active Assignments',
@@ -200,6 +203,7 @@ const Dashboard = () => {
             bgColor: 'bg-yellow-100'
           }
         ]
+      }
       case 'student':
         return [
           {
@@ -692,9 +696,17 @@ const Dashboard = () => {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-900 dark:text-white">{cls.name}</p>
-                        {cls.grade && <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Grade {cls.grade}</p>}
+                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                          {cls.grade ? `Grade ${cls.grade} · ` : ''}{cls.studentCount ?? 0} student{cls.studentCount !== 1 ? 's' : ''}
+                        </p>
                       </div>
                     </div>
+                    <button
+                      onClick={() => navigate(`/app/students?class=${encodeURIComponent(cls.name)}`)}
+                      className="text-xs text-primary-600 dark:text-primary-400 hover:underline flex-shrink-0"
+                    >
+                      View students
+                    </button>
                   </div>
                 ))}
               </div>

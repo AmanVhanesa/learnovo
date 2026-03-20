@@ -1,14 +1,14 @@
 import React, { useState } from 'react'
 import ChartFilters from './ChartFilters'
 
-const ChartCard = ({ title, children, onExport, filterOptions = {} }) => {
+const ChartCard = ({ title, children, onExport, filterOptions = {}, className }) => {
   const [range, setRange] = useState('30d')
   const [classValue, setClassValue] = useState('all')
   const [sectionValue, setSectionValue] = useState('all')
   const [teacherValue, setTeacherValue] = useState('all')
 
   return (
-    <div className="card p-4 sm:p-6">
+    <div className={className || "card p-4 sm:p-6"}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 sm:mb-5">
         <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
         <ChartFilters
