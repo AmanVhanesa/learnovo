@@ -641,7 +641,7 @@ const Dashboard = () => {
                   const daysLeft = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24))
                   const isUrgent = daysLeft <= 2
                   return (
-                    <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${isUrgent ? 'bg-red-50 dark:bg-red-500/10' : 'bg-blue-50 dark:bg-blue-500/10'}`}>
+                    <div key={index} className={`flex items-center justify-between p-3 rounded-xl ${isUrgent ? 'bg-red-50 dark:bg-red-500/10' : 'bg-blue-50 dark:bg-blue-500/10'}`}>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{assignment.title}</p>
                         <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{assignment.subject} - {assignment.class}</p>
