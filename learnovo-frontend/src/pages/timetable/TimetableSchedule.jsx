@@ -392,7 +392,9 @@ const TimetableSchedule = () => {
             <Calendar className="w-6 h-6 text-primary-600" />
             Timetable
           </h1>
-          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Weekly Schedule</p>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
+            {isStudent && user?.class ? `Class ${user.class}${user.section ? ` — Section ${user.section}` : ''} · Weekly Schedule` : 'Weekly Schedule'}
+          </p>
         </div>
         <TimetableExportButton
           onExportPDF={handleExportPDF}
@@ -577,7 +579,9 @@ const TimetableSchedule = () => {
           <div className="flex flex-col items-center justify-center py-8">
             <Eye className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-3" />
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              {isAdmin ? 'Select a filter above to view the timetable.' : 'No timetable available. Please check back later.'}
+              {isAdmin ? 'Select a filter above to view the timetable.'
+                : isStudent && !effectiveClassId ? 'Your class assignment is not set up yet. Please contact your school administration.'
+                : 'No timetable available. Please check back later.'}
             </p>
           </div>
         </div>

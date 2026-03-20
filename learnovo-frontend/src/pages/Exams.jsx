@@ -74,6 +74,7 @@ const Exams = () => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterClass, setFilterClass] = useState('');
     const [searchText, setSearchText] = useState('');
+    const [examSeriesFilter, setExamSeriesFilter] = useState('');
 
     /* ── Accordion collapse state: Set of "class" keys that are collapsed ── */
     const [collapsedClasses, setCollapsedClasses] = useState(new Set());
@@ -118,9 +119,9 @@ const Exams = () => {
     /* ── Student's own result card data ── */
     const isStudent = user.role === 'student';
     const { data: myResultData, isLoading: loadingMyResults } = useQuery({
-        queryKey: ['my-results', user._id || user.id],
+        queryKey: ['my-results', user._id || user.id, examSeriesFilter],
         queryFn: async () => {
-            const res = await examsService.getResultCard(user._id || user.id);
+            const res = await examsService.getResultCard(user._id || user.id, examSeriesFilter ? { examSeries: examSeriesFilter } : undefined);
             const d = res.data || res;
             return {
                 subjects: d?.subjects || [],
@@ -308,6 +309,80 @@ const Exams = () => {
     if (isStudent) {
         const mySubjects = myResultData?.subjects || [];
         const mySummary = myResultData?.summary || null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const { upcomingExams, pastExams } = (() => {
+            const upcoming = [];
+            const past = [];
+            exams.forEach(exam => {
+                const examDate = new Date(exam.date);
+                examDate.setHours(0, 0, 0, 0);
+                if (examDate >= today) {
+                    upcoming.push(exam);
+                } else {
+                    past.push(exam);
+                }
+            });
+            upcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
+            past.sort((a, b) => new Date(b.date) - new Date(a.date));
+            return { upcomingExams: upcoming, pastExams: past };
+        })();
+
+        const renderScheduleTable = (examList) => (
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
+                    <thead>
+                        <tr className="bg-gray-50 dark:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A]">
+                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Date</th>
+                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Exam</th>
+                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Subject</th>
+                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Time</th>
+                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Venue</th>
+                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {examList.map((exam, idx) => (
+                            <tr key={exam._id} className={`border-b border-gray-50 dark:border-[#38383A] ${idx % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-[#2C2C2E]/30'}`}>
+                                <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93]">
+                                    <div className="flex items-center gap-1.5">
+                                        <Calendar className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
+                                        {new Date(exam.date).toLocaleDateString()}
+                                    </div>
+                                </td>
+                                <td className="px-5 py-3">
+                                    <div className="font-medium text-gray-900 dark:text-white">{exam.name}</div>
+                                    {exam.examSeries && <div className="text-xs text-gray-400 dark:text-[#636366]">{exam.examSeries}</div>}
+                                </td>
+                                <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93]">{exam.subject}</td>
+                                <td className="px-5 py-3 text-xs text-gray-600 dark:text-[#8E8E93]">
+                                    {exam.startTime && exam.endTime ? `${exam.startTime}\u2013${exam.endTime}` : '\u2014'}
+                                </td>
+                                <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93]">
+                                    {exam.examRoom ? (
+                                        <div className="flex items-center gap-1.5">
+                                            <MapPin className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
+                                            {exam.examRoom}
+                                        </div>
+                                    ) : '\u2014'}
+                                </td>
+                                <td className="px-5 py-3">
+                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                                        exam.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158]' :
+                                        exam.status === 'Cancelled' ? 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-[rgba(255,69,58,0.12)] dark:text-[#FF453A]' :
+                                        exam.status === 'Ongoing' ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-[rgba(255,214,10,0.12)] dark:text-[#FFD60A]' :
+                                        'bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-500/12 dark:text-blue-400'
+                                    }`}>
+                                        {exam.status}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
 
         return (
             <div className="space-y-6">
@@ -325,6 +400,21 @@ const Exams = () => {
                         <FileText className="h-4 w-4" />
                         View Report Card
                     </button>
+                </div>
+
+                {/* Exam Series Filter */}
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-gray-700 dark:text-[#8E8E93]">Filter by Exam Series:</label>
+                    <select
+                        value={examSeriesFilter}
+                        onChange={(e) => setExamSeriesFilter(e.target.value)}
+                        className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                        <option value="">All Exam Series</option>
+                        {EXAM_SERIES.map(series => (
+                            <option key={series} value={series}>{series}</option>
+                        ))}
+                    </select>
                 </div>
 
                 {/* Summary Cards */}
@@ -371,7 +461,7 @@ const Exams = () => {
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm min-w-[600px]">
                                     <thead>
-                                        <tr className="bg-gray-50 dark:bg-[#000000] border-b border-gray-100 dark:border-[#38383A]">
+                                        <tr className="bg-gray-50 dark:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A]">
                                             <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Subject</th>
                                             <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Exam</th>
                                             <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Marks</th>
@@ -382,8 +472,18 @@ const Exams = () => {
                                     </thead>
                                     <tbody>
                                         {mySubjects.map((s, i) => (
-                                            <tr key={s.examId + '-' + i} className={`border-b border-gray-50 dark:border-[#38383A] ${i % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-[#000000]/30'}`}>
-                                                <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{s.subject}</td>
+                                            <tr key={s.examId + '-' + i} className={`border-b border-gray-50 dark:border-[#38383A] ${s.percentage >= 75 ? 'bg-emerald-50/40 dark:bg-[rgba(48,209,88,0.06)]' : i % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-[#2C2C2E]/30'}`}>
+                                                <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                                                    <div className="flex items-center gap-2">
+                                                        {s.subject}
+                                                        {s.percentage >= 75 && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158]">
+                                                                <Award className="h-3 w-3 mr-0.5" />
+                                                                Distinction
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="px-5 py-3">
                                                     <div className="text-gray-700 dark:text-[#8E8E93]">{s.examName}</div>
                                                     <div className="text-xs text-gray-400 dark:text-[#636366]">{s.examSeries} {s.date ? `\u2022 ${new Date(s.date).toLocaleDateString()}` : ''}</div>
@@ -400,7 +500,10 @@ const Exams = () => {
                                                     }`}>{s.grade}</span>
                                                 </td>
                                                 <td className="px-5 py-3 text-center">
-                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.isPassed ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400'}`}>
+                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${s.isPassed
+                                                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158]'
+                                                        : 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-[rgba(255,69,58,0.12)] dark:text-[#FF453A]'
+                                                    }`}>
                                                         {s.isPassed ? 'Pass' : 'Fail'}
                                                     </span>
                                                 </td>
@@ -419,50 +522,37 @@ const Exams = () => {
                     </div>
                 )}
 
-                {/* Upcoming Exams for student */}
-                {!loading && exams.length > 0 && (
+                {/* Exam Schedule - Upcoming */}
+                {!loading && (
                     <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
                         <div className="px-5 py-3.5 border-b border-gray-100 dark:border-[#38383A]">
-                            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">My Exams Schedule</h2>
+                            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-blue-500" />
+                                Upcoming Exams
+                            </h2>
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm min-w-[500px]">
-                                <thead>
-                                    <tr className="bg-gray-50 dark:bg-[#000000] border-b border-gray-100 dark:border-[#38383A]">
-                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Date</th>
-                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Exam</th>
-                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Subject</th>
-                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Time</th>
-                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {exams.map((exam, idx) => (
-                                        <tr key={exam._id} className={`border-b border-gray-50 dark:border-[#38383A] ${idx % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-[#000000]/30'}`}>
-                                            <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93]">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Calendar className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
-                                                    {new Date(exam.date).toLocaleDateString()}
-                                                </div>
-                                            </td>
-                                            <td className="px-5 py-3">
-                                                <div className="font-medium text-gray-900 dark:text-white">{exam.name}</div>
-                                                {exam.examSeries && <div className="text-xs text-gray-400 dark:text-[#636366]">{exam.examSeries}</div>}
-                                            </td>
-                                            <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93]">{exam.subject}</td>
-                                            <td className="px-5 py-3 text-xs text-gray-600 dark:text-[#8E8E93]">
-                                                {exam.startTime && exam.endTime ? `${exam.startTime}–${exam.endTime}` : '—'}
-                                            </td>
-                                            <td className="px-5 py-3">
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[exam.status] || 'bg-gray-100 text-gray-600'}`}>
-                                                    {exam.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        {upcomingExams.length > 0 ? (
+                            renderScheduleTable(upcomingExams)
+                        ) : (
+                            <div className="flex flex-col items-center py-12 text-gray-400 dark:text-[#636366]">
+                                <Clock className="h-10 w-10 mb-3 opacity-30" />
+                                <p className="font-medium">No upcoming exams</p>
+                                <p className="text-sm mt-1">You are all caught up! New exams will appear here when scheduled.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Exam Schedule - Past */}
+                {!loading && pastExams.length > 0 && (
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                        <div className="px-5 py-3.5 border-b border-gray-100 dark:border-[#38383A]">
+                            <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-gray-400 dark:text-[#636366]" />
+                                Past Exams
+                            </h2>
                         </div>
+                        {renderScheduleTable(pastExams)}
                     </div>
                 )}
 

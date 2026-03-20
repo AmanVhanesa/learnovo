@@ -215,7 +215,7 @@ const StudentFeesDashboard = () => {
             <div className="flex border-b border-gray-200 dark:border-[#38383A] gap-4 sm:gap-6 overflow-x-auto whitespace-nowrap">
                 <button
                     onClick={() => setActiveTab('invoices')}
-                    className={`pb-3 font-medium text-sm transition-colors ${activeTab === 'invoices' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'}`}
+                    className={`pb-3 font-medium text-sm transition-colors ${activeTab === 'invoices' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'}`}
                 >
                     <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4" />
@@ -224,7 +224,7 @@ const StudentFeesDashboard = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('history')}
-                    className={`pb-3 font-medium text-sm transition-colors ${activeTab === 'history' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'}`}
+                    className={`pb-3 font-medium text-sm transition-colors ${activeTab === 'history' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'}`}
                 >
                     <div className="flex items-center gap-2">
                         <History className="h-4 w-4" />
@@ -233,7 +233,7 @@ const StudentFeesDashboard = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('receipts')}
-                    className={`pb-3 font-medium text-sm transition-colors ${activeTab === 'receipts' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'}`}
+                    className={`pb-3 font-medium text-sm transition-colors ${activeTab === 'receipts' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'}`}
                 >
                     <div className="flex items-center gap-2">
                         <Download className="h-4 w-4" />
@@ -243,7 +243,7 @@ const StudentFeesDashboard = () => {
             </div>
 
             {isLoading ? (
-                <div className="py-20 text-center"><div className="loading loading-spinner text-indigo-600 loading-lg"></div></div>
+                <div className="py-20 flex justify-center"><div className="loading-spinner"></div></div>
             ) : (
                 <>
                     {/* INVOICES TAB */}
@@ -283,7 +283,7 @@ const StudentFeesDashboard = () => {
                                     <div className="p-4 bg-white dark:bg-[#1C1C1E]">
                                         <button
                                             onClick={() => setSelectedInvoice(invoice)}
-                                            className="w-full btn btn-outline border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 hover:border-indigo-300 dark:hover:border-indigo-700"
+                                            className="w-full btn btn-outline border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:border-primary-300 dark:hover:border-primary-700"
                                         >
                                             View Details
                                         </button>
@@ -350,7 +350,7 @@ const StudentFeesDashboard = () => {
                     {activeTab === 'receipts' && (
                         <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden animate-fade-in text-gray-900 dark:text-white">
                             {receiptsLoading ? (
-                                <div className="py-16 text-center"><div className="loading loading-spinner text-indigo-600 loading-lg"></div></div>
+                                <div className="py-16 text-center"><div className="loading-spinner"></div></div>
                             ) : receipts.length === 0 ? (
                                 <div className="py-16 text-center text-gray-500 dark:text-[#8E8E93]">
                                     <Download className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -473,7 +473,7 @@ const StudentFeesDashboard = () => {
                                 disabled={isGatewayPaying || selectedInvoice.balanceAmount <= 0 || history.some(h => h.invoiceId?._id === selectedInvoice._id && ['PENDING', 'PROCESSING', 'INITIATED', 'UNDER_REVIEW'].includes(h.status))}
                                 className={`w-full sm:w-auto justify-center px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${selectedInvoice.balanceAmount <= 0
                                         ? 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-400 dark:text-[#636366] cursor-not-allowed'
-                                        : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm hover:shadow active:scale-95'
+                                        : 'bg-primary-600 text-white hover:bg-primary-500 shadow-sm hover:shadow active:scale-95'
                                     }`}
                             >
                                 {isGatewayPaying ? (
@@ -514,7 +514,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Transaction ID / UTR *</label>
                                 <input
                                     type="text" required
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="e.g. UPI Ref 1234567890"
                                     value={disputeForm.transactionId}
                                     onChange={(e) => setDisputeForm({ ...disputeForm, transactionId: e.target.value })}
@@ -525,7 +525,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Amount Deducted (*) *</label>
                                 <input
                                     type="number" required min="1"
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="5000"
                                     value={disputeForm.amount}
                                     onChange={(e) => setDisputeForm({ ...disputeForm, amount: e.target.value })}
@@ -536,7 +536,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Explanation *</label>
                                 <textarea
                                     required rows="3"
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="Describe what happened..."
                                     value={disputeForm.studentNote}
                                     onChange={(e) => setDisputeForm({ ...disputeForm, studentNote: e.target.value })}
@@ -563,7 +563,7 @@ const StudentFeesDashboard = () => {
                         <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center bg-gray-50/80 dark:bg-[#2C2C2E]">
                             <div>
                                 <h2 className="text-lg font-bold flex items-center gap-2">
-                                    <IndianRupee className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                                    <IndianRupee className="h-5 w-5 text-primary-600 dark:text-primary-400" />
                                     Submit Payment Proof
                                 </h2>
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
@@ -580,7 +580,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Payment Mode *</label>
                                 <select
                                     required
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:bg-[#1C1C1E] dark:text-white"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white"
                                     value={paymentForm.paymentMode}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, paymentMode: e.target.value })}
                                 >
@@ -600,7 +600,7 @@ const StudentFeesDashboard = () => {
                                 <input
                                     type="text"
                                     required={paymentForm.paymentMode !== 'CASH'}
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="e.g. UPI Ref 1234567890"
                                     value={paymentForm.transactionRefId}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, transactionRefId: e.target.value })}
@@ -611,7 +611,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Amount Paid *</label>
                                 <input
                                     type="number" required min="1" max={paymentModal.invoice.balanceAmount}
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder={String(paymentModal.invoice.balanceAmount)}
                                     value={paymentForm.amount}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
@@ -622,7 +622,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Date of Payment *</label>
                                 <input
                                     type="date" required
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none dark:bg-[#1C1C1E] dark:text-white"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white"
                                     value={paymentForm.paymentDate}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
                                 />
@@ -636,7 +636,7 @@ const StudentFeesDashboard = () => {
                                 <button type="button" onClick={() => setPaymentModal({ isOpen: false, invoice: null })} className="w-full sm:w-auto px-4 py-2 font-medium text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-xl">
                                     Cancel
                                 </button>
-                                <button type="submit" disabled={submitPaymentMutation.isPending} className="w-full sm:w-auto px-6 py-2.5 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-glass disabled:opacity-50 flex items-center justify-center gap-2">
+                                <button type="submit" disabled={submitPaymentMutation.isPending} className="w-full sm:w-auto px-6 py-2.5 font-semibold text-white bg-primary-600 hover:bg-primary-500 rounded-2xl shadow-glass disabled:opacity-50 flex items-center justify-center gap-2">
                                     {submitPaymentMutation.isPending ? (
                                         <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Submitting...</>
                                     ) : (
@@ -662,7 +662,7 @@ const StudentFeesDashboard = () => {
                         </p>
                         <button
                             onClick={() => { setPaymentConfirmation(false); setActiveTab('history'); }}
-                            className="mt-6 w-full px-6 py-2.5 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-glass"
+                            className="mt-6 w-full px-6 py-2.5 font-semibold text-white bg-primary-600 hover:bg-primary-500 rounded-2xl shadow-glass"
                         >
                             View Payment History
                         </button>

@@ -133,13 +133,41 @@ function App() {
                     }>
                       <Route index element={<Navigate to="/app/dashboard" replace />} />
                       <Route path="dashboard" element={<Dashboard />} />
-                      <Route path="students" element={<Students />} />
-                      <Route path="students/bulk-promote" element={<BulkPromotion />} />
-                      <Route path="students/:id" element={<StudentDetail />} />
-                      <Route path="student-lists" element={<StudentLists />} />
-                      <Route path="employees" element={<Employees />} />
-                      <Route path="employees/:id" element={<EmployeeDetail />} />
-                      <Route path="teachers" element={<Teachers />} />
+                      <Route path="students" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher', 'parent']}>
+                          <Students />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="students/bulk-promote" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <BulkPromotion />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="students/:id" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher', 'parent']}>
+                          <StudentDetail />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="student-lists" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                          <StudentLists />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="employees" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <Employees />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="employees/:id" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <EmployeeDetail />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="teachers" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <Teachers />
+                        </ProtectedRoute>
+                      } />
 
                       {/* Academics Module */}
                       <Route path="academics" element={
@@ -159,30 +187,66 @@ function App() {
                       } />
 
                       {/* Finance Module */}
-                      <Route path="fees-finance" element={<FeesFinance />} />
-                      <Route path="fees" element={<Fees />} />
-                      <Route path="student/fees" element={<StudentFeesDashboard />} />
+                      <Route path="fees-finance" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <FeesFinance />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="fees" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <Fees />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="student/fees" element={
+                        <ProtectedRoute allowedRoles={['student', 'parent']}>
+                          <StudentFeesDashboard />
+                        </ProtectedRoute>
+                      } />
 
                       <Route path="attendance" element={<Attendance />} />
                       <Route path="attendance/student/:studentId" element={<StudentAttendanceView />} />
                       <Route path="assignments" element={<Assignments />} />
                       <Route path="homework" element={<Homework />} />
                       <Route path="exams" element={<Exams />} />
-                      <Route path="admissions" element={<Admissions />} />
-                      <Route path="activities" element={<Activities />} />
-                      <Route path="reports" element={<Reports />} />
+                      <Route path="admissions" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <Admissions />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="activities" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                          <Activities />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="reports" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                          <Reports />
+                        </ProtectedRoute>
+                      } />
 
                       {/* Communication Module */}
-                      <Route path="communication" element={<Communication />} />
+                      <Route path="communication" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                          <Communication />
+                        </ProtectedRoute>
+                      } />
                       <Route path="announcements" element={<Announcements />} />
                       <Route path="notifications" element={<Notifications />} />
                       <Route path="notification-preferences" element={<NotificationPreferences />} />
 
                       {/* Transport Module */}
-                      <Route path="transport" element={<Transport />} />
+                      <Route path="transport" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <Transport />
+                        </ProtectedRoute>
+                      } />
 
                       {/* Payroll Module */}
-                      <Route path="payroll" element={<Payroll />} />
+                      <Route path="payroll" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <Payroll />
+                        </ProtectedRoute>
+                      } />
 
                       {/* Expense Management Module */}
                       <Route path="expenses" element={
@@ -192,9 +256,21 @@ function App() {
                       } />
 
                       {/* Certificates Module */}
-                      <Route path="certificates" element={<CertificateManager />} />
-                      <Route path="certificates/generate" element={<CertificateGeneration />} />
-                      <Route path="certificates/templates" element={<TemplateSettings />} />
+                      <Route path="certificates" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                          <CertificateManager />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="certificates/generate" element={
+                        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                          <CertificateGeneration />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="certificates/templates" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <TemplateSettings />
+                        </ProtectedRoute>
+                      } />
 
                       {/* Timetable Module */}
                       <Route path="timetable" element={<TimetableSchedule />} />
@@ -215,7 +291,11 @@ function App() {
                       } />
 
                       <Route path="search" element={<Search />} />
-                      <Route path="settings" element={<Settings />} />
+                      <Route path="settings" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <Settings />
+                        </ProtectedRoute>
+                      } />
                       <Route path="profile" element={<Profile />} />
                     </Route>
 

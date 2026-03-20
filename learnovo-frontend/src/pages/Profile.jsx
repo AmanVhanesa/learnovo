@@ -1,7 +1,7 @@
-import React, { useRef } from 'react'
+import React, { useRef, useMemo } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
-import { Save, Camera, Loader, User, BookOpen, Briefcase, Heart, ShieldCheck } from 'lucide-react'
+import { Save, Camera, Loader, User, BookOpen, Briefcase, Heart, ShieldCheck, CheckCircle } from 'lucide-react'
 import api from '../services/authService'
 import toast from 'react-hot-toast'
 
@@ -58,6 +58,26 @@ const Profile = () => {
   const isTeacher = user?.role === 'teacher'
   const isEmployee = user?.role === 'teacher' || user?.role === 'staff' || user?.role === 'employee'
 
+  const [passwordError, setPasswordError] = React.useState('')
+
+  const profileCompletion = useMemo(() => {
+    if (!isStudent || !user) return { percentage: 0, missingFields: [] }
+    const fields = [
+      { key: 'name', label: 'Full Name', value: user.fullName || user.name },
+      { key: 'email', label: 'Email', value: user.email },
+      { key: 'phone', label: 'Phone', value: formData.phone || user.phone },
+      { key: 'dateOfBirth', label: 'Date of Birth', value: formData.dateOfBirth || user.dateOfBirth },
+      { key: 'gender', label: 'Gender', value: formData.gender || user.gender },
+      { key: 'bloodGroup', label: 'Blood Group', value: formData.bloodGroup || user.bloodGroup },
+      { key: 'address', label: 'Address', value: formData.address || user.address },
+      { key: 'avatar', label: 'Profile Photo', value: user.avatar || user.photo }
+    ]
+    const filled = fields.filter(f => f.value && String(f.value).trim() !== '')
+    const missing = fields.filter(f => !f.value || String(f.value).trim() === '').map(f => f.label)
+    const percentage = Math.round((filled.length / fields.length) * 100)
+    return { percentage, missingFields: missing }
+  }, [isStudent, user, formData.phone, formData.dateOfBirth, formData.gender, formData.bloodGroup, formData.address])
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
@@ -85,8 +105,8 @@ const Profile = () => {
       toast.error('Please select an image file (JPG, PNG, etc.)')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be smaller than 5MB')
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be smaller than 2MB')
       return
     }
 
@@ -146,6 +166,9 @@ const Profile = () => {
 
   const passwordMutation = useMutation({
     mutationFn: async () => {
+      if (formData.newPassword.length < 6) {
+        throw new Error('Password must be at least 6 characters')
+      }
       if (formData.newPassword !== formData.confirmPassword) {
         throw new Error('New passwords do not match')
       }
@@ -169,6 +192,11 @@ const Profile = () => {
       }
     },
     onError: (error) => {
+      if (error.message === 'Password must be at least 6 characters') {
+        setPasswordError(error.message)
+        toast.error(error.message)
+        return
+      }
       if (error.message === 'New passwords do not match') {
         toast.error('New passwords do not match')
         return
@@ -189,6 +217,29 @@ const Profile = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Profile</h1>
       </div>
+
+      {/* Profile Completion Indicator - Students only */}
+      {isStudent && (
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Profile Completion</h3>
+              {profileCompletion.percentage === 100 && (
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              )}
+            </div>
+            <span className="text-sm font-bold text-primary-600">{profileCompletion.percentage}%</span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-[#2C2C2E] rounded-full h-2">
+            <div className="bg-primary-600 h-2 rounded-full transition-all" style={{ width: `${profileCompletion.percentage}%` }} />
+          </div>
+          {profileCompletion.missingFields.length > 0 && (
+            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-2">
+              Missing: {profileCompletion.missingFields.join(', ')}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Profile Photo Card */}
       <div className="card p-4 sm:p-6">
@@ -235,7 +286,7 @@ const Profile = () => {
                 : <><Camera className="h-4 w-4" /> Change Photo</>
               }
             </button>
-            <p className="text-xs text-gray-400 mt-1.5">JPG, PNG up to 5MB. Face will be auto-cropped.</p>
+            <p className="text-xs text-gray-400 mt-1.5">JPG, PNG up to 2MB. Face will be auto-cropped.</p>
           </div>
         </div>
 
@@ -313,9 +364,11 @@ const Profile = () => {
               <input
                 type="text"
                 name="name"
-                className="input"
+                className={isStudent ? "input bg-gray-50 dark:bg-[#000000]" : "input"}
                 value={formData.name}
                 onChange={handleChange}
+                disabled={isStudent}
+                title={isStudent ? "Name can only be changed by administration" : undefined}
               />
             </div>
             <div>
@@ -355,9 +408,11 @@ const Profile = () => {
                 <input
                   type="date"
                   name="dateOfBirth"
-                  className="input"
+                  className={isStudent ? "input bg-gray-50 dark:bg-[#000000]" : "input"}
                   value={formData.dateOfBirth}
                   onChange={handleChange}
+                  disabled={isStudent}
+                  title={isStudent ? "Date of birth can only be changed by administration" : undefined}
                 />
               </div>
               <div>
@@ -560,10 +615,14 @@ const Profile = () => {
                 <input
                   type="password"
                   name="newPassword"
-                  className="input"
+                  className={`input ${passwordError ? 'border-red-500 dark:border-red-500' : ''}`}
                   value={formData.newPassword}
-                  onChange={handleChange}
+                  onChange={(e) => { handleChange(e); setPasswordError('') }}
+                  minLength={6}
                 />
+                {passwordError && (
+                  <p className="text-xs text-red-500 mt-1">{passwordError}</p>
+                )}
               </div>
               <div>
                 <label className="label">Confirm New Password</label>

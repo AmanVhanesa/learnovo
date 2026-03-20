@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Megaphone, Users, Calendar, AlertCircle, Trash2, X, Clock } from 'lucide-react';
+import { Plus, Megaphone, Users, Calendar, AlertCircle, Trash2, X, Clock, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import announcementsService from '../services/announcementsService';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,6 +13,8 @@ const Announcements = () => {
     const isAdmin = user?.role === 'admin';
     const [deletingId, setDeletingId] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [searchText, setSearchText] = useState('');
+    const [expandedIds, setExpandedIds] = useState(new Set());
     const [formData, setFormData] = useState({
         title: '',
         message: '',
@@ -28,6 +30,23 @@ const Announcements = () => {
             return response.data || [];
         },
     });
+
+    const filteredAnnouncements = useMemo(() => {
+        if (!searchText.trim()) return announcements;
+        const q = searchText.toLowerCase().trim();
+        return announcements.filter(
+            (a) => a.title.toLowerCase().includes(q) || a.message.toLowerCase().includes(q)
+        );
+    }, [announcements, searchText]);
+
+    const toggleExpanded = (id) => {
+        setExpandedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
 
     const createMutation = useMutation({
         mutationFn: (payload) => announcementsService.createAnnouncement(payload),
@@ -145,7 +164,7 @@ const Announcements = () => {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+                <div className="loading-spinner"></div>
             </div>
         );
     }
@@ -171,25 +190,43 @@ const Announcements = () => {
                 )}
             </div>
 
+            {/* Search */}
+            <div className="relative flex-1 min-w-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
+                <input
+                    className="input pl-9 w-full"
+                    placeholder="Search announcements\u2026"
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                />
+            </div>
+
             {/* Announcements List */}
-            {announcements.length === 0 ? (
-                <div className="card p-6 sm:p-12 text-center">
-                    <Megaphone className="h-12 w-12 text-gray-300 dark:text-[#636366] mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No announcements</h3>
+            {filteredAnnouncements.length === 0 ? (
+                <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-6 sm:p-12 text-center">
+                    <div className="w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Megaphone className="h-6 w-6 text-gray-400 dark:text-[#636366]" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                        {searchText.trim() ? 'No matching announcements' : 'No announcements'}
+                    </h3>
                     <p className="text-sm text-gray-500 dark:text-[#8E8E93]">
-                        {isAdmin ? 'Create your first announcement to get started' : 'No announcements have been posted yet'}
+                        {searchText.trim()
+                            ? 'Try a different search term'
+                            : isAdmin ? 'Create your first announcement to get started' : 'No announcements have been posted yet'}
                     </p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {announcements.map((announcement) => {
+                    {filteredAnnouncements.map((announcement) => {
                         const style = getPriorityStyle(announcement.priority);
                         const expired = isExpired(announcement.expiresAt);
+                        const isExpanded = expandedIds.has(announcement._id);
 
                         return (
                             <div
                                 key={announcement._id}
-                                className={`card p-4 sm:p-6 border-l-4 ${style.border} ${expired ? 'opacity-60' : ''} ${deletingId === announcement._id ? 'opacity-40 pointer-events-none' : ''}`}
+                                className={`bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 sm:p-6 border-l-4 ${style.border} ${expired ? 'opacity-60' : ''} ${deletingId === announcement._id ? 'opacity-40 pointer-events-none' : ''}`}
                             >
                                 <div className="flex justify-between items-start gap-4">
                                     <div className="flex-1 min-w-0">
@@ -204,7 +241,21 @@ const Announcements = () => {
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-gray-700 dark:text-[#8E8E93] text-sm leading-relaxed whitespace-pre-wrap">{announcement.message}</p>
+                                        <p className={`text-gray-700 dark:text-[#8E8E93] text-sm leading-relaxed whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}>
+                                            {announcement.message}
+                                        </p>
+                                        {announcement.message.length > 200 && (
+                                            <button
+                                                onClick={() => toggleExpanded(announcement._id)}
+                                                className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                                            >
+                                                {isExpanded ? (
+                                                    <>Read less <ChevronUp className="h-3 w-3" /></>
+                                                ) : (
+                                                    <>Read more <ChevronDown className="h-3 w-3" /></>
+                                                )}
+                                            </button>
+                                        )}
                                     </div>
                                     {isAdmin && (
                                         <button
