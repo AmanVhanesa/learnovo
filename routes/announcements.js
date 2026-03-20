@@ -77,8 +77,8 @@ router.get('/:id', protect, [
 
 // @desc    Create announcement
 // @route   POST /api/announcements
-// @access  Private (Admin only)
-router.post('/', protect, authorize('admin'), [
+// @access  Private (Admin + Teacher — teacher scoped to their classes)
+router.post('/', protect, authorize('admin', 'teacher'), [
     body('title').trim().isLength({ min: 3, max: 200 }).withMessage('Title must be between 3 and 200 characters'),
     body('message').trim().isLength({ min: 10, max: 2000 }).withMessage('Message must be between 10 and 2000 characters'),
     body('targetAudience').isArray({ min: 1 }).withMessage('Target audience must be a non-empty array'),
@@ -172,8 +172,8 @@ router.put('/:id', protect, authorize('admin'), [
 
 // @desc    Delete announcement
 // @route   DELETE /api/announcements/:id
-// @access  Private (Admin only)
-router.delete('/:id', protect, authorize('admin'), [
+// @access  Private (Admin + Teacher own announcements)
+router.delete('/:id', protect, authorize('admin', 'teacher'), [
     param('id').isMongoId().withMessage('Invalid announcement ID'),
     handleValidationErrors
 ], async (req, res) => {
