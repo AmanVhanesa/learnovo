@@ -8,6 +8,81 @@ const ImportExportService = require('../services/importExportService');
 
 const router = express.Router();
 
+// ── Static routes MUST come before /:id to avoid Express matching them as params ──
+
+// @desc    Get drivers with expiring licenses
+// @route   GET /api/drivers/expiring/licenses
+// @access  Private (Admin)
+router.get('/expiring/licenses', protect, authorize('admin'), async (req, res) => {
+    try {
+        const days = parseInt(req.query.days) || 30;
+        const checkDate = new Date();
+        checkDate.setDate(checkDate.getDate() + days);
+
+        const drivers = await Driver.find({
+            tenantId: req.user.tenantId,
+            isActive: true,
+            licenseExpiry: {
+                $gte: new Date(),
+                $lte: checkDate
+            }
+        }).sort({ licenseExpiry: 1 });
+
+        res.json({
+            success: true,
+            data: drivers,
+            count: drivers.length
+        });
+    } catch (error) {
+        console.error('Get expiring licenses error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching expiring licenses'
+        });
+    }
+});
+
+// @desc    Export drivers
+// @route   GET /api/drivers/export
+// @access  Private (Admin)
+router.get('/export', protect, authorize('admin'), async (req, res) => {
+    try {
+        const filter = { tenantId: req.user.tenantId };
+
+        if (req.query.status) {
+            filter.isActive = req.query.status === 'active';
+        }
+
+        const drivers = await Driver.find(filter).lean();
+
+        const columns = [
+            { key: 'driverId', header: 'Driver ID' },
+            { key: 'name', header: 'Name' },
+            { key: 'phone', header: 'Phone' },
+            { key: 'email', header: 'Email' },
+            { key: 'licenseNumber', header: 'License Number' },
+            { key: 'licenseType', header: 'License Type' },
+            { key: 'licenseExpiry', header: 'License Expiry', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+            { key: 'dateOfJoining', header: 'Date of Joining', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+            { key: 'salary', header: 'Salary' },
+            { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
+        ];
+
+        const csvBuffer = await ImportExportService.exportToCSV(drivers, columns);
+        const filename = `drivers_export_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.send(csvBuffer);
+    } catch (error) {
+        console.error('Export drivers error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while exporting drivers'
+        });
+    }
+});
+
 // @desc    Get all drivers
 // @route   GET /api/drivers
 // @access  Private (Admin)
@@ -378,79 +453,6 @@ router.put('/:id/toggle-status', protect, authorize('admin'), async (req, res) =
         res.status(500).json({
             success: false,
             message: 'Server error while toggling driver status'
-        });
-    }
-});
-
-// @desc    Get drivers with expiring licenses
-// @route   GET /api/drivers/expiring/licenses
-// @access  Private (Admin)
-router.get('/expiring/licenses', protect, authorize('admin'), async (req, res) => {
-    try {
-        const days = parseInt(req.query.days) || 30;
-        const checkDate = new Date();
-        checkDate.setDate(checkDate.getDate() + days);
-
-        const drivers = await Driver.find({
-            tenantId: req.user.tenantId,
-            isActive: true,
-            licenseExpiry: {
-                $gte: new Date(),
-                $lte: checkDate
-            }
-        }).sort({ licenseExpiry: 1 });
-
-        res.json({
-            success: true,
-            data: drivers,
-            count: drivers.length
-        });
-    } catch (error) {
-        console.error('Get expiring licenses error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while fetching expiring licenses'
-        });
-    }
-});
-
-// @desc    Export drivers
-// @route   GET /api/drivers/export
-// @access  Private (Admin)
-router.get('/export', protect, authorize('admin'), async (req, res) => {
-    try {
-        const filter = { tenantId: req.user.tenantId };
-
-        if (req.query.status) {
-            filter.isActive = req.query.status === 'active';
-        }
-
-        const drivers = await Driver.find(filter).lean();
-
-        const columns = [
-            { key: 'driverId', header: 'Driver ID' },
-            { key: 'name', header: 'Name' },
-            { key: 'phone', header: 'Phone' },
-            { key: 'email', header: 'Email' },
-            { key: 'licenseNumber', header: 'License Number' },
-            { key: 'licenseType', header: 'License Type' },
-            { key: 'licenseExpiry', header: 'License Expiry', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
-            { key: 'dateOfJoining', header: 'Date of Joining', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
-            { key: 'salary', header: 'Salary' },
-            { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
-        ];
-
-        const csvBuffer = await ImportExportService.exportToCSV(drivers, columns);
-        const filename = `drivers_export_${new Date().toISOString().split('T')[0]}.csv`;
-
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.send(csvBuffer);
-    } catch (error) {
-        console.error('Export drivers error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while exporting drivers'
         });
     }
 });

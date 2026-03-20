@@ -11,6 +11,51 @@ const ImportExportService = require('../services/importExportService');
 
 const router = express.Router();
 
+// ── Static routes MUST come before /:id to avoid Express matching them as params ──
+
+// @desc    Export routes
+// @route   GET /api/transport/routes/export
+// @access  Private (Admin)
+router.get('/export', protect, authorize('admin'), async (req, res) => {
+    try {
+        const filter = { tenantId: req.user.tenantId };
+
+        if (req.query.status) {
+            filter.isActive = req.query.status === 'active';
+        }
+
+        const routes = await Route.find(filter)
+            .populate('assignedVehicle', 'vehicleNumber')
+            .populate('assignedDriver', 'name')
+            .lean();
+
+        const columns = [
+            { key: 'routeId', header: 'Route ID' },
+            { key: 'routeName', header: 'Route Name' },
+            { key: 'routeCode', header: 'Route Code' },
+            { key: 'stopsCount', header: 'Stops Count', format: (val, row) => row.stops ? row.stops.length : 0 },
+            { key: 'assignedVehicle', header: 'Vehicle', format: (val) => val ? val.vehicleNumber : 'Not Assigned' },
+            { key: 'assignedDriver', header: 'Driver', format: (val) => val ? val.name : 'Not Assigned' },
+            { key: 'distance', header: 'Distance (km)' },
+            { key: 'monthlyFee', header: 'Monthly Fee' },
+            { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
+        ];
+
+        const csvBuffer = await ImportExportService.exportToCSV(routes, columns);
+        const filename = `routes_export_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.send(csvBuffer);
+    } catch (error) {
+        console.error('Export routes error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while exporting routes'
+        });
+    }
+});
+
 // @desc    Get all routes
 // @route   GET /api/transport/routes
 // @access  Private (Admin)
@@ -505,49 +550,6 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Server error while deleting route'
-        });
-    }
-});
-
-// @desc    Export routes
-// @route   GET /api/transport/routes/export
-// @access  Private (Admin)
-router.get('/export', protect, authorize('admin'), async (req, res) => {
-    try {
-        const filter = { tenantId: req.user.tenantId };
-
-        if (req.query.status) {
-            filter.isActive = req.query.status === 'active';
-        }
-
-        const routes = await Route.find(filter)
-            .populate('assignedVehicle', 'vehicleNumber')
-            .populate('assignedDriver', 'name')
-            .lean();
-
-        const columns = [
-            { key: 'routeId', header: 'Route ID' },
-            { key: 'routeName', header: 'Route Name' },
-            { key: 'routeCode', header: 'Route Code' },
-            { key: 'stopsCount', header: 'Stops Count', format: (val, row) => row.stops ? row.stops.length : 0 },
-            { key: 'assignedVehicle', header: 'Vehicle', format: (val) => val ? val.vehicleNumber : 'Not Assigned' },
-            { key: 'assignedDriver', header: 'Driver', format: (val) => val ? val.name : 'Not Assigned' },
-            { key: 'distance', header: 'Distance (km)' },
-            { key: 'monthlyFee', header: 'Monthly Fee' },
-            { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
-        ];
-
-        const csvBuffer = await ImportExportService.exportToCSV(routes, columns);
-        const filename = `routes_export_${new Date().toISOString().split('T')[0]}.csv`;
-
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.send(csvBuffer);
-    } catch (error) {
-        console.error('Export routes error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while exporting routes'
         });
     }
 });

@@ -285,5 +285,176 @@ router.get('/subscription', protect, getTenantFromRequest, validateTenantAccess,
   }
 });
 
+// ============================================================================
+// FEE PAYMENT WEBHOOK ENDPOINTS (HDFC/CCAvenue)
+// These do NOT require JWT authentication - they receive POST from payment gateway
+// ============================================================================
+
+const Fee = require('../models/Fee');
+const Payment = require('../models/Payment');
+const { logger } = require('../middleware/errorHandler');
+
+// @desc    Payment notification webhook from HDFC/CCAvenue gateway
+// @route   POST /api/payments/notify
+// @access  Public (from payment gateway)
+router.post('/notify', async (req, res) => {
+  try {
+    const {
+      order_id, tracking_id, bank_ref_no, order_status,
+      payment_mode, amount, currency, enc_val, merchant_id
+    } = req.body;
+
+    // Log all payment notifications
+    logger.info('Payment notification received', null, {
+      orderId: order_id,
+      trackingId: tracking_id,
+      status: order_status,
+      amount,
+      paymentMode: payment_mode
+    });
+
+    // Verify payment signature using CCAvenue Working Key
+    const workingKey = process.env.CCAVENUE_WORKING_KEY;
+    if (workingKey && enc_val) {
+      const ccavenueCrypto = require('crypto');
+      const md5 = ccavenueCrypto.createHash('md5').update(workingKey).digest();
+      const keyBase64 = Buffer.from(md5).toString('base64').substring(0, 16);
+
+      // Verify the encrypted value
+      try {
+        const decipher = ccavenueCrypto.createDecipheriv('aes-128-cbc', keyBase64, Buffer.alloc(16, 0));
+        let decrypted = decipher.update(enc_val, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+
+        // Parse decrypted response
+        const params = new URLSearchParams(decrypted);
+        const verifiedStatus = params.get('order_status');
+
+        if (verifiedStatus === 'Success') {
+          // Find fee record by Order ID and mark as paid
+          const fee = await Fee.findOne({ orderId: order_id });
+          if (fee) {
+            fee.status = 'paid';
+            fee.paymentDate = new Date();
+            fee.transactionId = tracking_id;
+            fee.bankReference = bank_ref_no;
+            fee.paymentMode = payment_mode;
+            await fee.save();
+
+            // Create payment record
+            await Payment.create({
+              tenantId: fee.tenantId,
+              feeId: fee._id,
+              studentId: fee.student,
+              amount: Number(amount),
+              currency: currency || 'INR',
+              orderId: order_id,
+              transactionId: tracking_id,
+              bankReference: bank_ref_no,
+              paymentMode: payment_mode,
+              status: 'success',
+              gatewayResponse: req.body
+            });
+          }
+        }
+      } catch (decryptErr) {
+        logger.error('Payment decryption failed', decryptErr, { orderId: order_id });
+      }
+    } else if (order_status === 'Success' || order_status === 'Shipped') {
+      // Fallback for Razorpay or gateways without encryption
+      const fee = await Fee.findOne({ orderId: order_id });
+      if (fee) {
+        fee.status = 'paid';
+        fee.paymentDate = new Date();
+        fee.transactionId = tracking_id;
+        fee.bankReference = bank_ref_no;
+        fee.paymentMode = payment_mode;
+        await fee.save();
+
+        // Create payment record (was missing in fallback path)
+        await Payment.create({
+          tenantId: fee.tenantId,
+          feeId: fee._id,
+          studentId: fee.student,
+          amount: Number(amount),
+          currency: currency || 'INR',
+          orderId: order_id,
+          transactionId: tracking_id,
+          bankReference: bank_ref_no,
+          paymentMode: payment_mode,
+          status: 'success',
+          gatewayResponse: req.body
+        });
+      }
+    }
+
+    // Always return 200 to the gateway
+    res.status(200).json({ success: true, message: 'Notification received' });
+  } catch (error) {
+    logger.error('Payment webhook error', error, { body: req.body });
+    // Still return 200 so gateway doesn't retry indefinitely
+    res.status(200).json({ success: true, message: 'Notification acknowledged' });
+  }
+});
+
+// @desc    Payment success redirect
+// @route   POST /api/payments/return
+// @access  Public (redirect from payment gateway)
+router.post('/return', async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    logger.info('Payment return (success)', null, { orderId: order_id });
+
+    // Redirect to frontend success page
+    const frontendUrl = process.env.FRONTEND_ORIGIN || 'https://learnovoapp.vercel.app';
+    res.redirect(`${frontendUrl}/app/fees?payment=success&orderId=${order_id}`);
+  } catch (error) {
+    logger.error('Payment return error', error);
+    res.redirect(`${process.env.FRONTEND_ORIGIN || 'https://learnovoapp.vercel.app'}/app/fees?payment=error`);
+  }
+});
+
+// @desc    Payment cancel redirect
+// @route   POST /api/payments/cancel
+// @access  Public (redirect from payment gateway)
+router.post('/cancel', async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    logger.info('Payment cancelled', null, { orderId: order_id });
+
+    const frontendUrl = process.env.FRONTEND_ORIGIN || 'https://learnovoapp.vercel.app';
+    res.redirect(`${frontendUrl}/app/fees?payment=cancelled&orderId=${order_id}`);
+  } catch (error) {
+    logger.error('Payment cancel error', error);
+    res.redirect(`${process.env.FRONTEND_ORIGIN || 'https://learnovoapp.vercel.app'}/app/fees?payment=cancelled`);
+  }
+});
+
+// @desc    Payment failure redirect
+// @route   POST /api/payments/failure
+// @access  Public (redirect from payment gateway)
+router.post('/failure', async (req, res) => {
+  try {
+    const { order_id } = req.body;
+    logger.info('Payment failed', null, { orderId: order_id });
+
+    // Update fee status — lookup by orderId (orderId is unique across the system)
+    if (order_id) {
+      const fee = await Fee.findOne({ orderId: order_id });
+      if (fee) {
+        fee.status = 'failed';
+        fee.failedAt = new Date();
+        await fee.save();
+      }
+    }
+
+    const frontendUrl = process.env.FRONTEND_ORIGIN || 'https://learnovoapp.vercel.app';
+    res.redirect(`${frontendUrl}/app/fees?payment=failed&orderId=${order_id}`);
+  } catch (error) {
+    logger.error('Payment failure error', error);
+    res.redirect(`${process.env.FRONTEND_ORIGIN || 'https://learnovoapp.vercel.app'}/app/fees?payment=failed`);
+  }
+});
+
 module.exports = router;
 

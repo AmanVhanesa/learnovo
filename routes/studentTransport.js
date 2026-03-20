@@ -9,6 +9,58 @@ const ImportExportService = require('../services/importExportService');
 
 const router = express.Router();
 
+// ── Static routes MUST come before /:id to avoid Express matching them as params ──
+
+// @desc    Export student transport assignments
+// @route   GET /api/student-transport/export
+// @access  Private (Admin)
+router.get('/export', protect, authorize('admin'), async (req, res) => {
+    try {
+        const filter = { tenantId: req.user.tenantId };
+
+        if (req.query.status) {
+            filter.isActive = req.query.status === 'active';
+        }
+        if (req.query.route) {
+            filter.route = req.query.route;
+        }
+        if (req.query.academicYear) {
+            filter.academicYear = req.query.academicYear;
+        }
+
+        const assignments = await StudentTransportAssignment.find(filter)
+            .populate('student', 'name class section admissionNumber phone')
+            .populate('route', 'routeName routeCode')
+            .lean();
+
+        const columns = [
+            { key: 'student', header: 'Student Name', format: (val) => val ? val.name : '' },
+            { key: 'student', header: 'Admission Number', format: (val) => val ? val.admissionNumber : '' },
+            { key: 'student', header: 'Class', format: (val) => val ? `${val.class}${val.section ? '-' + val.section : ''}` : '' },
+            { key: 'route', header: 'Route', format: (val) => val ? val.routeName : '' },
+            { key: 'stop', header: 'Stop' },
+            { key: 'transportType', header: 'Transport Type' },
+            { key: 'monthlyFee', header: 'Monthly Fee' },
+            { key: 'academicYear', header: 'Academic Year' },
+            { key: 'startDate', header: 'Start Date', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+            { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
+        ];
+
+        const csvBuffer = await ImportExportService.exportToCSV(assignments, columns);
+        const filename = `student_transport_export_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.send(csvBuffer);
+    } catch (error) {
+        console.error('Export assignments error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while exporting assignments'
+        });
+    }
+});
+
 // @desc    Get all student transport assignments
 // @route   GET /api/student-transport
 // @access  Private (Admin)
@@ -472,51 +524,4 @@ router.post('/bulk-assign', protect, authorize('admin'), [
 // @desc    Export student transport assignments
 // @route   GET /api/student-transport/export
 // @access  Private (Admin)
-router.get('/export', protect, authorize('admin'), async (req, res) => {
-    try {
-        const filter = { tenantId: req.user.tenantId };
-
-        if (req.query.status) {
-            filter.isActive = req.query.status === 'active';
-        }
-        if (req.query.route) {
-            filter.route = req.query.route;
-        }
-        if (req.query.academicYear) {
-            filter.academicYear = req.query.academicYear;
-        }
-
-        const assignments = await StudentTransportAssignment.find(filter)
-            .populate('student', 'name class section admissionNumber phone')
-            .populate('route', 'routeName routeCode')
-            .lean();
-
-        const columns = [
-            { key: 'student', header: 'Student Name', format: (val) => val ? val.name : '' },
-            { key: 'student', header: 'Admission Number', format: (val) => val ? val.admissionNumber : '' },
-            { key: 'student', header: 'Class', format: (val) => val ? `${val.class}${val.section ? '-' + val.section : ''}` : '' },
-            { key: 'route', header: 'Route', format: (val) => val ? val.routeName : '' },
-            { key: 'stop', header: 'Stop' },
-            { key: 'transportType', header: 'Transport Type' },
-            { key: 'monthlyFee', header: 'Monthly Fee' },
-            { key: 'academicYear', header: 'Academic Year' },
-            { key: 'startDate', header: 'Start Date', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
-            { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
-        ];
-
-        const csvBuffer = await ImportExportService.exportToCSV(assignments, columns);
-        const filename = `student_transport_export_${new Date().toISOString().split('T')[0]}.csv`;
-
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.send(csvBuffer);
-    } catch (error) {
-        console.error('Export assignments error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while exporting assignments'
-        });
-    }
-});
-
 module.exports = router;

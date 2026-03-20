@@ -9,6 +9,54 @@ const ImportExportService = require('../services/importExportService');
 
 const router = express.Router();
 
+// ── Static routes MUST come before /:id to avoid Express matching them as params ──
+
+// @desc    Export vehicles
+// @route   GET /api/vehicles/export
+// @access  Private (Admin)
+router.get('/export', protect, authorize('admin'), async (req, res) => {
+    try {
+        const filter = { tenantId: req.user.tenantId };
+
+        if (req.query.status) {
+            filter.isActive = req.query.status === 'active';
+        }
+        if (req.query.type) {
+            filter.vehicleType = req.query.type;
+        }
+
+        const vehicles = await Vehicle.find(filter)
+            .populate('assignedDriver', 'name phone')
+            .lean();
+
+        const columns = [
+            { key: 'vehicleId', header: 'Vehicle ID' },
+            { key: 'vehicleNumber', header: 'Vehicle Number' },
+            { key: 'vehicleType', header: 'Type' },
+            { key: 'model', header: 'Model' },
+            { key: 'capacity', header: 'Capacity' },
+            { key: 'assignedDriver', header: 'Driver', format: (val) => val ? val.name : 'Not Assigned' },
+            { key: 'insuranceExpiry', header: 'Insurance Expiry', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+            { key: 'fitnessExpiry', header: 'Fitness Expiry', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+            { key: 'pollutionExpiry', header: 'Pollution Expiry', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+            { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
+        ];
+
+        const csvBuffer = await ImportExportService.exportToCSV(vehicles, columns);
+        const filename = `vehicles_export_${new Date().toISOString().split('T')[0]}.csv`;
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.send(csvBuffer);
+    } catch (error) {
+        console.error('Export vehicles error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while exporting vehicles'
+        });
+    }
+});
+
 // @desc    Get all vehicles
 // @route   GET /api/vehicles
 // @access  Private (Admin)
@@ -370,52 +418,6 @@ router.delete('/:id', protect, authorize('admin'), async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Server error while deleting vehicle'
-        });
-    }
-});
-
-// @desc    Export vehicles
-// @route   GET /api/vehicles/export
-// @access  Private (Admin)
-router.get('/export', protect, authorize('admin'), async (req, res) => {
-    try {
-        const filter = { tenantId: req.user.tenantId };
-
-        if (req.query.status) {
-            filter.isActive = req.query.status === 'active';
-        }
-        if (req.query.type) {
-            filter.vehicleType = req.query.type;
-        }
-
-        const vehicles = await Vehicle.find(filter)
-            .populate('assignedDriver', 'name phone')
-            .lean();
-
-        const columns = [
-            { key: 'vehicleId', header: 'Vehicle ID' },
-            { key: 'vehicleNumber', header: 'Vehicle Number' },
-            { key: 'vehicleType', header: 'Type' },
-            { key: 'model', header: 'Model' },
-            { key: 'capacity', header: 'Capacity' },
-            { key: 'assignedDriver', header: 'Driver', format: (val) => val ? val.name : 'Not Assigned' },
-            { key: 'insuranceExpiry', header: 'Insurance Expiry', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
-            { key: 'fitnessExpiry', header: 'Fitness Expiry', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
-            { key: 'pollutionExpiry', header: 'Pollution Expiry', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
-            { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
-        ];
-
-        const csvBuffer = await ImportExportService.exportToCSV(vehicles, columns);
-        const filename = `vehicles_export_${new Date().toISOString().split('T')[0]}.csv`;
-
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
-        res.send(csvBuffer);
-    } catch (error) {
-        console.error('Export vehicles error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while exporting vehicles'
         });
     }
 });
