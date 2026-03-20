@@ -897,11 +897,13 @@ router.get('/report', protect, async (req, res) => {
 
     let records = attendanceRecords
 
-    if (studentId) {
+    // Auto-scope to own records for student/parent roles
+    const effectiveStudentId = studentId || (req.user.role === 'student' ? req.user._id.toString() : null)
+    if (effectiveStudentId) {
       records = attendanceRecords.map(record => ({
         ...record.toObject(),
         attendanceRecords: record.attendanceRecords.filter(
-          r => r.studentId._id.toString() === studentId
+          r => r.studentId._id.toString() === effectiveStudentId
         )
       })).filter(record => record.attendanceRecords.length > 0)
     }

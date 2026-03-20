@@ -489,7 +489,8 @@ router.get('/dashboard', protect, async (req, res) => {
     if (user.role === 'student') {
       const studentOid = new mongoose.Types.ObjectId(user._id);
       const tenantOid = new mongoose.Types.ObjectId(user.tenantId);
-      const [invoiceAgg, assignmentCount] = await Promise.all([
+      const Notification = require('../models/Notification');
+      const [invoiceAgg, assignmentCount, unreadNotifications] = await Promise.all([
         FeeInvoice.aggregate([
           { $match: { studentId: studentOid, tenantId: tenantOid, status: { $in: ['Pending', 'Partial', 'Overdue'] } } },
           { $group: { _id: null, totalOutstanding: { $sum: '$balanceAmount' }, count: { $sum: 1 } } }
@@ -500,6 +501,7 @@ router.get('/dashboard', protect, async (req, res) => {
             return Assignment.countDocuments({ tenantId, assignedTo: user._id });
           } catch { return 0; }
         })(),
+        Notification.getUnreadCount(user._id, tenantId),
       ]);
       const outstandingData = invoiceAgg[0] || { totalOutstanding: 0, count: 0 };
       statistics.students = { total: 1, active: user.isActive ? 1 : 0 };
@@ -508,7 +510,7 @@ router.get('/dashboard', protect, async (req, res) => {
         pendingFees: outstandingData.count,
         pendingFeesAmount: outstandingData.totalOutstanding,
         assignments: assignmentCount,
-        notifications: 0,
+        notifications: unreadNotifications,
       };
     }
 
@@ -517,16 +519,20 @@ router.get('/dashboard', protect, async (req, res) => {
       const childrenIds = (user.children && Array.isArray(user.children) ? user.children : [])
         .map(id => new mongoose.Types.ObjectId(id));
       const parentTenantOid = new mongoose.Types.ObjectId(user.tenantId);
-      const invoiceAgg = await FeeInvoice.aggregate([
-        { $match: { studentId: { $in: childrenIds }, tenantId: parentTenantOid, status: { $in: ['Pending', 'Partial', 'Overdue'] } } },
-        { $group: { _id: null, totalOutstanding: { $sum: '$balanceAmount' }, count: { $sum: 1 } } }
+      const Notification = require('../models/Notification');
+      const [invoiceAgg, parentUnreadNotifications] = await Promise.all([
+        FeeInvoice.aggregate([
+          { $match: { studentId: { $in: childrenIds }, tenantId: parentTenantOid, status: { $in: ['Pending', 'Partial', 'Overdue'] } } },
+          { $group: { _id: null, totalOutstanding: { $sum: '$balanceAmount' }, count: { $sum: 1 } } }
+        ]),
+        Notification.getUnreadCount(user._id, tenantId),
       ]);
       const outstandingData = invoiceAgg[0] || { totalOutstanding: 0, count: 0 };
       statistics.parent = {
         myChildren: childrenIds.length,
         pendingFees: outstandingData.count,
         pendingFeesAmount: outstandingData.totalOutstanding,
-        notifications: 0,
+        notifications: parentUnreadNotifications,
         performance: 'Good',
       };
     }
