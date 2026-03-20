@@ -38,7 +38,6 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
             const response = await transportService.getStudentTransportAssignments(params);
             setAssignments(response.data || []);
         } catch (error) {
-            console.error('Error fetching assignments:', error);
             toast.error('Failed to load student assignments');
         } finally {
             setLoading(false);
@@ -50,7 +49,6 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
             const response = await transportService.getRoutes({ status: 'active', limit: 100 });
             setRoutes(response.data || []);
         } catch (error) {
-            console.error('Error fetching routes:', error);
         }
     };
 
@@ -63,7 +61,6 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
             });
             setStudents(response.data.data || []);
         } catch (error) {
-            console.error('Error fetching students:', error);
         }
     };
 
@@ -72,7 +69,6 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
             const response = await transportService.getDrivers({ limit: 100, status: 'active' });
             setDrivers(response.data || []);
         } catch (error) {
-            console.error('Error fetching drivers:', error);
         }
     };
 
@@ -83,7 +79,6 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                 setSubDepartments(response.data.data);
             }
         } catch (error) {
-            console.error('Error fetching sub-departments:', error);
         }
     };
 
@@ -112,7 +107,6 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
             link.click();
             link.remove();
         } catch (error) {
-            console.error('Export error:', error);
             toast.error('Failed to export students');
         } finally {
             setExporting(false);
@@ -138,7 +132,6 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
             fetchAssignments();
             onStatsUpdate();
         } catch (error) {
-            console.error('Error deleting assignment:', error);
             toast.error(error.response?.data?.message || 'Failed to remove assignment');
         }
     };
@@ -363,7 +356,6 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
             }
             onClose(true);
         } catch (error) {
-            console.error('Error saving assignment:', error);
             toast.error(error.response?.data?.message || 'Failed to save assignment');
         } finally {
             setLoading(false);

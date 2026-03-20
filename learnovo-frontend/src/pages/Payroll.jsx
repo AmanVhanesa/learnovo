@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Eye, Edit2, Trash2, FileText, Plus, Download, Wallet, ArrowUpRight } from 'lucide-react';
+import toast from 'react-hot-toast';
 import payrollService from '../services/payrollService';
 import GeneratePayrollModal from '../components/payroll/GeneratePayrollModal';
 import AdvanceSalaryModal from '../components/payroll/AdvanceSalaryModal';
@@ -66,22 +67,21 @@ const Payroll = () => {
     const deletePayrollMutation = useMutation({
         mutationFn: (id) => payrollService.deletePayrollRecord(id),
         onSuccess: () => {
-            alert('Payroll record deleted successfully');
+            toast.success('Payroll record deleted successfully');
             queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
         },
         onError: (err) => {
-            console.error('Error deleting payroll:', err);
-            alert(err.message || 'Failed to delete payroll record');
+            toast.error(err.message || 'Failed to delete payroll record');
         },
     });
 
     const handleGenerateSuccess = (result) => {
-        alert(`Payroll generated successfully! Created: ${result.data.created}, Skipped: ${result.data.skipped}`);
+        toast.success(`Payroll generated! Created: ${result.data.created}, Skipped: ${result.data.skipped}`);
         queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
     };
 
     const handleAdvanceSuccess = (message) => {
-        alert(message);
+        toast.success(message);
         queryClient.invalidateQueries({ queryKey: ['advance-requests'] });
     };
 
@@ -97,8 +97,7 @@ const Payroll = () => {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (err) {
-            console.error('Error downloading monthly report:', err);
-            alert('Failed to download monthly report');
+            toast.error('Failed to download monthly report');
         }
     };
 
@@ -114,13 +113,12 @@ const Payroll = () => {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (err) {
-            console.error('Error downloading yearly report:', err);
-            alert('Failed to download yearly report');
+            toast.error('Failed to download yearly report');
         }
     };
 
     const handleEditSuccess = (message) => {
-        alert(message);
+        toast.success(message);
         queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
     };
 

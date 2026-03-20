@@ -49,7 +49,6 @@ const CertificateGeneration = () => {
             setStep(2);
         },
         onError: (error) => {
-            console.error(error);
             toast.error(error.response?.data?.message || 'Failed to generate preview');
         },
     });

@@ -29,7 +29,6 @@ const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
       })
       setPreviewCount((res.data || []).length)
     } catch (error) {
-      console.error('Preview error:', error)
       toast.error('Failed to fetch invoice count')
     } finally {
       setIsPreviewing(false)
@@ -71,7 +70,6 @@ const BulkDeleteInvoiceForm = ({ classes, activeSession, onSuccess }) => {
       setPreviewCount(null)
       onSuccess()
     } catch (error) {
-      console.error('Bulk delete error:', error)
       toast.error(error.response?.data?.message || 'Failed to delete invoices')
     } finally {
       setIsDeleting(false)

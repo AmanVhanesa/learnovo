@@ -26,7 +26,7 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
             const response = await employeesService.list({ limit: 100, status: 'active' });
             setEmployees(response.data);
         } catch (err) {
-            console.error('Error fetching employees:', err);
+            setError('Failed to fetch employees');
         }
     };
 
@@ -43,7 +43,6 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
             onClose();
             resetForm();
         } catch (err) {
-            console.error('Error creating advance request:', err);
             setError(err.message || 'Failed to create advance request');
         } finally {
             setLoading(false);
@@ -59,7 +58,6 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
             onSuccess('Advance salary request approved successfully');
             onClose();
         } catch (err) {
-            console.error('Error approving advance request:', err);
             setError(err.message || 'Failed to approve advance request');
         } finally {
             setLoading(false);
@@ -80,7 +78,6 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
             onSuccess('Advance salary request rejected');
             onClose();
         } catch (err) {
-            console.error('Error rejecting advance request:', err);
             setError(err.message || 'Failed to reject advance request');
         } finally {
             setLoading(false);

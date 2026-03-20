@@ -29,7 +29,6 @@ const RoutesTab = ({ onStatsUpdate }) => {
             const response = await transportService.getRoutes(params);
             setRoutes(response.data || []);
         } catch (error) {
-            console.error('Error fetching routes:', error);
             toast.error('Failed to load routes');
         } finally {
             setLoading(false);
@@ -41,7 +40,6 @@ const RoutesTab = ({ onStatsUpdate }) => {
             const response = await transportService.getVehicles({ status: 'active', limit: 100 });
             setVehicles(response.data || []);
         } catch (error) {
-            console.error('Error fetching vehicles:', error);
         }
     };
 
@@ -50,7 +48,6 @@ const RoutesTab = ({ onStatsUpdate }) => {
             const response = await transportService.getDrivers({ status: 'active', limit: 100 });
             setDrivers(response.data || []);
         } catch (error) {
-            console.error('Error fetching drivers:', error);
         }
     };
 
@@ -73,7 +70,6 @@ const RoutesTab = ({ onStatsUpdate }) => {
             fetchRoutes();
             onStatsUpdate();
         } catch (error) {
-            console.error('Error deleting route:', error);
             toast.error(error.response?.data?.message || 'Failed to delete route');
         }
     };
@@ -288,7 +284,6 @@ const RouteModal = ({ route, vehicles, drivers, onClose }) => {
             }
             onClose(true);
         } catch (error) {
-            console.error('Error saving route:', error);
             toast.error(error.response?.data?.message || 'Failed to save route');
         } finally {
             setLoading(false);

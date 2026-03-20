@@ -94,7 +94,6 @@ const Fees = () => {
       queryClient.invalidateQueries({ queryKey: ['students-for-fees'] })
     },
     onError: (err) => {
-      console.error('Save fee error:', err)
       let errorMessage = 'Failed to save fee'
       if (err.response?.data) {
         const errorData = err.response.data

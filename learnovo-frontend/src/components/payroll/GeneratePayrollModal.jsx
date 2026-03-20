@@ -25,16 +25,9 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
             setPreviewLoading(true);
             setError(''); // Clear any previous errors
             const response = await employeesService.list({ limit: 100, status: 'active' });
-            console.log('Employee API Response:', response);
-            console.log('Employee Data:', response.data);
-            const employeesWithSalary = response.data.filter(emp => {
-                console.log(`Employee ${emp.name}: salary = ${emp.salary}`);
-                return emp.salary && emp.salary > 0;
-            });
-            console.log('Employees with salary:', employeesWithSalary);
+            const employeesWithSalary = (response.data || []).filter(emp => emp.salary && emp.salary > 0);
             setEmployees(employeesWithSalary);
         } catch (err) {
-            console.error('Error fetching employees:', err);
             setError('Failed to fetch employees: ' + (err.message || 'Unknown error'));
         } finally {
             setPreviewLoading(false);
@@ -43,19 +36,14 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('=== PAYROLL SUBMIT TRIGGERED ===');
-        console.log('Form data:', formData);
         setError('');
         setLoading(true);
 
         try {
-            console.log('Calling generateMonthlyPayroll with:', formData);
             const result = await payrollService.generateMonthlyPayroll(formData);
-            console.log('Payroll generation result:', result);
             onSuccess(result);
             onClose();
         } catch (err) {
-            console.error('Error generating payroll:', err);
             setError(err.message || 'Failed to generate payroll');
         } finally {
             setLoading(false);

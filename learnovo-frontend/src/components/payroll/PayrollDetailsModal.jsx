@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import payrollService from '../../services/payrollService';
 
 const PayrollDetailsModal = ({ isOpen, onClose, payrollId }) => {
@@ -18,7 +19,7 @@ const PayrollDetailsModal = ({ isOpen, onClose, payrollId }) => {
             const response = await payrollService.getPayrollRecord(payrollId);
             setPayroll(response.data);
         } catch (err) {
-            console.error('Error fetching payroll details:', err);
+            toast.error('Failed to load payroll details');
         } finally {
             setLoading(false);
         }
@@ -39,8 +40,7 @@ const PayrollDetailsModal = ({ isOpen, onClose, payrollId }) => {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (err) {
-            console.error('Error downloading salary slip:', err);
-            alert('Failed to download salary slip');
+            toast.error('Failed to download salary slip');
         } finally {
             setDownloading(false);
         }

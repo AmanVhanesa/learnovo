@@ -50,27 +50,27 @@ const Transport = () => {
     ];
 
     return (
-        <div className="p-6">
+        <div className="space-y-4 sm:space-y-6">
             {/* Header */}
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Transport Management</h1>
-                <p className="text-gray-600 dark:text-[#8E8E93] mt-1">Manage drivers, vehicles, routes, and student transport assignments</p>
+            <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Transport Management</h1>
+                <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Manage drivers, vehicles, routes, and student transport assignments</p>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            {/* Stats Cards — simulated glass */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {statCards.map((stat, index) => {
                     const Icon = stat.icon;
                     return (
-                        <div key={index} className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow p-6">
+                        <div key={index} className="bg-white dark:bg-white/[0.08] dark:border dark:border-white/[0.15] dark:shadow-[0_4px_24px_rgba(0,0,0,0.10)] rounded-2xl shadow-glass p-4 sm:p-5">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-gray-600 dark:text-[#8E8E93]">{stat.label}</p>
-                                    <p className="text-3xl font-bold text-gray-800 dark:text-white mt-2">
+                                    <p className="text-sm text-gray-500 dark:text-[#8E8E93]">{stat.label}</p>
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
                                         {loading ? '...' : stat.value}
                                     </p>
                                 </div>
-                                <div className={`${stat.color} p-3 rounded-lg`}>
+                                <div className={`${stat.color} p-3 rounded-xl`}>
                                     <Icon className="w-6 h-6 text-white" />
                                 </div>
                             </div>
@@ -80,7 +80,7 @@ const Transport = () => {
             </div>
 
             {/* Tabs */}
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass overflow-hidden">
                 <div className="border-b border-gray-200 dark:border-[#38383A]">
                     <nav className="flex space-x-8 px-6" aria-label="Tabs">
                         {tabs.map((tab) => {

@@ -33,7 +33,6 @@ const VehiclesTab = ({ onStatsUpdate }) => {
             const response = await transportService.getVehicles(params);
             setVehicles(response.data || []);
         } catch (error) {
-            console.error('Error fetching vehicles:', error);
             toast.error('Failed to load vehicles');
         } finally {
             setLoading(false);
@@ -45,7 +44,6 @@ const VehiclesTab = ({ onStatsUpdate }) => {
             const response = await transportService.getDrivers({ status: 'active', limit: 100 });
             setDrivers(response.data || []);
         } catch (error) {
-            console.error('Error fetching drivers:', error);
         }
     };
 
@@ -68,7 +66,6 @@ const VehiclesTab = ({ onStatsUpdate }) => {
             fetchVehicles();
             onStatsUpdate();
         } catch (error) {
-            console.error('Error deleting vehicle:', error);
             toast.error(error.response?.data?.message || 'Failed to delete vehicle');
         }
     };
@@ -248,7 +245,6 @@ const VehicleModal = ({ vehicle, drivers, onClose }) => {
             }
             onClose(true);
         } catch (error) {
-            console.error('Error saving vehicle:', error);
             toast.error(error.response?.data?.message || 'Failed to save vehicle');
         } finally {
             setLoading(false);

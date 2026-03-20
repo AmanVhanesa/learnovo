@@ -39,7 +39,6 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
         setSearchResults(sorted)
         setIsOpen(sorted.length > 0)
       } catch (error) {
-        console.error('Search error:', error)
         setSearchResults([])
       } finally {
         setIsSearching(false)

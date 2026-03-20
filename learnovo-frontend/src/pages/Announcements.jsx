@@ -40,7 +40,6 @@ const Announcements = () => {
             setTimeout(() => refreshNotifications(), 1500);
         },
         onError: (error) => {
-            console.error('Create announcement error:', error?.response?.status, error?.response?.data || error.message);
             // The backend may have saved the announcement but failed during notification broadcast.
             // Always refresh to show the actual state.
             queryClient.invalidateQueries({ queryKey: ['announcements'] });

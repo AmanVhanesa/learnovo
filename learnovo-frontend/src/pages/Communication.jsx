@@ -52,7 +52,7 @@ const Communication = () => {
                     <div
                         key={index}
                         onClick={() => navigate(module.path)}
-                        className="card p-4 sm:p-6 cursor-pointer hover:shadow-md transition-all hover:-translate-y-0.5 relative"
+                        className="bg-white dark:bg-white/[0.08] dark:border dark:border-white/[0.15] dark:shadow-[0_4px_24px_rgba(0,0,0,0.10)] rounded-2xl shadow-glass p-4 sm:p-6 cursor-pointer hover:shadow-glass-md transition-all hover:-translate-y-0.5 relative"
                     >
                         <div className={`w-12 h-12 rounded-xl ${module.color} bg-opacity-10 dark:bg-opacity-20 flex items-center justify-center mb-4`}>
                             <module.icon className={`w-6 h-6 ${module.color.replace('bg-', 'text-')}`} />

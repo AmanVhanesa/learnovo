@@ -32,7 +32,6 @@ const DriversTab = ({ onStatsUpdate }) => {
             const response = await transportService.getDrivers(params);
             setDrivers(response.data || []);
         } catch (error) {
-            console.error('Error fetching drivers:', error);
             toast.error('Failed to load drivers');
         } finally {
             setLoading(false);
@@ -58,7 +57,6 @@ const DriversTab = ({ onStatsUpdate }) => {
             fetchDrivers();
             onStatsUpdate();
         } catch (error) {
-            console.error('Error deleting driver:', error);
             toast.error(error.response?.data?.message || 'Failed to delete driver');
         }
     };
@@ -309,7 +307,6 @@ const DriverModal = ({ driver, onClose }) => {
                 setPhotoPreview(result.data.url);
                 toast.success('Photo uploaded successfully');
             } catch (error) {
-                console.error('Photo upload error:', error);
                 toast.error(error.response?.data?.message || 'Failed to upload photo');
                 // Keep base64 preview even if upload fails; photo won't be saved to Cloudinary
             } finally {
@@ -345,7 +342,6 @@ const DriverModal = ({ driver, onClose }) => {
                         setPhotoUploading(true);
                         await transportService.uploadDriverPhoto(savedDriver._id, _pendingPhotoFile);
                     } catch (photoErr) {
-                        console.error('Pending photo upload failed:', photoErr);
                         toast.error('Driver saved but photo upload failed. You can re-upload by editing the driver.');
                     } finally {
                         setPhotoUploading(false);
@@ -354,7 +350,6 @@ const DriverModal = ({ driver, onClose }) => {
             }
             onClose(true);
         } catch (error) {
-            console.error('Error saving driver:', error);
             toast.error(error.response?.data?.message || 'Failed to save driver');
         } finally {
             setLoading(false);

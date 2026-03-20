@@ -70,7 +70,6 @@ const DiscountModal = ({ isOpen, onClose, invoice, onSuccess }) => {
       toast.success('Discount applied successfully')
       onSuccess()
     } catch (error) {
-      console.error('Discount error:', error)
       toast.error(error.response?.data?.message || 'Failed to apply discount')
     } finally {
       setIsSaving(false)

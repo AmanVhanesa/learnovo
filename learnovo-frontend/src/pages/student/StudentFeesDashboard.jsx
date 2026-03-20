@@ -195,7 +195,6 @@ const StudentFeesDashboard = () => {
             await downloadReceiptAsPdf(payment, school);
             toast.success('Receipt downloaded', { id: 'receipt' });
         } catch (e) {
-            console.error('Receipt error:', e);
             toast.error('Receipt unavailable', { id: 'receipt' });
         }
     }
