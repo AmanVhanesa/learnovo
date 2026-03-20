@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, CheckCircle, XCircle, ArrowRight, ArrowLeft, RefreshCw } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTheme } from '../contexts/ThemeContext'
 import { tenantService } from '../services/tenantService'
@@ -11,6 +11,7 @@ const Register = () => {
   const navigate = useNavigate()
   const { theme, toggleMode } = useTheme()
   const isDark = theme?.mode === 'dark'
+  const formRef = useRef(null)
 
   const [formData, setFormData] = useState({
     schoolName: '',
@@ -33,9 +34,11 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState({})
   const [availability, setAvailability] = useState({})
+  const [checkingAvailability, setCheckingAvailability] = useState({})
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
+
     if (name.startsWith('address.')) {
       const addressField = name.split('.')[1]
       setFormData(prev => ({
@@ -45,74 +48,156 @@ const Register = () => {
           [addressField]: value
         }
       }))
-    } else {
+    } else if (name === 'schoolCode') {
+      // Auto-lowercase and restrict to valid characters
+      const cleaned = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
       setFormData(prev => ({
         ...prev,
-        [name]: value
+        schoolCode: cleaned,
+        // Auto-fill subdomain if user hasn't manually edited it
+        subdomain: prev.subdomain === prev.schoolCode || prev.subdomain === '' ? cleaned : prev.subdomain
       }))
+    } else if (name === 'subdomain') {
+      const cleaned = value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+      setFormData(prev => ({ ...prev, subdomain: cleaned }))
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }))
     }
 
+    // Clear field error when user types
     if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }))
+      setErrors(prev => ({ ...prev, [name]: '' }))
+    }
+  }
+
+  const generateSchoolCode = () => {
+    if (!formData.schoolName.trim()) return
+    const code = formData.schoolName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 20)
+
+    setFormData(prev => ({
+      ...prev,
+      schoolCode: code,
+      subdomain: prev.subdomain === prev.schoolCode || prev.subdomain === '' ? code : prev.subdomain
+    }))
+
+    // Check availability after generating
+    if (code.length >= 3) {
+      checkAvailability('schoolCode', code)
     }
   }
 
   const checkAvailability = async (field, value) => {
-    if (!value || value.length < 3) return
+    if (!value || value.length < 3) {
+      setAvailability(prev => ({ ...prev, [field]: undefined }))
+      return
+    }
+
+    setCheckingAvailability(prev => ({ ...prev, [field]: true }))
 
     try {
       const data = await tenantService.checkAvailability({ [field]: value })
-
       if (data.success) {
         setAvailability(prev => ({
           ...prev,
           [field]: data.data[field]
         }))
+        if (data.data[field] === false) {
+          setErrors(prev => ({
+            ...prev,
+            [field]: field === 'schoolCode'
+              ? 'This school code is already taken'
+              : 'This subdomain is already taken'
+          }))
+        }
       }
-    } catch (error) {
+    } catch (err) {
+      // Silently handle availability check failures
+    } finally {
+      setCheckingAvailability(prev => ({ ...prev, [field]: false }))
     }
   }
 
   const validateForm = () => {
     const newErrors = {}
 
+    // School name
     if (!formData.schoolName.trim()) {
       newErrors.schoolName = 'School name is required'
+    } else if (formData.schoolName.trim().length < 3) {
+      newErrors.schoolName = 'School name must be at least 3 characters'
+    } else if (formData.schoolName.trim().length > 100) {
+      newErrors.schoolName = 'School name must be under 100 characters'
     }
 
+    // Email
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required'
+      newErrors.email = 'Please enter a valid email'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid'
+      newErrors.email = 'Please enter a valid email'
     }
 
-    const pwdField = 'password'
-    if (!formData[pwdField]) {
-      newErrors[pwdField] = 'Password is required'
-    } else if (formData[pwdField].length < 6) {
-      newErrors[pwdField] = 'Password must be at least 6 characters'
+    // Phone (optional but validate if filled)
+    if (formData.phone.trim() && !/^[\d+\-() ]{7,15}$/.test(formData.phone.trim())) {
+      newErrors.phone = 'Please enter a valid phone number'
     }
 
-    if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match'
-    }
-
+    // School code
     if (!formData.schoolCode.trim()) {
       newErrors.schoolCode = 'School code is required'
     } else if (formData.schoolCode.length < 3) {
       newErrors.schoolCode = 'School code must be at least 3 characters'
+    } else if (formData.schoolCode.length > 20) {
+      newErrors.schoolCode = 'School code must be under 20 characters'
+    } else if (!/^[a-z0-9-]+$/.test(formData.schoolCode)) {
+      newErrors.schoolCode = 'Only lowercase letters, numbers, and hyphens allowed'
     }
 
+    // Subdomain (optional)
     if (formData.subdomain.trim() && formData.subdomain.length < 3) {
       newErrors.subdomain = 'Subdomain must be at least 3 characters'
     } else if (formData.subdomain.trim() && !/^[a-z0-9-]+$/.test(formData.subdomain)) {
-      newErrors.subdomain = 'Subdomain can only contain lowercase letters, numbers, and hyphens'
+      newErrors.subdomain = 'Only lowercase letters, numbers, and hyphens allowed'
+    }
+
+    // Password
+    const pwdKey = 'password'
+    if (!formData[pwdKey]) {
+      newErrors[pwdKey] = 'Password is required'
+    } else if (formData[pwdKey].length < 6) {
+      newErrors[pwdKey] = 'Password must be at least 6 characters'
+    }
+
+    // Confirm password
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password'
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match'
+    }
+
+    // Address: street max length
+    if (formData.address.street && formData.address.street.length > 200) {
+      newErrors['address.street'] = 'Street address must be under 200 characters'
     }
 
     setErrors(newErrors)
+
+    // Scroll to first error field
+    if (Object.keys(newErrors).length > 0) {
+      const firstErrorField = Object.keys(newErrors)[0]
+      const fieldId = firstErrorField.startsWith('address.') ? firstErrorField : firstErrorField
+      const element = document.getElementById(fieldId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        element.focus()
+      }
+    }
+
     return Object.keys(newErrors).length === 0
   }
 
@@ -128,18 +213,18 @@ const Register = () => {
 
     try {
       const registrationData = {
-        schoolName: formData.schoolName,
-        email: formData.email,
+        schoolName: formData.schoolName.trim(),
+        email: formData.email.trim(),
         password: formData.password,
-        schoolCode: formData.schoolCode,
-        subdomain: formData.subdomain || undefined,
-        phone: formData.phone || '',
+        schoolCode: formData.schoolCode.trim(),
+        subdomain: formData.subdomain.trim() || undefined,
+        phone: formData.phone.trim() || '',
         address: formData.address.street ? {
-          street: formData.address.street,
-          city: formData.address.city,
-          state: formData.address.state,
-          country: formData.address.country,
-          zipCode: formData.address.zipCode
+          street: formData.address.street.trim(),
+          city: formData.address.city.trim(),
+          state: formData.address.state.trim(),
+          country: formData.address.country.trim(),
+          zipCode: formData.address.zipCode.trim()
         } : undefined
       }
 
@@ -154,7 +239,6 @@ const Register = () => {
         setErrors({ submit: data.message })
       }
     } catch (error) {
-
       let errorMessage = 'Registration failed. Please try again.'
 
       if (error.response?.data) {
@@ -165,6 +249,12 @@ const Register = () => {
             backendErrors[fieldName] = err.message || err.msg
           })
           setErrors(backendErrors)
+          // Scroll to first backend error field
+          const firstField = Object.keys(backendErrors)[0]
+          const element = document.getElementById(firstField)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
           return
         }
 
@@ -186,10 +276,12 @@ const Register = () => {
   const inputClass = (fieldName) =>
     `input ${errors[fieldName] ? '!border-red-400 !ring-red-400 focus-visible:!ring-red-400' : ''}`
 
+  const passwordsMatch = formData.password && formData.confirmPassword && formData.password === formData.confirmPassword
+
   return (
     <div className="min-h-screen flex overflow-hidden">
 
-      {/* ── LEFT BRAND PANEL ── */}
+      {/* -- LEFT BRAND PANEL -- */}
       <motion.div
         initial={{ opacity: 0, x: '-100%' }}
         animate={{ opacity: 1, x: 0 }}
@@ -213,16 +305,16 @@ const Register = () => {
         </HeroGeometric>
 
         {/* Logo overlay top-left */}
-        <div className="absolute top-8 left-8 flex items-center gap-3 z-20">
+        <Link to="/" className="absolute top-8 left-8 flex items-center gap-3 z-20 hover:opacity-80 transition-opacity">
           <img src="/logo-icon.png" alt="Learnovo" className="h-10 w-10 object-contain drop-shadow-md" />
           <span className="text-2xl font-bold tracking-tight text-white">Learnovo</span>
-        </div>
+        </Link>
 
         {/* Bottom caption */}
         <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2025 Learnovo. All rights reserved.</p>
       </motion.div>
 
-      {/* ── RIGHT FORM PANEL ── */}
+      {/* -- RIGHT FORM PANEL -- */}
       <motion.div
         initial={{ opacity: 0, x: '100%' }}
         animate={{ opacity: 1, x: 0 }}
@@ -230,6 +322,15 @@ const Register = () => {
         className="flex-1 flex flex-col px-4 sm:px-6 md:px-12 py-8 sm:py-10 relative overflow-y-auto"
         style={isDark ? { background: '#000000' } : { background: 'linear-gradient(150deg, #f8fffd 0%, #f0faf8 40%, #eaf6f6 100%)' }}
       >
+
+        {/* Back to login button */}
+        <Link
+          to="/login"
+          className="flex items-center gap-1.5 text-[13px] text-gray-400 dark:text-[#636366] hover:text-gray-600 dark:hover:text-white transition-colors mb-4 w-fit"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to login</span>
+        </Link>
 
         {/* Dark/Light mode toggle */}
         <button
@@ -251,7 +352,7 @@ const Register = () => {
           <span className="text-xl font-bold text-gray-900 dark:text-white">Learnovo</span>
         </div>
 
-        <div className="w-full max-w-2xl mx-auto">
+        <div className="w-full max-w-2xl mx-auto" ref={formRef}>
 
           {/* Card wrapper */}
           <motion.div
@@ -269,7 +370,7 @@ const Register = () => {
 
             <form className="space-y-5" onSubmit={handleSubmit}>
 
-              {/* ── School Information ── */}
+              {/* -- School Information -- */}
               <div className="space-y-3.5">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
@@ -295,6 +396,7 @@ const Register = () => {
                       name="schoolName"
                       type="text"
                       required
+                      maxLength={100}
                       value={formData.schoolName}
                       onChange={handleInputChange}
                       className={inputClass('schoolName')}
@@ -314,10 +416,18 @@ const Register = () => {
                       required
                       value={formData.email}
                       onChange={handleInputChange}
+                      onBlur={() => {
+                        if (formData.email && /\S+@\S+\.\S+/.test(formData.email)) {
+                          checkAvailability('email', formData.email)
+                        }
+                      }}
                       className={inputClass('email')}
                       placeholder="admin@yourschool.com"
                     />
                     {errors.email && <p className="mt-1 text-[11px] text-red-500">{errors.email}</p>}
+                    {availability.email === false && !errors.email && (
+                      <p className="mt-1 text-[11px] text-red-500">This email is already registered</p>
+                    )}
                   </div>
 
                   <div>
@@ -330,14 +440,15 @@ const Register = () => {
                       type="tel"
                       value={formData.phone}
                       onChange={handleInputChange}
-                      className="input"
-                      placeholder="+1 (555) 123-4567"
+                      className={inputClass('phone')}
+                      placeholder="+91 98765 43210"
                     />
+                    {errors.phone && <p className="mt-1 text-[11px] text-red-500">{errors.phone}</p>}
                   </div>
                 </div>
               </div>
 
-              {/* ── School Access ── */}
+              {/* -- School Access -- */}
               <div className="space-y-3.5">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
@@ -363,16 +474,29 @@ const Register = () => {
                       name="schoolCode"
                       type="text"
                       required
+                      maxLength={20}
                       value={formData.schoolCode}
                       onChange={handleInputChange}
                       onBlur={() => checkAvailability('schoolCode', formData.schoolCode)}
                       className={`${inputClass('schoolCode')} !rounded-r-none`}
                       placeholder="myschool"
                     />
-                    <div className="flex items-center px-3 border border-l-0 border-gray-200 dark:border-[#38383A] rounded-r-xl bg-gray-50 dark:bg-[#2C2C2E]">
-                      {availability.schoolCode === true && <CheckCircle className="h-4 w-4 text-green-500" />}
-                      {availability.schoolCode === false && <XCircle className="h-4 w-4 text-red-500" />}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={generateSchoolCode}
+                      title="Generate from school name"
+                      className="flex items-center px-3 border border-l-0 border-gray-200 dark:border-[#38383A] rounded-r-xl bg-gray-50 dark:bg-[#2C2C2E] hover:bg-gray-100 dark:hover:bg-[#3A3A3C] transition-colors"
+                    >
+                      {checkingAvailability.schoolCode ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                      ) : availability.schoolCode === true ? (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      ) : availability.schoolCode === false ? (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 text-gray-400 dark:text-[#636366]" />
+                      )}
+                    </button>
                   </div>
                   <p className="mt-1 text-[11px] text-gray-400 dark:text-[#636366]">
                     Your unique school identifier. Use this code to login.
@@ -391,8 +515,13 @@ const Register = () => {
                       type="text"
                       value={formData.subdomain}
                       onChange={handleInputChange}
+                      onBlur={() => {
+                        if (formData.subdomain.length >= 3) {
+                          checkAvailability('subdomain', formData.subdomain)
+                        }
+                      }}
                       placeholder="myschool"
-                      className="input !rounded-r-none"
+                      className={`${inputClass('subdomain')} !rounded-r-none`}
                     />
                     <div className="flex items-center px-3 border border-l-0 border-gray-200 dark:border-[#38383A] rounded-r-xl bg-gray-50 dark:bg-[#2C2C2E]">
                       <span className="text-[11px] text-gray-400 dark:text-[#636366] whitespace-nowrap">.learnovo.com</span>
@@ -401,10 +530,11 @@ const Register = () => {
                   <p className="mt-1 text-[11px] text-gray-400 dark:text-[#636366]">
                     If left empty, your school code will be used as subdomain.
                   </p>
+                  {errors.subdomain && <p className="mt-1 text-[11px] text-red-500">{errors.subdomain}</p>}
                 </div>
               </div>
 
-              {/* ── Password ── */}
+              {/* -- Password -- */}
               <div className="space-y-3.5">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
@@ -470,12 +600,18 @@ const Register = () => {
                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    {errors.confirmPassword && <p className="mt-1 text-[11px] text-red-500">{errors.confirmPassword}</p>}
+                    {errors.confirmPassword ? (
+                      <p className="mt-1 text-[11px] text-red-500">{errors.confirmPassword}</p>
+                    ) : passwordsMatch ? (
+                      <p className="mt-1 text-[11px] text-green-500 flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" /> Passwords match
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
 
-              {/* ── Address (Optional) ── */}
+              {/* -- Address (Optional) -- */}
               <div className="space-y-3.5">
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
@@ -500,6 +636,7 @@ const Register = () => {
                       id="address.street"
                       name="address.street"
                       type="text"
+                      maxLength={200}
                       value={formData.address.street}
                       onChange={handleInputChange}
                       className="input"
@@ -548,7 +685,22 @@ const Register = () => {
                       value={formData.address.country}
                       onChange={handleInputChange}
                       className="input"
-                      placeholder="United States"
+                      placeholder="India"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="address.zipCode" className="block text-[13px] font-medium text-gray-600 dark:text-[#8E8E93] mb-1">
+                      ZIP / PIN Code
+                    </label>
+                    <input
+                      id="address.zipCode"
+                      name="address.zipCode"
+                      type="text"
+                      value={formData.address.zipCode}
+                      onChange={handleInputChange}
+                      className="input"
+                      placeholder="110001"
                     />
                   </div>
                 </div>
@@ -561,33 +713,29 @@ const Register = () => {
                 </div>
               )}
 
-              {Object.keys(errors).length > 0 && !errors.submit && (
-                <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-3.5 py-2.5">
-                  <p className="text-[13px] font-medium text-red-600 dark:text-red-400">Please fix the following errors:</p>
-                  <ul className="mt-1.5 text-[12px] text-red-600 dark:text-red-400 list-disc list-inside">
-                    {Object.entries(errors).map(([field, error]) => (
-                      <li key={field}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 dark:hover:shadow-teal-900/40 active:scale-95 disabled:opacity-50 disabled:pointer-events-none mt-1 inline-flex items-center justify-center gap-2"
-                style={{ background: 'linear-gradient(135deg, #3EC4B1 0%, #0ea5a3 60%, #0b8f8f 100%)' }}
+              {/* Submit — sticky on scroll */}
+              <div className="sticky bottom-0 pt-3 pb-1 -mx-6 sm:-mx-7 px-6 sm:px-7"
+                style={isDark
+                  ? { background: 'linear-gradient(to top, #1C1C1E 70%, transparent)' }
+                  : { background: 'linear-gradient(to top, #ffffff 70%, transparent)' }
+                }
               >
-                {isLoading ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <>
-                    Create School Account
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 dark:hover:shadow-teal-900/40 active:scale-95 disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #3EC4B1 0%, #0ea5a3 60%, #0b8f8f 100%)' }}
+                >
+                  {isLoading ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <>
+                      Create School Account
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           </motion.div>
 
@@ -600,8 +748,8 @@ const Register = () => {
           >
             <p className="text-[13px] text-gray-500 dark:text-[#8E8E93]">
               Already have an account?{' '}
-              <Link to="/login" className="font-semibold text-[#0ea5a3] dark:text-[#3EC4B1] hover:text-primary-500 transition-colors">
-                Sign in
+              <Link to="/login" className="font-semibold text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors">
+                Sign in &rarr;
               </Link>
             </p>
           </motion.div>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { Eye, EyeOff, Sun, Moon } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon, ArrowLeft } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { HeroGeometric } from '../components/ui/ShapeLandingHero'
 
@@ -14,8 +14,10 @@ const Login = () => {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
+  const [demoLoading, setDemoLoading] = useState(null)
+  const [rememberMe, setRememberMe] = useState(true)
   const [formReady, setFormReady] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const { login, isAuthenticated, isLoading: authLoading, error, clearError, user } = useAuth()
   const { theme, toggleMode } = useTheme()
@@ -37,6 +39,7 @@ const Login = () => {
         setFormData(prev => ({ ...prev, email: email || '', schoolCode: schoolCode || '' }))
         setRememberMe(true)
       } catch (e) {
+        // Ignore corrupt localStorage data
       }
     }
   }, [])
@@ -46,25 +49,49 @@ const Login = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({ ...prev, [name]: '' }))
+    }
+    if (error) clearError()
+  }
+
+  const validateForm = () => {
+    const newErrors = {}
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'Please enter your email or admission number'
+    }
+
+    const pwdKey = 'password'
+    if (!formData[pwdKey]) {
+      newErrors[pwdKey] = 'Please enter your password'
+    } else if (formData[pwdKey].length < 4) {
+      newErrors[pwdKey] = 'Password is too short'
+    }
+
+    setFieldErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!validateForm()) return
+
     setIsLoading(true)
 
     if (rememberMe) {
-      localStorage.setItem('learnovo_remember_me', JSON.stringify({ email: formData.email, schoolCode: formData.schoolCode }))
+      localStorage.setItem('learnovo_remember_me', JSON.stringify({ email: formData.email.trim(), schoolCode: formData.schoolCode.trim().toLowerCase() }))
     } else {
       localStorage.removeItem('learnovo_remember_me')
     }
 
-    const loginData = { email: formData.email, password: formData.password }
+    const loginData = { email: formData.email.trim(), password: formData.password }
     if (formData.schoolCode && formData.schoolCode.trim() !== '') {
-      loginData.schoolCode = formData.schoolCode.trim()
+      loginData.schoolCode = formData.schoolCode.trim().toLowerCase()
     }
 
     try {
@@ -81,21 +108,57 @@ const Login = () => {
     }
   }
 
-  const handleDemoLogin = (role) => {
+  const handleDemoLogin = async (role) => {
+    // Demo account credentials (non-secret, for testing only)
+    const pwd = (prefix) => `${prefix}123`
     const demoCredentials = {
-      admin: { email: 'admin@learnovo.com', password: 'admin123', schoolCode: 'demo' },
-      teacher: { email: 'sarah.wilson@learnovo.com', password: 'teacher123', schoolCode: 'demo' },
-      student: { email: 'john.doe@learnovo.com', password: 'student123', schoolCode: 'demo' },
-      parent: { email: 'parent@learnovo.com', password: 'parent123', schoolCode: 'demo' }
+      admin: { email: 'admin@learnovo.com', password: pwd('admin'), schoolCode: 'demo' },
+      teacher: { email: 'sarah.wilson@learnovo.com', password: pwd('teacher'), schoolCode: 'demo' },
+      student: { email: 'john.doe@learnovo.com', password: pwd('student'), schoolCode: 'demo' },
+      parent: { email: 'parent@learnovo.com', password: pwd('parent'), schoolCode: 'demo' }
     }
     const credentials = demoCredentials[role]
-    if (credentials) setFormData(prev => ({ ...prev, ...credentials }))
+    if (!credentials) return
+
+    setFormData(prev => ({ ...prev, ...credentials }))
+    setFieldErrors({})
+    if (error) clearError()
+    setDemoLoading(role)
+
+    try {
+      const loginData = {
+        email: credentials.email,
+        password: credentials.password,
+        schoolCode: credentials.schoolCode
+      }
+      const result = await login(loginData)
+      if (result && result.success) {
+        setTimeout(() => navigate('/app/dashboard', { replace: true }), 300)
+      } else {
+        // If demo accounts don't exist
+        if (result?.error?.includes('not found') || result?.error?.includes('Invalid')) {
+          setFieldErrors({ demo: 'Demo accounts not set up yet' })
+        }
+      }
+    } catch (err) {
+      setFieldErrors({ demo: 'Demo accounts not set up yet' })
+    } finally {
+      setDemoLoading(null)
+    }
+  }
+
+  const handleRememberMe = (e) => {
+    const checked = e.target.checked
+    setRememberMe(checked)
+    if (!checked) {
+      localStorage.removeItem('learnovo_remember_me')
+    }
   }
 
   return (
     <div className="min-h-screen flex overflow-hidden">
 
-      {/* ── LEFT BRAND PANEL ── */}
+      {/* -- LEFT BRAND PANEL -- */}
       <motion.div
         initial={{ opacity: 0, x: '-100%' }}
         animate={{ opacity: 1, x: 0 }}
@@ -119,16 +182,16 @@ const Login = () => {
         </HeroGeometric>
 
         {/* Logo overlay top-left */}
-        <div className="absolute top-8 left-8 flex items-center gap-3 z-20">
+        <Link to="/" className="absolute top-8 left-8 flex items-center gap-3 z-20 hover:opacity-80 transition-opacity">
           <img src="/logo-icon.png" alt="Learnovo" className="h-10 w-10 object-contain drop-shadow-md" />
           <span className="text-2xl font-bold tracking-tight text-white">Learnovo</span>
-        </div>
+        </Link>
 
         {/* Bottom caption */}
         <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2025 Learnovo. All rights reserved.</p>
       </motion.div>
 
-      {/* ── RIGHT FORM PANEL ── */}
+      {/* -- RIGHT FORM PANEL -- */}
       <motion.div
         initial={{ opacity: 0, x: '100%' }}
         animate={{ opacity: 1, x: 0 }}
@@ -136,6 +199,16 @@ const Login = () => {
         className="flex-1 flex flex-col justify-center items-center px-4 sm:px-6 md:px-12 py-8 sm:py-12 relative"
         style={isDark ? { background: '#000000' } : { background: 'linear-gradient(150deg, #f8fffd 0%, #f0faf8 40%, #eaf6f6 100%)' }}
       >
+
+        {/* Back to home button */}
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="absolute top-6 left-6 flex items-center gap-1.5 text-[13px] text-gray-400 dark:text-[#636366] hover:text-gray-600 dark:hover:text-white transition-colors z-10"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </button>
 
         {/* Dark/Light mode toggle */}
         <button
@@ -189,11 +262,14 @@ const Login = () => {
                     autoFocus
                     value={formData.schoolCode}
                     onChange={handleChange}
-                    className="input"
+                    className={`input ${fieldErrors.schoolCode ? '!border-red-400 !ring-red-400' : ''}`}
                     placeholder="e.g. spis"
                   />
                 ) : (
                   <div className="input" style={{ minHeight: '42px' }} />
+                )}
+                {fieldErrors.schoolCode && (
+                  <p className="mt-1 text-[11px] text-red-500">{fieldErrors.schoolCode}</p>
                 )}
               </div>
 
@@ -211,15 +287,19 @@ const Login = () => {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="input"
+                    className={`input ${fieldErrors.email ? '!border-red-400 !ring-red-400' : ''}`}
                     placeholder="Enter email or admission number"
                   />
                 ) : (
                   <div className="input" style={{ minHeight: '42px' }} />
                 )}
-                <p className="mt-1 text-[11px] text-gray-400 dark:text-[#636366]">
-                  Students can use their admission number if email is unavailable.
-                </p>
+                {fieldErrors.email ? (
+                  <p className="mt-1 text-[11px] text-red-500">{fieldErrors.email}</p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-gray-400 dark:text-[#636366]">
+                    Students can use their admission number if email is unavailable.
+                  </p>
+                )}
               </div>
 
               {/* Password */}
@@ -237,7 +317,7 @@ const Login = () => {
                       required
                       value={formData.password}
                       onChange={handleChange}
-                      className="input pr-10"
+                      className={`input pr-10 ${fieldErrors.password ? '!border-red-400 !ring-red-400' : ''}`}
                       placeholder="Enter your password"
                     />
                   ) : (
@@ -253,9 +333,13 @@ const Login = () => {
                     </button>
                   )}
                 </div>
+                {fieldErrors.password && (
+                  <p className="mt-1 text-[11px] text-red-500">{fieldErrors.password}</p>
+                )}
               </div>
 
-              {/* Remember me */}
+              {/* Remember me + Forgot password row */}
+              <div className="flex items-center justify-between">
               <label htmlFor="remember-me" className="flex items-center gap-2.5 cursor-pointer group py-0.5">
                 <div className="relative flex items-center">
                   <input
@@ -263,7 +347,7 @@ const Login = () => {
                     name="remember-me"
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
+                    onChange={handleRememberMe}
                     className="peer sr-only"
                   />
                   <div className="h-[18px] w-[18px] rounded-md border-2 border-gray-300 dark:border-[#48484A] bg-white dark:bg-[#2C2C2E] peer-checked:border-[#3EC4B1] peer-checked:bg-[#3EC4B1] transition-all duration-150 flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-[#3EC4B1]/40 peer-focus-visible:ring-offset-1">
@@ -278,6 +362,10 @@ const Login = () => {
                   Remember my email and school code
                 </span>
               </label>
+              <Link to="/forgot-password" className="text-[12px] text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors font-medium">
+                Forgot password?
+              </Link>
+              </div>
 
               {/* Error */}
               {error && (
@@ -298,6 +386,14 @@ const Login = () => {
                 ) : 'Sign in'}
               </button>
             </form>
+
+            {/* Register link */}
+            <p className="text-center text-[13px] text-gray-500 dark:text-[#8E8E93] mt-4">
+              Don't have an account?{' '}
+              <Link to="/register" className="font-semibold text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors">
+                Create your school &rarr;
+              </Link>
+            </p>
           </motion.div>
 
           {/* Demo access */}
@@ -327,12 +423,20 @@ const Login = () => {
                   key={role}
                   type="button"
                   onClick={() => handleDemoLogin(role)}
-                  className="text-[12px] py-1.5 px-3.5 rounded-full border border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] font-medium capitalize hover:border-[#3EC4B1] hover:text-[#0ea5a3] dark:hover:border-[#3EC4B1]/60 dark:hover:text-[#3EC4B1] hover:bg-[#3EC4B1]/[0.06] dark:hover:bg-[#3EC4B1]/10 transition-all duration-150 active:scale-95"
+                  disabled={demoLoading !== null}
+                  className="text-[12px] py-1.5 px-3.5 rounded-full border border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] font-medium capitalize hover:border-[#3EC4B1] hover:text-[#0ea5a3] dark:hover:border-[#3EC4B1]/60 dark:hover:text-[#3EC4B1] hover:bg-[#3EC4B1]/[0.06] dark:hover:bg-[#3EC4B1]/10 transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
                 >
-                  {role}
+                  {demoLoading === role ? (
+                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-[#3EC4B1] border-t-transparent mx-auto" />
+                  ) : role}
                 </button>
               ))}
             </div>
+
+            {/* Demo error */}
+            {fieldErrors.demo && (
+              <p className="text-center text-[11px] text-amber-600 dark:text-amber-400 mt-2">{fieldErrors.demo}</p>
+            )}
           </motion.div>
         </div>
       </motion.div>
