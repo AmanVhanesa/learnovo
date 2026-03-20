@@ -3,9 +3,13 @@ import { X, Upload, Trash2, Image as ImageIcon, File } from 'lucide-react';
 import homeworkService from '../../services/homeworkService';
 import { classesService } from '../../services/classesService';
 import { subjectsService } from '../../services/subjectsService';
+import { attendanceService } from '../../services/attendanceService';
+import { teacherAssignmentsService } from '../../services/academicsService';
+import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const HomeworkForm = ({ homework, onClose, onSuccess }) => {
+    const { user } = useAuth();
     const isEditing = !!homework;
 
     const [formData, setFormData] = useState({
@@ -101,13 +105,24 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
     const fetchOptions = async () => {
         try {
-            const [classesRes, subjectsRes] = await Promise.all([
-                classesService.list(),
-                subjectsService.list()
-            ]);
-
-            if (classesRes.success) setClasses(classesRes.data || []);
-            if (subjectsRes.success) setSubjects(subjectsRes.data || []);
+            if (user?.role === 'teacher') {
+                const [classesRes, subjectsRes, assignmentsRes] = await Promise.all([
+                    attendanceService.getTeacherClasses(),
+                    subjectsService.list(),
+                    teacherAssignmentsService.list({ teacherId: user._id })
+                ]);
+                setClasses(classesRes?.data || []);
+                const allSubjects = subjectsRes.success ? (subjectsRes.data || []) : [];
+                const mySubjectIds = new Set((assignmentsRes.data || []).map(a => (a.subjectId?._id || a.subjectId)));
+                setSubjects(allSubjects.filter(s => mySubjectIds.has(s._id)));
+            } else {
+                const [classesRes, subjectsRes] = await Promise.all([
+                    classesService.list(),
+                    subjectsService.list()
+                ]);
+                if (classesRes.success) setClasses(classesRes.data || []);
+                if (subjectsRes.success) setSubjects(subjectsRes.data || []);
+            }
         } catch (error) {
             toast.error('Failed to load class/subject options');
         }

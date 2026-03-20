@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { assignmentsService } from '../services/assignmentsService'
 import { classesService } from '../services/classesService'
 import { subjectsService } from '../services/subjectsService'
+import { attendanceService } from '../services/attendanceService'
+import { teacherAssignmentsService } from '../services/academicsService'
 import { exportCSV } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 
@@ -33,10 +35,17 @@ const Assignments = () => {
   const isTeacher = user?.role === 'teacher'
   const isAdmin = user?.role === 'admin'
 
-  // Fetch classes
+  // Fetch classes — teacher sees only their assigned classes
   const { data: classes = [] } = useQuery({
-    queryKey: ['assignments-classes'],
+    queryKey: ['assignments-classes', user?.role],
     queryFn: async () => {
+      if (user?.role === 'teacher') {
+        const res = await attendanceService.getTeacherClasses()
+        return (res?.data || []).map(cls => ({
+          id: cls._id || cls.id,
+          name: cls.name || `${cls.grade} ${cls.section || ''}`.trim()
+        }))
+      }
       const res = await classesService.list()
       return (res?.data || res || []).map(cls => ({
         id: cls._id || cls.id,
@@ -45,10 +54,22 @@ const Assignments = () => {
     },
   })
 
-  // Fetch subjects
+  // Fetch subjects — teacher sees only their assigned subjects
   const { data: subjects = [] } = useQuery({
-    queryKey: ['assignments-subjects'],
+    queryKey: ['assignments-subjects', user?.role],
     queryFn: async () => {
+      if (user?.role === 'teacher') {
+        const [subjectsRes, assignmentsRes] = await Promise.all([
+          subjectsService.list(),
+          teacherAssignmentsService.list({ teacherId: user._id })
+        ])
+        const allSubjects = (subjectsRes?.data || subjectsRes || [])
+        const mySubjectIds = new Set((assignmentsRes.data || []).map(a => (a.subjectId?._id || a.subjectId)))
+        return allSubjects.filter(s => mySubjectIds.has(s._id || s.id)).map(sub => ({
+          id: sub._id || sub.id,
+          name: sub.name
+        }))
+      }
       const res = await subjectsService.list()
       return (res?.data || res || []).map(sub => ({
         id: sub._id || sub.id,

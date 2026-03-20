@@ -52,7 +52,6 @@ const StudentLists = lazy(() => import('./pages/StudentLists'))
 const Employees = lazy(() => import('./pages/Employees'))
 const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'))
 const Teachers = lazy(() => import('./pages/Teachers'))
-const Academics = lazy(() => import('./pages/Academics'))
 const Classes = lazy(() => import('./pages/Classes'))
 const ClassDetail = lazy(() => import('./pages/ClassDetail'))
 const FeesFinance = lazy(() => import('./pages/FeesFinance'))
@@ -62,7 +61,6 @@ const Attendance = lazy(() => import('./pages/Attendance'))
 const StudentAttendanceView = lazy(() => import('./pages/attendance/StudentAttendanceView'))
 const Assignments = lazy(() => import('./pages/Assignments'))
 const Homework = lazy(() => import('./pages/Homework'))
-const Exams = lazy(() => import('./pages/Exams'))
 const Admissions = lazy(() => import('./pages/Admissions'))
 const Activities = lazy(() => import('./pages/Activities'))
 const Reports = lazy(() => import('./pages/Reports'))
@@ -85,6 +83,19 @@ const TimetableSchedule = lazy(() => import('./pages/timetable/TimetableSchedule
 const TimetableBuilder = lazy(() => import('./pages/timetable/TimetableBuilder'))
 const Substitutions = lazy(() => import('./pages/timetable/Substitutions'))
 const SpecialDays = lazy(() => import('./pages/timetable/SpecialDays'))
+
+// ── Role-based page wrappers ──
+const AcademicsPage = lazy(async () => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  if (user.role === 'teacher') return import('./pages/teacher/TeacherAcademics')
+  return import('./pages/Academics')
+})
+
+const ExamsPage = lazy(async () => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  if (user.role === 'teacher') return import('./pages/teacher/TeacherExams')
+  return import('./pages/Exams')
+})
 
 // ── Minimal fallback shown while a lazy chunk loads
 const PageLoader = () => (
@@ -172,7 +183,7 @@ function App() {
                       {/* Academics Module */}
                       <Route path="academics" element={
                         <ProtectedRoute allowedRoles={['admin', 'teacher']}>
-                          <Academics />
+                          <AcademicsPage />
                         </ProtectedRoute>
                       } />
                       <Route path="classes" element={
@@ -207,7 +218,7 @@ function App() {
                       <Route path="attendance/student/:studentId" element={<StudentAttendanceView />} />
                       <Route path="assignments" element={<Assignments />} />
                       <Route path="homework" element={<Homework />} />
-                      <Route path="exams" element={<Exams />} />
+                      <Route path="exams" element={<ExamsPage />} />
                       <Route path="admissions" element={
                         <ProtectedRoute allowedRoles={['admin']}>
                           <Admissions />

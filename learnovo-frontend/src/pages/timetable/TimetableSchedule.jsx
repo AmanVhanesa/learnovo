@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { timetableService } from '../../services/timetableService'
+import { attendanceService } from '../../services/attendanceService'
 import TimetableGrid from '../../components/timetable/TimetableGrid'
 import ViewSwitcher from '../../components/timetable/ViewSwitcher'
 import TimetableExportButton from '../../components/timetable/TimetableExportButton'
@@ -61,6 +62,7 @@ const TimetableSchedule = () => {
   // State
   const [weekOffset, setWeekOffset] = useState(0)
   const [activeView, setActiveView] = useState('class')
+  const [teacherView, setTeacherView] = useState('my') // 'my' | 'class' — for teacher only
   const [selectedClassId, setSelectedClassId] = useState(user?.classId || '')
   const [selectedSectionId, setSelectedSectionId] = useState(user?.sectionId || '')
   const [selectedTeacherId, setSelectedTeacherId] = useState(isTeacher ? user?._id : '')
@@ -121,6 +123,16 @@ const TimetableSchedule = () => {
     enabled: isAdmin && activeView === 'room'
   })
 
+  // Teacher: fetch assigned classes for class view
+  const { data: teacherClassesData } = useQuery({
+    queryKey: ['teacher-timetable-classes'],
+    queryFn: async () => {
+      const res = await attendanceService.getTeacherClasses()
+      return res?.data || []
+    },
+    enabled: isTeacher
+  })
+
   // Build query params based on role and active view
   const scheduleParams = useMemo(() => {
     const params = {
@@ -130,8 +142,12 @@ const TimetableSchedule = () => {
       params.classId = effectiveClassId
       params.sectionId = effectiveSectionId
     }
-    if (isTeacher && activeView !== 'class') {
-      params.teacherId = user?._id
+    if (isTeacher) {
+      if (teacherView === 'class' && selectedClassId) {
+        params.classId = selectedClassId
+      } else {
+        params.teacherId = user?._id
+      }
     }
     if (isAdmin) {
       if (activeView === 'class' && selectedClassId) {
@@ -144,7 +160,7 @@ const TimetableSchedule = () => {
       }
     }
     return params
-  }, [weekDates, role, activeView, selectedClassId, selectedSectionId, selectedTeacherId, selectedRoomId, effectiveClassId, effectiveSectionId])
+  }, [weekDates, role, activeView, teacherView, selectedClassId, selectedSectionId, selectedTeacherId, selectedRoomId, effectiveClassId, effectiveSectionId])
 
   // Determine which fetch function to use
   const fetchScheduleFn = useMemo(() => {
@@ -164,22 +180,25 @@ const TimetableSchedule = () => {
       }
     }
     if (isTeacher) {
+      if (teacherView === 'class' && selectedClassId) {
+        return () => timetableService.getClassSchedule(selectedClassId, { weekStart: scheduleParams.weekStart })
+      }
       return () => timetableService.getTeacherSchedule(user?._id, { weekStart: scheduleParams.weekStart })
     }
     return () => timetableService.getWeekSchedule(scheduleParams)
-  }, [scheduleParams, role, activeView, isAdmin, isTeacher, isStudent, isParent, selectedClassId, selectedTeacherId, selectedRoomId, effectiveClassId, user?._id])
+  }, [scheduleParams, role, activeView, teacherView, isAdmin, isTeacher, isStudent, isParent, selectedClassId, selectedTeacherId, selectedRoomId, effectiveClassId, user?._id])
 
   const shouldFetch = useMemo(() => {
     if (isStudent) return !!effectiveClassId
     if (isParent) return !!effectiveClassId
-    if (isTeacher) return true
+    if (isTeacher) return teacherView === 'my' || !!selectedClassId
     if (isAdmin) {
       if (activeView === 'class') return !!selectedClassId
       if (activeView === 'teacher') return !!selectedTeacherId
       if (activeView === 'room') return !!selectedRoomId
     }
     return false
-  }, [role, activeView, selectedClassId, selectedTeacherId, selectedRoomId, effectiveClassId])
+  }, [role, activeView, teacherView, selectedClassId, selectedTeacherId, selectedRoomId, effectiveClassId])
 
   const { data: weekData, isLoading: weekLoading, error: weekError } = useQuery({
     queryKey: ['week-schedule', scheduleParams, activeView],
@@ -408,6 +427,32 @@ const TimetableSchedule = () => {
         <ViewSwitcher activeView={activeView} onChange={setActiveView} />
       )}
 
+      {/* Teacher: My Schedule / Class View toggle */}
+      {isTeacher && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setTeacherView('my'); setSelectedClassId('') }}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+              teacherView === 'my'
+                ? 'bg-primary-600 text-white dark:bg-[#3EC4B1] dark:text-black'
+                : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'
+            }`}
+          >
+            My Schedule
+          </button>
+          <button
+            onClick={() => setTeacherView('class')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+              teacherView === 'class'
+                ? 'bg-primary-600 text-white dark:bg-[#3EC4B1] dark:text-black'
+                : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'
+            }`}
+          >
+            Class Timetable
+          </button>
+        </div>
+      )}
+
       {/* Filters Row */}
       <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -462,6 +507,20 @@ const TimetableSchedule = () => {
               <option value="">Select Room</option>
               {(roomsData || []).map(r => (
                 <option key={r._id} value={r._id}>{r.name} {r.building ? `(${r.building})` : ''}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Teacher: Class View Filter */}
+          {isTeacher && teacherView === 'class' && (
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="w-full sm:w-auto min-w-[160px] px-3 py-2.5 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-sm text-gray-700 dark:text-gray-200 focus:ring-2 focus:ring-primary-500 focus:outline-none"
+            >
+              <option value="">Select Class</option>
+              {(teacherClassesData || []).map(cls => (
+                <option key={cls._id} value={cls._id}>{cls.name || cls.grade}</option>
               ))}
             </select>
           )}

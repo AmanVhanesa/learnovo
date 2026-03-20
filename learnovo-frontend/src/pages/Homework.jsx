@@ -5,6 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import homeworkService from '../services/homeworkService';
 import { classesService } from '../services/classesService';
 import { subjectsService } from '../services/subjectsService';
+import { attendanceService } from '../services/attendanceService';
+import { teacherAssignmentsService } from '../services/academicsService';
 import HomeworkForm from '../components/homework/HomeworkForm';
 import HomeworkDetailsModal from '../components/homework/HomeworkDetailsModal';
 import HomeworkSubmissionForm from '../components/homework/HomeworkSubmissionForm';
@@ -30,18 +32,31 @@ const Homework = () => {
     const [selectedHomework, setSelectedHomework] = useState(null);
     const [editingHomework, setEditingHomework] = useState(null);
 
-    // Fetch filter options (classes + subjects)
+    // Fetch filter options (classes + subjects) — teacher sees only their assigned ones
     const { data: classes = [] } = useQuery({
-        queryKey: ['homework-classes'],
+        queryKey: ['homework-classes', user?.role],
         queryFn: async () => {
+            if (user?.role === 'teacher') {
+                const res = await attendanceService.getTeacherClasses();
+                return res?.data || [];
+            }
             const res = await classesService.list();
             return res.success ? (res.data || []) : [];
         },
     });
 
     const { data: subjects = [] } = useQuery({
-        queryKey: ['homework-subjects'],
+        queryKey: ['homework-subjects', user?.role],
         queryFn: async () => {
+            if (user?.role === 'teacher') {
+                const [subjectsRes, assignmentsRes] = await Promise.all([
+                    subjectsService.list(),
+                    teacherAssignmentsService.list({ teacherId: user._id })
+                ]);
+                const allSubjects = subjectsRes.success ? (subjectsRes.data || []) : [];
+                const mySubjectIds = new Set((assignmentsRes.data || []).map(a => (a.subjectId?._id || a.subjectId)));
+                return allSubjects.filter(s => mySubjectIds.has(s._id));
+            }
             const res = await subjectsService.list();
             return res.success ? (res.data || []) : [];
         },
