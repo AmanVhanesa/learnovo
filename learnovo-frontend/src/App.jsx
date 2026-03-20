@@ -63,15 +63,12 @@ const Assignments = lazy(() => import('./pages/Assignments'))
 const Homework = lazy(() => import('./pages/Homework'))
 const Admissions = lazy(() => import('./pages/Admissions'))
 const Activities = lazy(() => import('./pages/Activities'))
-const Reports = lazy(() => import('./pages/Reports'))
-const Communication = lazy(() => import('./pages/Communication'))
 const Announcements = lazy(() => import('./pages/Announcements'))
 const Notifications = lazy(() => import('./pages/Notifications'))
 const NotificationPreferences = lazy(() => import('./pages/NotificationPreferences'))
 const Transport = lazy(() => import('./pages/Transport'))
 const Payroll = lazy(() => import('./pages/Payroll'))
 const Expenses = lazy(() => import('./pages/Expenses'))
-const CertificateManager = lazy(() => import('./pages/certificates/CertificateManager'))
 const CertificateGeneration = lazy(() => import('./pages/certificates/CertificateGeneration'))
 const TemplateSettings = lazy(() => import('./pages/certificates/TemplateSettings'))
 const Search = lazy(() => import('./pages/Search'))
@@ -95,6 +92,24 @@ const ExamsPage = lazy(async () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}')
   if (user.role === 'teacher') return import('./pages/teacher/TeacherExams')
   return import('./pages/Exams')
+})
+
+const CertificatesPage = lazy(async () => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  if (user.role === 'teacher') return import('./pages/teacher/TeacherCertificates')
+  return import('./pages/certificates/CertificateManager')
+})
+
+const CommunicationPage = lazy(async () => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  if (user.role === 'teacher') return import('./pages/teacher/TeacherCommunication')
+  return import('./pages/Communication')
+})
+
+const ReportsPage = lazy(async () => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  if (user.role === 'teacher') return import('./pages/teacher/TeacherReports')
+  return import('./pages/Reports')
 })
 
 // ── Minimal fallback shown while a lazy chunk loads
@@ -231,14 +246,14 @@ function App() {
                       } />
                       <Route path="reports" element={
                         <ProtectedRoute allowedRoles={['admin', 'teacher']}>
-                          <Reports />
+                          <ReportsPage />
                         </ProtectedRoute>
                       } />
 
                       {/* Communication Module */}
                       <Route path="communication" element={
                         <ProtectedRoute allowedRoles={['admin', 'teacher']}>
-                          <Communication />
+                          <CommunicationPage />
                         </ProtectedRoute>
                       } />
                       <Route path="announcements" element={<Announcements />} />
@@ -269,7 +284,7 @@ function App() {
                       {/* Certificates Module */}
                       <Route path="certificates" element={
                         <ProtectedRoute allowedRoles={['admin', 'teacher']}>
-                          <CertificateManager />
+                          <CertificatesPage />
                         </ProtectedRoute>
                       } />
                       <Route path="certificates/generate" element={
