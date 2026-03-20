@@ -230,7 +230,7 @@ const AcademicsManagement = () => {
             </div>
 
             {/* Tab Content */}
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass">
                 {/* SESSIONS TAB */}
                 {activeTab === 'sessions' && (
                     <div className="p-4 sm:p-6">
@@ -260,7 +260,7 @@ const AcademicsManagement = () => {
                                 {sessions.map((session) => (
                                     <div
                                         key={session._id}
-                                        className={`border rounded-lg p-4 ${session.isActive ? 'border-primary-300 dark:border-[#2a5a52] bg-primary-50 dark:bg-[#1a3a35]' : 'border-gray-200 dark:border-[#38383A] dark:bg-[#2C2C2E]'
+                                        className={`border rounded-2xl p-4 ${session.isActive ? 'border-primary-300 dark:border-[#2a5a52] bg-primary-50 dark:bg-[#1a3a35]' : 'border-gray-200 dark:border-[#38383A] dark:bg-[#2C2C2E]'
                                             }`}
                                     >
                                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -379,7 +379,7 @@ const AcademicsManagement = () => {
                                         const academicYear = gradeClasses[0]?.academicYear || '';
 
                                         return (
-                                            <div key={grade} className="border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] rounded-lg p-4 hover:shadow-md dark:hover:shadow-none dark:hover:border-[#48484A] transition-all">
+                                            <div key={grade} className="border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] rounded-2xl p-4 hover:shadow-md dark:hover:shadow-none dark:hover:border-[#48484A] transition-all">
                                                 {/* Grade Header */}
                                                 <div className="flex items-start justify-between mb-3">
                                                     <div>
@@ -522,7 +522,7 @@ const AcademicsManagement = () => {
                                                     {groupSubjects.map(subject => (
                                                         <div
                                                             key={subject._id}
-                                                            className={`relative border rounded-lg p-4 transition-all hover:shadow-md dark:hover:shadow-none dark:hover:border-[#48484A] ${subject.isActive ? colors.border + ' ' + colors.bg : 'border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] opacity-60'}`}
+                                                            className={`relative border rounded-2xl p-4 transition-all hover:shadow-md dark:hover:shadow-none dark:hover:border-[#48484A] ${subject.isActive ? colors.border + ' ' + colors.bg : 'border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] opacity-60'}`}
                                                         >
                                                             {/* Top row: name + actions */}
                                                             <div className="flex items-start justify-between gap-2 mb-2">
@@ -611,7 +611,7 @@ const AcademicsManagement = () => {
                                         if (clsSubjects.length === 0) return null
 
                                         return (
-                                            <div key={cls._id} className="border border-gray-200 dark:border-[#38383A] dark:bg-[#2C2C2E] rounded-lg p-4">
+                                            <div key={cls._id} className="border border-gray-200 dark:border-[#38383A] dark:bg-[#2C2C2E] rounded-2xl p-4">
                                                 <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">{cls.name} - {cls.grade}</h3>
                                                 <div className="space-y-2">
                                                     {clsSubjects.map((cs) => {
@@ -976,7 +976,7 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
 
                             <div className="space-y-2">
                                 {sections.map((sec, idx) => (
-                                    <div key={idx} className="flex gap-2 items-center">
+                                    <div key={sec._id || idx} className="flex gap-2 items-center">
                                         <input
                                             className="input flex-1"
                                             value={sec.name}

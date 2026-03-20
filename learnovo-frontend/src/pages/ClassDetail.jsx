@@ -7,6 +7,7 @@ import { studentsService } from '../services/studentsService'
 import { teachersService } from '../services/teachersService'
 import { subjectsService } from '../services/subjectsService'
 import { useAuth } from '../contexts/AuthContext'
+import toast from 'react-hot-toast'
 
 const ClassDetail = () => {
   const { id } = useParams()
@@ -74,8 +75,7 @@ const ClassDetail = () => {
       queryClient.invalidateQueries({ queryKey: ['unenrolled-students'] })
     },
     onError: (error) => {
-      console.error('Error enrolling students:', error)
-      alert('Error enrolling students. Please try again.')
+      toast.error('Error enrolling students. Please try again.')
     },
   })
 
@@ -87,8 +87,7 @@ const ClassDetail = () => {
       queryClient.invalidateQueries({ queryKey: ['class-details', id] })
     },
     onError: (error) => {
-      console.error('Error assigning subject:', error)
-      alert('Error assigning subject. Please try again.')
+      toast.error('Error assigning subject. Please try again.')
     },
   })
 
@@ -98,8 +97,7 @@ const ClassDetail = () => {
       queryClient.invalidateQueries({ queryKey: ['class-details', id] })
     },
     onError: (error) => {
-      console.error('Error removing subject:', error)
-      alert('Error removing subject. Please try again.')
+      toast.error('Error removing subject. Please try again.')
     },
   })
 

@@ -277,7 +277,7 @@ const Homework = () => {
                     {homework.map((hw) => (
                         <div
                             key={hw._id}
-                            className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm border border-gray-200 dark:border-[#38383A] p-4 sm:p-6 hover:shadow-md transition-shadow"
+                            className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] p-4 sm:p-6 hover:shadow-glass-md transition-shadow"
                         >
                             {/* Header */}
                             <div className="flex justify-between items-start mb-4">
@@ -303,10 +303,28 @@ const Homework = () => {
                                     <Calendar className="h-4 w-4 mr-2" />
                                     Assigned: {formatDate(hw.assignedDate)}
                                 </div>
-                                <div className="flex items-center text-sm text-gray-600 dark:text-[#8E8E93]">
-                                    <Clock className="h-4 w-4 mr-2" />
-                                    Due: {formatDate(hw.dueDate)}
-                                </div>
+                                {(() => {
+                                    const due = new Date(hw.dueDate);
+                                    due.setHours(23, 59, 59, 999);
+                                    const now = new Date();
+                                    const daysLeft = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+                                    const isOverdue = daysLeft < 0;
+                                    const isDueToday = daysLeft === 0;
+                                    const colorClass = isOverdue
+                                        ? 'text-red-600 dark:text-red-400'
+                                        : isDueToday
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-emerald-600 dark:text-emerald-400';
+                                    return (
+                                        <div className={`flex items-center text-sm font-medium ${colorClass}`}>
+                                            <Clock className="h-4 w-4 mr-2" />
+                                            Due: {formatDate(hw.dueDate)}
+                                            {isOverdue && <span className="ml-2 text-xs">(Overdue)</span>}
+                                            {isDueToday && <span className="ml-2 text-xs">(Due Today)</span>}
+                                            {!isOverdue && !isDueToday && <span className="ml-2 text-xs">({daysLeft}d left)</span>}
+                                        </div>
+                                    );
+                                })()}
                                 {isTeacher && hw.submissionStats && (
                                     <div className="flex items-center text-sm text-gray-600 dark:text-[#8E8E93]">
                                         <CheckCircle className="h-4 w-4 mr-2" />

@@ -299,7 +299,7 @@ const Assignments = () => {
             { label: 'Completed', value: assignments.filter(a => a.status === 'completed').length, icon: CheckCircle, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-500/20' },
             { label: 'Overdue', value: assignments.filter(a => a.status === 'active' && isOverdue(a.dueDate)).length, icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-500/20' },
           ].map((stat, i) => (
-            <div key={i} className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4 dark:border dark:border-[#38383A]">
+            <div key={i} className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass p-4 dark:border dark:border-[#38383A]">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-lg ${stat.bg}`}>
                   <stat.icon className={`h-5 w-5 ${stat.color}`} />
@@ -315,7 +315,7 @@ const Assignments = () => {
       )}
 
       {/* Filters */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm p-4">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
@@ -359,7 +359,7 @@ const Assignments = () => {
       </div>
 
       {/* Assignments Table */}
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[750px]">
             <thead>
@@ -482,8 +482,8 @@ const Assignments = () => {
 
       {/* Create/Edit Modal */}
       {showModal && !isStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editing ? 'Edit Assignment' : 'Create Assignment'}
@@ -583,7 +583,7 @@ const Assignments = () => {
                     value={form.totalMarks}
                     onChange={(e) => setForm({ ...form, totalMarks: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
-                    min="0"
+                    min="1"
                   />
                 </div>
               </div>
@@ -624,8 +624,8 @@ const Assignments = () => {
 
       {/* Details Modal */}
       {showDetailsModal && selectedAssignment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Assignment Details</h3>
               <button

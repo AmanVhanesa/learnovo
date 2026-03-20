@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { classesService } from '../services/classesService'
 import { teachersService } from '../services/teachersService'
 import { useAuth } from '../contexts/AuthContext'
+import toast from 'react-hot-toast'
 
 const Classes = () => {
   const { user } = useAuth()
@@ -53,8 +54,7 @@ const Classes = () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] })
     },
     onError: (error) => {
-      console.error('Error saving class:', error)
-      alert(error.response?.data?.message || 'Error saving class. Please try again.')
+      toast.error(error.response?.data?.message || 'Error saving class. Please try again.')
     },
   })
 
@@ -64,8 +64,7 @@ const Classes = () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] })
     },
     onError: (error) => {
-      console.error('Error deleting class:', error)
-      alert('Error deleting class. Please try again.')
+      toast.error('Error deleting class. Please try again.')
     },
   })
 

@@ -269,7 +269,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Report_Card_${(student?.name || studentName || 'Student').replace(/\s+/g, '_')}_${filterSeries || 'All'}.pdf`;
+            a.download = `Report_Card_${(cardData?.student?.name || studentName || 'Student').replace(/\s+/g, '_')}_${filterSeries || 'All'}.pdf`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -288,8 +288,8 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const brandColor = schoolInfo.brandColor || '#1E3A5F';
 
     return ReactDOM.createPortal(
-        <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-xl shadow-2xl w-full max-w-4xl sm:mx-4 h-full sm:h-auto sm:max-h-[92vh] flex flex-col">
+        <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg w-full max-w-4xl sm:mx-4 h-full sm:h-auto sm:max-h-[92vh] flex flex-col">
 
                 {/* ── Modal Header ── */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-[#38383A] shrink-0 gap-2">

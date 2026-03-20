@@ -535,11 +535,11 @@ const Exams = () => {
             {/* ── Grouped Exam List ── */}
             <div className="space-y-3">
                 {loading ? (
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm flex justify-center items-center py-16">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass flex justify-center items-center py-16">
                         <div className="loading-spinner" />
                     </div>
                 ) : Object.keys(groupedExams).length === 0 ? (
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-sm flex flex-col items-center py-16 text-gray-400 dark:text-[#636366]">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass flex flex-col items-center py-16 text-gray-400 dark:text-[#636366]">
                         <BookOpen className="h-10 w-10 mb-3 opacity-30" />
                         <p className="font-medium">No exams found</p>
                     </div>
