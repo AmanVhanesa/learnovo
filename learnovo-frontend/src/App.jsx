@@ -7,6 +7,7 @@ import { SuperAdminProvider } from './contexts/SuperAdminContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { NotificationProvider } from './contexts/NotificationContext'
+import { TenantProvider, useTenant } from './contexts/TenantContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import SuperAdminRoute from './components/superadmin/SuperAdminRoute'
 import Layout from './components/Layout'
@@ -121,15 +122,61 @@ const PageLoader = () => (
   </div>
 )
 
+// ── Gate that blocks rendering when subdomain is loading or invalid
+function SubdomainGate({ children }) {
+  const { isSubdomainApp, isLoading, error } = useTenant()
+
+  // No subdomain detected — root domain, render normally
+  if (!isSubdomainApp) return children
+
+  // Subdomain detected but still resolving tenant
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-black">
+        <div className="loading-spinner mb-4" />
+        <p className="text-gray-500 dark:text-gray-400">Loading school portal...</p>
+      </div>
+    )
+  }
+
+  // Subdomain resolved but tenant not found
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-black px-4">
+        <div className="max-w-md text-center">
+          <h1 className="text-6xl font-bold text-gray-300 dark:text-gray-700 mb-4">404</h1>
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
+            School Not Found
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
+            The school portal you are looking for does not exist or is no longer active.
+          </p>
+          <a
+            href={`${window.location.protocol}//learnovoportal.com`}
+            className="inline-block px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+          >
+            Go to Learnovo Home
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  // Subdomain valid, tenant loaded — render the app
+  return children
+}
+
 function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
+      <TenantProvider>
       <AuthProvider>
         <SuperAdminProvider>
           <SettingsProvider>
             <ThemeProvider>
             <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+              <SubdomainGate>
               <div className="App">
                 <Toaster
                   position="top-right"
@@ -353,11 +400,13 @@ function App() {
                   </Routes>
                 </Suspense>
               </div>
+              </SubdomainGate>
             </Router>
           </ThemeProvider>
           </SettingsProvider>
         </SuperAdminProvider>
       </AuthProvider>
+      </TenantProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   )

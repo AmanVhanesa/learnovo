@@ -29,6 +29,12 @@ api.interceptors.request.use(
 )
 
 export const tenantService = {
+  // Get public tenant info by subdomain (no auth required)
+  getPublicInfo: async (subdomain) => {
+    const response = await api.get(`/tenants/public/${subdomain}`)
+    return response.data
+  },
+
   // Register a new school/tenant
   register: async (tenantData) => {
     try {

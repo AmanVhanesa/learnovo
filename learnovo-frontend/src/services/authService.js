@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getSubdomain } from '../contexts/TenantContext'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -6,17 +7,26 @@ if (!API_URL) {
   throw new Error('VITE_API_URL is not defined. Please set it in your environment variables.')
 }
 
+// Detect tenant subdomain once at module load
+const _currentSubdomain = getSubdomain()
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_URL,
 })
 
-// Add token to requests and set Content-Type appropriately
+// Add token, Content-Type, and tenant subdomain header to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+
+    // Attach tenant subdomain so the backend can resolve the tenant
+    // even when the API is on a separate domain (e.g. api.learnovoportal.com)
+    if (_currentSubdomain) {
+      config.headers['X-Tenant-Subdomain'] = _currentSubdomain
     }
 
     // Only set Content-Type to JSON if it's not already set and data is not FormData
