@@ -1,10 +1,9 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
     School, CheckCircle2, Ban, Users, IndianRupee,
     AlertTriangle, Eye, Clock, Plus, Megaphone, BarChart3,
-    TrendingUp, RefreshCw
+    TrendingUp, RefreshCw, Activity, Bell, Edit2, Pause
 } from 'lucide-react'
 import { Line, Doughnut } from 'react-chartjs-2'
 import {
@@ -32,6 +31,12 @@ const SuperAdminDashboard = () => {
             if (res?.success && res?.data) return res.data
             return null
         },
+    })
+
+    const { data: healthData } = useQuery({
+        queryKey: ['superadmin-system-health-mini'],
+        queryFn: async () => { const res = await superAdminService.getSystemHealth(); return res.data },
+        refetchInterval: 60000,
     })
 
     const formatCurrency = (amount) => `₹${(amount || 0).toLocaleString('en-IN')}`
@@ -93,7 +98,7 @@ const SuperAdminDashboard = () => {
                 <DashKpi icon={CheckCircle2} title="Active Tenants" value={stats?.activeTenants || 0} color="emerald" onClick={() => navigate('/super-admin/schools')} />
                 <DashKpi icon={Ban} title="Suspended" value={stats?.suspendedTenants || 0} color="red" onClick={() => navigate('/super-admin/schools')} />
                 <DashKpi icon={Users} title="Total Students" value={(stats?.totalStudents || 0).toLocaleString()} color="blue" onClick={() => navigate('/super-admin/users')} />
-                <DashKpi icon={IndianRupee} title="Monthly Revenue" value={formatCurrency(stats?.revenue?.monthly)} color="teal" onClick={() => navigate('/super-admin/billing')} />
+                <DashKpi icon={IndianRupee} title="Monthly Revenue" value={formatCurrency(stats?.revenue?.monthly)} subtitle={!stats?.revenue?.monthly ? 'No revenue yet' : undefined} color="teal" onClick={() => navigate('/super-admin/billing')} />
             </div>
 
             {/* Quick Actions */}
@@ -120,7 +125,18 @@ const SuperAdminDashboard = () => {
                         <Line data={trendData} options={{
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1e293b', cornerRadius: 8 } },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#1e293b',
+                                    cornerRadius: 8,
+                                    padding: 10,
+                                    callbacks: {
+                                        title: (items) => items[0]?.label || '',
+                                        label: (ctx) => `Registrations: ${ctx.raw}`
+                                    }
+                                }
+                            },
                             scales: {
                                 x: { grid: { display: false }, ticks: { font: { size: 11 } } },
                                 y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { precision: 0, font: { size: 11 } } }
@@ -135,13 +151,21 @@ const SuperAdminDashboard = () => {
                         <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">Plan Distribution</h3>
                     </div>
                     <div className="h-48 sm:h-64 flex items-center justify-center">
-                        <div className="w-44 h-44 sm:w-56 sm:h-56">
+                        <div className="w-44 h-44 sm:w-56 sm:h-56 relative">
                             <Doughnut data={planChartData} options={{
                                 responsive: true,
                                 maintainAspectRatio: false,
                                 cutout: '65%',
-                                plugins: { legend: { position: 'bottom', labels: { padding: 16, font: { size: 11 }, usePointStyle: true, pointStyle: 'circle' } } }
+                                plugins: {
+                                    legend: { position: 'bottom', labels: { padding: 16, font: { size: 11 }, usePointStyle: true, pointStyle: 'circle' } },
+                                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} (${((ctx.raw / (stats?.totalTenants || 1)) * 100).toFixed(0)}%)` } }
+                                }
                             }} />
+                            {/* Center text */}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ top: '-12px' }}>
+                                <span className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{stats?.totalTenants || 0}</span>
+                                <span className="text-[10px] text-gray-400">Total</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -172,6 +196,98 @@ const SuperAdminDashboard = () => {
                 </div>
             </div>
 
+            {/* System Health Mini Widget */}
+            {healthData && (() => {
+                const heapUsed = healthData.server?.memoryUsage?.heapUsed || 0
+                const heapTotal = healthData.server?.memoryUsage?.heapTotal || 0
+                const heapPct = heapTotal ? Math.round((heapUsed / heapTotal) * 100) : 0
+                const isCritical = heapPct > 85
+                const heapColor = heapPct > 90 ? '#EF4444' : heapPct > 80 ? '#F97316' : heapPct > 60 ? '#EAB308' : '#3EC4B1'
+                return (
+                    <div onClick={() => navigate('/super-admin/system')} className="card p-4 cursor-pointer hover:shadow-glass-md transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <Activity className="h-5 w-5 text-primary-500" />
+                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">System Health</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full ${isCritical ? 'bg-red-500' : 'bg-emerald-500'} animate-pulse`} />
+                                <span className={`text-xs font-medium ${isCritical ? 'text-red-600' : 'text-emerald-600'}`}>{isCritical ? 'Needs Attention' : 'Healthy'}</span>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Heap Memory</p>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">{heapUsed} MB</p>
+                                <div className="w-full bg-gray-100 dark:bg-[#2C2C2E] rounded-full h-1.5 mt-1">
+                                    <div className="h-1.5 rounded-full transition-all" style={{ width: `${Math.min(100, heapPct)}%`, backgroundColor: heapColor }} />
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Uptime</p>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">{(() => { const s = healthData.server?.uptime || 0; const d = Math.floor(s/86400); const h = Math.floor((s%86400)/3600); const m = Math.floor((s%3600)/60); return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m` })()}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">DB Size</p>
+                                <p className="text-sm font-bold text-gray-900 dark:text-white">{healthData.database?.totalSize || 0} MB</p>
+                            </div>
+                        </div>
+                    </div>
+                )
+            })()}
+
+            {/* Trials Expiring Soon */}
+            {stats?.recentRegistrations?.length > 0 && (() => {
+                const now = new Date()
+                const trialTenants = (stats.recentRegistrations || []).filter(t => {
+                    if (t.subscription?.status !== 'trial') return false
+                    const trialEnd = t.subscription?.trialEndDate ? new Date(t.subscription.trialEndDate) : null
+                    if (!trialEnd) return false
+                    const daysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24))
+                    return daysLeft >= 0 && daysLeft <= 7
+                })
+                if (!trialTenants.length) return null
+                return (
+                    <div className="card overflow-hidden">
+                        <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 dark:border-[#38383A]">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Trials Expiring Soon</h2>
+                                <span className="text-xs text-gray-400">(Next 7 days)</span>
+                            </div>
+                        </div>
+                        <div className="divide-y divide-gray-50 dark:divide-[#38383A]">
+                            {trialTenants.map(t => {
+                                const trialEnd = new Date(t.subscription.trialEndDate)
+                                const daysLeft = Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24))
+                                const urgencyColor = daysLeft <= 2 ? 'text-red-600 bg-red-50' : daysLeft <= 5 ? 'text-orange-600 bg-orange-50' : 'text-yellow-600 bg-yellow-50'
+                                return (
+                                    <div key={t._id} className="px-4 sm:px-5 py-3 flex items-center justify-between">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                                                <span className="text-primary-700 font-bold text-xs">{(t.schoolName || 'S').charAt(0).toUpperCase()}</span>
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{t.schoolName}</p>
+                                                <p className="text-xs text-gray-400">Expires {trialEnd.toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${urgencyColor}`}>
+                                                {daysLeft === 0 ? 'Today' : `${daysLeft}d left`}
+                                            </span>
+                                            <button className="inline-flex items-center px-2.5 py-1 border border-amber-200 text-xs font-medium rounded-lg text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors">
+                                                <Bell className="h-3 w-3 mr-1" /> Remind
+                                            </button>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                )
+            })()}
+
             {/* Recent Registrations */}
             <div className="card overflow-hidden">
                 <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 dark:border-[#38383A] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -190,11 +306,11 @@ const SuperAdminDashboard = () => {
                         <table className="w-full min-w-[640px]">
                             <thead>
                                 <tr className="bg-gray-50 dark:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A]">
-                                    <th className="px-4 sm:px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">School</th>
-                                    <th className="px-4 sm:px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">Email</th>
-                                    <th className="px-4 sm:px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">Plan</th>
-                                    <th className="px-4 sm:px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">Status</th>
-                                    <th className="px-4 sm:px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">Joined</th>
+                                    <th className="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">School</th>
+                                    <th className="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Email</th>
+                                    <th className="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Plan</th>
+                                    <th className="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Status</th>
+                                    <th className="px-4 sm:px-5 py-3 text-left text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Joined</th>
                                     <th className="px-4 sm:px-5 py-3 text-right text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">Actions</th>
                                 </tr>
                             </thead>
@@ -221,12 +337,28 @@ const SuperAdminDashboard = () => {
                                         </td>
                                         <td className="px-4 sm:px-5 py-3 text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(t.createdAt).toLocaleDateString()}</td>
                                         <td className="px-4 sm:px-5 py-3 text-right">
-                                            <button
-                                                onClick={() => navigate('/super-admin/schools')}
-                                                className="inline-flex items-center px-2.5 py-1 border border-primary-200 text-xs font-medium rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
-                                            >
-                                                <Eye className="h-3.5 w-3.5 mr-1" /> View
-                                            </button>
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                <button
+                                                    onClick={() => navigate('/super-admin/schools')}
+                                                    className="inline-flex items-center px-2.5 py-1 border border-primary-200 text-xs font-medium rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                                                >
+                                                    <Eye className="h-3.5 w-3.5 mr-1" /> View
+                                                </button>
+                                                <button
+                                                    onClick={() => navigate('/super-admin/schools')}
+                                                    className="inline-flex items-center px-2 py-1 border border-gray-200 dark:border-[#38383A] text-xs font-medium rounded-lg text-gray-600 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
+                                                >
+                                                    <Edit2 className="h-3 w-3" />
+                                                </button>
+                                                {t.subscription?.status !== 'suspended' && (
+                                                    <button
+                                                        onClick={() => navigate('/super-admin/schools')}
+                                                        className="inline-flex items-center px-2 py-1 border border-red-200 text-xs font-medium rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                                                    >
+                                                        <Pause className="h-3 w-3" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -239,13 +371,13 @@ const SuperAdminDashboard = () => {
     )
 }
 
-const DashKpi = ({ icon: Icon, title, value, color, onClick }) => {
+const DashKpi = ({ icon: Icon, title, value, subtitle, color, onClick }) => {
     const colorMap = {
-        indigo: 'bg-indigo-50 text-indigo-600',
-        emerald: 'bg-emerald-50 text-emerald-600',
-        red: 'bg-red-50 text-red-600',
-        blue: 'bg-blue-50 text-blue-600',
-        teal: 'bg-primary-50 text-primary-600'
+        indigo: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400',
+        emerald: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400',
+        red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
+        blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+        teal: 'bg-primary-50 dark:bg-[rgba(62,196,177,0.12)] text-primary-600 dark:text-[#3EC4B1]'
     }
     return (
         <div onClick={onClick} className="card p-3 sm:p-5 cursor-pointer hover:shadow-glass-md transition-shadow group">
@@ -254,8 +386,9 @@ const DashKpi = ({ icon: Icon, title, value, color, onClick }) => {
                     <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <div className="min-w-0">
-                    <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-[#8E8E93] truncate">{title}</p>
+                    <p className="text-[10px] sm:text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider truncate">{title}</p>
                     <p className="text-base sm:text-xl font-bold text-gray-900 dark:text-white mt-0.5">{value}</p>
+                    {subtitle && <p className="text-[10px] text-gray-400 dark:text-[#636366] truncate">{subtitle}</p>}
                 </div>
             </div>
         </div>
@@ -264,14 +397,14 @@ const DashKpi = ({ icon: Icon, title, value, color, onClick }) => {
 
 const StatusBadge = ({ status }) => {
     const colors = {
-        active: 'bg-emerald-100 text-emerald-700',
-        trial: 'bg-blue-100 text-blue-700',
-        suspended: 'bg-red-100 text-red-700',
-        cancelled: 'bg-gray-100 text-gray-500'
+        active: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158] dark:ring-0',
+        trial: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-[rgba(255,214,10,0.12)] dark:text-[#FFD60A] dark:ring-0',
+        suspended: 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-[rgba(255,69,58,0.12)] dark:text-[#FF453A] dark:ring-0',
+        cancelled: 'bg-gray-50 text-gray-600 ring-1 ring-gray-200 dark:bg-[rgba(142,142,147,0.12)] dark:text-[#8E8E93] dark:ring-0',
     }
     return (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${colors[status] || 'bg-gray-100 text-gray-500'}`}>
-            {status}
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${colors[status] || colors.cancelled}`}>
+            {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
         </span>
     )
 }

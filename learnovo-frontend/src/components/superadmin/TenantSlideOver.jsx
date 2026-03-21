@@ -1,681 +1,1322 @@
-import React, { useState, useEffect } from 'react'
-import {
-    X, Mail, Phone, MapPin, Calendar, CreditCard, ShieldAlert,
-    CheckCircle2, Square, Ban, Trash2, Save,
-    Users, GraduationCap, Zap, Settings, RefreshCw, ChevronRight,
-    Star, TrendingUp, Clock, AlertTriangle, Globe, Copy
-} from 'lucide-react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import { superAdminService } from '../../services/superAdminService'
 import toast from 'react-hot-toast'
+import {
+    X, Building2, Users, FileText, Activity, StickyNote, Settings, ChevronRight,
+    Mail, Phone, MapPin, Calendar, Clock, Crown, Shield, GraduationCap, BookOpen,
+    HardDrive, DollarSign, CreditCard, Check, AlertTriangle, Trash2, RotateCcw,
+    KeyRound, Send, Plus, ChevronLeft, ChevronDown, Upload, Globe, Hash, Eye,
+    UserCircle, Loader2, RefreshCw, XCircle, CheckCircle2, Ban, Zap, Star
+} from 'lucide-react'
 
-const TenantSlideOver = ({ isOpen, onClose, tenantId, onUpdate }) => {
-    const [tenant, setTenant] = useState(null)
-    const [isLoading, setIsLoading] = useState(false)
-    const [isUpdating, setIsUpdating] = useState(false)
-    const [activeTab, setActiveTab] = useState('overview')
+const TABS = [
+    { key: 'overview', label: 'Overview', icon: Building2 },
+    { key: 'users', label: 'Users', icon: Users },
+    { key: 'invoices', label: 'Invoices', icon: FileText },
+    { key: 'activity', label: 'Activity', icon: Activity },
+    { key: 'notes', label: 'Notes', icon: StickyNote },
+]
 
-    const [showPlanChange, setShowPlanChange] = useState(false)
-    const [selectedPlan, setSelectedPlan] = useState('')
-    const [showExtendTrial, setShowExtendTrial] = useState(false)
-    const [trialDays, setTrialDays] = useState(14)
-    const [showOverrideFeatures, setShowOverrideFeatures] = useState(false)
-    const [overrideLimits, setOverrideLimits] = useState({ students: 0, teachers: 0 })
-    const [showSubdomainEdit, setShowSubdomainEdit] = useState(false)
-    const [subdomainInput, setSubdomainInput] = useState('')
+const STATUS_STYLES = {
+    active: {
+        light: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+        dark: 'dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158] dark:ring-0',
+    },
+    trial: {
+        light: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+        dark: 'dark:bg-[rgba(255,214,10,0.12)] dark:text-[#FFD60A] dark:ring-0',
+    },
+    pending: {
+        light: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
+        dark: 'dark:bg-[rgba(255,214,10,0.12)] dark:text-[#FFD60A] dark:ring-0',
+    },
+    suspended: {
+        light: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+        dark: 'dark:bg-[rgba(255,69,58,0.12)] dark:text-[#FF453A] dark:ring-0',
+    },
+    cancelled: {
+        light: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+        dark: 'dark:bg-[rgba(255,69,58,0.12)] dark:text-[#FF453A] dark:ring-0',
+    },
+}
+
+const PLAN_COLORS = {
+    free: 'bg-gray-100 text-gray-700 dark:bg-[#2C2C2E] dark:text-[#8E8E93]',
+    starter: 'bg-blue-50 text-blue-700 dark:bg-[rgba(10,132,255,0.12)] dark:text-[#0A84FF]',
+    professional: 'bg-purple-50 text-purple-700 dark:bg-[rgba(191,90,242,0.12)] dark:text-[#BF5AF2]',
+    enterprise: 'bg-amber-50 text-amber-700 dark:bg-[rgba(255,214,10,0.12)] dark:text-[#FFD60A]',
+}
+
+const AVATAR_COLORS = [
+    'bg-primary-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500',
+    'bg-amber-500', 'bg-emerald-500', 'bg-rose-500', 'bg-cyan-500',
+]
+
+function getAvatarColor(name) {
+    if (!name) return AVATAR_COLORS[0]
+    let hash = 0
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+}
+
+function formatDate(date) {
+    if (!date) return 'N/A'
+    return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+function formatDateTime(date) {
+    if (!date) return 'N/A'
+    return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    })
+}
+
+function getTrialCountdown(trialEnd) {
+    if (!trialEnd) return null
+    const now = new Date()
+    const end = new Date(trialEnd)
+    const diff = end - now
+    if (diff <= 0) return { text: 'Expired', expired: true }
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24))
+    return { text: `${days} day${days !== 1 ? 's' : ''} remaining`, expired: false }
+}
+
+function StatusBadge({ status }) {
+    const s = (status || 'pending').toLowerCase()
+    const style = STATUS_STYLES[s] || STATUS_STYLES.pending
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${style.light} ${style.dark}`}>
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+        </span>
+    )
+}
+
+function PlanBadge({ plan }) {
+    const p = (plan || 'free').toLowerCase()
+    const color = PLAN_COLORS[p] || PLAN_COLORS.free
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${color}`}>
+            <Crown className="w-3 h-3 mr-1" />
+            {p.charAt(0).toUpperCase() + p.slice(1)}
+        </span>
+    )
+}
+
+function RoleBadge({ role }) {
+    const r = (role || 'user').toLowerCase()
+    const colors = {
+        admin: 'bg-purple-50 text-purple-700 dark:bg-[rgba(191,90,242,0.12)] dark:text-[#BF5AF2]',
+        teacher: 'bg-blue-50 text-blue-700 dark:bg-[rgba(10,132,255,0.12)] dark:text-[#0A84FF]',
+        student: 'bg-emerald-50 text-emerald-700 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158]',
+        user: 'bg-gray-100 text-gray-600 dark:bg-[#2C2C2E] dark:text-[#8E8E93]',
+    }
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${colors[r] || colors.user}`}>
+            {r.charAt(0).toUpperCase() + r.slice(1)}
+        </span>
+    )
+}
+
+function InvoiceStatusBadge({ status }) {
+    const s = (status || 'pending').toLowerCase()
+    const map = {
+        paid: STATUS_STYLES.active,
+        pending: STATUS_STYLES.pending,
+        overdue: STATUS_STYLES.suspended,
+        cancelled: STATUS_STYLES.cancelled,
+        draft: { light: 'bg-gray-100 text-gray-600 ring-1 ring-gray-200', dark: 'dark:bg-[#2C2C2E] dark:text-[#8E8E93] dark:ring-0' },
+    }
+    const style = map[s] || map.pending
+    return (
+        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${style.light} ${style.dark}`}>
+            {s.charAt(0).toUpperCase() + s.slice(1)}
+        </span>
+    )
+}
+
+function ProgressBar({ current, max, label, unit }) {
+    const pct = max > 0 ? Math.min((current / max) * 100, 100) : 0
+    const isHigh = pct >= 90
+    const isMid = pct >= 70 && pct < 90
+    return (
+        <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-[#8E8E93]">{label}</span>
+                <span className="font-semibold text-gray-900 dark:text-white">
+                    {current?.toLocaleString()}{unit ? ` ${unit}` : ''} <span className="text-gray-400 dark:text-[#636366] font-normal">/ {max?.toLocaleString()}{unit ? ` ${unit}` : ''}</span>
+                </span>
+            </div>
+            <div className="h-2 rounded-full bg-gray-100 dark:bg-[#2C2C2E] overflow-hidden">
+                <div
+                    className={`h-full rounded-full transition-all duration-500 ${isHigh ? 'bg-red-500 dark:bg-[#FF453A]' : isMid ? 'bg-amber-500 dark:bg-[#FFD60A]' : 'bg-primary-500 dark:bg-[#3EC4B1]'}`}
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+        </div>
+    )
+}
+
+function Spinner() {
+    return (
+        <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-primary-500" />
+        </div>
+    )
+}
+
+function EmptyState({ icon: Icon, title, description }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-gray-100 dark:bg-[#2C2C2E] flex items-center justify-center mb-3">
+                <Icon className="w-6 h-6 text-gray-400 dark:text-[#636366]" />
+            </div>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">{title}</p>
+            {description && <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">{description}</p>}
+        </div>
+    )
+}
+
+function ErrorState({ message, onRetry }) {
+    return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 dark:bg-[rgba(255,69,58,0.12)] flex items-center justify-center mb-3">
+                <AlertTriangle className="w-6 h-6 text-red-500 dark:text-[#FF453A]" />
+            </div>
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">Failed to load data</p>
+            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">{message || 'An error occurred'}</p>
+            {onRetry && (
+                <button
+                    onClick={onRetry}
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-xl h-10 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-100/80 dark:text-[#3EC4B1] dark:hover:bg-[rgba(62,196,177,0.08)] active:scale-[0.97] transition-all"
+                >
+                    <RefreshCw className="w-4 h-4" /> Retry
+                </button>
+            )}
+        </div>
+    )
+}
+
+// ─── Confirm Modal ─────────────────────────────────────────────────────────
+function ConfirmModal({ isOpen, onClose, title, description, confirmLabel, confirmStyle, inputLabel, inputMatch, onConfirm, loading }) {
+    const [inputValue, setInputValue] = useState('')
 
     useEffect(() => {
-        if (isOpen && tenantId) {
-            setActiveTab('overview')
-            fetchTenantDetails()
-        } else {
-            setTenant(null)
-            setShowPlanChange(false)
-            setShowExtendTrial(false)
-            setShowOverrideFeatures(false)
-        }
-    }, [isOpen, tenantId])
+        if (isOpen) setInputValue('')
+    }, [isOpen])
 
-    const fetchTenantDetails = async () => {
-        setIsLoading(true)
+    if (!isOpen) return null
+
+    const canConfirm = inputMatch ? inputValue === inputMatch : true
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 dark:bg-black/75 backdrop-blur-sm p-4" onClick={onClose}>
+            <div
+                className="bg-white dark:bg-[#1C1C1E] rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-[rgba(255,69,58,0.12)] flex items-center justify-center flex-shrink-0">
+                        <AlertTriangle className="w-5 h-5 text-red-600 dark:text-[#FF453A]" />
+                    </div>
+                    <div>
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
+                        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">{description}</p>
+                    </div>
+                </div>
+
+                {inputLabel && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">{inputLabel}</label>
+                        <input
+                            type="text"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            placeholder={inputMatch || ''}
+                            className="w-full h-11 sm:h-10 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] px-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#636366] focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#3EC4B1]"
+                        />
+                    </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                    <button
+                        onClick={onClose}
+                        disabled={loading}
+                        className="rounded-xl h-10 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-100/80 dark:text-[#3EC4B1] dark:hover:bg-[rgba(62,196,177,0.08)] active:scale-[0.97] transition-all"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={() => onConfirm(inputValue)}
+                        disabled={!canConfirm || loading}
+                        className={`rounded-xl h-10 px-4 text-sm font-semibold active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${confirmStyle || 'bg-red-600 text-white hover:bg-red-500 dark:bg-[#FF453A] dark:hover:bg-[#FF6961]'}`}
+                    >
+                        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {confirmLabel}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────
+export default function TenantSlideOver({ isOpen, onClose, tenantId, onUpdate }) {
+    const [activeTab, setActiveTab] = useState('overview')
+    const [tenant, setTenant] = useState(null)
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
+
+    // Tab data states
+    const [users, setUsers] = useState([])
+    const [usersLoading, setUsersLoading] = useState(false)
+    const [usersError, setUsersError] = useState(null)
+    const [usersPage, setUsersPage] = useState(1)
+    const [usersTotalPages, setUsersTotalPages] = useState(1)
+
+    const [invoices, setInvoices] = useState([])
+    const [invoicesLoading, setInvoicesLoading] = useState(false)
+    const [invoicesError, setInvoicesError] = useState(null)
+
+    const [activities, setActivities] = useState([])
+    const [activitiesLoading, setActivitiesLoading] = useState(false)
+    const [activitiesError, setActivitiesError] = useState(null)
+
+    const [notes, setNotes] = useState([])
+    const [notesLoading, setNotesLoading] = useState(false)
+    const [notesError, setNotesError] = useState(null)
+    const [newNote, setNewNote] = useState('')
+    const [savingNote, setSavingNote] = useState(false)
+
+    // Action states
+    const [showActions, setShowActions] = useState(false)
+    const [selectedPlan, setSelectedPlan] = useState('')
+    const [plans, setPlans] = useState([])
+    const [trialDays, setTrialDays] = useState(7)
+    const [actionLoading, setActionLoading] = useState(null)
+
+    // Confirm modals
+    const [suspendModal, setSuspendModal] = useState(false)
+    const [deleteModal, setDeleteModal] = useState(false)
+    const [deleteNoteId, setDeleteNoteId] = useState(null)
+
+    // ─── Fetch Tenant ──────────────────────────────────────────────────────
+    const fetchTenant = useCallback(async () => {
+        if (!tenantId) return
+        setLoading(true)
+        setError(null)
         try {
             const res = await superAdminService.getTenantById(tenantId)
             if (res.success) {
                 setTenant(res.data)
-                setSelectedPlan(res.data.subscription?.plan || '')
-                setOverrideLimits({
-                    students: res.data.subscription?.customLimits?.students || res.data.planConfig?.limits?.students || 0,
-                    teachers: res.data.subscription?.customLimits?.teachers || res.data.planConfig?.limits?.teachers || 0,
-                })
+                setSelectedPlan(res.data?.subscription?.plan || res.data?.plan || '')
+            } else {
+                setError(res.message || 'Failed to fetch tenant')
             }
-        } catch {
-            toast.error('Failed to load tenant details')
-            onClose()
+        } catch (err) {
+            setError(err.response?.data?.message || err.message || 'Failed to fetch tenant')
         } finally {
-            setIsLoading(false)
+            setLoading(false)
         }
-    }
+    }, [tenantId])
 
-    const handleStatusChange = async (action) => {
-        if (!window.confirm(`Are you sure you want to ${action} this account?`)) return
-        setIsUpdating(true)
+    useEffect(() => {
+        if (isOpen && tenantId) {
+            setActiveTab('overview')
+            fetchTenant()
+        }
+        if (!isOpen) {
+            setTenant(null)
+            setLoading(true)
+            setError(null)
+            setShowActions(false)
+        }
+    }, [isOpen, tenantId, fetchTenant])
+
+    // ─── Fetch Tab Data ────────────────────────────────────────────────────
+    const fetchUsers = useCallback(async (page = 1) => {
+        if (!tenantId) return
+        setUsersLoading(true)
+        setUsersError(null)
         try {
-            if (action === 'suspend') {
-                await superAdminService.suspendTenant(tenantId)
-                toast.success('Account suspended')
-            } else if (action === 'activate') {
-                await superAdminService.activateTenant(tenantId)
-                toast.success('Account activated!')
+            const res = await superAdminService.getTenantUsers(tenantId, { page, limit: 10 })
+            if (res.success) {
+                setUsers(res.data || [])
+                const total = res.pagination?.total || res.total || 0
+                setUsersTotalPages(Math.max(1, Math.ceil(total / 10)))
+                setUsersPage(page)
+            } else {
+                setUsersError(res.message || 'Failed to load users')
             }
-            fetchTenantDetails()
-            if (onUpdate) onUpdate()
-        } catch {
-            toast.error(`Failed to ${action} account`)
+        } catch (err) {
+            setUsersError(err.response?.data?.message || 'Failed to load users')
         } finally {
-            setIsUpdating(false)
+            setUsersLoading(false)
         }
-    }
+    }, [tenantId])
 
+    const fetchInvoices = useCallback(async () => {
+        if (!tenantId) return
+        setInvoicesLoading(true)
+        setInvoicesError(null)
+        try {
+            const res = await superAdminService.getTenantInvoices(tenantId)
+            if (res.success) {
+                setInvoices(res.data || [])
+            } else {
+                setInvoicesError(res.message || 'Failed to load invoices')
+            }
+        } catch (err) {
+            setInvoicesError(err.response?.data?.message || 'Failed to load invoices')
+        } finally {
+            setInvoicesLoading(false)
+        }
+    }, [tenantId])
+
+    const fetchActivity = useCallback(async () => {
+        if (!tenantId) return
+        setActivitiesLoading(true)
+        setActivitiesError(null)
+        try {
+            const res = await superAdminService.getTenantActivity(tenantId)
+            if (res.success) {
+                setActivities(res.data || [])
+            } else {
+                setActivitiesError(res.message || 'Failed to load activity')
+            }
+        } catch (err) {
+            setActivitiesError(err.response?.data?.message || 'Failed to load activity')
+        } finally {
+            setActivitiesLoading(false)
+        }
+    }, [tenantId])
+
+    const fetchNotes = useCallback(async () => {
+        if (!tenantId) return
+        setNotesLoading(true)
+        setNotesError(null)
+        try {
+            const res = await superAdminService.getTenantNotes(tenantId)
+            if (res.success) {
+                setNotes(res.data || [])
+            } else {
+                setNotesError(res.message || 'Failed to load notes')
+            }
+        } catch (err) {
+            setNotesError(err.response?.data?.message || 'Failed to load notes')
+        } finally {
+            setNotesLoading(false)
+        }
+    }, [tenantId])
+
+    useEffect(() => {
+        if (!isOpen || !tenantId) return
+        if (activeTab === 'users') fetchUsers(1)
+        if (activeTab === 'invoices') fetchInvoices()
+        if (activeTab === 'activity') fetchActivity()
+        if (activeTab === 'notes') fetchNotes()
+    }, [activeTab, isOpen, tenantId, fetchUsers, fetchInvoices, fetchActivity, fetchNotes])
+
+    // Fetch plans for change plan action
+    useEffect(() => {
+        if (showActions && plans.length === 0) {
+            superAdminService.getPlans().then(res => {
+                if (res.success) setPlans(res.data || [])
+            }).catch(() => {})
+        }
+    }, [showActions, plans.length])
+
+    // ─── Actions ───────────────────────────────────────────────────────────
     const handleChangePlan = async () => {
-        setIsUpdating(true)
+        if (!selectedPlan) return
+        setActionLoading('plan')
         try {
-            await superAdminService.updateTenantPlan(tenantId, { plan: selectedPlan })
-            toast.success('Plan updated!')
-            setShowPlanChange(false)
-            fetchTenantDetails()
-            if (onUpdate) onUpdate()
-        } catch {
-            toast.error('Failed to update plan')
+            const res = await superAdminService.updateTenantPlan(tenantId, { plan: selectedPlan })
+            if (res.success) {
+                toast.success('Plan updated successfully')
+                fetchTenant()
+                onUpdate?.()
+            } else {
+                toast.error(res.message || 'Failed to update plan')
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to update plan')
         } finally {
-            setIsUpdating(false)
+            setActionLoading(null)
         }
     }
 
     const handleExtendTrial = async () => {
-        setIsUpdating(true)
+        if (!trialDays || trialDays < 1) return
+        setActionLoading('trial')
         try {
-            await superAdminService.extendTenantTrial(tenantId, trialDays)
-            toast.success(`Trial extended by ${trialDays} days!`)
-            setShowExtendTrial(false)
-            fetchTenantDetails()
-            if (onUpdate) onUpdate()
-        } catch {
-            toast.error('Failed to extend trial')
-        } finally {
-            setIsUpdating(false)
-        }
-    }
-
-    const handleOverrideFeatures = async () => {
-        setIsUpdating(true)
-        try {
-            await superAdminService.overrideFeatures(tenantId, {
-                customLimits: {
-                    students: Number(overrideLimits.students),
-                    teachers: Number(overrideLimits.teachers),
-                }
-            })
-            toast.success('Custom limits applied!')
-            setShowOverrideFeatures(false)
-            fetchTenantDetails()
-            if (onUpdate) onUpdate()
-        } catch {
-            toast.error('Failed to apply custom limits')
-        } finally {
-            setIsUpdating(false)
-        }
-    }
-
-    const handleSubdomainSave = async () => {
-        const slug = subdomainInput.toLowerCase().trim()
-        if (!slug || !/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(slug)) {
-            toast.error('Invalid subdomain: use lowercase letters, numbers, and hyphens (3-63 chars)')
-            return
-        }
-        setIsUpdating(true)
-        try {
-            await superAdminService.updateTenant(tenantId, { subdomain: slug })
-            toast.success(`Subdomain set to ${slug}.learnovoportal.com`)
-            setShowSubdomainEdit(false)
-            fetchTenantDetails()
-            if (onUpdate) onUpdate()
+            const res = await superAdminService.extendTenantTrial(tenantId, trialDays)
+            if (res.success) {
+                toast.success(`Trial extended by ${trialDays} days`)
+                fetchTenant()
+                onUpdate?.()
+            } else {
+                toast.error(res.message || 'Failed to extend trial')
+            }
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to update subdomain')
+            toast.error(err.response?.data?.message || 'Failed to extend trial')
         } finally {
-            setIsUpdating(false)
+            setActionLoading(null)
         }
     }
 
-    const handleDeleteTenant = async () => {
-        if (!window.confirm(
-            `PERMANENTLY DELETE "${tenant?.schoolName}"?\n\nThis will deactivate the school and all its users. This action cannot be undone.`
-        )) return
-        setIsUpdating(true)
+    const handleSuspend = async () => {
+        setActionLoading('suspend')
         try {
-            await superAdminService.deleteTenant(tenantId)
-            toast.success('Tenant deleted')
-            onClose()
-            if (onUpdate) onUpdate()
-        } catch {
-            toast.error('Failed to delete tenant')
+            const res = await superAdminService.suspendTenant(tenantId)
+            if (res.success) {
+                toast.success('Account suspended')
+                setSuspendModal(false)
+                fetchTenant()
+                onUpdate?.()
+            } else {
+                toast.error(res.message || 'Failed to suspend account')
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to suspend account')
         } finally {
-            setIsUpdating(false)
+            setActionLoading(null)
         }
     }
+
+    const handleReactivate = async () => {
+        setActionLoading('reactivate')
+        try {
+            const res = await superAdminService.activateTenant(tenantId)
+            if (res.success) {
+                toast.success('Account reactivated')
+                fetchTenant()
+                onUpdate?.()
+            } else {
+                toast.error(res.message || 'Failed to reactivate account')
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to reactivate account')
+        } finally {
+            setActionLoading(null)
+        }
+    }
+
+    const handleResetAdminPassword = async () => {
+        setActionLoading('reset')
+        try {
+            const res = await superAdminService.resetTenantAdminPassword(tenantId)
+            if (res.success) {
+                toast.success('Password reset email sent to admin')
+            } else {
+                toast.error(res.message || 'Failed to reset password')
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to reset password')
+        } finally {
+            setActionLoading(null)
+        }
+    }
+
+    const handleDelete = async () => {
+        setActionLoading('delete')
+        try {
+            const res = await superAdminService.deleteTenant(tenantId)
+            if (res.success) {
+                toast.success('School deleted permanently')
+                setDeleteModal(false)
+                onClose()
+                onUpdate?.()
+            } else {
+                toast.error(res.message || 'Failed to delete school')
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete school')
+        } finally {
+            setActionLoading(null)
+        }
+    }
+
+    const handleAddNote = async () => {
+        if (!newNote.trim()) return
+        setSavingNote(true)
+        try {
+            const res = await superAdminService.createTenantNote(tenantId, { content: newNote.trim() })
+            if (res.success) {
+                toast.success('Note added')
+                setNewNote('')
+                fetchNotes()
+            } else {
+                toast.error(res.message || 'Failed to add note')
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to add note')
+        } finally {
+            setSavingNote(false)
+        }
+    }
+
+    const handleDeleteNote = async (noteId) => {
+        setDeleteNoteId(null)
+        try {
+            const res = await superAdminService.deleteTenantNote(tenantId, noteId)
+            if (res.success) {
+                toast.success('Note deleted')
+                fetchNotes()
+            } else {
+                toast.error(res.message || 'Failed to delete note')
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete note')
+        }
+    }
+
+    // ─── Derived Data ──────────────────────────────────────────────────────
+    const schoolName = tenant?.schoolName || tenant?.name || ''
+    const schoolCode = tenant?.schoolCode || tenant?.code || ''
+    const status = (tenant?.status || 'pending').toLowerCase()
+    const plan = tenant?.subscription?.plan || tenant?.plan || 'free'
+    const subdomain = tenant?.subdomain || ''
+    const adminEmail = tenant?.adminEmail || tenant?.admin?.email || ''
+    const phone = tenant?.phone || tenant?.contactPhone || ''
+    const address = tenant?.address || ''
+    const registrationDate = tenant?.createdAt
+    const lastActivity = tenant?.lastActivity || tenant?.updatedAt
+    const trialEnd = tenant?.subscription?.trialEnd || tenant?.trialEnd
+    const subscriptionStart = tenant?.subscription?.startDate || tenant?.subscriptionStart
+    const subscriptionEnd = tenant?.subscription?.endDate || tenant?.subscriptionEnd
+    const usage = tenant?.usage || {}
+    const features = tenant?.features || tenant?.subscription?.features || []
+    const quickStats = {
+        totalUsers: tenant?.stats?.totalUsers || usage?.totalUsers || 0,
+        totalInvoices: tenant?.stats?.totalInvoices || 0,
+        totalRevenue: tenant?.stats?.totalRevenue || 0,
+        lastPayment: tenant?.stats?.lastPaymentDate || null,
+    }
+    const isSuspended = status === 'suspended'
 
     if (!isOpen) return null
 
-    // --- Styling helpers ---
-    const planLabel = {
-        free: 'Free Trial', free_trial: 'Free Trial', basic: 'Basic',
-        pro: 'Pro', premium: 'Premium', enterprise: 'Enterprise',
-    }
-    const planBadgeStyle = {
-        free: 'bg-gray-100 text-gray-600 border-gray-200',
-        free_trial: 'bg-gray-100 text-gray-600 border-gray-200',
-        basic: 'bg-blue-50 text-blue-700 border-blue-200',
-        pro: 'bg-violet-50 text-violet-700 border-violet-200',
-        premium: 'bg-violet-50 text-violet-700 border-violet-200',
-        enterprise: 'bg-amber-50 text-amber-700 border-amber-200',
-    }
-    const statusStyle = {
-        active: { label: 'Active', dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700' },
-        trial: { label: 'Trial', dot: 'bg-sky-500', badge: 'bg-sky-50 text-sky-700' },
-        suspended: { label: 'Suspended', dot: 'bg-red-500', badge: 'bg-red-50 text-red-700' },
-        cancelled: { label: 'Cancelled', dot: 'bg-gray-400', badge: 'bg-gray-50 text-gray-600' },
-    }
+    // ─── Render ────────────────────────────────────────────────────────────
+    return (
+        <Fragment>
+            {/* Backdrop */}
+            <div
+                className="fixed inset-0 z-40 bg-black/40 dark:bg-black/75 backdrop-blur-sm transition-opacity"
+                onClick={onClose}
+            />
 
-    const currentStatus = tenant?.subscription?.status
-    const plan = tenant?.subscription?.plan
-    const pLabel = planLabel[plan] || plan || 'Free'
-    const pBadge = planBadgeStyle[plan] || planBadgeStyle.free
-    const ss = statusStyle[currentStatus] || statusStyle.cancelled
-    const isSuspended = currentStatus === 'suspended'
-    const isTrial = currentStatus === 'trial'
-    const isActive = currentStatus === 'active'
+            {/* Slide Over Panel */}
+            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl flex">
+                <div className="relative flex flex-col w-full bg-white dark:bg-[#1C1C1E] shadow-2xl overflow-hidden">
 
-    const studentLimit = tenant?.subscription?.customLimits?.students || tenant?.planConfig?.limits?.students || 0
-    const studentCount = tenant?.usage?.students || 0
-    const studentPercent = studentLimit ? Math.min(100, Math.round((studentCount / studentLimit) * 100)) : 0
-    const teacherLimit = tenant?.subscription?.customLimits?.teachers || tenant?.planConfig?.limits?.teachers || 0
-    const teacherCount = tenant?.usage?.teachers || 0
-    const teacherPercent = teacherLimit ? Math.min(100, Math.round((teacherCount / teacherLimit) * 100)) : 0
-
-    const tabs = [
-        { id: 'overview', label: 'Overview', icon: TrendingUp },
-        { id: 'settings', label: 'Settings', icon: Settings },
-    ]
-
-    const getInitials = (name) => name ? name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() : 'S'
-    const avatarColors = ['bg-teal-600', 'bg-violet-600', 'bg-blue-600', 'bg-amber-600', 'bg-rose-600']
-    const getAvatarColor = (name) => avatarColors[(name?.charCodeAt(0) || 0) % avatarColors.length]
-
-    const UsageBar = ({ label, count, limit, percent, icon: Icon }) => (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-100 dark:border-[#38383A] p-4">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-primary-50 rounded-lg flex items-center justify-center">
-                        <Icon className="h-3.5 w-3.5 text-primary-600" />
+                    {/* ─── Header ───────────────────────────────────────────── */}
+                    <div className="flex-shrink-0 border-b border-gray-200 dark:border-[#38383A] px-6 py-4">
+                        {loading ? (
+                            <div className="flex items-center gap-4 animate-pulse">
+                                <div className="w-12 h-12 rounded-2xl bg-gray-200 dark:bg-[#2C2C2E]" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-5 w-48 rounded bg-gray-200 dark:bg-[#2C2C2E]" />
+                                    <div className="h-4 w-32 rounded bg-gray-100 dark:bg-[#2C2C2E]" />
+                                </div>
+                            </div>
+                        ) : tenant ? (
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className={`w-12 h-12 rounded-2xl ${getAvatarColor(schoolName)} flex items-center justify-center flex-shrink-0`}>
+                                        <span className="text-lg font-bold text-white">
+                                            {schoolName.charAt(0).toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{schoolName}</h2>
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            {schoolCode && (
+                                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-mono font-medium rounded-md bg-gray-100 text-gray-600 dark:bg-[#2C2C2E] dark:text-[#8E8E93]">
+                                                    {schoolCode}
+                                                </span>
+                                            )}
+                                            <StatusBadge status={status} />
+                                            <PlanBadge plan={plan} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={onClose}
+                                    className="rounded-xl h-10 w-10 flex items-center justify-center text-gray-400 hover:bg-gray-100/80 dark:text-[#636366] dark:hover:bg-[rgba(62,196,177,0.08)] active:scale-[0.97] transition-all flex-shrink-0"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        ) : null}
                     </div>
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
+
+                    {/* ─── Tabs ──────────────────────────────────────────────── */}
+                    <div className="flex-shrink-0 border-b border-gray-200 dark:border-[#38383A] px-6 overflow-x-auto">
+                        <nav className="flex gap-1 -mb-px">
+                            {TABS.map(tab => {
+                                const Icon = tab.icon
+                                const isActive = activeTab === tab.key && !showActions
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => { setActiveTab(tab.key); setShowActions(false) }}
+                                        className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                                            isActive
+                                                ? 'border-primary-500 text-primary-600 dark:border-[#3EC4B1] dark:text-[#3EC4B1]'
+                                                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-[#8E8E93] dark:hover:text-white'
+                                        }`}
+                                    >
+                                        <Icon className="w-4 h-4" />
+                                        <span className="hidden sm:inline">{tab.label}</span>
+                                    </button>
+                                )
+                            })}
+
+                            {/* Actions Toggle */}
+                            <button
+                                onClick={() => setShowActions(!showActions)}
+                                className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ml-auto ${
+                                    showActions
+                                        ? 'border-primary-500 text-primary-600 dark:border-[#3EC4B1] dark:text-[#3EC4B1]'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-[#8E8E93] dark:hover:text-white'
+                                }`}
+                            >
+                                <Settings className="w-4 h-4" />
+                                <span className="hidden sm:inline">Actions</span>
+                            </button>
+                        </nav>
+                    </div>
+
+                    {/* ─── Body ──────────────────────────────────────────────── */}
+                    <div className="flex-1 overflow-y-auto">
+                        {loading ? (
+                            <Spinner />
+                        ) : error ? (
+                            <ErrorState message={error} onRetry={fetchTenant} />
+                        ) : showActions ? (
+                            <ActionsPanel
+                                tenant={tenant}
+                                plans={plans}
+                                selectedPlan={selectedPlan}
+                                setSelectedPlan={setSelectedPlan}
+                                trialDays={trialDays}
+                                setTrialDays={setTrialDays}
+                                actionLoading={actionLoading}
+                                isSuspended={isSuspended}
+                                onChangePlan={handleChangePlan}
+                                onExtendTrial={handleExtendTrial}
+                                onSuspend={() => setSuspendModal(true)}
+                                onReactivate={handleReactivate}
+                                onResetPassword={handleResetAdminPassword}
+                                onDelete={() => setDeleteModal(true)}
+                            />
+                        ) : (
+                            <div className="p-6">
+                                {activeTab === 'overview' && (
+                                    <OverviewTab
+                                        tenant={tenant}
+                                        schoolName={schoolName}
+                                        schoolCode={schoolCode}
+                                        subdomain={subdomain}
+                                        adminEmail={adminEmail}
+                                        phone={phone}
+                                        address={address}
+                                        registrationDate={registrationDate}
+                                        lastActivity={lastActivity}
+                                        plan={plan}
+                                        status={status}
+                                        trialEnd={trialEnd}
+                                        subscriptionStart={subscriptionStart}
+                                        subscriptionEnd={subscriptionEnd}
+                                        usage={usage}
+                                        features={features}
+                                        quickStats={quickStats}
+                                    />
+                                )}
+                                {activeTab === 'users' && (
+                                    <UsersTab
+                                        users={users}
+                                        loading={usersLoading}
+                                        error={usersError}
+                                        page={usersPage}
+                                        totalPages={usersTotalPages}
+                                        onPageChange={fetchUsers}
+                                        onRetry={() => fetchUsers(usersPage)}
+                                    />
+                                )}
+                                {activeTab === 'invoices' && (
+                                    <InvoicesTab
+                                        invoices={invoices}
+                                        loading={invoicesLoading}
+                                        error={invoicesError}
+                                        onRetry={fetchInvoices}
+                                    />
+                                )}
+                                {activeTab === 'activity' && (
+                                    <ActivityTab
+                                        activities={activities}
+                                        loading={activitiesLoading}
+                                        error={activitiesError}
+                                        onRetry={fetchActivity}
+                                    />
+                                )}
+                                {activeTab === 'notes' && (
+                                    <NotesTab
+                                        notes={notes}
+                                        loading={notesLoading}
+                                        error={notesError}
+                                        newNote={newNote}
+                                        setNewNote={setNewNote}
+                                        savingNote={savingNote}
+                                        onAddNote={handleAddNote}
+                                        deleteNoteId={deleteNoteId}
+                                        setDeleteNoteId={setDeleteNoteId}
+                                        onDeleteNote={handleDeleteNote}
+                                        onRetry={fetchNotes}
+                                    />
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <span className="text-xs text-gray-400 dark:text-[#636366]">{limit > 0 ? `${percent}%` : 'Unlimited'}</span>
             </div>
-            <div className="flex items-end gap-1 mb-2">
-                <span className="text-2xl font-bold text-gray-900 dark:text-white">{count.toLocaleString()}</span>
-                {limit > 0 && <span className="text-sm text-gray-400 pb-0.5">/ {limit.toLocaleString()}</span>}
-            </div>
-            {limit > 0 && (
-                <div className="h-1.5 w-full bg-gray-100 dark:bg-[#2C2C2E] rounded-full overflow-hidden">
-                    <div
-                        className={`h-full rounded-full transition-all duration-500 ${percent > 90 ? 'bg-red-500' : percent > 70 ? 'bg-amber-500' : 'bg-primary-500'}`}
-                        style={{ width: `${percent}%` }}
+
+            {/* ─── Confirm Modals ─────────────────────────────────────────── */}
+            <ConfirmModal
+                isOpen={suspendModal}
+                onClose={() => setSuspendModal(false)}
+                title="Suspend Account"
+                description={`This will immediately suspend "${schoolName}" and lock all users out. Type the school name to confirm.`}
+                confirmLabel="Suspend Account"
+                inputLabel="Type the school name to confirm"
+                inputMatch={schoolName}
+                onConfirm={handleSuspend}
+                loading={actionLoading === 'suspend'}
+            />
+
+            <ConfirmModal
+                isOpen={deleteModal}
+                onClose={() => setDeleteModal(false)}
+                title="Delete School Permanently"
+                description={`This action is irreversible. All data for "${schoolName}" will be permanently deleted including users, courses, and files. Type DELETE to confirm.`}
+                confirmLabel="Delete Permanently"
+                confirmStyle="bg-red-700 text-white hover:bg-red-600 dark:bg-[#FF453A] dark:hover:bg-[#FF6961]"
+                inputLabel={'Type "DELETE" to confirm'}
+                inputMatch="DELETE"
+                onConfirm={handleDelete}
+                loading={actionLoading === 'delete'}
+            />
+        </Fragment>
+    )
+}
+
+// ─── Overview Tab ──────────────────────────────────────────────────────────
+function OverviewTab({ tenant, schoolName, schoolCode, subdomain, adminEmail, phone, address, registrationDate, lastActivity, plan, status, trialEnd, subscriptionStart, subscriptionEnd, usage, features, quickStats }) {
+    const trialCountdown = getTrialCountdown(trialEnd)
+
+    return (
+        <div className="space-y-6">
+            {/* School Info */}
+            <section className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2C2C2E]">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
+                        School Information
+                    </h3>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                    <InfoRow icon={Building2} label="Name" value={schoolName} />
+                    <InfoRow icon={Hash} label="Code" value={schoolCode} />
+                    <InfoRow icon={Globe} label="Subdomain" value={subdomain ? `${subdomain}.learnovoportal.com` : 'Not set'} />
+                    <InfoRow icon={Mail} label="Admin Email" value={adminEmail} />
+                    <InfoRow icon={Phone} label="Phone" value={phone || 'Not provided'} />
+                    <InfoRow icon={MapPin} label="Address" value={address || 'Not provided'} />
+                    <InfoRow icon={Calendar} label="Registered" value={formatDate(registrationDate)} />
+                    <InfoRow icon={Clock} label="Last Activity" value={formatDateTime(lastActivity)} />
+                </div>
+            </section>
+
+            {/* Subscription */}
+            <section className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2C2C2E]">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Crown className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
+                        Subscription
+                    </h3>
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500 dark:text-[#8E8E93]">Plan</span>
+                        <PlanBadge plan={plan} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500 dark:text-[#8E8E93]">Status</span>
+                        <StatusBadge status={status} />
+                    </div>
+                    {trialEnd && (
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-500 dark:text-[#8E8E93]">Trial Ends</span>
+                            <div className="text-right">
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(trialEnd)}</span>
+                                {trialCountdown && (
+                                    <span className={`ml-2 text-xs font-medium ${trialCountdown.expired ? 'text-red-500 dark:text-[#FF453A]' : 'text-amber-600 dark:text-[#FFD60A]'}`}>
+                                        ({trialCountdown.text})
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {subscriptionStart && (
+                        <InfoRow icon={Calendar} label="Start Date" value={formatDate(subscriptionStart)} />
+                    )}
+                    {subscriptionEnd && (
+                        <InfoRow icon={Calendar} label="End Date" value={formatDate(subscriptionEnd)} />
+                    )}
+                </div>
+            </section>
+
+            {/* Usage */}
+            <section className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2C2C2E]">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
+                        Usage
+                    </h3>
+                </div>
+                <div className="px-5 py-4 space-y-4">
+                    <ProgressBar
+                        current={usage?.students || usage?.currentStudents || 0}
+                        max={usage?.maxStudents || usage?.studentsLimit || 100}
+                        label="Students"
                     />
+                    <ProgressBar
+                        current={usage?.teachers || usage?.currentTeachers || 0}
+                        max={usage?.maxTeachers || usage?.teachersLimit || 20}
+                        label="Teachers"
+                    />
+                    <ProgressBar
+                        current={usage?.storageUsed || usage?.currentStorage || 0}
+                        max={usage?.maxStorage || usage?.storageLimit || 10}
+                        label="Storage"
+                        unit="GB"
+                    />
+                </div>
+            </section>
+
+            {/* Quick Stats */}
+            <section className="grid grid-cols-2 gap-3">
+                <StatCard icon={Users} label="Total Users" value={quickStats.totalUsers} />
+                <StatCard icon={FileText} label="Invoices" value={quickStats.totalInvoices} />
+                <StatCard icon={DollarSign} label="Revenue" value={`$${quickStats.totalRevenue?.toLocaleString() || '0'}`} />
+                <StatCard icon={CreditCard} label="Last Payment" value={quickStats.lastPayment ? formatDate(quickStats.lastPayment) : 'None'} small />
+            </section>
+
+            {/* Features */}
+            {features.length > 0 && (
+                <section className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2C2C2E]">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
+                            Features
+                        </h3>
+                    </div>
+                    <div className="px-5 py-4">
+                        <div className="grid grid-cols-2 gap-2">
+                            {features.map((feature, i) => {
+                                const featureName = typeof feature === 'string' ? feature : feature?.name || feature?.key || ''
+                                const enabled = typeof feature === 'string' ? true : feature?.enabled !== false
+                                return (
+                                    <div key={i} className="flex items-center gap-2 text-sm">
+                                        {enabled ? (
+                                            <Check className="w-4 h-4 text-emerald-500 dark:text-[#30D158] flex-shrink-0" />
+                                        ) : (
+                                            <X className="w-4 h-4 text-gray-300 dark:text-[#636366] flex-shrink-0" />
+                                        )}
+                                        <span className={enabled ? 'text-gray-700 dark:text-white' : 'text-gray-400 dark:text-[#636366]'}>
+                                            {featureName}
+                                        </span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </section>
+            )}
+        </div>
+    )
+}
+
+function InfoRow({ icon: Icon, label, value }) {
+    return (
+        <div className="flex items-center justify-between py-1">
+            <span className="flex items-center gap-2 text-sm text-gray-500 dark:text-[#8E8E93]">
+                <Icon className="w-4 h-4" />
+                {label}
+            </span>
+            <span className="text-sm font-medium text-gray-900 dark:text-white text-right truncate max-w-[60%]">{value}</span>
+        </div>
+    )
+}
+
+function StatCard({ icon: Icon, label, value, small }) {
+    return (
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] p-4">
+            <div className="flex items-center gap-2 mb-2">
+                <Icon className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
+                <span className="text-xs text-gray-500 dark:text-[#8E8E93]">{label}</span>
+            </div>
+            <p className={`font-semibold text-gray-900 dark:text-white ${small ? 'text-sm' : 'text-xl'}`}>{value}</p>
+        </div>
+    )
+}
+
+// ─── Users Tab ─────────────────────────────────────────────────────────────
+function UsersTab({ users, loading, error, page, totalPages, onPageChange, onRetry }) {
+    if (loading) return <Spinner />
+    if (error) return <ErrorState message={error} onRetry={onRetry} />
+    if (users.length === 0) return <EmptyState icon={Users} title="No users found" description="This school has no registered users yet." />
+
+    return (
+        <div className="space-y-4">
+            <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-[#38383A]">
+                <table className="w-full">
+                    <thead>
+                        <tr className="bg-gray-50/80 dark:bg-[#2C2C2E]">
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">User</th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">Role</th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">Status</th>
+                            <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">Last Login</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-[#2C2C2E]">
+                        {users.map(user => (
+                            <tr key={user._id || user.id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                                <td className="px-4 py-3">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A'}</p>
+                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{user.email}</p>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3"><RoleBadge role={user.role} /></td>
+                                <td className="px-4 py-3"><StatusBadge status={user.status || (user.isActive ? 'active' : 'suspended')} /></td>
+                                <td className="px-4 py-3 text-xs text-gray-500 dark:text-[#8E8E93]">{user.lastLogin ? formatDateTime(user.lastLogin) : 'Never'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-2">
+                    <button
+                        onClick={() => onPageChange(page - 1)}
+                        disabled={page <= 1}
+                        className="rounded-xl h-10 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-100/80 dark:text-[#3EC4B1] dark:hover:bg-[rgba(62,196,177,0.08)] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                        <ChevronLeft className="w-4 h-4" /> Previous
+                    </button>
+                    <span className="text-sm text-gray-500 dark:text-[#8E8E93]">
+                        Page {page} of {totalPages}
+                    </span>
+                    <button
+                        onClick={() => onPageChange(page + 1)}
+                        disabled={page >= totalPages}
+                        className="rounded-xl h-10 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-100/80 dark:text-[#3EC4B1] dark:hover:bg-[rgba(62,196,177,0.08)] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                        Next <ChevronRight className="w-4 h-4" />
+                    </button>
                 </div>
             )}
         </div>
     )
+}
 
-    const FeatureRow = ({ label, enabled }) => (
-        <div className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg ${enabled ? 'bg-primary-50/60 dark:bg-primary-900/20' : 'bg-gray-50 dark:bg-[#2C2C2E]'}`}>
-            <span className={`text-sm ${enabled ? 'text-gray-800 dark:text-white' : 'text-gray-400 dark:text-[#636366]'}`}>{label}</span>
-            {enabled
-                ? <CheckCircle2 className="h-4 w-4 text-primary-500" />
-                : <Square className="h-4 w-4 text-gray-300" />
-            }
-        </div>
-    )
+// ─── Invoices Tab ──────────────────────────────────────────────────────────
+function InvoicesTab({ invoices, loading, error, onRetry }) {
+    if (loading) return <Spinner />
+    if (error) return <ErrorState message={error} onRetry={onRetry} />
+    if (invoices.length === 0) return <EmptyState icon={FileText} title="No invoices" description="No invoices have been generated for this school." />
 
     return (
-        <>
-            {/* Backdrop */}
-            <div
-                className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity"
-                onClick={onClose}
-            />
-
-            {/* Modal */}
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-                <div className={`relative w-full max-w-2xl bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-2xl flex flex-col max-h-[90vh] transform transition-all duration-200 ${isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
-
-                    {/* ── Header ── */}
-                    {!isLoading && tenant ? (
-                        <div className="px-6 pt-5 pb-4 border-b border-gray-100 dark:border-[#38383A] flex-shrink-0">
-                            {/* Top row */}
-                            <div className="flex items-start justify-between mb-4">
-                                <span className="text-[10px] font-bold tracking-[0.15em] text-gray-400 dark:text-[#636366] uppercase">Manage Tenant</span>
-                                <button
-                                    onClick={onClose}
-                                    className="w-8 h-8 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg flex items-center justify-center transition-colors"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-
-                            {/* School identity */}
-                            <div className="flex items-center gap-4">
-                                {tenant.logo ? (
-                                    <img src={tenant.logo} alt={tenant.schoolName} className="h-14 w-14 rounded-xl object-cover ring-1 ring-gray-200 flex-shrink-0" />
-                                ) : (
-                                    <div className={`w-14 h-14 ${getAvatarColor(tenant.schoolName)} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                                        <span className="text-white font-bold text-lg">{getInitials(tenant.schoolName)}</span>
-                                    </div>
-                                )}
-                                <div className="min-w-0 flex-1">
-                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight truncate">{tenant.schoolName || 'Unnamed School'}</h2>
-                                    <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                        <span className="bg-gray-100 text-gray-600 text-[11px] font-semibold px-2 py-0.5 rounded font-mono">
-                                            #{tenant.schoolCode?.toUpperCase()}
-                                        </span>
-                                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${ss.badge}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full ${ss.dot}`} />
-                                            {ss.label}
-                                        </span>
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${pBadge}`}>
-                                            <Star className="h-2.5 w-2.5" /> {pLabel}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="px-6 pt-5 pb-4 border-b border-gray-100 dark:border-[#38383A] flex-shrink-0">
-                            <div className="flex items-start justify-between mb-4">
-                                <span className="text-[10px] font-bold tracking-[0.15em] text-gray-400 dark:text-[#636366] uppercase">Manage Tenant</span>
-                                <button onClick={onClose} className="w-8 h-8 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] text-gray-400 rounded-lg flex items-center justify-center">
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div className="flex items-center gap-4 animate-pulse">
-                                <div className="w-14 h-14 bg-gray-200 rounded-xl" />
-                                <div className="space-y-2 flex-1">
-                                    <div className="h-5 w-40 bg-gray-200 rounded" />
-                                    <div className="h-3 w-28 bg-gray-100 rounded" />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ── Tabs ── */}
-                    {tenant && (
-                        <div className="flex border-b border-gray-100 dark:border-[#38383A] px-6 flex-shrink-0 bg-gray-50/50 dark:bg-[#2C2C2E]/50">
-                            {tabs.map(tab => {
-                                const Icon = tab.icon
-                                return (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setActiveTab(tab.id)}
-                                        className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${activeTab === tab.id
-                                            ? 'border-primary-500 text-primary-700'
-                                            : 'border-transparent text-gray-400 dark:text-[#636366] hover:text-gray-600 dark:hover:text-white'
-                                            }`}
-                                    >
-                                        <Icon className="h-3.5 w-3.5" />
-                                        {tab.label}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    )}
-
-                    {/* ── Content ── */}
-                    <div className="flex-1 overflow-y-auto bg-gray-50/30 dark:bg-[#000000]/30">
-                        {isLoading || !tenant ? (
-                            <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-400 dark:text-[#636366]">
-                                <RefreshCw className="h-6 w-6 animate-spin text-primary-400" />
-                                <span className="text-sm">Loading school details...</span>
-                            </div>
-                        ) : activeTab === 'overview' ? (
-                            <div className="p-5 space-y-5">
-
-                                {/* Contact Info */}
-                                <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-100 dark:border-[#38383A] overflow-hidden">
-                                    <div className="px-4 py-2.5 border-b border-gray-50 dark:border-[#38383A] bg-gray-50/50 dark:bg-[#2C2C2E]/50">
-                                        <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#636366]">Contact</p>
-                                    </div>
-                                    <div className="divide-y divide-gray-50 dark:divide-[#38383A]">
-                                        {[
-                                            { icon: Mail, value: tenant.email, href: `mailto:${tenant.email}`, fallback: 'No email provided' },
-                                            { icon: Phone, value: tenant.phone, href: tenant.phone ? `tel:${tenant.phone}` : null, fallback: 'Not provided' },
-                                            { icon: MapPin, value: tenant.address && typeof tenant.address === 'object' ? Object.values(tenant.address).filter(Boolean).join(', ') : tenant.address, fallback: 'Not provided' },
-                                            { icon: Calendar, value: tenant.createdAt ? `Joined ${new Date(tenant.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}` : null, fallback: 'Unknown' },
-                                        ].map(({ icon: Icon, value, href, fallback }, i) => (
-                                            <div key={i} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 dark:hover:bg-[#2C2C2E]/50 transition-colors">
-                                                <div className="w-8 h-8 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg flex items-center justify-center flex-shrink-0">
-                                                    <Icon className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
-                                                </div>
-                                                {href && value
-                                                    ? <a href={href} className="text-sm text-gray-700 dark:text-[#8E8E93] hover:text-primary-600 truncate transition-colors">{value}</a>
-                                                    : <span className={`text-sm truncate ${value ? 'text-gray-700 dark:text-[#8E8E93]' : 'text-gray-400 dark:text-[#636366]'}`}>{value || fallback}</span>
-                                                }
-                                            </div>
-                                        ))}
-                                        {/* Subdomain row */}
-                                        <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 dark:hover:bg-[#2C2C2E]/50 transition-colors">
-                                            <div className="w-8 h-8 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg flex items-center justify-center flex-shrink-0">
-                                                <Globe className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
-                                            </div>
-                                            {tenant.subdomain ? (
-                                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                    <a href={`https://${tenant.subdomain}.learnovoportal.com`} target="_blank" rel="noopener noreferrer"
-                                                        className="text-sm text-primary-600 hover:text-primary-700 truncate font-medium">
-                                                        {tenant.subdomain}.learnovoportal.com
-                                                    </a>
-                                                    <button
-                                                        onClick={() => { navigator.clipboard.writeText(`${tenant.subdomain}.learnovoportal.com`); toast.success('Copied!') }}
-                                                        className="text-gray-300 hover:text-gray-500 flex-shrink-0"
-                                                    >
-                                                        <Copy className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <span className="text-sm text-amber-600 font-medium">No subdomain assigned</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Usage */}
-                                <div>
-                                    <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#636366] mb-3">Usage</p>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <UsageBar label="Students" count={studentCount} limit={studentLimit} percent={studentPercent} icon={GraduationCap} />
-                                        <UsageBar label="Teachers" count={teacherCount} limit={teacherLimit} percent={teacherPercent} icon={Users} />
-                                    </div>
-                                </div>
-
-                                {/* Features */}
-                                <div>
-                                    <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#636366] mb-3">Feature Access</p>
-                                    <div className="space-y-1.5 bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-100 dark:border-[#38383A] p-3">
-                                        <FeatureRow label="Core Academics" enabled={true} />
-                                        <FeatureRow label="Attendance Tracking" enabled={true} />
-                                        <FeatureRow label="Timetable & Homework" enabled={true} />
-                                        <FeatureRow label="Grades & Exams" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="Result Cards (PDF)" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="Fees & Finance" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="Fee Receipts (PDF)" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="Basic Reports" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="Advanced Analytics" enabled={['pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="Custom Reports" enabled={['pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="CSV Import" enabled={['basic', 'pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="API Access" enabled={['pro', 'premium', 'enterprise'].includes(plan)} />
-                                        <FeatureRow label="Custom Integrations" enabled={['enterprise'].includes(plan)} />
-                                        <FeatureRow label="Dedicated Account Manager" enabled={['enterprise'].includes(plan)} />
-                                    </div>
-                                </div>
-
-                            </div>
-                        ) : (
-                            <div className="p-5 space-y-5">
-
-                                {/* Subscription */}
-                                <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-100 dark:border-[#38383A] overflow-hidden">
-                                    <div className="px-4 py-2.5 border-b border-gray-50 dark:border-[#38383A] flex items-center justify-between bg-gray-50/50 dark:bg-[#2C2C2E]/50">
-                                        <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#636366]">Subscription Plan</p>
-                                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${pBadge}`}>{pLabel}</span>
-                                    </div>
-
-                                    <div className="p-4 space-y-4">
-                                        {showPlanChange ? (
-                                            <div className="space-y-3 bg-primary-50/50 border border-primary-100 rounded-xl p-4">
-                                                <p className="text-xs font-semibold text-primary-800">Select New Plan</p>
-                                                <select
-                                                    value={selectedPlan}
-                                                    onChange={(e) => setSelectedPlan(e.target.value)}
-                                                    className="block w-full border-gray-200 rounded-lg shadow-sm text-sm focus:ring-primary-500 focus:border-primary-500"
-                                                >
-                                                    <option value="free">Free Trial</option>
-                                                    <option value="basic">Basic</option>
-                                                    <option value="pro">Pro</option>
-                                                    <option value="enterprise">Enterprise</option>
-                                                </select>
-                                                <div className="flex gap-2">
-                                                    <button onClick={handleChangePlan} disabled={isUpdating || selectedPlan === plan}
-                                                        className="flex-1 bg-primary-600 text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition">
-                                                        {isUpdating ? 'Saving...' : 'Confirm Change'}
-                                                    </button>
-                                                    <button onClick={() => setShowPlanChange(false)}
-                                                        className="flex-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 text-gray-600 text-xs font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition">
-                                                        Cancel
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <button onClick={() => setShowPlanChange(true)}
-                                                className="w-full flex items-center justify-between p-3 rounded-xl border border-dashed border-gray-200 hover:border-primary-300 hover:bg-primary-50/50 transition-all group">
-                                                <div className="flex items-center gap-2 text-sm font-medium text-gray-500 group-hover:text-primary-700">
-                                                    <CreditCard className="h-4 w-4" />
-                                                    Change Plan
-                                                </div>
-                                                <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-primary-500" />
-                                            </button>
-                                        )}
-
-                                        {/* Date info */}
-                                        <div className="flex items-center justify-between text-sm pt-1 border-t border-gray-50 dark:border-[#38383A]">
-                                            <div className="flex items-center gap-1.5 text-gray-500 dark:text-[#8E8E93]">
-                                                <Clock className="h-3.5 w-3.5" />
-                                                <span className="text-xs">{isTrial ? 'Trial ends' : 'Period ends'}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-semibold text-gray-700 dark:text-white">
-                                                    {tenant.subscription?.trialEndsAt
-                                                        ? new Date(tenant.subscription.trialEndsAt).toLocaleDateString()
-                                                        : tenant.subscription?.currentPeriodEnd
-                                                            ? new Date(tenant.subscription.currentPeriodEnd).toLocaleDateString()
-                                                            : 'N/A'}
-                                                </span>
-                                                {isTrial && (
-                                                    <button
-                                                        onClick={() => setShowExtendTrial(!showExtendTrial)}
-                                                        className="text-[11px] font-bold text-primary-600 hover:text-primary-700 underline"
-                                                    >Extend</button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {showExtendTrial && (
-                                            <div className="bg-primary-50/50 border border-primary-100 rounded-xl p-3 flex gap-2">
-                                                <select value={trialDays} onChange={(e) => setTrialDays(Number(e.target.value))}
-                                                    className="flex-1 text-xs border-gray-200 rounded-lg shadow-sm">
-                                                    <option value={7}>+ 7 days</option>
-                                                    <option value={14}>+ 14 days</option>
-                                                    <option value={30}>+ 30 days</option>
-                                                    <option value={60}>+ 60 days</option>
-                                                </select>
-                                                <button onClick={handleExtendTrial} disabled={isUpdating}
-                                                    className="bg-primary-600 text-white px-4 text-xs font-semibold rounded-lg hover:bg-primary-700 disabled:opacity-50 transition">
-                                                    Extend
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Override Limits */}
-                                <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-100 dark:border-[#38383A] overflow-hidden">
-                                    <div className="px-4 py-2.5 border-b border-gray-50 dark:border-[#38383A] flex items-center justify-between bg-gray-50/50 dark:bg-[#2C2C2E]/50">
-                                        <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#636366]">Custom Limits</p>
-                                        <button
-                                            onClick={() => setShowOverrideFeatures(!showOverrideFeatures)}
-                                            className={`text-[11px] font-bold uppercase tracking-wide ${showOverrideFeatures ? 'text-red-500' : 'text-primary-600 hover:text-primary-700'}`}
-                                        >
-                                            {showOverrideFeatures ? 'Cancel' : 'Override'}
-                                        </button>
-                                    </div>
-
-                                    {showOverrideFeatures ? (
-                                        <div className="p-4 space-y-3">
-                                            <p className="text-xs text-amber-700 font-medium flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-lg">
-                                                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-                                                These limits override plan defaults for this school only.
-                                            </p>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {[
-                                                    { label: 'Max Students', key: 'students' },
-                                                    { label: 'Max Teachers', key: 'teachers' },
-                                                ].map(({ label, key }) => (
-                                                    <div key={key}>
-                                                        <label className="block text-xs text-gray-600 font-medium mb-1">{label}</label>
-                                                        <input
-                                                            type="number" min="0"
-                                                            value={overrideLimits[key]}
-                                                            onChange={(e) => setOverrideLimits({ ...overrideLimits, [key]: e.target.value })}
-                                                            className="block w-full border border-gray-200 rounded-lg text-sm px-3 py-2 focus:ring-primary-500 focus:border-primary-500"
-                                                        />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <button onClick={handleOverrideFeatures} disabled={isUpdating}
-                                                className="w-full bg-primary-600 text-white py-2.5 text-xs font-semibold rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-1.5 transition">
-                                                <Save className="h-3.5 w-3.5" /> Apply Custom Limits
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="p-4 grid grid-cols-2 gap-3">
-                                            <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-lg p-3">
-                                                <p className="text-[10px] text-gray-400 dark:text-[#636366] font-semibold uppercase tracking-wide mb-1">Students Cap</p>
-                                                <p className="text-lg font-bold text-gray-900 dark:text-white">{studentLimit > 0 ? studentLimit.toLocaleString() : 'Unlimited'}</p>
-                                            </div>
-                                            <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-lg p-3">
-                                                <p className="text-[10px] text-gray-400 dark:text-[#636366] font-semibold uppercase tracking-wide mb-1">Teachers Cap</p>
-                                                <p className="text-lg font-bold text-gray-900 dark:text-white">{teacherLimit > 0 ? teacherLimit.toLocaleString() : 'Unlimited'}</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Subdomain */}
-                                <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-100 dark:border-[#38383A] overflow-hidden">
-                                    <div className="px-4 py-2.5 border-b border-gray-50 dark:border-[#38383A] flex items-center justify-between bg-gray-50/50 dark:bg-[#2C2C2E]/50">
-                                        <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#636366]">Subdomain</p>
-                                        {!showSubdomainEdit && (
-                                            <button
-                                                onClick={() => { setSubdomainInput(tenant?.subdomain || tenant?.schoolCode || ''); setShowSubdomainEdit(true) }}
-                                                className="text-[11px] font-bold uppercase tracking-wide text-primary-600 hover:text-primary-700"
-                                            >
-                                                {tenant?.subdomain ? 'Change' : 'Assign'}
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="p-4">
-                                        {showSubdomainEdit ? (
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <label className="block text-xs text-gray-600 font-medium mb-1">Subdomain Slug</label>
-                                                    <div className="flex items-center gap-0">
-                                                        <input
-                                                            type="text"
-                                                            value={subdomainInput}
-                                                            onChange={(e) => setSubdomainInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                                                            placeholder="greenwood"
-                                                            className="block w-full border border-gray-200 rounded-l-lg text-sm px-3 py-2 focus:ring-primary-500 focus:border-primary-500"
-                                                        />
-                                                        <span className="bg-gray-100 dark:bg-[#2C2C2E] border border-l-0 border-gray-200 text-xs text-gray-500 px-2 py-2 rounded-r-lg whitespace-nowrap">
-                                                            .learnovoportal.com
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-400 mt-1">Lowercase letters, numbers, and hyphens only (3-63 chars)</p>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <button onClick={handleSubdomainSave} disabled={isUpdating}
-                                                        className="flex-1 bg-primary-600 text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5">
-                                                        <Save className="h-3.5 w-3.5" /> {isUpdating ? 'Saving...' : 'Save Subdomain'}
-                                                    </button>
-                                                    <button onClick={() => setShowSubdomainEdit(false)}
-                                                        className="flex-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 text-gray-600 text-xs font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition">
-                                                        Cancel
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <Globe className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                                                {tenant?.subdomain ? (
-                                                    <span className="text-sm font-medium text-gray-700 dark:text-white">{tenant.subdomain}.learnovoportal.com</span>
-                                                ) : (
-                                                    <span className="text-sm text-amber-600">Not assigned — click &quot;Assign&quot; above</span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Danger Zone */}
-                                <div className="bg-white dark:bg-[#1C1C1E] border border-red-100 dark:border-red-900/50 rounded-xl overflow-hidden">
-                                    <div className="px-4 py-2.5 border-b border-red-50 dark:border-red-900/30 bg-red-50/50 dark:bg-red-900/10 flex items-center gap-2">
-                                        <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
-                                        <p className="text-[11px] font-bold text-red-600 uppercase tracking-wider">Danger Zone</p>
-                                    </div>
-                                    <div className="p-4">
-                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mb-3 leading-relaxed">
-                                            Permanently deactivate this school and all its users. This cannot be undone.
-                                        </p>
-                                        <button
-                                            onClick={handleDeleteTenant}
-                                            disabled={isUpdating}
-                                            className="w-full flex items-center justify-center gap-2 py-2.5 border border-red-200 text-red-600 text-xs font-semibold rounded-lg hover:bg-red-50 hover:border-red-300 transition-colors disabled:opacity-50"
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                            Delete Tenant Permanently
-                                        </button>
-                                    </div>
-                                </div>
-
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ── Footer Action Bar ── */}
-                    {tenant && (
-                        <div className="flex-shrink-0 px-5 py-4 bg-white dark:bg-[#1C1C1E] border-t border-gray-100 dark:border-[#2C2C2E]">
-                            {isSuspended ? (
-                                <button onClick={() => handleStatusChange('activate')} disabled={isUpdating}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-                                    <CheckCircle2 className="h-4 w-4" /> Activate Account
-                                </button>
-                            ) : isTrial ? (
-                                <button onClick={() => handleStatusChange('activate')} disabled={isUpdating}
-                                    className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-                                    <Zap className="h-4 w-4" /> Activate — End Trial
-                                </button>
-                            ) : isActive ? (
-                                <button onClick={() => handleStatusChange('suspend')} disabled={isUpdating}
-                                    className="w-full border-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-                                    <Ban className="h-4 w-4" /> Suspend Account
-                                </button>
-                            ) : (
-                                <button onClick={() => handleStatusChange('activate')} disabled={isUpdating}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-                                    <CheckCircle2 className="h-4 w-4" /> Reactivate Account
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </>
+        <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-[#38383A]">
+            <table className="w-full">
+                <thead>
+                    <tr className="bg-gray-50/80 dark:bg-[#2C2C2E]">
+                        <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">Invoice</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">Amount</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">Status</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">Due Date</th>
+                        <th className="text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93]">Method</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-[#2C2C2E]">
+                    {invoices.map(inv => (
+                        <tr key={inv._id || inv.id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                                {inv.invoiceNumber || inv.number || `INV-${(inv._id || inv.id || '').slice(-6)}`}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white">
+                                ${(inv.amount || inv.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-4 py-3"><InvoiceStatusBadge status={inv.status} /></td>
+                            <td className="px-4 py-3 text-xs text-gray-500 dark:text-[#8E8E93]">{formatDate(inv.dueDate)}</td>
+                            <td className="px-4 py-3 text-xs text-gray-500 dark:text-[#8E8E93] capitalize">{inv.paymentMethod || inv.method || 'N/A'}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
     )
 }
 
-export default TenantSlideOver
+// ─── Activity Tab ──────────────────────────────────────────────────────────
+function ActivityTab({ activities, loading, error, onRetry }) {
+    if (loading) return <Spinner />
+    if (error) return <ErrorState message={error} onRetry={onRetry} />
+    if (activities.length === 0) return <EmptyState icon={Activity} title="No activity" description="No recent activity recorded for this school." />
+
+    return (
+        <div className="space-y-0">
+            {activities.map((item, idx) => (
+                <div key={item._id || item.id || idx} className="relative flex gap-4 pb-6 last:pb-0">
+                    {/* Timeline line */}
+                    {idx < activities.length - 1 && (
+                        <div className="absolute left-[15px] top-8 bottom-0 w-px bg-gray-200 dark:bg-[#38383A]" />
+                    )}
+                    {/* Dot */}
+                    <div className="relative flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 dark:bg-[#2C2C2E] flex items-center justify-center">
+                        <Activity className="w-4 h-4 text-gray-500 dark:text-[#8E8E93]" />
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900 dark:text-white">{item.action || item.description || item.message || 'Activity'}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                            {(item.user || item.userName || item.performedBy) && (
+                                <span className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                                    by {item.user?.name || item.userName || item.performedBy}
+                                </span>
+                            )}
+                            <span className="text-xs text-gray-400 dark:text-[#636366]">
+                                {formatDateTime(item.createdAt || item.timestamp || item.date)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
+// ─── Notes Tab ─────────────────────────────────────────────────────────────
+function NotesTab({ notes, loading, error, newNote, setNewNote, savingNote, onAddNote, deleteNoteId, setDeleteNoteId, onDeleteNote, onRetry }) {
+    if (loading) return <Spinner />
+    if (error) return <ErrorState message={error} onRetry={onRetry} />
+
+    return (
+        <div className="space-y-6">
+            {/* Add Note */}
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] p-5">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Add Custom Note</h4>
+                <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Write an internal note about this school..."
+                    rows={3}
+                    className="w-full rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#636366] focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#3EC4B1] resize-none"
+                />
+                <div className="flex justify-end mt-3">
+                    <button
+                        onClick={onAddNote}
+                        disabled={!newNote.trim() || savingNote}
+                        className="rounded-xl h-10 px-4 text-sm font-semibold bg-primary-600 text-white hover:bg-primary-500 dark:bg-[#3EC4B1] dark:text-black dark:hover:bg-[#35a89a] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {savingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                        Save Note
+                    </button>
+                </div>
+            </div>
+
+            {/* Notes List */}
+            {notes.length === 0 ? (
+                <EmptyState icon={StickyNote} title="No notes yet" description="Add internal notes about this school for your team." />
+            ) : (
+                <div className="space-y-3">
+                    {notes.map(note => (
+                        <div key={note._id || note.id} className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] p-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <p className="text-sm text-gray-900 dark:text-white flex-1 whitespace-pre-wrap">{note.content || note.text || note.body}</p>
+                                <button
+                                    onClick={() => setDeleteNoteId(note._id || note.id)}
+                                    className="rounded-xl h-8 w-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:text-[#636366] dark:hover:text-[#FF453A] dark:hover:bg-[rgba(255,69,58,0.08)] active:scale-[0.97] transition-all flex-shrink-0"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-[#636366]">
+                                {(note.author || note.createdBy) && (
+                                    <span>{typeof note.author === 'object' ? note.author.name : (note.author || note.createdBy)}</span>
+                                )}
+                                <span>{formatDateTime(note.createdAt || note.date)}</span>
+                            </div>
+
+                            {/* Inline delete confirm */}
+                            {deleteNoteId === (note._id || note.id) && (
+                                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#2C2C2E] flex items-center justify-between">
+                                    <span className="text-xs text-red-600 dark:text-[#FF453A] font-medium">Delete this note?</span>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setDeleteNoteId(null)}
+                                            className="rounded-xl h-8 px-3 text-xs font-semibold text-gray-600 hover:bg-gray-100/80 dark:text-[#3EC4B1] dark:hover:bg-[rgba(62,196,177,0.08)] active:scale-[0.97] transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={() => onDeleteNote(note._id || note.id)}
+                                            className="rounded-xl h-8 px-3 text-xs font-semibold bg-red-600 text-white hover:bg-red-500 dark:bg-[#FF453A] dark:hover:bg-[#FF6961] active:scale-[0.97] transition-all"
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ─── Actions Panel ─────────────────────────────────────────────────────────
+function ActionsPanel({ tenant, plans, selectedPlan, setSelectedPlan, trialDays, setTrialDays, actionLoading, isSuspended, onChangePlan, onExtendTrial, onSuspend, onReactivate, onResetPassword, onDelete }) {
+    return (
+        <div className="p-6 space-y-6">
+            {/* Change Plan */}
+            <section className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Crown className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
+                    Change Plan
+                </h3>
+                <div className="flex items-center gap-3">
+                    <select
+                        value={selectedPlan}
+                        onChange={(e) => setSelectedPlan(e.target.value)}
+                        className="flex-1 h-11 sm:h-10 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] px-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#3EC4B1]"
+                    >
+                        <option value="">Select a plan</option>
+                        {plans.map(p => (
+                            <option key={p._id || p.id} value={p.slug || p.name?.toLowerCase()}>
+                                {p.name} {p.price ? `- $${p.price}/mo` : ''}
+                            </option>
+                        ))}
+                        {plans.length === 0 && (
+                            <>
+                                <option value="free">Free</option>
+                                <option value="starter">Starter</option>
+                                <option value="professional">Professional</option>
+                                <option value="enterprise">Enterprise</option>
+                            </>
+                        )}
+                    </select>
+                    <button
+                        onClick={onChangePlan}
+                        disabled={!selectedPlan || actionLoading === 'plan'}
+                        className="rounded-xl h-10 px-4 text-sm font-semibold bg-primary-600 text-white hover:bg-primary-500 dark:bg-[#3EC4B1] dark:text-black dark:hover:bg-[#35a89a] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {actionLoading === 'plan' && <Loader2 className="w-4 h-4 animate-spin" />}
+                        Save
+                    </button>
+                </div>
+            </section>
+
+            {/* Extend Trial */}
+            <section className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
+                    Extend Trial
+                </h3>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 flex-1">
+                        <input
+                            type="number"
+                            value={trialDays}
+                            onChange={(e) => setTrialDays(Math.max(1, parseInt(e.target.value) || 1))}
+                            min={1}
+                            max={365}
+                            className="w-24 h-11 sm:h-10 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] px-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#3EC4B1] text-center"
+                        />
+                        <span className="text-sm text-gray-500 dark:text-[#8E8E93]">days</span>
+                    </div>
+                    <button
+                        onClick={onExtendTrial}
+                        disabled={actionLoading === 'trial'}
+                        className="rounded-xl h-10 px-4 text-sm font-semibold bg-primary-600 text-white hover:bg-primary-500 dark:bg-[#3EC4B1] dark:text-black dark:hover:bg-[#35a89a] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {actionLoading === 'trial' && <Loader2 className="w-4 h-4 animate-spin" />}
+                        Extend
+                    </button>
+                </div>
+            </section>
+
+            {/* Account Actions */}
+            <section className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-200 dark:border-[#38383A] p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
+                    Account Actions
+                </h3>
+                <div className="space-y-3">
+                    {/* Suspend / Reactivate */}
+                    {isSuspended ? (
+                        <button
+                            onClick={onReactivate}
+                            disabled={actionLoading === 'reactivate'}
+                            className="w-full rounded-xl h-10 px-4 text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-500 dark:bg-[#30D158] dark:text-black dark:hover:bg-[#28b84c] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {actionLoading === 'reactivate' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                            Reactivate Account
+                        </button>
+                    ) : (
+                        <button
+                            onClick={onSuspend}
+                            disabled={actionLoading === 'suspend'}
+                            className="w-full rounded-xl h-10 px-4 text-sm font-semibold bg-red-600 text-white hover:bg-red-500 dark:bg-[#FF453A] dark:hover:bg-[#FF6961] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {actionLoading === 'suspend' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                            Suspend Account
+                        </button>
+                    )}
+
+                    {/* Reset Admin Password */}
+                    <button
+                        onClick={onResetPassword}
+                        disabled={actionLoading === 'reset'}
+                        className="w-full rounded-xl h-10 px-4 text-sm font-semibold text-gray-600 hover:bg-gray-100/80 dark:text-[#3EC4B1] dark:hover:bg-[rgba(62,196,177,0.08)] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-gray-200 dark:border-[#38383A]"
+                    >
+                        {actionLoading === 'reset' ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                        Reset Admin Password
+                    </button>
+                </div>
+            </section>
+
+            {/* Danger Zone */}
+            <section className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-red-200 dark:border-red-900/40 p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-red-600 dark:text-[#FF453A] flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Danger Zone
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                    This action is permanent and cannot be undone. All school data, users, courses, and files will be permanently deleted.
+                </p>
+                <button
+                    onClick={onDelete}
+                    disabled={actionLoading === 'delete'}
+                    className="w-full rounded-xl h-10 px-4 text-sm font-semibold bg-red-700 text-white hover:bg-red-600 dark:bg-[#FF453A] dark:hover:bg-[#FF6961] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                    {actionLoading === 'delete' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    Delete School Permanently
+                </button>
+            </section>
+        </div>
+    )
+}

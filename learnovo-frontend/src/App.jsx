@@ -44,6 +44,8 @@ const SuperAdminSupport = lazy(() => import('./pages/superadmin/Support'))
 const SuperAdminReports = lazy(() => import('./pages/superadmin/Reports'))
 const SuperAdminSettings = lazy(() => import('./pages/superadmin/Settings'))
 const SuperAdminSystem = lazy(() => import('./pages/superadmin/System'))
+const SuperAdminProfile = lazy(() => import('./pages/superadmin/Profile'))
+const SuperAdminBackups = lazy(() => import('./pages/superadmin/Backups'))
 const SuperAdminLayout = lazy(() => import('./components/superadmin/SuperAdminLayout'))
 
 // ── App pages — all lazy-loaded for code splitting
@@ -396,6 +398,8 @@ function App() {
                       <Route path="audit-log" element={<SuperAdminAuditLog />} />
                       <Route path="settings" element={<SuperAdminSettings />} />
                       <Route path="system" element={<SuperAdminSystem />} />
+                      <Route path="profile" element={<SuperAdminProfile />} />
+                      <Route path="backups" element={<SuperAdminBackups />} />
                     </Route>
                   </Routes>
                 </Suspense>

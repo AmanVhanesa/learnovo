@@ -28,7 +28,7 @@ superAdminClient.interceptors.response.use(
     (error) => {
         if (error.response && error.response.status === 401) {
             localStorage.removeItem('superAdminToken')
-            localStorage.removeItem('superAdminUser')
+            localStorage.removeItem('superAdmin')
             if (window.location.pathname !== '/super-admin-login') {
                 window.location.href = '/super-admin-login'
             }
@@ -270,15 +270,101 @@ export const superAdminService = {
         return response.data
     },
 
+    // ─── Tenant Notes ─────────────────────────────────────────────────────────
+    getTenantNotes: async (tenantId) => {
+        const response = await superAdminClient.get(`/tenants/${tenantId}/notes`)
+        return response.data
+    },
+    createTenantNote: async (tenantId, data) => {
+        const response = await superAdminClient.post(`/tenants/${tenantId}/notes`, data)
+        return response.data
+    },
+    deleteTenantNote: async (tenantId, noteId) => {
+        const response = await superAdminClient.delete(`/tenants/${tenantId}/notes/${noteId}`)
+        return response.data
+    },
+    resetTenantAdminPassword: async (tenantId) => {
+        const response = await superAdminClient.post(`/tenants/${tenantId}/reset-admin-password`)
+        return response.data
+    },
+    getTenantUsers: async (tenantId, params) => {
+        const response = await superAdminClient.get(`/tenants/${tenantId}/users`, { params })
+        return response.data
+    },
+    getTenantInvoices: async (tenantId, params) => {
+        const response = await superAdminClient.get(`/tenants/${tenantId}/invoices`, { params })
+        return response.data
+    },
+    getTenantActivity: async (tenantId, params) => {
+        const response = await superAdminClient.get(`/tenants/${tenantId}/activity`, { params })
+        return response.data
+    },
+
+    // ─── Super Admin Users ─────────────────────────────────────────────────────
+    getSuperAdmins: async () => {
+        const response = await superAdminClient.get('/admins')
+        return response.data
+    },
+    createSuperAdmin: async (data) => {
+        const response = await superAdminClient.post('/admins', data)
+        return response.data
+    },
+    updateSuperAdmin: async (id, data) => {
+        const response = await superAdminClient.patch(`/admins/${id}`, data)
+        return response.data
+    },
+    deactivateSuperAdmin: async (id) => {
+        const response = await superAdminClient.delete(`/admins/${id}`)
+        return response.data
+    },
+
     // ─── Modules ─────────────────────────────────────────────────────────────
     getModules: async () => {
         const response = await superAdminClient.get('/modules')
         return response.data
     },
+    updateModule: async (id, data) => {
+        const response = await superAdminClient.patch(`/modules/${id}`, data)
+        return response.data
+    },
+    updateModulePlanAccess: async (data) => {
+        const response = await superAdminClient.patch('/modules/plan-access', data)
+        return response.data
+    },
+    overrideTenantModules: async (tenantId, data) => {
+        const response = await superAdminClient.patch(`/tenants/${tenantId}/module-overrides`, data)
+        return response.data
+    },
+
+    // ─── Revenue ──────────────────────────────────────────────────────────────
+    getRevenueChart: async (params) => {
+        const response = await superAdminClient.get('/billing/revenue-chart', { params })
+        return response.data
+    },
+    getInvoiceById: async (id) => {
+        const response = await superAdminClient.get(`/invoices/${id}`)
+        return response.data
+    },
 
     // ─── Reports ─────────────────────────────────────────────────────────────
-    getReportsOverview: async () => {
-        const response = await superAdminClient.get('/reports/overview')
+    getReportsOverview: async (params) => {
+        const response = await superAdminClient.get('/reports/overview', { params })
+        return response.data
+    },
+    getSchoolActivityReport: async (params) => {
+        const response = await superAdminClient.get('/reports/school-activity', { params })
+        return response.data
+    },
+    getRevenueReport: async (params) => {
+        const response = await superAdminClient.get('/reports/revenue', { params })
+        return response.data
+    },
+    getTrialConversionFunnel: async (params) => {
+        const response = await superAdminClient.get('/reports/trial-funnel', { params })
+        return response.data
+    },
+    exportReport: async (type, params) => {
+        const response = await superAdminClient.get(`/reports/export/${type}`, { params, responseType: 'blob' })
         return response.data
     },
 
@@ -292,5 +378,83 @@ export const superAdminService = {
     getAuditLogs: async (params) => {
         const response = await superAdminClient.get('/audit-logs', { params })
         return response.data
-    }
+    },
+    exportAuditLogs: async (params) => {
+        const response = await superAdminClient.get('/audit-logs/export', { params, responseType: 'blob' })
+        return response.data
+    },
+
+    // ─── Communication (extended) ─────────────────────────────────────────────
+    getScheduledAnnouncements: async (params) => {
+        const response = await superAdminClient.get('/announcements/scheduled', { params })
+        return response.data
+    },
+    cancelAnnouncement: async (id) => {
+        const response = await superAdminClient.patch(`/announcements/${id}/cancel`)
+        return response.data
+    },
+    previewAnnouncement: async (data) => {
+        const response = await superAdminClient.post('/announcements/preview', data)
+        return response.data
+    },
+    sendTestEmail: async (templateId) => {
+        const response = await superAdminClient.post(`/email-templates/${templateId}/test`)
+        return response.data
+    },
+    previewEmailTemplate: async (id) => {
+        const response = await superAdminClient.get(`/email-templates/${id}/preview`)
+        return response.data
+    },
+    getEmailHistory: async (params) => {
+        const response = await superAdminClient.get('/email-history', { params })
+        return response.data
+    },
+    searchTenants: async (query) => {
+        const response = await superAdminClient.get('/tenants', { params: { search: query, limit: 20 } })
+        return response.data
+    },
+
+    // ─── Support (extended) ───────────────────────────────────────────────────
+    bulkUpdateTickets: async (data) => {
+        const response = await superAdminClient.patch('/support-tickets/bulk', data)
+        return response.data
+    },
+    exportTickets: async (params) => {
+        const response = await superAdminClient.get('/support-tickets/export', { params, responseType: 'blob' })
+        return response.data
+    },
+
+    // ─── Settings (extended) ──────────────────────────────────────────────────
+    testEmailConfig: async () => {
+        const response = await superAdminClient.post('/settings/test-email')
+        return response.data
+    },
+    testPaymentGateway: async () => {
+        const response = await superAdminClient.post('/settings/test-payment')
+        return response.data
+    },
+
+    // ─── Profile ────────────────────────────────────────────────────────────
+    updateProfile: async (data) => {
+        const response = await superAdminClient.patch('/profile', data)
+        return response.data
+    },
+    changePassword: async (data) => {
+        const response = await superAdminClient.patch('/profile/password', data)
+        return response.data
+    },
+
+    // ─── Backups ────────────────────────────────────────────────────────────
+    getBackups: async (params) => {
+        const response = await superAdminClient.get('/backups', { params })
+        return response.data
+    },
+    triggerBackup: async () => {
+        const response = await superAdminClient.post('/backups/trigger')
+        return response.data
+    },
+    deleteBackup: async (id) => {
+        const response = await superAdminClient.delete(`/backups/${id}`)
+        return response.data
+    },
 }

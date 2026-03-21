@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { Menu, Search, LogOut, ChevronDown, ChevronRight, Bell, Sun, Moon } from 'lucide-react'
+import { Menu, Search, LogOut, ChevronDown, ChevronRight, Bell, Sun, Moon, User } from 'lucide-react'
 import { useSuperAdminAuth } from '../../contexts/SuperAdminContext'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -17,6 +17,8 @@ const PAGE_TITLES = {
     '/super-admin/audit-log': 'Audit Logs',
     '/super-admin/settings': 'Platform Settings',
     '/super-admin/system': 'System Health',
+    '/super-admin/profile': 'My Profile',
+    '/super-admin/backups': 'Backup Management',
 }
 
 const SuperAdminHeader = ({ onToggleSidebar }) => {
@@ -53,13 +55,13 @@ const SuperAdminHeader = ({ onToggleSidebar }) => {
     const initials = displayName.charAt(0)?.toUpperCase() || 'S'
 
     return (
-        <header className="bg-white dark:bg-[#1C1C1E] shadow-sm border-b border-gray-200 dark:border-[#38383A]">
-            <div className="flex items-center justify-between h-14 px-3 sm:px-4 md:px-6">
+        <header className="h-16 bg-white/80 dark:bg-[#000000]/80 backdrop-blur-lg border-b border-gray-200/60 dark:border-[#38383A]">
+            <div className="flex items-center justify-between h-full px-3 sm:px-4 md:px-6">
                 {/* Left: hamburger + breadcrumb */}
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <button
                         onClick={onToggleSidebar}
-                        className="xl:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] focus:outline-none flex-shrink-0"
+                        className="xl:hidden p-2 rounded-xl text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] focus:outline-none flex-shrink-0"
                     >
                         <Menu className="h-5 w-5" />
                     </button>
@@ -73,8 +75,9 @@ const SuperAdminHeader = ({ onToggleSidebar }) => {
                     </nav>
                 </div>
 
-                {/* Right: search + profile */}
+                {/* Right: search + theme + notifications + profile */}
                 <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                    {/* Search bar — matches main app style */}
                     <form onSubmit={handleSearch} className="hidden md:block">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
@@ -82,7 +85,7 @@ const SuperAdminHeader = ({ onToggleSidebar }) => {
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="block w-56 pl-9 pr-3 py-1.5 border border-gray-200 dark:border-[#38383A] rounded-lg text-sm bg-gray-50 dark:bg-[#1C1C1E] dark:text-white placeholder-gray-400 dark:placeholder-[#636366] focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 focus:bg-white dark:focus:bg-[#1C1C1E] transition-colors"
+                                className="block w-56 pl-9 pr-3 h-10 border border-gray-200 dark:border-[#38383A] rounded-xl text-sm bg-white dark:bg-[#1C1C1E] dark:text-white placeholder-gray-400 dark:placeholder-[#636366] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
                                 placeholder="Search..."
                             />
                         </div>
@@ -91,17 +94,25 @@ const SuperAdminHeader = ({ onToggleSidebar }) => {
                     {/* Dark/Light mode toggle */}
                     <button
                         onClick={toggleMode}
-                        className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-[#8E8E93] dark:hover:text-white dark:hover:bg-[#2C2C2E] transition-colors focus:outline-none"
+                        className="p-2 rounded-xl text-gray-400 hover:bg-gray-100/80 hover:text-gray-600 dark:text-[#8E8E93] dark:hover:text-white dark:hover:bg-[rgba(62,196,177,0.08)] transition-colors focus:outline-none"
                         aria-label={theme.mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
                     >
                         {theme.mode === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                     </button>
 
-                    {/* Profile dropdown */}
+                    {/* Notification bell */}
+                    <button
+                        className="p-2 rounded-xl text-gray-400 hover:bg-gray-100/80 hover:text-gray-600 dark:text-[#8E8E93] dark:hover:text-white dark:hover:bg-[rgba(62,196,177,0.08)] transition-colors focus:outline-none relative"
+                        aria-label="Notifications"
+                    >
+                        <Bell className="h-5 w-5" />
+                    </button>
+
+                    {/* Profile dropdown — matches main app avatar style */}
                     <div className="relative" ref={dropdownRef}>
                         <button
                             onClick={() => setProfileOpen(o => !o)}
-                            className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors focus:outline-none"
+                            className="flex items-center gap-2 p-1 rounded-xl hover:bg-gray-100/80 dark:hover:bg-[#2C2C2E] transition-colors focus:outline-none"
                         >
                             <div className="h-8 w-8 rounded-full overflow-hidden bg-primary-500 flex-shrink-0 flex items-center justify-center">
                                 <span className="text-xs font-bold text-white">{initials}</span>
@@ -113,11 +124,18 @@ const SuperAdminHeader = ({ onToggleSidebar }) => {
                         </button>
 
                         {profileOpen && (
-                            <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-[#1C1C1E] rounded-xl shadow-lg border border-gray-100 dark:border-[#38383A] py-1 z-50 animate-scale-in">
+                            <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg border border-gray-100 dark:border-[#38383A] py-1 z-50 animate-scale-in">
                                 <div className="px-4 py-3 border-b border-gray-100 dark:border-[#38383A]">
                                     <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{displayName}</p>
-                                    <p className="text-xs text-primary-600 truncate">{superAdmin?.email}</p>
+                                    <p className="text-xs text-primary-600 dark:text-[#3EC4B1] truncate">{superAdmin?.email}</p>
                                 </div>
+                                <button
+                                    onClick={() => { setProfileOpen(false); navigate('/super-admin/profile') }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
+                                >
+                                    <User className="h-4 w-4" />
+                                    My Profile
+                                </button>
                                 <button
                                     onClick={handleLogout}
                                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"

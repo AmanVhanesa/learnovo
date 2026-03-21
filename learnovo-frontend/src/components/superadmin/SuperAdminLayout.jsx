@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import SuperAdminSidebar from './SuperAdminSidebar'
 import SuperAdminHeader from './SuperAdminHeader'
@@ -37,19 +37,11 @@ const SuperAdminLayout = () => {
 
     return (
         <div className="flex h-screen bg-gray-50 dark:bg-[#000000] overflow-hidden">
-            {/* Mobile overlay backdrop */}
-            {sidebarOpen && !isLargeDesktop && (
-                <div
-                    className="fixed inset-0 bg-black/30 z-20 xl:hidden"
-                    onClick={closeSidebar}
-                />
-            )}
-
             {/* Sidebar */}
             <SuperAdminSidebar isOpen={sidebarOpen} onClose={closeSidebar} />
 
-            {/* Main content area */}
-            <div className="flex-1 flex flex-col min-h-0 xl:ml-[230px]">
+            {/* Main content area — offset by sidebar w-64 (256px) */}
+            <div className="flex-1 flex flex-col min-h-0 xl:ml-64">
                 {/* Header — sticky on mobile */}
                 <div className={isMobile ? 'sticky top-0 z-10' : ''}>
                     <SuperAdminHeader
