@@ -371,6 +371,52 @@ router.put('/subscription', protect, getTenantFromRequest, validateTenantAccess,
   }
 });
 
+// @desc    Get public tenant info by subdomain (no auth required)
+// @route   GET /api/tenants/public/:subdomain
+// @access  Public
+router.get('/public/:subdomain', async (req, res) => {
+  try {
+    const { subdomain } = req.params;
+    const tenant = await Tenant.findOne({
+      subdomain: subdomain.toLowerCase(),
+      isActive: true,
+      isDeleted: { $ne: true }
+    }).select('schoolName schoolCode subdomain logo primaryColor secondaryColor subscription.plan subscription.status');
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        message: 'School not found',
+        requestId: req.requestId
+      });
+    }
+
+    res.json({
+      success: true,
+      tenant: {
+        id: tenant._id,
+        schoolName: tenant.schoolName,
+        schoolCode: tenant.schoolCode,
+        subdomain: tenant.subdomain,
+        logo: tenant.logo,
+        primaryColor: tenant.primaryColor,
+        secondaryColor: tenant.secondaryColor,
+        plan: tenant.subscription?.plan
+      },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('Get public tenant info error', error, {
+      requestId: req.requestId,
+      subdomain: req.params.subdomain
+    });
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching school information'
+    });
+  }
+});
+
 // @desc    Check if school code/subdomain is available
 // @route   GET /api/tenants/check-availability
 // @access  Public

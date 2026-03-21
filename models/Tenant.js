@@ -16,11 +16,19 @@ const tenantSchema = new mongoose.Schema({
   },
   subdomain: {
     type: String,
-    required: false, // Not required - only used for subdomain routing if implemented
+    required: false, // Not required — auto-generated from schoolCode on registration if omitted
     unique: true,
     sparse: true, // Allow multiple null values
     lowercase: true,
-    trim: true
+    trim: true,
+    validate: {
+      validator: function (v) {
+        if (!v) return true; // null/undefined is fine (sparse)
+        // Must be a valid URL-safe slug: lowercase alphanumeric + hyphens, 3-63 chars
+        return /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(v);
+      },
+      message: 'Subdomain must be 3-63 characters, lowercase alphanumeric and hyphens only, cannot start/end with a hyphen'
+    }
   },
 
   // Contact information
@@ -170,6 +178,10 @@ tenantSchema.virtual('fullAddress').get(function () {
 // Pre-save middleware
 tenantSchema.pre('save', function (next) {
   this.updatedAt = new Date();
+  // Auto-populate subdomain from schoolCode if not explicitly set
+  if (!this.subdomain && this.schoolCode) {
+    this.subdomain = this.schoolCode.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
   next();
 });
 

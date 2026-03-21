@@ -2,19 +2,88 @@ const Tenant = require('../models/Tenant');
 const cache = require('../utils/cache');
 
 /**
- * Middleware to extract tenant from subdomain, school code, or JWT.
+ * Base domains for subdomain extraction.
+ * The first segment before any of these is treated as the tenant slug.
+ * e.g. greenwood.learnovoportal.com → "greenwood"
+ */
+const BASE_DOMAINS = [
+  'learnovoportal.com',
+  'learnovo.app',
+  'localhost',
+];
+
+/**
+ * Segments that are never treated as a tenant subdomain.
+ */
+const RESERVED_SUBDOMAINS = new Set([
+  'www', 'api', 'admin', 'app', 'mail', 'ftp', 'staging', 'dev',
+]);
+
+/**
+ * Extract the tenant subdomain slug from a hostname.
+ * Returns null when the request is on the root/naked domain or a reserved prefix.
+ *
+ * Examples:
+ *   greenwood.learnovoportal.com  → "greenwood"
+ *   www.learnovoportal.com        → null
+ *   learnovoportal.com            → null
+ *   greenwood.localhost            → "greenwood"  (local dev)
+ *   localhost                      → null
+ *   greenwood.localhost:3000       → "greenwood"  (port is stripped)
+ */
+function extractSubdomain(hostname) {
+  if (!hostname) return null;
+
+  // Strip port if present (e.g. greenwood.localhost:3000)
+  const host = hostname.split(':')[0].toLowerCase();
+
+  // Check against each known base domain
+  for (const base of BASE_DOMAINS) {
+    if (host === base) return null; // naked domain
+    if (host.endsWith(`.${base}`)) {
+      const prefix = host.slice(0, -(base.length + 1)); // everything before .base
+      // prefix could be "greenwood" or "greenwood.us-east-1" — take first segment
+      const slug = prefix.split('.')[0];
+      if (!slug || RESERVED_SUBDOMAINS.has(slug)) return null;
+      return slug;
+    }
+  }
+
+  // Fallback: for any unknown domain with 3+ parts, treat first segment as subdomain
+  // e.g. greenwood.custom-domain.com → "greenwood"
+  const parts = host.split('.');
+  if (parts.length >= 3) {
+    const slug = parts[0];
+    if (!RESERVED_SUBDOMAINS.has(slug)) return slug;
+  }
+
+  return null;
+}
+
+/**
+ * Middleware to extract tenant from subdomain, X-Tenant-Subdomain header,
+ * school code, or JWT.
  * Tenant documents are cached for 10 minutes to avoid repeated DB lookups.
  */
 const getTenantFromRequest = async (req, res, next) => {
   try {
     let tenant = null;
 
-    // Method 1: Extract from subdomain (e.g., schoolname.mysms.com)
-    const host = req.get('host');
-    if (host && host.includes('.')) {
-      const subdomain = host.split('.')[0];
-      if (subdomain !== 'www' && subdomain !== 'localhost') {
-        tenant = await getCachedTenant({ subdomain, isActive: true }, `tenant:sub:${subdomain}`);
+    // Method 1: Extract from subdomain in Host header
+    const subdomain = extractSubdomain(req.get('host'));
+    if (subdomain) {
+      tenant = await getCachedTenant({ subdomain, isActive: true }, `tenant:sub:${subdomain}`);
+    }
+
+    // Method 1b: Frontend can also send subdomain via header (useful when
+    // the API is on a different domain than the frontend, e.g. api.learnovoportal.com)
+    if (!tenant) {
+      const headerSubdomain = req.get('X-Tenant-Subdomain');
+      if (headerSubdomain) {
+        const slug = headerSubdomain.toLowerCase().trim();
+        if (slug && !RESERVED_SUBDOMAINS.has(slug)) {
+          tenant = await getCachedTenant({ subdomain: slug, isActive: true }, `tenant:sub:${slug}`);
+        }
       }
     }
 
@@ -112,5 +181,6 @@ const addTenantFilter = (req, res, next) => {
 module.exports = {
   getTenantFromRequest,
   validateTenantAccess,
-  addTenantFilter
+  addTenantFilter,
+  extractSubdomain, // exported for testing and reuse
 };

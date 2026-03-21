@@ -53,7 +53,11 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) return callback(null, true);
     // Allow Vercel preview deployments
     if (origin.endsWith('.vercel.app')) return callback(null, true);
-    // In development, allow any localhost
+    // Allow all *.learnovoportal.com subdomains (tenant frontends)
+    if (origin.endsWith('.learnovoportal.com') || origin === 'https://learnovoportal.com') {
+      return callback(null, true);
+    }
+    // In development, allow any localhost (including subdomain.localhost)
     if (process.env.NODE_ENV !== 'production' &&
         (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
       return callback(null, true);
@@ -63,7 +67,7 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Tenant-Subdomain'],
   exposedHeaders: ['X-Request-ID', 'Content-Disposition'],
   maxAge: 86400, // Cache preflight for 24 hours
   optionsSuccessStatus: 200 // Some legacy browsers choke on 204
