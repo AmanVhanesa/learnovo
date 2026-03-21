@@ -3,10 +3,14 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
-// ── Singleton browser instance ──
+// ── Lazy browser instance — launches on demand, closes after idle ──
 let browserInstance = null;
+let activePages = 0;
+let idleTimer = null;
+const IDLE_TIMEOUT_MS = 60_000; // Close Chromium after 60s of no PDF requests
 
 async function getBrowser() {
+    clearIdleTimer();
     if (!browserInstance || !browserInstance.isConnected()) {
         browserInstance = await puppeteer.launch({
             headless: true,
@@ -22,17 +26,43 @@ async function getBrowser() {
             ]
         });
     }
+    activePages++;
     return browserInstance;
+}
+
+function releaseBrowser() {
+    activePages = Math.max(0, activePages - 1);
+    if (activePages === 0) {
+        scheduleIdleClose();
+    }
+}
+
+function scheduleIdleClose() {
+    clearIdleTimer();
+    idleTimer = setTimeout(async () => {
+        if (activePages === 0) {
+            await closeBrowser();
+        }
+    }, IDLE_TIMEOUT_MS);
+}
+
+function clearIdleTimer() {
+    if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+    }
 }
 
 /**
  * Gracefully close the shared browser (call on server shutdown)
  */
 async function closeBrowser() {
+    clearIdleTimer();
     if (browserInstance) {
         try { await browserInstance.close(); } catch (e) { /* ignore */ }
         browserInstance = null;
     }
+    activePages = 0;
 }
 
 // ── Template helpers ──
@@ -397,6 +427,7 @@ const pdfService = {
             return Buffer.from(pdfUint8);
         } finally {
             await page.close();
+            releaseBrowser();
         }
     },
 
@@ -451,6 +482,7 @@ const pdfService = {
             return Buffer.from(pdfUint8);
         } finally {
             await page.close();
+            releaseBrowser();
         }
     },
 
