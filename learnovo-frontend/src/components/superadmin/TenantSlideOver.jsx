@@ -3,7 +3,7 @@ import {
     X, Mail, Phone, MapPin, Calendar, CreditCard, ShieldAlert,
     CheckCircle2, Square, Ban, Trash2, Save,
     Users, GraduationCap, Zap, Settings, RefreshCw, ChevronRight,
-    Star, TrendingUp, Clock, AlertTriangle
+    Star, TrendingUp, Clock, AlertTriangle, Globe, Copy
 } from 'lucide-react'
 import { superAdminService } from '../../services/superAdminService'
 import toast from 'react-hot-toast'
@@ -20,6 +20,8 @@ const TenantSlideOver = ({ isOpen, onClose, tenantId, onUpdate }) => {
     const [trialDays, setTrialDays] = useState(14)
     const [showOverrideFeatures, setShowOverrideFeatures] = useState(false)
     const [overrideLimits, setOverrideLimits] = useState({ students: 0, teachers: 0 })
+    const [showSubdomainEdit, setShowSubdomainEdit] = useState(false)
+    const [subdomainInput, setSubdomainInput] = useState('')
 
     useEffect(() => {
         if (isOpen && tenantId) {
@@ -118,6 +120,26 @@ const TenantSlideOver = ({ isOpen, onClose, tenantId, onUpdate }) => {
             if (onUpdate) onUpdate()
         } catch {
             toast.error('Failed to apply custom limits')
+        } finally {
+            setIsUpdating(false)
+        }
+    }
+
+    const handleSubdomainSave = async () => {
+        const slug = subdomainInput.toLowerCase().trim()
+        if (!slug || !/^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(slug)) {
+            toast.error('Invalid subdomain: use lowercase letters, numbers, and hyphens (3-63 chars)')
+            return
+        }
+        setIsUpdating(true)
+        try {
+            await superAdminService.updateTenant(tenantId, { subdomain: slug })
+            toast.success(`Subdomain set to ${slug}.learnovoportal.com`)
+            setShowSubdomainEdit(false)
+            fetchTenantDetails()
+            if (onUpdate) onUpdate()
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to update subdomain')
         } finally {
             setIsUpdating(false)
         }
@@ -347,6 +369,28 @@ const TenantSlideOver = ({ isOpen, onClose, tenantId, onUpdate }) => {
                                                 }
                                             </div>
                                         ))}
+                                        {/* Subdomain row */}
+                                        <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 dark:hover:bg-[#2C2C2E]/50 transition-colors">
+                                            <div className="w-8 h-8 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <Globe className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
+                                            </div>
+                                            {tenant.subdomain ? (
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    <a href={`https://${tenant.subdomain}.learnovoportal.com`} target="_blank" rel="noopener noreferrer"
+                                                        className="text-sm text-primary-600 hover:text-primary-700 truncate font-medium">
+                                                        {tenant.subdomain}.learnovoportal.com
+                                                    </a>
+                                                    <button
+                                                        onClick={() => { navigator.clipboard.writeText(`${tenant.subdomain}.learnovoportal.com`); toast.success('Copied!') }}
+                                                        className="text-gray-300 hover:text-gray-500 flex-shrink-0"
+                                                    >
+                                                        <Copy className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-amber-600 font-medium">No subdomain assigned</span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -519,6 +563,62 @@ const TenantSlideOver = ({ isOpen, onClose, tenantId, onUpdate }) => {
                                             </div>
                                         </div>
                                     )}
+                                </div>
+
+                                {/* Subdomain */}
+                                <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                                    <div className="px-4 py-2.5 border-b border-gray-50 dark:border-[#38383A] flex items-center justify-between bg-gray-50/50 dark:bg-[#2C2C2E]/50">
+                                        <p className="text-[11px] font-bold tracking-widest uppercase text-gray-400 dark:text-[#636366]">Subdomain</p>
+                                        {!showSubdomainEdit && (
+                                            <button
+                                                onClick={() => { setSubdomainInput(tenant?.subdomain || tenant?.schoolCode || ''); setShowSubdomainEdit(true) }}
+                                                className="text-[11px] font-bold uppercase tracking-wide text-primary-600 hover:text-primary-700"
+                                            >
+                                                {tenant?.subdomain ? 'Change' : 'Assign'}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="p-4">
+                                        {showSubdomainEdit ? (
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-xs text-gray-600 font-medium mb-1">Subdomain Slug</label>
+                                                    <div className="flex items-center gap-0">
+                                                        <input
+                                                            type="text"
+                                                            value={subdomainInput}
+                                                            onChange={(e) => setSubdomainInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                                                            placeholder="greenwood"
+                                                            className="block w-full border border-gray-200 rounded-l-lg text-sm px-3 py-2 focus:ring-primary-500 focus:border-primary-500"
+                                                        />
+                                                        <span className="bg-gray-100 dark:bg-[#2C2C2E] border border-l-0 border-gray-200 text-xs text-gray-500 px-2 py-2 rounded-r-lg whitespace-nowrap">
+                                                            .learnovoportal.com
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400 mt-1">Lowercase letters, numbers, and hyphens only (3-63 chars)</p>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={handleSubdomainSave} disabled={isUpdating}
+                                                        className="flex-1 bg-primary-600 text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition flex items-center justify-center gap-1.5">
+                                                        <Save className="h-3.5 w-3.5" /> {isUpdating ? 'Saving...' : 'Save Subdomain'}
+                                                    </button>
+                                                    <button onClick={() => setShowSubdomainEdit(false)}
+                                                        className="flex-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 text-gray-600 text-xs font-semibold py-2.5 rounded-lg hover:bg-gray-50 transition">
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <Globe className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                                                {tenant?.subdomain ? (
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-white">{tenant.subdomain}.learnovoportal.com</span>
+                                                ) : (
+                                                    <span className="text-sm text-amber-600">Not assigned — click &quot;Assign&quot; above</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Danger Zone */}
