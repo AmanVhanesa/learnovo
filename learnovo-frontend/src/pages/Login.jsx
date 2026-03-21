@@ -339,32 +339,32 @@ const Login = () => {
               </div>
 
               {/* Remember me + Forgot password row */}
-              <div className="flex items-center justify-between">
-              <label htmlFor="remember-me" className="flex items-center gap-2.5 cursor-pointer group py-0.5">
-                <div className="relative flex items-center">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={handleRememberMe}
-                    className="peer sr-only"
-                  />
-                  <div className="h-[18px] w-[18px] rounded-md border-2 border-gray-300 dark:border-[#48484A] bg-white dark:bg-[#2C2C2E] peer-checked:border-[#3EC4B1] peer-checked:bg-[#3EC4B1] transition-all duration-150 flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-[#3EC4B1]/40 peer-focus-visible:ring-offset-1">
-                    {rememberMe && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="remember-me" className="flex items-center gap-2 cursor-pointer group py-0.5 min-w-0">
+                  <div className="relative flex-shrink-0 flex items-center">
+                    <input
+                      id="remember-me"
+                      name="remember-me"
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={handleRememberMe}
+                      className="peer sr-only"
+                    />
+                    <div className="h-[16px] w-[16px] rounded-md border-2 border-gray-300 dark:border-[#48484A] bg-white dark:bg-[#2C2C2E] peer-checked:border-[#3EC4B1] peer-checked:bg-[#3EC4B1] transition-all duration-150 flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-[#3EC4B1]/40 peer-focus-visible:ring-offset-1">
+                      {rememberMe && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <span className="text-[13px] text-gray-500 dark:text-[#8E8E93] group-hover:text-gray-700 dark:group-hover:text-white transition-colors select-none">
-                  Remember my email and school code
-                </span>
-              </label>
-              <Link to="/forgot-password" className="text-[12px] text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors font-medium">
-                Forgot password?
-              </Link>
+                  <span className="text-[11px] text-gray-500 dark:text-[#8E8E93] group-hover:text-gray-700 dark:group-hover:text-white transition-colors select-none whitespace-nowrap">
+                    Remember me
+                  </span>
+                </label>
+                <Link to="/forgot-password" className="text-[11px] text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors font-medium whitespace-nowrap flex-shrink-0">
+                  Forgot password?
+                </Link>
               </div>
 
               {/* Error */}
