@@ -524,7 +524,7 @@ const Register = () => {
                       className={`${inputClass('subdomain')} !rounded-r-none`}
                     />
                     <div className="flex items-center px-3 border border-l-0 border-gray-200 dark:border-[#38383A] rounded-r-xl bg-gray-50 dark:bg-[#2C2C2E]">
-                      <span className="text-[11px] text-gray-400 dark:text-[#636366] whitespace-nowrap">.learnovo.com</span>
+                      <span className="text-[11px] text-gray-400 dark:text-[#636366] whitespace-nowrap">.learnovoportal.com</span>
                     </div>
                   </div>
                   <p className="mt-1 text-[11px] text-gray-400 dark:text-[#636366]">
