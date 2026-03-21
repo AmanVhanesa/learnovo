@@ -7,7 +7,13 @@ const { protect, authorize } = require('../middleware/auth');
 const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, sumMoney } = require('../utils/money');
 
+const planGate = require('../middleware/planGate');
+
 const router = express.Router();
+
+// All fee report routes require fees/finance feature (Basic+)
+router.use(planGate.requireActiveSubscription);
+router.use(planGate.checkFeesAndFinance);
 
 // @desc    Get fees dashboard summary
 // @route   GET /api/fees/dashboard

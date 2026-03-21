@@ -15,7 +15,10 @@ async function getBrowser() {
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--font-render-hinting=none'
+                '--font-render-hinting=none',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process'
             ]
         });
     }

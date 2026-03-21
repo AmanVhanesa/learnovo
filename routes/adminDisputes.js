@@ -8,8 +8,13 @@ const PaymentDispute = require('../models/PaymentDispute');
 const StudentBalance = require('../models/StudentBalance');
 const { protect, authorize } = require('../middleware/auth');
 const { toNumber, roundToRupee } = require('../utils/money');
+const planGate = require('../middleware/planGate');
 
 const router = express.Router();
+
+// Disputes are part of fees/finance — require Basic+ plan
+router.use(planGate.requireActiveSubscription);
+router.use(planGate.checkFeesAndFinance);
 
 /**
  * Helper to log state transitions strictly

@@ -107,18 +107,53 @@ const getTenantFromRequest = async (req, res, next) => {
 
     // Check subscription status
     if (tenant.subscription && tenant.subscription.status === 'suspended') {
-      return res.status(403).json({
-        success: false,
-        message: 'School subscription is suspended. Please contact support.'
-      });
+      // Allow certain endpoints even when suspended (auth, payments, health)
+      const allowedWhenSuspended = ['/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/payments/plans', '/api/payments/create-order', '/api/payments/verify', '/api/payments/subscription', '/health'];
+      const isAllowed = allowedWhenSuspended.some(path => req.path.startsWith(path) || req.originalUrl.startsWith(path));
+      if (!isAllowed) {
+        return res.status(403).json({
+          success: false,
+          code: 'SUBSCRIPTION_SUSPENDED',
+          message: 'School subscription is suspended. Please contact support.',
+          upgradeUrl: '/pricing',
+        });
+      }
     }
 
     // Check trial expiry
-    if (tenant.subscription && tenant.subscription.status === 'trial' && new Date() > tenant.subscription.trialEndsAt) {
-      return res.status(403).json({
-        success: false,
-        message: 'Trial period has expired. Please upgrade your subscription.'
-      });
+    if (tenant.subscription && tenant.subscription.status === 'trial') {
+      const now = new Date();
+      const trialEnd = tenant.subscription.trialEndsAt ? new Date(tenant.subscription.trialEndsAt) : null;
+
+      if (trialEnd && now > trialEnd) {
+        // Auto-update status to 'suspended' in database (fire and forget)
+        Tenant.findByIdAndUpdate(tenant._id, { 'subscription.status': 'suspended' }).catch(() => {});
+        // Invalidate cache for this tenant
+        cache.del(`tenant:sub:${tenant.subdomain}`);
+        cache.del(`tenant:code:${tenant.schoolCode}`);
+        cache.del(`tenant:id:${tenant._id}`);
+
+        // Allow certain endpoints through even after expiry
+        const allowedAfterExpiry = ['/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/payments/plans', '/api/payments/create-order', '/api/payments/verify', '/api/payments/subscription', '/health'];
+        const isAllowed = allowedAfterExpiry.some(path => req.path.startsWith(path) || req.originalUrl.startsWith(path));
+
+        if (!isAllowed) {
+          const daysExpired = Math.floor((now - trialEnd) / (1000 * 60 * 60 * 24));
+          return res.status(403).json({
+            success: false,
+            code: 'TRIAL_EXPIRED',
+            message: 'Your 14-day free trial has expired. Please upgrade to continue.',
+            trialEndedAt: trialEnd,
+            daysExpired,
+            upgradeUrl: '/pricing',
+          });
+        }
+      }
+
+      // Add trial info to request for use in responses
+      if (trialEnd) {
+        req.trialDaysRemaining = Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
+      }
     }
 
     req.tenant = tenant;

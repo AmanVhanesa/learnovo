@@ -5,6 +5,7 @@ const Counter = require('../models/Counter');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const notificationService = require('../services/notificationService');
+const planGate = require('../middleware/planGate');
 
 const router = express.Router();
 
@@ -152,7 +153,7 @@ router.get('/:id', protect, async (req, res) => {
 // @desc    Create new employee
 // @route   POST /api/employees
 // @access  Private (Admin)
-router.post('/', protect, authorize('admin'), [
+router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkTeacherLimit, [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('phone').trim().notEmpty().withMessage('Phone is required'),
     body('email').optional().isEmail().withMessage('Valid email required'),
@@ -706,8 +707,8 @@ const ImportExportService = require('../services/importExportService');
 
 // @desc    Download CSV template
 // @route   GET /api/employees/import/template
-// @access  Private (Admin)
-router.get('/import/template', protect, authorize('admin'), async (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.get('/import/template', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, async (req, res) => {
     try {
         const template = await EmployeeImportService.generateTemplate();
         res.setHeader('Content-Type', 'text/csv');
@@ -721,8 +722,8 @@ router.get('/import/template', protect, authorize('admin'), async (req, res) => 
 
 // @desc    Preview import
 // @route   POST /api/employees/import/preview
-// @access  Private (Admin)
-router.post('/import/preview', protect, authorize('admin'), (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.post('/import/preview', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, (req, res) => {
     uploadSingleFile(req, res, async (err) => {
         try {
             if (err) return res.status(400).json({ success: false, message: err.message });
@@ -740,8 +741,8 @@ router.post('/import/preview', protect, authorize('admin'), (req, res) => {
 
 // @desc    Execute import
 // @route   POST /api/employees/import/execute
-// @access  Private (Admin)
-router.post('/import/execute', protect, authorize('admin'), async (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.post('/import/execute', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, async (req, res) => {
     try {
         const { validData, options } = req.body;
         if (!validData || !Array.isArray(validData) || validData.length === 0) {

@@ -5,7 +5,7 @@ services:
     region: singapore
     plan: free
     buildCommand: cd learnovo-backend && npm install
-    startCommand: cd learnovo-backend && node server.js
+    startCommand: cd learnovo-backend && node --expose-gc --max-old-space-size=512 server.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -29,4 +29,6 @@ services:
         value: info
       - key: BCRYPT_ROUNDS
         value: 12
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=512"
 

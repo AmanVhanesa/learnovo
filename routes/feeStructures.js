@@ -3,6 +3,11 @@ const router = express.Router();
 const FeeStructure = require('../models/FeeStructure');
 const Class = require('../models/Class');
 const { protect, authorize } = require('../middleware/auth');
+const planGate = require('../middleware/planGate');
+
+// All fee structure routes require fees/finance feature (Basic+)
+router.use(planGate.requireActiveSubscription);
+router.use(planGate.checkFeesAndFinance);
 
 // @desc    Get all fee structures
 // @route   GET /api/fee-structures

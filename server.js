@@ -229,6 +229,7 @@ app.use('/api/files', require('./routes/files')); // Cloudinary file operations
 app.use('/api/test', require('./routes/test')); // Test endpoints (remove in production)
 
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/subscription', require('./routes/subscription'));
 app.use('/api/exams', require('./routes/exams'));
 app.use('/api/drivers', require('./routes/drivers'));
 app.use('/api/vehicles', require('./routes/vehicles'));
@@ -270,6 +271,23 @@ try {
   backupJob.startJob();
 } catch (e) {
   console.error("Failed to start backup job:", e);
+}
+
+// ── Memory monitoring ───────────────────────────────────────────────
+setInterval(() => {
+  const mem = process.memoryUsage();
+  const heapPercent = (mem.heapUsed / mem.heapTotal) * 100;
+  if (heapPercent > 85) {
+    console.warn(`[memory] HIGH HEAP: ${heapPercent.toFixed(1)}% (${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(mem.heapTotal / 1024 / 1024)}MB)`);
+  }
+}, 60000); // check every 60s
+
+// ── Periodic GC (if --expose-gc flag is set) ────────────────────────
+if (global.gc) {
+  setInterval(() => {
+    global.gc();
+    console.log('[gc] Manual garbage collection triggered');
+  }, 30 * 60 * 1000); // Every 30 minutes
 }
 
 // Start server

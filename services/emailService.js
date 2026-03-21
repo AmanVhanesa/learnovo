@@ -1,6 +1,8 @@
 const nodemailer = require('nodemailer');
 const { logger } = require('../middleware/errorHandler');
 
+const MAX_QUEUE_SIZE = 100; // Never keep more than 100 emails in queue
+
 class EmailService {
   constructor() {
     this.transporter = null;
@@ -42,6 +44,12 @@ class EmailService {
 
   // Add email to queue
   queueEmail(emailData) {
+    // Prevent unbounded queue growth
+    if (this.emailQueue.length >= MAX_QUEUE_SIZE) {
+      logger.warn('Email queue full, dropping oldest item', { queueLength: this.emailQueue.length });
+      this.emailQueue.shift();
+    }
+
     const emailJob = {
       id: Date.now() + Math.random(),
       ...emailData,

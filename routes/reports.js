@@ -9,9 +9,9 @@ const Admission = require('../models/Admission');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const Class = require('../models/Class');
 
-const router = express.Router();
+const planGate = require('../middleware/planGate');
 
-// @desc    Get dashboard statistics
+const router = express.Router();
 // @route   GET /api/reports/dashboard
 // @access  Private
 router.get('/dashboard', protect, async (req, res) => {

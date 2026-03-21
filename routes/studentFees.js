@@ -15,7 +15,13 @@ const { handleValidationErrors } = require('../middleware/validation');
 const MockPaymentGateway = require('../services/payment/MockPaymentGateway');
 const gateway = new MockPaymentGateway();
 
+const planGate = require('../middleware/planGate');
+
 const router = express.Router();
+
+// All student fee routes require fees/finance feature (Basic+)
+router.use(planGate.requireActiveSubscription);
+router.use(planGate.checkFeesAndFinance);
 
 /**
  * Helper to log state transitions strictly

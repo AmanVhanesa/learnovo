@@ -9,12 +9,17 @@ const { handleValidationErrors, validateFee } = require('../middleware/validatio
 const { formatCurrencyWithSettings } = require('../utils/currency');
 const { sendFeeReminder, sendOverdueFeeReminder } = require('../utils/email');
 
+const planGate = require('../middleware/planGate');
+
 const router = express.Router();
+
+// Plan gates: all fee routes require fees/finance feature (Basic+ plan)
+const feePlanGates = [planGate.requireActiveSubscription, planGate.checkFeesAndFinance];
 
 // @desc    Get all fees
 // @route   GET /api/fees
 // @access  Private
-router.get('/', protect, [
+router.get('/', protect, feePlanGates, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('status').optional().isIn(['pending', 'paid', 'overdue', 'cancelled']).withMessage('Invalid status'),
@@ -133,7 +138,7 @@ router.get('/', protect, [
 // @desc    Get fee statistics
 // @route   GET /api/fees/statistics
 // @access  Private
-router.get('/statistics', protect, async(req, res) => {
+router.get('/statistics', protect, feePlanGates, async(req, res) => {
   try {
     const filter = {};
 
@@ -187,7 +192,7 @@ router.get('/statistics', protect, async(req, res) => {
 // @desc    Get overdue fees
 // @route   GET /api/fees/overdue
 // @access  Private
-router.get('/overdue', protect, async(req, res) => {
+router.get('/overdue', protect, feePlanGates, async(req, res) => {
   try {
     const filter = { status: 'overdue' };
 
@@ -230,7 +235,7 @@ router.get('/overdue', protect, async(req, res) => {
 // @desc    Get single fee
 // @route   GET /api/fees/:id
 // @access  Private
-router.get('/:id', protect, canAccessFee, async(req, res) => {
+router.get('/:id', protect, feePlanGates, canAccessFee, async(req, res) => {
   try {
     const fee = await Fee.findById(req.params.id)
       .populate('student', 'name email phone class studentId rollNumber');
@@ -267,7 +272,7 @@ router.get('/:id', protect, canAccessFee, async(req, res) => {
 // @desc    Create new fee
 // @route   POST /api/fees
 // @access  Private (Admin, Teacher)
-router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleValidationErrors, async(req, res) => {
+router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateFee, handleValidationErrors, async(req, res) => {
   try {
     const {
       student,
@@ -644,7 +649,7 @@ router.post('/', protect, authorize('admin', 'teacher'), validateFee, handleVali
 // @desc    Update fee
 // @route   PUT /api/fees/:id
 // @access  Private (Admin, Teacher)
-router.put('/:id', protect, authorize('admin', 'teacher'), [
+router.put('/:id', protect, feePlanGates, authorize('admin', 'teacher'), [
   body('amount').optional().isNumeric().isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
   body('description').optional().trim().isLength({ min: 5, max: 200 }).withMessage('Description must be between 5 and 200 characters'),
   body('dueDate').optional().isISO8601().withMessage('Please provide a valid due date'),
@@ -701,7 +706,7 @@ router.put('/:id', protect, authorize('admin', 'teacher'), [
 // @desc    Mark fee as paid
 // @route   PUT /api/fees/:id/pay
 // @access  Private (Admin, Teacher)
-router.put('/:id/pay', protect, authorize('admin', 'teacher'), [
+router.put('/:id/pay', protect, feePlanGates, authorize('admin', 'teacher'), [
   body('paymentMethod').isIn(['cash', 'bank_transfer', 'online', 'cheque', 'other']).withMessage('Invalid payment method'),
   body('notes').optional().trim().isLength({ max: 500 }).withMessage('Notes must be less than 500 characters'),
   handleValidationErrors
@@ -757,7 +762,7 @@ router.put('/:id/pay', protect, authorize('admin', 'teacher'), [
 // @desc    Send fee reminder
 // @route   POST /api/fees/:id/remind
 // @access  Private (Admin, Teacher)
-router.post('/:id/remind', protect, authorize('admin', 'teacher'), async(req, res) => {
+router.post('/:id/remind', protect, feePlanGates, authorize('admin', 'teacher'), async(req, res) => {
   try {
     const fee = await Fee.findById(req.params.id)
       .populate('student', 'name email phone class studentId rollNumber');
@@ -809,7 +814,7 @@ router.post('/:id/remind', protect, authorize('admin', 'teacher'), async(req, re
 // @desc    Delete fee
 // @route   DELETE /api/fees/:id
 // @access  Private (Admin)
-router.delete('/:id', protect, authorize('admin'), async(req, res) => {
+router.delete('/:id', protect, feePlanGates, authorize('admin'), async(req, res) => {
   try {
     const fee = await Fee.findById(req.params.id);
 

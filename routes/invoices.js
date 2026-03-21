@@ -15,7 +15,13 @@ const { handleValidationErrors } = require('../middleware/validation');
 const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, calcBalance, isFullyPaid, sumMoney, validateAmount } = require('../utils/money');
 
+const planGate = require('../middleware/planGate');
+
 const router = express.Router();
+
+// All invoice routes require fees/finance feature (Basic+)
+router.use(planGate.requireActiveSubscription);
+router.use(planGate.checkFeesAndFinance);
 
 // @desc    Generate invoice for student
 // @route   POST /api/invoices/generate

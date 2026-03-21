@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "clear:db": "node scripts/clearDatabase.js",
-    "start": "node server.js",
+    "start": "node --expose-gc --max-old-space-size=512 server.js",
     "dev": "nodemon server.js",
     "seed": "node scripts/seedData.js",
     "seed:demo": "node scripts/seedDemoData.js",

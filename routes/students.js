@@ -17,6 +17,7 @@ const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const Class = require('../models/Class');
 const Driver = require('../models/Driver');
 const { logger } = require('../middleware/errorHandler');
+const planGate = require('../middleware/planGate');
 
 const router = express.Router();
 
@@ -229,8 +230,8 @@ router.get('/', protect, authorize('admin', 'teacher'), [
 
 // @desc    Download student import CSV template
 // @route   GET /api/students/import/template
-// @access  Private (Admin)
-router.get('/import/template', protect, authorize('admin'), (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.get('/import/template', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, (req, res) => {
   try {
     const fields = [
       'fullName', 'email', 'phone', 'dateOfBirth', 'gender',
@@ -339,8 +340,8 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
 
 // @desc    Preview student import from CSV
 // @route   POST /api/students/import/preview
-// @access  Private (Admin)
-router.post('/import/preview', protect, authorize('admin'), upload.single('file'), async (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.post('/import/preview', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Please upload a CSV file' });
@@ -596,8 +597,8 @@ router.post('/import/preview', protect, authorize('admin'), upload.single('file'
 
 // @desc    Execute student import
 // @route   POST /api/students/import/execute
-// @access  Private (Admin)
-router.post('/import/execute', protect, authorize('admin'), async (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.post('/import/execute', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, async (req, res) => {
   // Extend timeout for large imports (5 minutes)
   req.setTimeout(300000);
   res.setTimeout(300000);
@@ -1469,7 +1470,7 @@ router.get('/:id', protect, canAccessStudent, async (req, res) => {
 // @desc    Create new student
 // @route   POST /api/students
 // @access  Private (Admin)
-router.post('/', protect, authorize('admin'), validateStudent, handleValidationErrors, async (req, res) => {
+router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkStudentLimit, validateStudent, handleValidationErrors, async (req, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
       return res.status(400).json({ success: false, message: 'User tenant not found.' });
@@ -2376,8 +2377,8 @@ const ImportExportService = require('../services/importExportService');
 
 // @desc    Download CSV template for student import
 // @route   GET /api/students/import/template
-// @access  Private (Admin)
-router.get('/import/template', protect, authorize('admin'), async (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.get('/import/template', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, async (req, res) => {
   try {
     const template = await StudentImportService.generateTemplate();
 
@@ -2395,8 +2396,8 @@ router.get('/import/template', protect, authorize('admin'), async (req, res) => 
 
 // @desc    Preview student import (validate without importing)
 // @route   POST /api/students/import/preview
-// @access  Private (Admin)
-router.post('/import/preview', protect, authorize('admin'), (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.post('/import/preview', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, (req, res) => {
   uploadSingleFile(req, res, async (err) => {
     try {
       if (err) {
@@ -2435,8 +2436,8 @@ router.post('/import/preview', protect, authorize('admin'), (req, res) => {
 
 // @desc    Execute student import
 // @route   POST /api/students/import/execute
-// @access  Private (Admin)
-router.post('/import/execute', protect, authorize('admin'), async (req, res) => {
+// @access  Private (Admin) — Basic+ plan required
+router.post('/import/execute', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, async (req, res) => {
   try {
     const { validData, options } = req.body;
 

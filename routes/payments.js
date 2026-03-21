@@ -4,6 +4,8 @@ const Tenant = require('../models/Tenant');
 const { protect } = require('../middleware/auth');
 const { getTenantFromRequest, validateTenantAccess } = require('../middleware/tenant');
 
+const { PLANS, getPlanConfig } = require('../utils/planConfig');
+
 const router = express.Router();
 
 // Initialize Razorpay (lazy load - only if package is installed and env vars are set)
@@ -22,28 +24,28 @@ try {
   console.warn('Razorpay package not installed. Payment gateway features will be limited to mock mode.');
 }
 
-// Subscription plans
+// Derive SUBSCRIPTION_PLANS from the single source of truth (planConfig)
 const SUBSCRIPTION_PLANS = {
   basic: {
-    name: 'Basic Plan',
-    maxStudents: 100,
-    maxTeachers: 10,
-    price: 999, // in INR
-    features: ['100 Students', '10 Teachers', 'Basic Support']
+    name: PLANS.basic.name,
+    maxStudents: PLANS.basic.limits.students,
+    maxTeachers: PLANS.basic.limits.teachers,
+    price: PLANS.basic.price,
+    features: [`${PLANS.basic.limits.students} Students`, `${PLANS.basic.limits.teachers} Teachers`, 'Email Support', 'Grades & Exams', 'Fees & Finance', 'CSV Import']
   },
   pro: {
-    name: 'Pro Plan',
-    maxStudents: 500,
-    maxTeachers: 50,
-    price: 2999,
-    features: ['500 Students', '50 Teachers', 'Priority Support', 'Advanced Reports']
+    name: PLANS.pro.name,
+    maxStudents: PLANS.pro.limits.students,
+    maxTeachers: PLANS.pro.limits.teachers,
+    price: PLANS.pro.price,
+    features: [`${PLANS.pro.limits.students} Students`, `${PLANS.pro.limits.teachers} Teachers`, 'Priority Support', 'Advanced Analytics', 'Payment Gateway', 'SMS & WhatsApp']
   },
   enterprise: {
-    name: 'Enterprise Plan',
-    maxStudents: 10000,
-    maxTeachers: 500,
-    price: 9999,
-    features: ['Unlimited Students', '500 Teachers', '24/7 Support', 'All Features', 'Custom Integration']
+    name: PLANS.enterprise.name,
+    maxStudents: 999999,
+    maxTeachers: 999999,
+    price: 0, // Custom pricing
+    features: ['Unlimited Students', 'Unlimited Teachers', 'Dedicated Support', 'All Features', 'Custom Integrations', 'White-label']
   }
 };
 

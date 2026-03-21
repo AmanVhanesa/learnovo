@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Class = require('../models/Class');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const planGate = require('../middleware/planGate');
 
 const router = express.Router();
 
@@ -70,7 +71,7 @@ router.get('/', protect, authorize('admin'), [
 // @desc    Create teacher
 // @route   POST /api/teachers
 // @access  Private (Admin)
-router.post('/', protect, authorize('admin'), [
+router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkTeacherLimit, [
   body('name').trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),

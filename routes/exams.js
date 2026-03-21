@@ -9,7 +9,13 @@ const { handleValidationErrors } = require('../middleware/validation');
 let notificationService;
 try { notificationService = require('../services/notificationService'); } catch (e) { /* optional */ }
 
+const planGate = require('../middleware/planGate');
+
 const router = express.Router();
+
+// Plan gates: all exam routes require grades/exams feature (Basic+ plan)
+// Applied after protect in each route
+const examPlanGates = [planGate.requireActiveSubscription, planGate.checkGradesAndExams];
 
 /**
  * Resolve class names a teacher is assigned to (all 4 allocation methods).
@@ -81,7 +87,7 @@ function timesOverlap(startA, endA, startB, endB) {
 // @desc    Get all exams
 // @route   GET /api/exams
 // @access  Private
-router.get('/', protect, [
+router.get('/', protect, examPlanGates, [
     query('class').optional().trim(),
     query('subject').optional().trim(),
     query('section').optional().trim(),
@@ -180,7 +186,7 @@ router.get('/', protect, [
 // @desc    Create exam
 // @route   POST /api/exams
 // @access  Private (Admin, Teacher)
-router.post('/', protect, authorize('admin', 'teacher'), [
+router.post('/', protect, examPlanGates, authorize('admin', 'teacher'), [
     body('name').notEmpty().withMessage('Exam name is required'),
     body('class').notEmpty().withMessage('Class is required'),
     body('subject').notEmpty().withMessage('Subject is required'),
@@ -254,7 +260,7 @@ router.post('/', protect, authorize('admin', 'teacher'), [
 // @desc    Get result card for a student (aggregated across exams)
 // @route   GET /api/exams/result-card/:studentId
 // @access  Private
-router.get('/result-card/:studentId', protect, async (req, res) => {
+router.get('/result-card/:studentId', protect, examPlanGates, async (req, res) => {
     try {
         const { studentId } = req.params;
         const { examSeries, class: className } = req.query;
@@ -352,7 +358,7 @@ router.get('/result-card/:studentId', protect, async (req, res) => {
 // @desc    Download report card PDF for a student
 // @route   GET /api/exams/result-card/:studentId/pdf
 // @access  Private
-router.get('/result-card/:studentId/pdf', protect, async (req, res) => {
+router.get('/result-card/:studentId/pdf', protect, examPlanGates, async (req, res) => {
     try {
         const { studentId } = req.params;
         const { examSeries, class: className } = req.query;
@@ -483,7 +489,7 @@ router.get('/result-card/:studentId/pdf', protect, async (req, res) => {
 // @desc    Get logged-in student's published results
 // @route   GET /api/exams/my-results
 // @access  Private (Student)
-router.get('/my-results', protect, authorize('student'), async (req, res) => {
+router.get('/my-results', protect, examPlanGates, authorize('student'), async (req, res) => {
     try {
         const results = await Result.find({
             tenantId: req.user.tenantId,
@@ -506,7 +512,7 @@ router.get('/my-results', protect, authorize('student'), async (req, res) => {
 // @desc    Get exam details
 // @route   GET /api/exams/:id
 // @access  Private
-router.get('/:id', protect, async (req, res) => {
+router.get('/:id', protect, examPlanGates, async (req, res) => {
     try {
         const exam = await Exam.findOne({
             _id: req.params.id,
@@ -527,7 +533,7 @@ router.get('/:id', protect, async (req, res) => {
 // @desc    Update exam (status, fields)
 // @route   PATCH /api/exams/:id
 // @access  Private (Admin, Teacher)
-router.patch('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
+router.patch('/:id', protect, examPlanGates, authorize('admin', 'teacher'), async (req, res) => {
     try {
         const exam = await Exam.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
 
@@ -570,7 +576,7 @@ router.patch('/:id', protect, authorize('admin', 'teacher'), async (req, res) =>
 // @desc    Delete exam
 // @route   DELETE /api/exams/:id
 // @access  Private (Admin, Teacher)
-router.delete('/:id', protect, authorize('admin', 'teacher'), async (req, res) => {
+router.delete('/:id', protect, examPlanGates, authorize('admin', 'teacher'), async (req, res) => {
     try {
         const exam = await Exam.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
 
@@ -591,7 +597,7 @@ router.delete('/:id', protect, authorize('admin', 'teacher'), async (req, res) =
 // @desc    Add/Update results for an exam
 // @route   POST /api/exams/:id/results
 // @access  Private (Admin, Teacher)
-router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, res) => {
+router.post('/:id/results', protect, examPlanGates, authorize('admin', 'teacher'), async (req, res) => {
     try {
         const exam = await Exam.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
         if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
@@ -661,7 +667,7 @@ router.post('/:id/results', protect, authorize('admin', 'teacher'), async (req, 
 // @desc    Get results for an exam
 // @route   GET /api/exams/:id/results
 // @access  Private
-router.get('/:id/results', protect, async (req, res) => {
+router.get('/:id/results', protect, examPlanGates, async (req, res) => {
     try {
         const results = await Result.find({ exam: req.params.id, tenantId: req.user.tenantId })
             .populate('student', 'name rollNumber admissionNumber')
@@ -677,7 +683,7 @@ router.get('/:id/results', protect, async (req, res) => {
 // @desc    Publish/unpublish all results for an exam
 // @route   PUT /api/exams/:id/results/publish
 // @access  Private (Admin, Teacher)
-router.put('/:id/results/publish', protect, authorize('admin', 'teacher'), async (req, res) => {
+router.put('/:id/results/publish', protect, examPlanGates, authorize('admin', 'teacher'), async (req, res) => {
     try {
         const exam = await Exam.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
         if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });

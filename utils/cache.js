@@ -11,9 +11,11 @@ const NodeCache = require('node-cache');
  */
 
 const cache = new NodeCache({
-  stdTTL: 300,        // default 5 min
-  checkperiod: 60,    // purge expired keys every 60 s
-  useClones: false,   // return references (faster)
+  stdTTL: 300,           // default 5 min
+  checkperiod: 120,      // purge expired keys every 2 min
+  useClones: false,      // return references (faster, saves memory)
+  maxKeys: 500,          // prevent unbounded memory growth
+  deleteOnExpire: true,  // remove keys immediately on expiry
 });
 
 /** Get a value by key (returns undefined on miss). */
@@ -48,4 +50,11 @@ const getOrSet = async (key, fn, ttlSeconds) => {
   return value;
 };
 
-module.exports = { get, set, del, delByPrefix, flush, getOrSet };
+/** Get cache statistics (hits, misses, keys count). */
+const getStats = () => ({
+  keys: cache.keys().length,
+  hits: cache.getStats().hits,
+  misses: cache.getStats().misses,
+});
+
+module.exports = { get, set, del, delByPrefix, flush, getOrSet, getStats };

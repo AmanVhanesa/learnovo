@@ -1,135 +1,228 @@
 /**
- * planGate middleware
+ * Plan gating middleware for Learnovo.
  *
- * Usage: router.get('/route', auth, planGate('featureName'), handler)
+ * Provides three types of access control:
+ * 1. requireActiveSubscription — blocks expired trials & suspended accounts
+ * 2. requireFeature(featureName)  — blocks if plan doesn't include a feature
+ * 3. limitGate(limitKey, getCount) — blocks when usage limit reached
  *
- * Checks that the authenticated user's tenant has the given feature enabled
- * in their plan. If not, returns 403 with an upgrade message.
+ * Convenience exports for common gates (checkStudentLimit, checkGrades, etc.)
  */
 
-const { getPlanConfig, getFeatureRequiredPlan, getPlanDisplayName } = require('../utils/planConfig');
+const { getPlanConfig, getFeatureRequiredPlan, getPlanDisplayName, hasFeature, getLimit } = require('../utils/planConfig');
+const Tenant = require('../models/Tenant');
 
 /**
- * Returns Express middleware that gates a route behind a plan feature.
- * @param {string} featureName - Key from PLANS[plan].features
+ * Resolve the tenant from req.tenant or req.user.tenantId.
+ * Some routes set req.tenant via tenant middleware, others only have req.user.tenantId via protect.
  */
-const planGate = (featureName) => (req, res, next) => {
-    try {
-        const tenant = req.tenant;
-
-        if (!tenant) {
-            return res.status(401).json({
-                success: false,
-                message: 'Tenant context not found. Ensure getTenantFromRequest ran first.'
-            });
+async function resolveTenant(req) {
+    if (req.tenant) return req.tenant;
+    if (req.user?.tenantId) {
+        const tenant = await Tenant.findById(req.user.tenantId).lean();
+        if (tenant) {
+            req.tenant = tenant; // cache for subsequent middleware
         }
-
-        const plan = tenant.subscription?.plan || 'free_trial';
-        const status = tenant.subscription?.status;
-
-        // Always allow super admins through
-        if (req.user?.role === 'superadmin') {
-            return next();
-        }
-
-        // Expired trial or suspended — block everything
-        if (status === 'suspended') {
-            return res.status(403).json({
-                success: false,
-                message: 'Your school subscription is suspended. Please contact support.',
-                code: 'SUBSCRIPTION_SUSPENDED'
-            });
-        }
-
-        if (status === 'trial' && new Date() > new Date(tenant.subscription.trialEndsAt)) {
-            return res.status(403).json({
-                success: false,
-                message: 'Your trial has expired. Please upgrade to continue.',
-                code: 'TRIAL_EXPIRED'
-            });
-        }
-
-        // Check custom override limits if feature is a limit check
-        // (handled separately in route — this middleware handles boolean feature flags)
-
-        const planConfig = getPlanConfig(plan);
-        if (!planConfig) {
-            return res.status(403).json({
-                success: false,
-                message: 'Unknown subscription plan. Please contact support.',
-                code: 'UNKNOWN_PLAN'
-            });
-        }
-
-        const hasFeature = planConfig.features[featureName];
-
-        if (!hasFeature) {
-            const requiredPlan = getFeatureRequiredPlan(featureName);
-            const requiredPlanName = getPlanDisplayName(requiredPlan);
-            const currentPlanName = getPlanDisplayName(plan);
-
-            return res.status(403).json({
-                success: false,
-                message: `This feature is not available on your current plan (${currentPlanName}).`,
-                upgrade: {
-                    requiredPlan,
-                    requiredPlanName,
-                    currentPlan: plan,
-                    currentPlanName
-                },
-                code: 'PLAN_LIMIT_EXCEEDED'
-            });
-        }
-
-        next();
-    } catch (err) {
-        next(err);
+        return tenant;
     }
-};
+    return null;
+}
 
-/**
- * Limit gate — checks that usage doesn't exceed plan/custom limits.
- * @param {string} limitKey - 'students' or 'teachers'
- * @param {Function} getCount - async fn(req) => currentCount
- */
-const limitGate = (limitKey, getCount) => async (req, res, next) => {
+// ─── CHECK 1: Subscription status ──────────────────────────────────────
+const requireActiveSubscription = async (req, res, next) => {
     try {
-        const tenant = req.tenant;
-        if (!tenant) return next();
+        // Skip if no user context yet (protect middleware will handle auth)
+        if (!req.user) return next();
+
+        const tenant = await resolveTenant(req);
+        if (!tenant) {
+            return res.status(403).json({ success: false, message: 'Tenant not found' });
+        }
 
         // Super admin bypass
         if (req.user?.role === 'superadmin') return next();
 
-        const plan = tenant.subscription?.plan || 'free_trial';
-        const planConfig = getPlanConfig(plan);
+        const { status, trialEndsAt } = tenant.subscription || {};
 
-        // Check custom override first, then plan default
-        const limit = tenant.subscription?.customLimits?.[limitKey]
-            ?? planConfig?.limits?.[limitKey]
-            ?? Infinity;
-
-        if (limit === Infinity) return next();
-
-        const currentCount = await getCount(req);
-
-        if (currentCount >= limit) {
+        if (status === 'trial' && trialEndsAt && new Date() > new Date(trialEndsAt)) {
             return res.status(403).json({
                 success: false,
-                message: `You have reached the maximum ${limitKey} limit (${limit}) for your plan.`,
-                currentCount,
-                limit,
-                code: 'USAGE_LIMIT_EXCEEDED',
-                upgrade: {
-                    currentPlan: plan,
-                    currentPlanName: getPlanDisplayName(plan),
-                }
+                code: 'TRIAL_EXPIRED',
+                message: 'Your 14-day free trial has expired. Please upgrade to continue.',
+                upgradeUrl: '/pricing',
+            });
+        }
+
+        if (status === 'suspended') {
+            return res.status(403).json({
+                success: false,
+                code: 'SUBSCRIPTION_SUSPENDED',
+                message: 'Your subscription has been suspended. Please contact support.',
+            });
+        }
+
+        if (status === 'cancelled') {
+            return res.status(403).json({
+                success: false,
+                code: 'SUBSCRIPTION_CANCELLED',
+                message: 'Your subscription has been cancelled. Please renew to continue.',
+                upgradeUrl: '/pricing',
             });
         }
 
         next();
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 };
 
-module.exports = { planGate, limitGate };
+// ─── CHECK 2: Feature gate ─────────────────────────────────────────────
+const requireFeature = (featureName) => {
+    return async (req, res, next) => {
+        try {
+            // Skip if no user context yet (protect middleware will handle auth)
+            if (!req.user) return next();
+
+            const tenant = await resolveTenant(req);
+            if (!tenant) {
+                return res.status(403).json({ success: false, message: 'Tenant not found' });
+            }
+
+            // Super admin bypass
+            if (req.user?.role === 'superadmin') return next();
+
+            const plan = tenant.subscription?.plan || 'free';
+
+            if (!hasFeature(plan, featureName)) {
+                const planConfig = getPlanConfig(plan);
+                const requiredPlan = getFeatureRequiredPlan(featureName);
+
+                return res.status(403).json({
+                    success: false,
+                    code: 'FEATURE_NOT_IN_PLAN',
+                    message: `This feature is not available on your ${planConfig.name} plan.`,
+                    feature: featureName,
+                    currentPlan: plan,
+                    currentPlanName: planConfig.name,
+                    requiredPlan: requiredPlan || 'enterprise',
+                    requiredPlanName: getPlanDisplayName(requiredPlan || 'enterprise'),
+                    upgradeUrl: '/pricing',
+                });
+            }
+
+            next();
+        } catch (error) {
+            next(error);
+        }
+    };
+};
+
+// ─── CHECK 3: Usage limit gate ─────────────────────────────────────────
+const limitGate = (limitKey, getCount) => {
+    return async (req, res, next) => {
+        try {
+            // Skip if no user context yet
+            if (!req.user) return next();
+
+            const tenant = await resolveTenant(req);
+            if (!tenant) return next();
+
+            // Super admin bypass
+            if (req.user?.role === 'superadmin') return next();
+
+            const plan = tenant.subscription?.plan || 'free';
+            const planConfig = getPlanConfig(plan);
+
+            // Check custom override first, then plan default
+            const limit = tenant.subscription?.customLimits?.[limitKey]
+                ?? planConfig?.limits?.[limitKey]
+                ?? Infinity;
+
+            if (limit === Infinity) return next();
+
+            const currentCount = await getCount(req);
+
+            if (currentCount >= limit) {
+                return res.status(403).json({
+                    success: false,
+                    code: 'USAGE_LIMIT_EXCEEDED',
+                    message: `You have reached the maximum of ${limit} ${limitKey} on your ${planConfig.name} plan.`,
+                    currentCount,
+                    limit,
+                    currentPlan: plan,
+                    currentPlanName: planConfig.name,
+                    upgradeUrl: '/pricing',
+                });
+            }
+
+            next();
+        } catch (error) {
+            next(error);
+        }
+    };
+};
+
+// ─── Convenience: Student limit ────────────────────────────────────────
+const checkStudentLimit = limitGate('students', async (req) => {
+    const User = require('../models/User');
+    return User.countDocuments({
+        tenantId: req.tenant._id,
+        role: 'student',
+        isActive: true,
+    });
+});
+
+// ─── Convenience: Teacher limit ────────────────────────────────────────
+const checkTeacherLimit = async (req, res, next) => {
+    // Only enforce for teacher-type roles
+    const teacherRoles = ['teacher', 'principal', 'vice_principal'];
+    const role = req.body?.role;
+    if (role && !teacherRoles.includes(role)) {
+        return next(); // Not a teacher role, skip
+    }
+
+    const gate = limitGate('teachers', async (r) => {
+        const User = require('../models/User');
+        return User.countDocuments({
+            tenantId: r.tenant._id,
+            role: { $in: ['teacher', 'principal', 'vice_principal'] },
+            isActive: true,
+        });
+    });
+
+    return gate(req, res, next);
+};
+
+// ─── Convenience: Feature gates ────────────────────────────────────────
+const checkGrades = requireFeature('grades');
+const checkExams = requireFeature('exams');
+const checkGradesAndExams = requireFeature('grades'); // grades + exams are gated together
+const checkFeesAndFinance = requireFeature('feesFinance');
+const checkCsvImport = requireFeature('csvImport');
+const checkParentPortal = requireFeature('parentPortal');
+const checkPaymentGateway = requireFeature('paymentGateway');
+const checkBasicReports = requireFeature('basicReports');
+const checkAdvancedAnalytics = requireFeature('advancedAnalytics');
+const checkCustomReports = requireFeature('customReports');
+const checkSmsWhatsapp = requireFeature('smsWhatsappAlerts');
+const checkApiAccess = requireFeature('apiAccess');
+
+module.exports = {
+    requireActiveSubscription,
+    requireFeature,
+    limitGate,
+    checkStudentLimit,
+    checkTeacherLimit,
+    checkGrades,
+    checkExams,
+    checkGradesAndExams,
+    checkFeesAndFinance,
+    checkCsvImport,
+    checkParentPortal,
+    checkPaymentGateway,
+    checkBasicReports,
+    checkAdvancedAnalytics,
+    checkCustomReports,
+    checkSmsWhatsapp,
+    checkApiAccess,
+};

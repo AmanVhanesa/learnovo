@@ -430,6 +430,9 @@ router.get('/users', async (req, res) => {
         if (req.query.search) {
             filter.$or = [
                 { name: { $regex: req.query.search, $options: 'i' } },
+                { firstName: { $regex: req.query.search, $options: 'i' } },
+                { lastName: { $regex: req.query.search, $options: 'i' } },
+                { fullName: { $regex: req.query.search, $options: 'i' } },
                 { email: { $regex: req.query.search, $options: 'i' } }
             ];
         }
@@ -1677,41 +1680,154 @@ router.get('/reports/overview', async (req, res) => {
  */
 router.get('/system/health', async (req, res) => {
     try {
+        const os = require('os');
         const dbStats = await mongoose.connection.db.stats();
         const adminDb = mongoose.connection.db.admin();
         const serverStatus = await adminDb.serverStatus().catch(() => null);
 
-        // Per-tenant storage (top 10)
-        const tenantStorage = await Tenant.aggregate([
-            { $match: { isDeleted: { $ne: true } } },
-            { $project: { schoolName: 1, schoolCode: 1 } },
-            { $limit: 10 }
-        ]);
-
         const memUsage = process.memoryUsage();
+        const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+        const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
+        const heapPercent = heapTotalMB ? (heapUsedMB / heapTotalMB) * 100 : 0;
+        const rssMB = Math.round(memUsage.rss / 1024 / 1024);
+        const externalMB = Math.round((memUsage.external || 0) / 1024 / 1024);
+
+        // Format uptime
+        const uptimeSec = Math.floor(process.uptime());
+        const d = Math.floor(uptimeSec / 86400);
+        const h = Math.floor((uptimeSec % 86400) / 3600);
+        const m = Math.floor((uptimeSec % 3600) / 60);
+        const uptimeFormatted = d > 0 ? `${d}d ${h}h ${m}m` : h > 0 ? `${h}h ${m}m` : `${m}m`;
+
+        // Email queue status
+        let emailStatus = { status: 'not_configured', queueLength: 0, pending: 0, failed: 0 };
+        try {
+            const emailService = require('../services/emailService');
+            const qs = emailService.getQueueStatus();
+            emailStatus = { status: 'configured', ...qs };
+        } catch (e) { /* email service may not be loaded */ }
+
+        // Cache stats
+        let cacheStats = { keys: 0, hits: 0, misses: 0 };
+        try {
+            const cacheModule = require('../utils/cache');
+            cacheStats = cacheModule.getStats();
+        } catch (e) { /* ignore */ }
+
+        // Service configuration checks
+        const cloudinaryConfigured = !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY);
+        const s3Configured = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+        const razorpayConfigured = !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+
+        // Build alerts
+        const alerts = [];
+        if (heapPercent > 85) {
+            alerts.push({ level: 'critical', title: 'High Memory Usage', message: `Heap memory is at ${heapPercent.toFixed(1)}% (${heapUsedMB} MB / ${heapTotalMB} MB). Server may become unstable.` });
+        } else if (heapPercent > 70) {
+            alerts.push({ level: 'warning', title: 'Elevated Memory Usage', message: `Heap memory is at ${heapPercent.toFixed(1)}%.` });
+        }
+        if (emailStatus.failed > 0) {
+            alerts.push({ level: 'warning', title: 'Failed Emails', message: `${emailStatus.failed} failed emails in queue` });
+        }
+        if (mongoose.connection.readyState !== 1) {
+            alerts.push({ level: 'critical', title: 'Database Disconnected', message: 'MongoDB connection is not active.' });
+        }
+
+        const overallStatus = alerts.some(a => a.level === 'critical') ? 'critical' : alerts.some(a => a.level === 'warning') ? 'warning' : 'healthy';
+
+        // CPU usage
+        const cpuUsage = process.cpuUsage();
+        const loadAvg = os.loadavg();
+
+        // Database connections
+        const connections = serverStatus?.connections || {};
+
+        // Read package.json version
+        let appVersion = '1.0.0';
+        try {
+            const pkg = require('../package.json');
+            appVersion = pkg.version || '1.0.0';
+        } catch (e) { /* ignore */ }
 
         return res.json({
             success: true,
             data: {
+                status: overallStatus,
+                lastChecked: new Date(),
+
                 server: {
-                    uptime: process.uptime(),
-                    memoryUsage: {
-                        rss: Math.round(memUsage.rss / 1024 / 1024),
-                        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
-                        heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024)
-                    },
                     nodeVersion: process.version,
-                    platform: process.platform
+                    platform: process.platform,
+                    arch: process.arch,
+                    pid: process.pid,
+                    uptime: uptimeSec,
+                    uptimeFormatted,
+                    memory: {
+                        rss: rssMB,
+                        heapTotal: heapTotalMB,
+                        heapUsed: heapUsedMB,
+                        external: externalMB,
+                        heapUsedPercent: Math.round(heapPercent * 10) / 10,
+                    },
+                    cpu: {
+                        user: cpuUsage.user,
+                        system: cpuUsage.system,
+                        loadAvg,
+                    },
+                    os: {
+                        type: os.type(),
+                        release: os.release(),
+                        totalMemory: Math.round(os.totalmem() / 1024 / 1024),
+                        freeMemory: Math.round(os.freemem() / 1024 / 1024),
+                    },
                 },
+
                 database: {
-                    totalSize: Math.round((dbStats.dataSize || 0) / 1024 / 1024),
-                    storageSize: Math.round((dbStats.storageSize || 0) / 1024 / 1024),
-                    collections: dbStats.collections,
-                    objects: dbStats.objects,
-                    indexes: dbStats.indexes,
-                    connectionPool: serverStatus?.connections || {}
+                    status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+                    readyState: mongoose.connection.readyState,
+                    host: mongoose.connection.host,
+                    name: mongoose.connection.name,
+                    stats: {
+                        dataSize: Math.round((dbStats.dataSize || 0) / 1024 / 1024),
+                        storageSize: Math.round((dbStats.storageSize || 0) / 1024 / 1024),
+                        collections: dbStats.collections,
+                        objects: dbStats.objects,
+                        indexes: dbStats.indexes,
+                        avgObjSize: dbStats.avgObjSize ? Math.round(dbStats.avgObjSize) : 0,
+                    },
+                    connections: {
+                        current: connections.current || 0,
+                        available: connections.available || 0,
+                        totalCreated: connections.totalCreated || 0,
+                    },
                 },
-                topTenants: tenantStorage
+
+                services: {
+                    email: emailStatus,
+                    cache: {
+                        keys: cacheStats.keys || 0,
+                        hits: cacheStats.hits || 0,
+                        misses: cacheStats.misses || 0,
+                        hitRate: (cacheStats.hits + cacheStats.misses) > 0
+                            ? Math.round((cacheStats.hits / (cacheStats.hits + cacheStats.misses)) * 100)
+                            : 0,
+                    },
+                    storage: {
+                        cloudinary: cloudinaryConfigured ? 'configured' : 'not_configured',
+                        s3: s3Configured ? 'configured' : 'not_configured',
+                    },
+                    payment: {
+                        razorpay: razorpayConfigured ? 'configured' : 'not_configured',
+                    },
+                },
+
+                alerts,
+
+                platform: {
+                    version: appVersion,
+                    environment: process.env.NODE_ENV || 'development',
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                },
             },
             requestId: req.requestId
         });
