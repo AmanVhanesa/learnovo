@@ -1688,9 +1688,14 @@ router.get('/system/health', async (req, res) => {
         const memUsage = process.memoryUsage();
         const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
         const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
-        const heapPercent = heapTotalMB ? (heapUsedMB / heapTotalMB) * 100 : 0;
         const rssMB = Math.round(memUsage.rss / 1024 / 1024);
         const externalMB = Math.round((memUsage.external || 0) / 1024 / 1024);
+
+        // Determine the actual max heap size from --max-old-space-size or V8 defaults
+        const v8 = require('v8');
+        const heapStats = v8.getHeapStatistics();
+        const heapMaxMB = Math.round(heapStats.heap_size_limit / 1024 / 1024);
+        const heapPercent = heapMaxMB ? (heapUsedMB / heapMaxMB) * 100 : 0;
 
         // Format uptime
         const uptimeSec = Math.floor(process.uptime());
@@ -1722,9 +1727,9 @@ router.get('/system/health', async (req, res) => {
         // Build alerts
         const alerts = [];
         if (heapPercent > 85) {
-            alerts.push({ level: 'critical', title: 'High Memory Usage', message: `Heap memory is at ${heapPercent.toFixed(1)}% (${heapUsedMB} MB / ${heapTotalMB} MB). Server may become unstable.` });
+            alerts.push({ level: 'critical', title: 'High Memory Usage', message: `Heap memory is at ${heapPercent.toFixed(1)}% (${heapUsedMB} MB / ${heapMaxMB} MB). Server may become unstable.` });
         } else if (heapPercent > 70) {
-            alerts.push({ level: 'warning', title: 'Elevated Memory Usage', message: `Heap memory is at ${heapPercent.toFixed(1)}%.` });
+            alerts.push({ level: 'warning', title: 'Elevated Memory Usage', message: `Heap memory is at ${heapPercent.toFixed(1)}% (${heapUsedMB} MB / ${heapMaxMB} MB).` });
         }
         if (emailStatus.failed > 0) {
             alerts.push({ level: 'warning', title: 'Failed Emails', message: `${emailStatus.failed} failed emails in queue` });
@@ -1766,6 +1771,7 @@ router.get('/system/health', async (req, res) => {
                         rss: rssMB,
                         heapTotal: heapTotalMB,
                         heapUsed: heapUsedMB,
+                        heapMax: heapMaxMB,
                         external: externalMB,
                         heapUsedPercent: Math.round(heapPercent * 10) / 10,
                     },
