@@ -51,6 +51,8 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     // Allow if origin is in the allowed list
     if (allowedOrigins.includes(origin)) return callback(null, true);
+    // Allow Vercel preview deployments
+    if (origin.endsWith('.vercel.app')) return callback(null, true);
     // In development, allow any localhost
     if (process.env.NODE_ENV !== 'production' &&
         (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
