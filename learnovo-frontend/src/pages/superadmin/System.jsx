@@ -68,7 +68,8 @@ const System = () => {
   const mem = serverData.memory || serverData.memoryUsage || {}
   const heapUsed = mem.heapUsed || 0
   const heapTotal = mem.heapTotal || 0
-  const heapPercent = mem.heapUsedPercent || (heapTotal ? Math.round((heapUsed / heapTotal) * 100) : 0)
+  const heapMax = mem.heapMax || heapTotal // V8 heap size limit (from --max-old-space-size)
+  const heapPercent = mem.heapUsedPercent || (heapMax ? Math.round((heapUsed / heapMax) * 100) : 0)
   const rssMB = mem.rss || 0
   const externalMB = mem.external || 0
   const heapColor = getHeapColor(heapPercent)
@@ -171,7 +172,7 @@ const System = () => {
         <StatCard
           icon={Cpu}
           title="Heap Memory"
-          value={`${heapUsed} / ${heapTotal} MB`}
+          value={`${heapUsed} / ${heapMax} MB`}
           subtitle={`${heapPercent}% used`}
           color={heapPercent > 80 ? 'red' : heapPercent > 60 ? 'amber' : 'blue'}
           progress={heapPercent}
@@ -212,7 +213,8 @@ const System = () => {
             <div className="border-t border-gray-100 dark:border-[#38383A] pt-3 mt-3">
               <p className="text-[11px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wider mb-2">Memory</p>
               <InfoRow label="Heap Used" value={`${heapUsed} MB`} />
-              <InfoRow label="Heap Total" value={`${heapTotal} MB`} />
+              <InfoRow label="Heap Allocated" value={`${heapTotal} MB`} />
+              <InfoRow label="Heap Max" value={`${heapMax} MB`} />
               <InfoRow label="RSS Memory" value={`${rssMB} MB`} />
               <InfoRow label="External Memory" value={`${externalMB} MB`} />
               {/* Heap usage bar */}
