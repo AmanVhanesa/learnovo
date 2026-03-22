@@ -31,6 +31,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         photo: employee?.photo || '',
 
         // Personal Info
+        guardianRelation: employee?.guardianRelation || 'father',
         fatherOrHusbandName: employee?.fatherOrHusbandName || '',
         gender: employee?.gender || 'male',
         dateOfBirth: employee?.dateOfBirth ? employee.dateOfBirth.substring(0, 10) : '',
@@ -568,12 +569,25 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="min-w-0">
-                                    <label className="label">Father/Husband Name</label>
-                                    <input
-                                        className="input"
-                                        value={form.fatherOrHusbandName}
-                                        onChange={(e) => updateField('fatherOrHusbandName', e.target.value)}
-                                    />
+                                    <label className="label">
+                                        {form.guardianRelation === 'father' ? "Father's" : "Husband's"} Name
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <select
+                                            className="input w-[130px] shrink-0"
+                                            value={form.guardianRelation}
+                                            onChange={(e) => updateField('guardianRelation', e.target.value)}
+                                        >
+                                            <option value="father">Father</option>
+                                            <option value="husband">Husband</option>
+                                        </select>
+                                        <input
+                                            className="input flex-1 min-w-0"
+                                            placeholder="Enter name"
+                                            value={form.fatherOrHusbandName}
+                                            onChange={(e) => updateField('fatherOrHusbandName', e.target.value)}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="min-w-0">

@@ -11,6 +11,7 @@ const SuperAdminLogin = () => {
     const [showPassword, setShowPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [formReady, setFormReady] = useState(false)
+    const [rememberMe, setRememberMe] = useState(true)
 
     const { login, isAuthenticated, isLoading: authLoading, error, clearError } = useSuperAdminAuth()
     const { theme, toggleMode } = useTheme()
@@ -22,6 +23,17 @@ const SuperAdminLogin = () => {
             navigate('/super-admin/dashboard', { replace: true })
         }
     }, [isAuthenticated, authLoading, isLoading, navigate])
+
+    useEffect(() => {
+        const saved = localStorage.getItem('superadmin_remember_me')
+        if (saved) {
+            try {
+                const { email } = JSON.parse(saved)
+                setFormData(prev => ({ ...prev, email: email || '' }))
+                setRememberMe(true)
+            } catch (e) { /* ignore corrupt data */ }
+        }
+    }, [])
 
     useEffect(() => {
         clearError()
@@ -37,6 +49,12 @@ const SuperAdminLogin = () => {
     const handleSubmit = async (e) => {
         e.preventDefault()
         setIsLoading(true)
+
+        if (rememberMe) {
+            localStorage.setItem('superadmin_remember_me', JSON.stringify({ email: formData.email.trim() }))
+        } else {
+            localStorage.removeItem('superadmin_remember_me')
+        }
 
         try {
             const result = await login(formData)
@@ -200,6 +218,27 @@ const SuperAdminLogin = () => {
                                     )}
                                 </div>
                             </div>
+
+                            {/* Remember me */}
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => {
+                                        setRememberMe(e.target.checked)
+                                        if (!e.target.checked) localStorage.removeItem('superadmin_remember_me')
+                                    }}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-4 h-4 rounded border border-gray-300 dark:border-[#48484A] bg-white dark:bg-[#2C2C2E] peer-checked:bg-teal-500 peer-checked:border-teal-500 flex items-center justify-center transition-colors">
+                                    {rememberMe && (
+                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    )}
+                                </div>
+                                <span className="text-[13px] text-gray-500 dark:text-[#8E8E93]">Remember me</span>
+                            </label>
 
                             {/* Error */}
                             {error && (
