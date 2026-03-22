@@ -70,7 +70,7 @@ const EditInvoiceModal = ({ invoice, onClose, onSuccess }) => {
     if (!invoice) return null
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
                     <div>

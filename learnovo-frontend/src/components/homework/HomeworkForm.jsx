@@ -214,7 +214,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     const isImage = (fileType) => fileType?.startsWith('image/');
 
     return (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10 rounded-t-2xl">

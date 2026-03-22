@@ -323,7 +323,7 @@ const TeacherCommunication = () => {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete Announcement?</h3>
             <p className="text-sm text-gray-600 dark:text-[#8E8E93] mb-6">This cannot be undone. Students who already received the notification will still see it.</p>

@@ -503,7 +503,7 @@ const Assignments = () => {
 
       {/* Create/Edit Modal */}
       {showModal && !isStudent && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -645,7 +645,7 @@ const Assignments = () => {
 
       {/* Details Modal */}
       {showDetailsModal && selectedAssignment && (
-        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Assignment Details</h3>
