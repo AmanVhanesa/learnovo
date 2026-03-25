@@ -48,8 +48,12 @@ function getDriveClient() {
     refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN,
   });
 
-  // Reset cached client when the token cannot be refreshed
-  oauth2Client.on('tokens', () => {});
+  // Automatically update credentials when new tokens are received
+  oauth2Client.on('tokens', (tokens) => {
+    if (tokens.access_token) {
+      oauth2Client.setCredentials(tokens);
+    }
+  });
   oauth2Client.on('error', () => { _driveClient = null; });
 
   _driveClient = google.drive({ version: 'v3', auth: oauth2Client });
@@ -78,7 +82,14 @@ async function checkConnection() {
 
     // Detect expired/revoked token
     const status = err.response?.status || err.code;
-    if (status === 401 || status === 403 || msg.includes('invalid_grant') || msg.includes('Token has been expired or revoked')) {
+    const isTokenError = status === 401 || status === 403
+      || msg.includes('invalid_grant')
+      || msg.includes('Token has been expired or revoked')
+      || msg.includes('token has been revoked')
+      || msg.includes('invalid_client')
+      || msg.includes('unauthorized_client')
+      || msg.includes('access_denied');
+    if (isTokenError) {
       return { ok: false, error: 'Refresh token expired or revoked. Re-run: node scripts/gdrive-setup.js' };
     }
 

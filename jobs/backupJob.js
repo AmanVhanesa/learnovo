@@ -13,19 +13,19 @@ const { logger } = require('../middleware/errorHandler');
  */
 
 async function runAutoBackup() {
-  if (!googleDriveService.isConfigured()) {
-    logger.info('Auto-backup skipped: Google Drive not configured');
-    return;
-  }
-
-  // Verify the token still works before looping through tenants
-  const connection = await googleDriveService.checkConnection();
-  if (!connection.ok) {
-    logger.error(`Auto-backup skipped: Google Drive connection failed — ${connection.error}`);
-    return;
-  }
-
   logger.info('Auto-backup job started');
+
+  // Check if Google Drive is available
+  let driveAvailable = false;
+  if (googleDriveService.isConfigured()) {
+    const connection = await googleDriveService.checkConnection();
+    driveAvailable = connection.ok;
+    if (!driveAvailable) {
+      logger.error(`Auto-backup: Google Drive connection failed — ${connection.error}. Falling back to local-only backups.`);
+    }
+  } else {
+    logger.info('Auto-backup: Google Drive not configured, running local-only backups');
+  }
 
   try {
     const Tenant = mongoose.model('Tenant');
@@ -36,7 +36,12 @@ async function runAutoBackup() {
 
     for (const tenant of tenants) {
       try {
-        await backupService.createAndUploadBackup(tenant._id, null, 'scheduled');
+        if (driveAvailable) {
+          await backupService.createAndUploadBackup(tenant._id, null, 'scheduled');
+        } else {
+          // Fallback: create backup buffer and log it (local-only)
+          await backupService.createLocalBackup(tenant._id, null, 'scheduled');
+        }
         successCount++;
         logger.info(`Auto-backup completed for ${tenant.schoolName || tenant._id}`);
       } catch (err) {

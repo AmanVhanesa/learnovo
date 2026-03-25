@@ -111,7 +111,62 @@ async function createAndUploadBackup(tenantId, performedBy, type = 'manual') {
   }
 }
 
+/**
+ * Create backup locally (no Google Drive upload).
+ * Used as fallback when Google Drive is unavailable.
+ * Logs the result to BackupLog.
+ */
+async function createLocalBackup(tenantId, performedBy, type = 'manual') {
+  const startTime = Date.now();
+
+  try {
+    const { buffer, metadata } = await createBackupBuffer(tenantId);
+
+    const log = await BackupLog.create({
+      tenantId,
+      performedBy: performedBy || undefined,
+      filename: `learnovo-backup-${tenantId}.json.gz`,
+      sizeBytes: metadata.sizeBytes,
+      collectionsCount: metadata.collectionsCount,
+      documentsCount: metadata.documentsCount,
+      status: 'success',
+      type,
+      storageLocation: 'local',
+    });
+
+    logger.info('Local backup completed', {
+      tenantId,
+      type,
+      storageLocation: 'local',
+      collections: metadata.collectionsCount,
+      documents: metadata.documentsCount,
+      sizeBytes: metadata.sizeBytes,
+      durationMs: Date.now() - startTime,
+    });
+
+    return { log, metadata, buffer };
+  } catch (error) {
+    try {
+      await BackupLog.create({
+        tenantId,
+        performedBy: performedBy || undefined,
+        filename: 'failed-backup',
+        status: 'failed',
+        errorMessage: error.message,
+        type,
+        storageLocation: 'local',
+      });
+    } catch {
+      // ignore logging errors
+    }
+
+    logger.error('Local backup failed', error, { tenantId, type });
+    throw error;
+  }
+}
+
 module.exports = {
   createBackupBuffer,
   createAndUploadBackup,
+  createLocalBackup,
 };
