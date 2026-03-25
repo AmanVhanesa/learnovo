@@ -136,6 +136,38 @@ const payrollService = {
         }
     },
 
+    /**
+     * Mark a payroll record as paid
+     */
+    markAsPaid: async (id) => {
+        try {
+            const response = await api.put(`/payroll/${id}`, {
+                paymentStatus: 'paid',
+                paymentDate: new Date().toISOString()
+            });
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || error;
+        }
+    },
+
+    /**
+     * Bulk mark payroll records as paid
+     */
+    bulkMarkAsPaid: async (ids) => {
+        try {
+            const results = await Promise.all(
+                ids.map(id => api.put(`/payroll/${id}`, {
+                    paymentStatus: 'paid',
+                    paymentDate: new Date().toISOString()
+                }))
+            );
+            return results;
+        } catch (error) {
+            throw error.response?.data || error;
+        }
+    },
+
     // ============================================================================
     // ADVANCE SALARY METHODS
     // ============================================================================

@@ -1233,16 +1233,22 @@ const Landing = () => {
               <p className="text-sm text-gray-500 dark:text-[#9CA3AF] leading-relaxed">The complete school management platform for modern institutions.</p>
             </div>
             {[
-              { title: 'Product', links: ['Features', 'Pricing', 'Integrations', 'API'] },
-              { title: 'Resources', links: ['Help Center', 'Documentation', 'Blog', 'Guides', 'Webinars'] },
-              { title: 'Company', links: ['About', 'Careers', 'Contact', 'Press', 'Partners'] },
-              { title: 'Legal', links: ['Privacy', 'Terms', 'Cookie Policy', 'GDPR', 'Security'] },
+              { title: 'Product', links: [{ label: 'Features' }, { label: 'Pricing' }, { label: 'Integrations' }, { label: 'API' }] },
+              { title: 'Resources', links: [{ label: 'Help Center' }, { label: 'Documentation' }, { label: 'Blog' }, { label: 'Guides' }, { label: 'Webinars' }] },
+              { title: 'Company', links: [{ label: 'About' }, { label: 'Careers' }, { label: 'Contact' }, { label: 'Press' }, { label: 'Partners' }] },
+              { title: 'Legal', links: [{ label: 'Privacy Policy', to: '/privacy-policy' }, { label: 'Terms & Conditions', to: '/terms-and-conditions' }, { label: 'Cookie Policy' }, { label: 'GDPR' }, { label: 'Security' }] },
             ].map((col, i) => (
               <div key={i}>
                 <h4 className="text-sm font-semibold mb-4 text-gray-900 dark:text-white">{col.title}</h4>
                 <ul className="space-y-2.5">
                   {col.links.map((link, li) => (
-                    <li key={li}><a href="#" className="text-sm text-gray-500 hover:text-primary-600 dark:text-[#9CA3AF] dark:hover:text-[#34D399] transition-colors">{link}</a></li>
+                    <li key={li}>
+                      {link.to ? (
+                        <Link to={link.to} className="text-sm text-gray-500 hover:text-primary-600 dark:text-[#9CA3AF] dark:hover:text-[#34D399] transition-colors">{link.label}</Link>
+                      ) : (
+                        <a href="#" className="text-sm text-gray-500 hover:text-primary-600 dark:text-[#9CA3AF] dark:hover:text-[#34D399] transition-colors">{link.label}</a>
+                      )}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -1250,13 +1256,13 @@ const Landing = () => {
             <div>
               <h4 className="text-sm font-semibold mb-4 text-gray-900 dark:text-white">Contact</h4>
               <ul className="space-y-2.5">
-                <li><a href="mailto:hello@learnovo.app" className="text-sm text-gray-500 dark:text-[#9CA3AF] hover:text-primary-600 dark:hover:text-[#34D399] transition-colors">hello@learnovo.app</a></li>
-                <li><span className="text-sm text-gray-500 dark:text-[#9CA3AF]">+91 XXXXX XXXXX</span></li>
+                <li><a href="mailto:evotechnologiesinnovation@gmail.com" className="text-sm text-gray-500 dark:text-[#9CA3AF] hover:text-primary-600 dark:hover:text-[#34D399] transition-colors">evotechnologiesinnovation@gmail.com</a></li>
+                <li><a href="tel:+916283482293" className="text-sm text-gray-500 dark:text-[#9CA3AF] hover:text-primary-600 dark:hover:text-[#34D399] transition-colors">+91 62834 82293</a></li>
               </ul>
             </div>
           </div>
           <div className="border-t border-gray-200 dark:border-[#1a1a1a] pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-gray-400 dark:text-[#9CA3AF]">&copy; 2026 Learnovo. All rights reserved.</p>
+            <p className="text-sm text-gray-400 dark:text-[#9CA3AF]">&copy; 2026 Learnovo by EvoTech Innovation. All rights reserved.</p>
             <div className="flex items-center gap-6">
               {['Twitter', 'LinkedIn', 'GitHub'].map(social => (
                 <a key={social} href="#" className="text-sm text-gray-400 hover:text-primary-600 dark:text-[#9CA3AF] dark:hover:text-[#34D399] transition-colors">{social}</a>

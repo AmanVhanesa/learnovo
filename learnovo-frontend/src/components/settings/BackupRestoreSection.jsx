@@ -157,7 +157,7 @@ const BackupRestoreSection = () => {
           Google Drive Backup
         </h3>
 
-        {cloudStatus.configured ? (
+        {cloudStatus.configured && cloudStatus.active !== false ? (
           <div className="mt-3 space-y-3">
             {cloudStatus.file ? (
               <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-[#8E8E93]">
@@ -201,6 +201,32 @@ const BackupRestoreSection = () => {
                   <><Download className="h-4 w-4" /> Download to Device</>
                 )}
               </button>
+            </div>
+          </div>
+        ) : cloudStatus.configured && cloudStatus.active === false ? (
+          <div className="mt-3 flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-500/20 rounded-xl">
+            <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">Google Drive connection failed</p>
+              <p className="text-xs text-red-600 dark:text-red-400/80 mt-1">
+                {cloudStatus.error || 'Unable to reach Google Drive. The refresh token may have expired.'}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-[#636366] mt-2">
+                To fix: re-run <code className="bg-gray-100 dark:bg-[#2C2C2E] px-1.5 py-0.5 rounded text-xs">node scripts/gdrive-setup.js</code> on the server and update the refresh token.
+              </p>
+              <div className="mt-3">
+                <button
+                  onClick={() => downloadMutation.mutate()}
+                  disabled={downloadMutation.isPending}
+                  className="btn btn-primary btn-sm inline-flex items-center gap-2"
+                >
+                  {downloadMutation.isPending ? (
+                    <><Loader className="h-4 w-4 animate-spin" /> Downloading...</>
+                  ) : (
+                    <><Download className="h-4 w-4" /> Download Local Backup</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         ) : (

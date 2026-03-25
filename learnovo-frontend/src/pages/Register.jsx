@@ -32,6 +32,7 @@ const Register = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [agreeTerms, setAgreeTerms] = useState(false)
   const [errors, setErrors] = useState({})
   const [availability, setAvailability] = useState({})
   const [checkingAvailability, setCheckingAvailability] = useState({})
@@ -185,6 +186,11 @@ const Register = () => {
       newErrors['address.street'] = 'Street address must be under 200 characters'
     }
 
+    // Terms acceptance
+    if (!agreeTerms) {
+      newErrors.agreeTerms = 'You must agree to the Terms & Conditions and Privacy Policy'
+    }
+
     setErrors(newErrors)
 
     // Scroll to first error field
@@ -311,7 +317,7 @@ const Register = () => {
         </Link>
 
         {/* Bottom caption */}
-        <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2025 Learnovo. All rights reserved.</p>
+        <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2026 Learnovo. All rights reserved.</p>
       </motion.div>
 
       {/* -- RIGHT FORM PANEL -- */}
@@ -706,6 +712,39 @@ const Register = () => {
                 </div>
               </div>
 
+              {/* Terms & Conditions acceptance */}
+              <div className="space-y-1">
+                <label htmlFor="agreeTerms" className="flex items-start gap-2.5 cursor-pointer group py-0.5">
+                  <div className="relative flex-shrink-0 flex items-center mt-0.5">
+                    <input
+                      id="agreeTerms"
+                      name="agreeTerms"
+                      type="checkbox"
+                      checked={agreeTerms}
+                      onChange={(e) => {
+                        setAgreeTerms(e.target.checked)
+                        if (errors.agreeTerms) setErrors(prev => ({ ...prev, agreeTerms: '' }))
+                      }}
+                      className="peer sr-only"
+                    />
+                    <div className={`h-[16px] w-[16px] rounded-md border-2 ${errors.agreeTerms ? 'border-red-400' : 'border-gray-300 dark:border-[#48484A]'} bg-white dark:bg-[#2C2C2E] peer-checked:border-[#3EC4B1] peer-checked:bg-[#3EC4B1] transition-all duration-150 flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-[#3EC4B1]/40 peer-focus-visible:ring-offset-1`}>
+                      {agreeTerms && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[12px] text-gray-500 dark:text-[#8E8E93] leading-relaxed">
+                    I agree to the{' '}
+                    <Link to="/terms-and-conditions" target="_blank" className="text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline font-medium">Terms & Conditions</Link>
+                    {' '}and{' '}
+                    <Link to="/privacy-policy" target="_blank" className="text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline font-medium">Privacy Policy</Link>
+                  </span>
+                </label>
+                {errors.agreeTerms && <p className="text-[11px] text-red-500 pl-[26px]">{errors.agreeTerms}</p>}
+              </div>
+
               {/* Error display */}
               {errors.submit && (
                 <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-3.5 py-2.5">
@@ -744,13 +783,21 @@ const Register = () => {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 1.2, ease: [0.25, 0.4, 0.25, 1] }}
-            className="mt-6 text-center"
+            className="mt-6 text-center space-y-3"
           >
             <p className="text-[13px] text-gray-500 dark:text-[#8E8E93]">
               Already have an account?{' '}
               <Link to="/login" className="font-semibold text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors">
                 Sign in &rarr;
               </Link>
+            </p>
+            <div className="flex items-center justify-center gap-3 text-[11px] text-gray-400 dark:text-[#636366]">
+              <Link to="/terms-and-conditions" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Terms & Conditions</Link>
+              <span>·</span>
+              <Link to="/privacy-policy" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Privacy Policy</Link>
+            </div>
+            <p className="text-[10px] text-gray-300 dark:text-[#48484A]">
+              Need help? <a href="mailto:evotechnologiesinnovation@gmail.com" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">evotechnologiesinnovation@gmail.com</a> · <a href="tel:+916283482293" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">+91 62834 82293</a>
             </p>
           </motion.div>
         </div>

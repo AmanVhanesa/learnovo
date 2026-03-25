@@ -91,9 +91,23 @@ const StudentDetail = () => {
     // Toggle status mutation
     const toggleStatusMutation = useMutation({
         mutationFn: ({ reason }) => studentsService.toggleStatus(id, reason ? { reason } : {}),
+        onMutate: async ({ isDeactivation }) => {
+            await queryClient.cancelQueries({ queryKey: ['student', id] })
+            const previous = queryClient.getQueryData(['student', id])
+            queryClient.setQueryData(['student', id], (old) => {
+                if (!old?.student) return old
+                return {
+                    ...old,
+                    student: {
+                        ...old.student,
+                        isActive: !isDeactivation,
+                        ...(isDeactivation ? { inactivatedAt: new Date().toISOString() } : { inactivatedAt: null, removalDate: null, removalReason: null })
+                    }
+                }
+            })
+            return { previous }
+        },
         onSuccess: (_, { isDeactivation }) => {
-            queryClient.invalidateQueries({ queryKey: ['student', id] })
-            queryClient.invalidateQueries({ queryKey: ['students'] })
             if (isDeactivation) {
                 toast.success('Student deactivated successfully')
                 setShowDeactivateModal(false)
@@ -102,8 +116,13 @@ const StudentDetail = () => {
                 toast.success('Student activated successfully')
             }
         },
-        onError: (error, { isDeactivation }) => {
+        onError: (error, { isDeactivation }, context) => {
+            if (context?.previous) queryClient.setQueryData(['student', id], context.previous)
             toast.error(`Failed to ${isDeactivation ? 'deactivate' : 'activate'} student`)
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ['student', id] })
+            queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
         },
     })
 
@@ -334,6 +353,51 @@ const StudentDetail = () => {
                                 {student.isActive ? 'Active' : 'Inactive'}
                             </span>
                         </div>
+
+                        {/* Deactivation Info */}
+                        {!student.isActive && (student.removalDate || student.inactivatedAt) && (
+                            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg">
+                                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                                    <div>
+                                        <span className="text-red-600 dark:text-red-400 font-medium">Deactivated on: </span>
+                                        <span className="text-gray-800 dark:text-gray-200">
+                                            {new Date(student.removalDate || student.inactivatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        </span>
+                                    </div>
+                                    {student.createdAt && (
+                                        <div>
+                                            <span className="text-red-600 dark:text-red-400 font-medium">Active period: </span>
+                                            <span className="text-gray-800 dark:text-gray-200">
+                                                {new Date(student.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                {' — '}
+                                                {new Date(student.removalDate || student.inactivatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                {' '}
+                                                ({(() => {
+                                                    const start = new Date(student.createdAt);
+                                                    const end = new Date(student.removalDate || student.inactivatedAt);
+                                                    const diffMs = end - start;
+                                                    const totalDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                                    const years = Math.floor(totalDays / 365);
+                                                    const months = Math.floor((totalDays % 365) / 30);
+                                                    const days = totalDays % 30;
+                                                    const parts = [];
+                                                    if (years > 0) parts.push(`${years} year${years > 1 ? 's' : ''}`);
+                                                    if (months > 0) parts.push(`${months} month${months > 1 ? 's' : ''}`);
+                                                    if (days > 0 || parts.length === 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+                                                    return parts.join(', ');
+                                                })()})
+                                            </span>
+                                        </div>
+                                    )}
+                                    {student.removalReason && (
+                                        <div>
+                                            <span className="text-red-600 dark:text-red-400 font-medium">Reason: </span>
+                                            <span className="text-gray-800 dark:text-gray-200">{student.removalReason}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                             <div>

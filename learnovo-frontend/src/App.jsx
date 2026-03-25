@@ -29,6 +29,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import TermsAndConditions from './pages/TermsAndConditions'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 
 // ── Super admin pages
 const SuperAdminLogin = lazy(() => import('./pages/superadmin/Login'))
@@ -74,6 +76,8 @@ const NotificationPreferences = lazy(() => import('./pages/NotificationPreferenc
 const Transport = lazy(() => import('./pages/Transport'))
 const Payroll = lazy(() => import('./pages/Payroll'))
 const Expenses = lazy(() => import('./pages/Expenses'))
+const Income = lazy(() => import('./pages/Income'))
+const FinanceDashboard = lazy(() => import('./pages/FinanceDashboard'))
 const CertificateGeneration = lazy(() => import('./pages/certificates/CertificateGeneration'))
 const TemplateSettings = lazy(() => import('./pages/certificates/TemplateSettings'))
 const Search = lazy(() => import('./pages/Search'))
@@ -203,6 +207,8 @@ function App() {
                     <Route path="/register" element={<Register />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+                    <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                     <Route path="/app" element={
                       <ProtectedRoute>
                         <NotificationProvider>
@@ -331,6 +337,20 @@ function App() {
                       <Route path="expenses" element={
                         <ProtectedRoute allowedRoles={['admin']}>
                           <Expenses />
+                        </ProtectedRoute>
+                      } />
+
+                      {/* Income Management Module */}
+                      <Route path="income" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <Income />
+                        </ProtectedRoute>
+                      } />
+
+                      {/* Finance Dashboard (combined view) */}
+                      <Route path="finance-dashboard" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                          <FinanceDashboard />
                         </ProtectedRoute>
                       } />
 

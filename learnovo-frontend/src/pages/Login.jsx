@@ -188,7 +188,7 @@ const Login = () => {
         </Link>
 
         {/* Bottom caption */}
-        <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2025 Learnovo. All rights reserved.</p>
+        <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2026 Learnovo. All rights reserved.</p>
       </motion.div>
 
       {/* -- RIGHT FORM PANEL -- */}
@@ -437,6 +437,23 @@ const Login = () => {
             {fieldErrors.demo && (
               <p className="text-center text-[11px] text-amber-600 dark:text-amber-400 mt-2">{fieldErrors.demo}</p>
             )}
+          </motion.div>
+
+          {/* Terms & Contact footer */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 1.5 }}
+            className="mt-8 text-center space-y-2"
+          >
+            <div className="flex items-center justify-center gap-3 text-[11px] text-gray-400 dark:text-[#636366]">
+              <Link to="/terms-and-conditions" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Terms & Conditions</Link>
+              <span>·</span>
+              <Link to="/privacy-policy" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Privacy Policy</Link>
+            </div>
+            <p className="text-[10px] text-gray-300 dark:text-[#48484A]">
+              Need help? <a href="mailto:evotechnologiesinnovation@gmail.com" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">evotechnologiesinnovation@gmail.com</a> · <a href="tel:+916283482293" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">+91 62834 82293</a>
+            </p>
           </motion.div>
         </div>
       </motion.div>

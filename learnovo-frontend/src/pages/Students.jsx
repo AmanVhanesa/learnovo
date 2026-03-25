@@ -205,12 +205,37 @@ const Students = () => {
 
   const reactivateMutation = useMutation({
     mutationFn: (studentId) => studentsService.reactivate(studentId),
+    onMutate: async (studentId) => {
+      await queryClient.cancelQueries({ queryKey: ['students'] })
+      const queryKey = ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage]
+      const previous = queryClient.getQueryData(queryKey)
+      queryClient.setQueryData(queryKey, (old) => {
+        if (!old?.data) return old
+        // If filtering by "inactive", remove from list; otherwise flip the flag
+        const shouldRemove = statusFilter === 'inactive'
+        return {
+          ...old,
+          data: shouldRemove
+            ? old.data.filter(s => s._id !== studentId)
+            : old.data.map(s => s._id === studentId
+              ? { ...s, isActive: true, removalDate: null, removalReason: null, inactivatedAt: null }
+              : s
+            ),
+          ...(shouldRemove && old.pagination ? { pagination: { ...old.pagination, total: Math.max(0, (old.pagination.total || 0) - 1) } } : {})
+        }
+      })
+      return { previous, queryKey }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success('Student reactivated successfully')
     },
-    onError: (error) => {
+    onError: (error, _, context) => {
+      if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous)
       toast.error(error.response?.data?.message || 'Failed to reactivate student')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'none' })
     },
   })
 
@@ -244,14 +269,39 @@ const Students = () => {
 
   const deactivateMutation = useMutation({
     mutationFn: ({ studentId, formData }) => studentsService.deactivate(studentId, formData),
+    onMutate: async ({ studentId, formData }) => {
+      await queryClient.cancelQueries({ queryKey: ['students'] })
+      const queryKey = ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage]
+      const previous = queryClient.getQueryData(queryKey)
+      queryClient.setQueryData(queryKey, (old) => {
+        if (!old?.data) return old
+        // If filtering by "active", remove from list; otherwise flip the flag
+        const shouldRemove = statusFilter === 'active'
+        return {
+          ...old,
+          data: shouldRemove
+            ? old.data.filter(s => s._id !== studentId)
+            : old.data.map(s => s._id === studentId
+              ? { ...s, isActive: false, removalDate: formData.removalDate || new Date().toISOString(), removalReason: formData.removalReason, inactivatedAt: new Date().toISOString() }
+              : s
+            ),
+          ...(shouldRemove && old.pagination ? { pagination: { ...old.pagination, total: Math.max(0, (old.pagination.total || 0) - 1) } } : {})
+        }
+      })
+      return { previous, queryKey }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success('Student deactivated successfully')
       setShowDeactivateModal(false)
       setStudentToDeactivate(null)
     },
-    onError: (error) => {
+    onError: (error, _, context) => {
+      if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous)
       toast.error(error.response?.data?.message || 'Failed to deactivate student')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'none' })
     },
   })
 
@@ -261,13 +311,38 @@ const Students = () => {
 
   const bulkActivateMutation = useMutation({
     mutationFn: (ids) => studentsService.bulkActivate(ids),
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: ['students'] })
+      const queryKey = ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage]
+      const previous = queryClient.getQueryData(queryKey)
+      const idSet = new Set(ids)
+      const shouldRemove = statusFilter === 'inactive'
+      queryClient.setQueryData(queryKey, (old) => {
+        if (!old?.data) return old
+        return {
+          ...old,
+          data: shouldRemove
+            ? old.data.filter(s => !idSet.has(s._id))
+            : old.data.map(s => idSet.has(s._id)
+              ? { ...s, isActive: true, removalDate: null, removalReason: null, inactivatedAt: null }
+              : s
+            ),
+          ...(shouldRemove && old.pagination ? { pagination: { ...old.pagination, total: Math.max(0, (old.pagination.total || 0) - ids.length) } } : {})
+        }
+      })
+      return { previous, queryKey }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success(`${selectedStudents.length} students activated`)
       setSelectedStudents([])
     },
-    onError: () => {
+    onError: (_, __, context) => {
+      if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous)
       toast.error('Failed to activate students')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'none' })
     },
   })
 
@@ -281,13 +356,38 @@ const Students = () => {
 
   const bulkDeactivateMutation = useMutation({
     mutationFn: ({ ids, reason }) => studentsService.bulkDeactivate(ids, reason),
+    onMutate: async ({ ids }) => {
+      await queryClient.cancelQueries({ queryKey: ['students'] })
+      const queryKey = ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage]
+      const previous = queryClient.getQueryData(queryKey)
+      const idSet = new Set(ids)
+      const shouldRemove = statusFilter === 'active'
+      queryClient.setQueryData(queryKey, (old) => {
+        if (!old?.data) return old
+        return {
+          ...old,
+          data: shouldRemove
+            ? old.data.filter(s => !idSet.has(s._id))
+            : old.data.map(s => idSet.has(s._id)
+              ? { ...s, isActive: false, inactivatedAt: new Date().toISOString() }
+              : s
+            ),
+          ...(shouldRemove && old.pagination ? { pagination: { ...old.pagination, total: Math.max(0, (old.pagination.total || 0) - ids.length) } } : {})
+        }
+      })
+      return { previous, queryKey }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] })
       toast.success(`${selectedStudents.length} students deactivated`)
       setSelectedStudents([])
     },
-    onError: () => {
+    onError: (_, __, context) => {
+      if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous)
       toast.error('Failed to deactivate students')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'none' })
     },
   })
 
@@ -872,6 +972,31 @@ const Students = () => {
                       >
                         {student.isActive ? 'Active' : 'Inactive'}
                       </span>
+                      {!student.isActive && (student.removalDate || student.inactivatedAt) && (
+                        <div className="mt-1 text-xs text-gray-500 dark:text-[#8E8E93] space-y-0.5">
+                          <div>
+                            Deactivated: {new Date(student.removalDate || student.inactivatedAt).toLocaleDateString()}
+                          </div>
+                          {student.createdAt && (
+                            <div>
+                              Active for: {(() => {
+                                const start = new Date(student.createdAt);
+                                const end = new Date(student.removalDate || student.inactivatedAt);
+                                const diffMs = end - start;
+                                const totalDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                const years = Math.floor(totalDays / 365);
+                                const months = Math.floor((totalDays % 365) / 30);
+                                const days = totalDays % 30;
+                                const parts = [];
+                                if (years > 0) parts.push(`${years}y`);
+                                if (months > 0) parts.push(`${months}m`);
+                                if (days > 0 || parts.length === 0) parts.push(`${days}d`);
+                                return parts.join(' ');
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div className="flex space-x-2">

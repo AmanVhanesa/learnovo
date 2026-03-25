@@ -88,7 +88,7 @@ const ResetPassword = () => {
           <span className="text-2xl font-bold tracking-tight text-white">Learnovo</span>
         </Link>
 
-        <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2025 Learnovo. All rights reserved.</p>
+        <p className="absolute bottom-6 left-8 text-white/30 text-sm z-20">&copy; 2026 Learnovo. All rights reserved.</p>
       </motion.div>
 
       {/* -- RIGHT FORM PANEL -- */}
