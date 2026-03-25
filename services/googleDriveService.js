@@ -24,6 +24,14 @@ function isConfigured() {
   );
 }
 
+/**
+ * Reset the cached Drive client.
+ * Call this on auth errors so the next request creates a fresh client.
+ */
+function resetClient() {
+  _driveClient = null;
+}
+
 function getDriveClient() {
   if (_driveClient) return _driveClient;
 
@@ -40,8 +48,42 @@ function getDriveClient() {
     refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN,
   });
 
+  // Reset cached client when the token cannot be refreshed
+  oauth2Client.on('tokens', () => {});
+  oauth2Client.on('error', () => { _driveClient = null; });
+
   _driveClient = google.drive({ version: 'v3', auth: oauth2Client });
   return _driveClient;
+}
+
+/**
+ * Check if Google Drive is actually reachable (not just configured).
+ * Returns { ok: true } or { ok: false, error: string }.
+ */
+async function checkConnection() {
+  if (!isConfigured()) {
+    return { ok: false, error: 'Missing environment variables' };
+  }
+
+  try {
+    const drive = getDriveClient();
+    await drive.about.get({ fields: 'user' });
+    return { ok: true };
+  } catch (err) {
+    resetClient();
+    const msg = err.response?.data?.error_description
+      || err.response?.data?.error?.message
+      || err.message
+      || 'Unknown error';
+
+    // Detect expired/revoked token
+    const status = err.response?.status || err.code;
+    if (status === 401 || status === 403 || msg.includes('invalid_grant') || msg.includes('Token has been expired or revoked')) {
+      return { ok: false, error: 'Refresh token expired or revoked. Re-run: node scripts/gdrive-setup.js' };
+    }
+
+    return { ok: false, error: msg };
+  }
 }
 
 function getBackupFilename(tenantId) {
@@ -52,17 +94,25 @@ function getBackupFilename(tenantId) {
  * Find existing backup file for a tenant in the Drive folder.
  */
 async function findExistingFile(tenantId) {
-  const drive = getDriveClient();
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  const filename = getBackupFilename(tenantId);
+  try {
+    const drive = getDriveClient();
+    const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    const filename = getBackupFilename(tenantId);
 
-  const res = await drive.files.list({
-    q: `'${folderId}' in parents and name = '${filename}' and trashed = false`,
-    fields: 'files(id, name, size, modifiedTime, webViewLink)',
-    pageSize: 1,
-  });
+    const res = await drive.files.list({
+      q: `'${folderId}' in parents and name = '${filename}' and trashed = false`,
+      fields: 'files(id, name, size, modifiedTime, webViewLink)',
+      pageSize: 1,
+    });
 
-  return res.data.files?.[0] || null;
+    return res.data.files?.[0] || null;
+  } catch (err) {
+    // Reset client on auth errors so next attempt gets a fresh token
+    if (err.response?.status === 401 || err.response?.status === 403 || err.message?.includes('invalid_grant')) {
+      resetClient();
+    }
+    throw err;
+  }
 }
 
 /**
@@ -149,6 +199,8 @@ async function getFileInfo(tenantId) {
 
 module.exports = {
   isConfigured,
+  checkConnection,
+  resetClient,
   uploadOrReplace,
   downloadFile,
   getFileInfo,

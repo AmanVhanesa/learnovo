@@ -79,13 +79,28 @@ app.options('*', cors(corsOptions));
 app.use(cors(corsOptions));
 
 // Security middleware (AFTER CORS so headers aren't stripped)
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
+// Skip helmet for test-payment page (needs relaxed CSP for Razorpay)
+app.use((req, res, next) => {
+  if (req.path === '/test-payment' || req.path.startsWith('/public/')) {
+    return next();
+  }
+  helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } })(req, res, next);
+});
 app.use(compression());
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
+// The "verify" callback saves the raw body for Razorpay webhook signature verification.
+// express.json() normally parses the body and throws away the raw string, but we need
+// the exact raw bytes to compute the HMAC signature.
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    // Only save rawBody for the webhook route (to save memory on other routes)
+    if (req.originalUrl === '/api/fee-payments/webhook') {
+      req.rawBody = buf.toString();
+    }
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static files - uploads/ directory no longer used (S3 + Cloudinary)
@@ -180,6 +195,14 @@ app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+// Serve payment test page (development only)
+if (process.env.NODE_ENV !== 'production') {
+  const path = require('path');
+  app.get('/test-payment', (req, res) => {
+    res.sendFile(path.join(__dirname, 'test-payment.html'));
+  });
+}
+
 // ── Request timeout middleware ───────────────────────────────────────
 app.use((req, res, next) => {
   // Long-running routes get a generous timeout (3 min)
@@ -229,6 +252,7 @@ app.use('/api/files', require('./routes/files')); // Cloudinary file operations
 app.use('/api/test', require('./routes/test')); // Test endpoints (remove in production)
 
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/fee-payments', require('./routes/feePayments'));
 app.use('/api/subscription', require('./routes/subscription'));
 app.use('/api/exams', require('./routes/exams'));
 app.use('/api/drivers', require('./routes/drivers'));
@@ -242,6 +266,12 @@ app.use('/api/homework', require('./routes/homework'));
 // Expense Management
 app.use('/api/expenses', require('./routes/expenses'));
 
+// Income Management
+app.use('/api/income', require('./routes/income'));
+
+// Finance Dashboard (combined income + expense)
+app.use('/api/finance', require('./routes/financeDashboard'));
+
 // Timetable Management
 app.use('/api/timetable', require('./routes/timetable'));
 
@@ -251,6 +281,16 @@ app.use('/api/admin', require('./routes/backup'));
 // Super Admin Routes
 app.use('/api/super-admin/auth', require('./routes/superAdminAuth'));
 app.use('/api/super-admin', require('./routes/superAdmin'));
+
+// Serve test payment page (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/public', express.static(require('path').join(__dirname, 'public')));
+  app.get('/test-payment', (req, res) => {
+    // Relax CSP for test page so Razorpay checkout script can load
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* https://*.razorpay.com; frame-src https://*.razorpay.com;");
+    res.sendFile(require('path').join(__dirname, 'test-payment.html'));
+  });
+}
 
 // Error handling middleware
 app.use(errorHandler);

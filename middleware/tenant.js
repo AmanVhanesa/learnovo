@@ -108,7 +108,7 @@ const getTenantFromRequest = async (req, res, next) => {
     // Check subscription status
     if (tenant.subscription && tenant.subscription.status === 'suspended') {
       // Allow certain endpoints even when suspended (auth, payments, health)
-      const allowedWhenSuspended = ['/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/payments/plans', '/api/payments/create-order', '/api/payments/verify', '/api/payments/subscription', '/health'];
+      const allowedWhenSuspended = ['/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/payments/plans', '/api/payments/create-order', '/api/payments/verify', '/api/payments/subscription', '/api/fee-payments/create-order', '/api/fee-payments/verify', '/api/fee-payments/webhook', '/health'];
       const isAllowed = allowedWhenSuspended.some(path => req.path.startsWith(path) || req.originalUrl.startsWith(path));
       if (!isAllowed) {
         return res.status(403).json({
@@ -134,7 +134,7 @@ const getTenantFromRequest = async (req, res, next) => {
         cache.del(`tenant:id:${tenant._id}`);
 
         // Allow certain endpoints through even after expiry
-        const allowedAfterExpiry = ['/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/payments/plans', '/api/payments/create-order', '/api/payments/verify', '/api/payments/subscription', '/health'];
+        const allowedAfterExpiry = ['/api/auth/login', '/api/auth/logout', '/api/auth/me', '/api/payments/plans', '/api/payments/create-order', '/api/payments/verify', '/api/payments/subscription', '/api/fee-payments/create-order', '/api/fee-payments/verify', '/api/fee-payments/webhook', '/health'];
         const isAllowed = allowedAfterExpiry.some(path => req.path.startsWith(path) || req.originalUrl.startsWith(path));
 
         if (!isAllowed) {

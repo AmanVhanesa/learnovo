@@ -286,13 +286,14 @@ router.get('/pdf/slip/:id', protect, authorize('admin'), async (req, res) => {
             });
         }
 
-        const pdfDoc = await payrollPdfService.generateSalarySlip(req.params.id);
+        const pdfBuffer = await payrollPdfService.generateSalarySlip(req.params.id);
         const filename = `salary_slip_${payroll.month}_${payroll.year}.pdf`;
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.setHeader('Content-Length', pdfBuffer.length);
 
-        pdfDoc.pipe(res);
+        res.send(pdfBuffer);
 
     } catch (error) {
         console.error('Generate salary slip PDF error:', error);
@@ -310,7 +311,7 @@ router.get('/pdf/monthly/:year/:month', protect, authorize('admin'), async (req,
     try {
         const { year, month } = req.params;
 
-        const pdfDoc = await payrollPdfService.generateMonthlyReport(
+        const pdfBuffer = await payrollPdfService.generateMonthlyReport(
             req.user.tenantId,
             parseInt(month),
             parseInt(year)
@@ -320,8 +321,9 @@ router.get('/pdf/monthly/:year/:month', protect, authorize('admin'), async (req,
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.setHeader('Content-Length', pdfBuffer.length);
 
-        pdfDoc.pipe(res);
+        res.send(pdfBuffer);
 
     } catch (error) {
         console.error('Generate monthly report PDF error:', error);
@@ -339,7 +341,7 @@ router.get('/pdf/yearly/:employeeId/:year', protect, authorize('admin'), async (
     try {
         const { employeeId, year } = req.params;
 
-        const pdfDoc = await payrollPdfService.generateYearlyReport(
+        const pdfBuffer = await payrollPdfService.generateYearlyReport(
             employeeId,
             req.user.tenantId,
             parseInt(year)
@@ -349,8 +351,9 @@ router.get('/pdf/yearly/:employeeId/:year', protect, authorize('admin'), async (
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.setHeader('Content-Length', pdfBuffer.length);
 
-        pdfDoc.pipe(res);
+        res.send(pdfBuffer);
 
     } catch (error) {
         console.error('Generate yearly report PDF error:', error);

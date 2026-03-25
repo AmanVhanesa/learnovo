@@ -139,6 +139,19 @@ router.get('/backup/cloud/status', async (req, res) => {
     });
   }
 
+  // Env vars are set — verify the token actually works
+  const connection = await googleDriveService.checkConnection();
+  if (!connection.ok) {
+    return res.json({
+      success: true,
+      data: {
+        configured: true,
+        active: false,
+        error: connection.error,
+      },
+    });
+  }
+
   try {
     const fileInfo = await googleDriveService.getFileInfo(tenantId);
 
@@ -146,13 +159,19 @@ router.get('/backup/cloud/status', async (req, res) => {
       success: true,
       data: {
         configured: true,
+        active: true,
         file: fileInfo,
       },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to check cloud backup status',
+    logger.error('Cloud status check failed', error, { tenantId });
+    res.json({
+      success: true,
+      data: {
+        configured: true,
+        active: false,
+        error: error.message || 'Failed to reach Google Drive',
+      },
     });
   }
 });

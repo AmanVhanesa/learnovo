@@ -18,6 +18,13 @@ async function runAutoBackup() {
     return;
   }
 
+  // Verify the token still works before looping through tenants
+  const connection = await googleDriveService.checkConnection();
+  if (!connection.ok) {
+    logger.error(`Auto-backup skipped: Google Drive connection failed — ${connection.error}`);
+    return;
+  }
+
   logger.info('Auto-backup job started');
 
   try {
