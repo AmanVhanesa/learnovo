@@ -367,6 +367,15 @@ const ImportModal = ({
                                 </div>
                             </div>
 
+                            {/* Breakdown hint */}
+                            {previewData.summary.breakdown && (
+                                <div className="bg-gray-50 dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg px-4 py-2">
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] font-mono">
+                                        {previewData.summary.breakdown}
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Duplicates Warning & Action Choice */}
                             {previewData.summary.duplicatesInDB > 0 && (
                                 <div className="bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-2xl p-4">
@@ -445,6 +454,22 @@ const ImportModal = ({
                                             Download Error Report
                                         </button>
                                     </div>
+
+                                    {/* Error summary by type */}
+                                    {previewData.summary.errorsByType && (
+                                        <div className="mb-3 p-2 bg-red-100 dark:bg-red-500/20 rounded-lg">
+                                            <p className="text-xs font-semibold text-red-800 dark:text-red-300 mb-1">Error breakdown:</p>
+                                            <ul className="text-xs text-red-700 dark:text-red-400 space-y-0.5">
+                                                {Object.entries(previewData.summary.errorsByType)
+                                                    .sort(([, a], [, b]) => b - a)
+                                                    .slice(0, 5)
+                                                    .map(([msg, count], i) => (
+                                                        <li key={i} className="font-mono">{count}x — {msg}</li>
+                                                    ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
                                     <div className="max-h-40 overflow-y-auto">
                                         <ul className="text-sm text-red-700 dark:text-red-400 space-y-1">
                                             {previewData.errors.slice(0, 10).map((error, index) => (
