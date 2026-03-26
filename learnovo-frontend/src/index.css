@@ -407,15 +407,25 @@ input, select, textarea {
     height: 100dvh;
   }
 
-  /* Paint an opaque outline ON TOP of the modal's border-radius edge,
-     covering sub-pixel anti-aliasing that lets the backdrop bleed through. */
+  /* Cover border-radius anti-aliasing with an opaque pseudo-element frame.
+     ::after renders on the top-most layer of the element, directly over
+     the semi-transparent edge pixels that let the backdrop bleed through. */
   .modal-overlay > div {
-    outline: 2px solid #ffffff;
-    outline-offset: -2px;
+    position: relative;
   }
 
-  .dark .modal-overlay > div {
-    outline-color: #1C1C1E;
+  .modal-overlay > div::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 2px #ffffff;
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .dark .modal-overlay > div::after {
+    box-shadow: inset 0 0 0 2px #1C1C1E;
   }
 
   .modal-content {
