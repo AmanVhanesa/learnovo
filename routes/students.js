@@ -641,17 +641,138 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
     // Pre-cache all classes and drivers for this tenant to avoid N+1 queries in the loop
     const Class = require('../models/Class');
     const Section = require('../models/Section');
-    const allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
+    let allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
     const allDrivers = await Driver.find({ tenantId, isActive: true }).select('_id name').lean();
     const driverCache = new Map(allDrivers.map(d => [d.name.toLowerCase().trim(), d]));
 
+    // ── Auto-create missing classes from import data ──────────────────────
+    // Collect all unique class names from the import, resolve them to DB
+    // names, and batch-create any that don't exist yet.
+    const classNamesFromImport = new Set();
+    for (const row of validData) {
+      if (row.class && row.class.trim()) {
+        classNamesFromImport.add(row.class.trim());
+      }
+    }
+
+    // Build a lookup of existing classes (lowercase name/grade → doc)
+    const existingClassLookup = new Map();
+    allClasses.forEach(c => {
+      if (c.name) existingClassLookup.set(c.name.toLowerCase(), c);
+      if (c.grade) existingClassLookup.set(c.grade.toLowerCase(), c);
+    });
+
+    const classesToCreate = [];
+    for (const rawName of classNamesFromImport) {
+      // Try exact and extracted match (same logic as per-row lookup)
+      const candidates = [rawName];
+      const classMatch = rawName.match(/class\s*(\d+|nursery|lkg|ukg)/i);
+      if (classMatch) {
+        const ext = classMatch[1].toLowerCase();
+        const norm = ['nursery', 'lkg', 'ukg'].includes(ext)
+          ? ext.charAt(0).toUpperCase() + ext.slice(1) : ext;
+        if (norm !== rawName) candidates.push(norm);
+      }
+      const found = candidates.some(c => existingClassLookup.has(c.toLowerCase()));
+      if (!found) {
+        // Determine a display name & grade for the new class
+        classesToCreate.push({
+          tenantId,
+          name: rawName,
+          grade: rawName,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+    }
+
+    if (classesToCreate.length > 0) {
+      try {
+        const created = await Class.insertMany(classesToCreate, { ordered: false });
+        logger.info(`Import: auto-created ${created.length} missing classes`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+        // Refresh the full class list
+        allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
+      } catch (classErr) {
+        // Partial success is fine — re-fetch everything
+        logger.warn('Import: class auto-create partial error', { requestId: req.requestId, tenantId: req.user?.tenantId, error: classErr.message });
+        allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
+      }
+    }
+
+    // ── Auto-create missing sections from import data ─────────────────────
+    // Build a classId lookup from the refreshed class list
+    const classLookupByName = new Map();
+    allClasses.forEach(c => {
+      if (c.name) classLookupByName.set(c.name.toLowerCase(), c);
+      if (c.grade) classLookupByName.set(c.grade.toLowerCase(), c);
+    });
+
     // Pre-fetch all sections for this tenant (keyed by classId_sectionName)
-    const allSections = await Section.find({ tenantId, isActive: true }).select('_id name classId').lean();
+    let allSections = await Section.find({ tenantId, isActive: true }).select('_id name classId').lean();
     const sectionCache = new Map();
     allSections.forEach(sec => {
       const key = `${sec.classId.toString()}_${sec.name.toUpperCase()}`;
       sectionCache.set(key, sec);
     });
+
+    // Collect unique (class, section) pairs from the import data
+    const sectionsToCreate = [];
+    const seenSectionKeys = new Set();
+    for (const row of validData) {
+      if (row.class && row.class.trim() && row.section && row.section.trim()) {
+        const rawClass = row.class.trim();
+        const sectionName = row.section.trim().toUpperCase();
+        // Find the class doc
+        const candidates = [rawClass];
+        const cm = rawClass.match(/class\s*(\d+|nursery|lkg|ukg)/i);
+        if (cm) {
+          const ext = cm[1].toLowerCase();
+          const norm = ['nursery', 'lkg', 'ukg'].includes(ext)
+            ? ext.charAt(0).toUpperCase() + ext.slice(1) : ext;
+          if (norm !== rawClass) candidates.push(norm);
+        }
+        let classDoc = null;
+        for (const cand of candidates) {
+          classDoc = classLookupByName.get(cand.toLowerCase());
+          if (classDoc) break;
+          // Partial match
+          for (const [k, v] of classLookupByName) {
+            if (k.includes(cand.toLowerCase())) { classDoc = v; break; }
+          }
+          if (classDoc) break;
+        }
+        if (classDoc) {
+          const sKey = `${classDoc._id.toString()}_${sectionName}`;
+          if (!sectionCache.has(sKey) && !seenSectionKeys.has(sKey)) {
+            seenSectionKeys.add(sKey);
+            sectionsToCreate.push({
+              tenantId,
+              classId: classDoc._id,
+              name: sectionName,
+              isActive: true,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+          }
+        }
+      }
+    }
+
+    if (sectionsToCreate.length > 0) {
+      try {
+        const created = await Section.insertMany(sectionsToCreate, { ordered: false });
+        logger.info(`Import: auto-created ${created.length} missing sections`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+      } catch (secErr) {
+        logger.warn('Import: section auto-create partial error', { requestId: req.requestId, tenantId: req.user?.tenantId, error: secErr.message });
+      }
+      // Refresh sections cache
+      allSections = await Section.find({ tenantId, isActive: true }).select('_id name classId').lean();
+      sectionCache.clear();
+      allSections.forEach(sec => {
+        sectionCache.set(`${sec.classId.toString()}_${sec.name.toUpperCase()}`, sec);
+      });
+    }
 
     // Pre-fetch all sub-departments and batch-create any missing ones from the import data
     const allSubDepts = await SubDepartment.find({ tenantId }).lean();
@@ -672,6 +793,9 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
         newSubDepts.forEach(sd => subDeptCache.set(sd.name.toUpperCase(), sd));
       } catch (sdErr) {
         logger.warn('SubDepartment batch create warning', { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email, error: sdErr.message });
+        // Re-fetch on partial failure so newly created entries are in the cache
+        const refreshed = await SubDepartment.find({ tenantId }).lean();
+        refreshed.forEach(sd => subDeptCache.set(sd.name.toUpperCase(), sd));
       }
     }
 
@@ -1032,16 +1156,26 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
     if (docsToInsert.length > 0) {
       const CHUNK = 200;
       for (let i = 0; i < docsToInsert.length; i += CHUNK) {
+        const chunk = docsToInsert.slice(i, i + CHUNK);
         try {
-          const r = await User.collection.insertMany(docsToInsert.slice(i, i + CHUNK), { ordered: false });
+          const r = await User.collection.insertMany(chunk, { ordered: false });
           results.success += r.insertedCount || 0;
         } catch (bulkErr) {
-          results.success += bulkErr.result?.nInserted || 0;
-          if (bulkErr.writeErrors) {
-            bulkErr.writeErrors.forEach(we => {
-              results.failed++;
-              results.errors.push(`Insert error: ${we.errmsg || we.message}`);
-            });
+          // MongoDB Driver 5+ uses bulkErr.insertedCount; older uses bulkErr.result.nInserted
+          const inserted = bulkErr.insertedCount ?? bulkErr.result?.nInserted ?? 0;
+          results.success += inserted;
+          const writeErrors = bulkErr.writeErrors || [];
+          writeErrors.forEach(we => {
+            results.failed++;
+            const errMsg = we.errmsg || we.err?.errmsg || we.message || 'Unknown insert error';
+            results.errors.push(`Insert error (admNo: ${chunk[we.index]?.admissionNumber || '?'}): ${errMsg}`);
+          });
+          // If no writeErrors but still an error, log the full error for debugging
+          if (writeErrors.length === 0) {
+            const failedCount = chunk.length - inserted;
+            results.failed += failedCount;
+            results.errors.push(`Bulk insert error (${failedCount} failed): ${bulkErr.message}`);
+            logger.error('Bulk insert error without writeErrors', bulkErr, { requestId: req.requestId, tenantId: req.user?.tenantId, chunkSize: chunk.length, inserted });
           }
         }
       }
@@ -1055,10 +1189,10 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       const CHUNK = 200;
       for (let i = 0; i < ops.length; i += CHUNK) {
         try {
-          await User.bulkWrite(ops.slice(i, i + CHUNK), { ordered: false });
-          results.replaced += Math.min(CHUNK, ops.length - i);
+          const bwResult = await User.bulkWrite(ops.slice(i, i + CHUNK), { ordered: false });
+          results.replaced += bwResult.modifiedCount ?? bwResult.nModified ?? Math.min(CHUNK, ops.length - i);
         } catch (bulkErr) {
-          results.replaced += bulkErr.result?.nModified || 0;
+          results.replaced += bulkErr.result?.nModified ?? bulkErr.modifiedCount ?? 0;
           results.failed += bulkErr.writeErrors?.length || 0;
         }
       }
@@ -2841,6 +2975,145 @@ router.post('/bulk-class-action', protect, authorize('admin', 'principal'), asyn
   } catch (error) {
     logger.error('Bulk class action error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
     res.status(500).json({ success: false, message: 'Server error during bulk operation' });
+  }
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Subject Preferences — per-student opt-out of optional subjects
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * @desc    Get subject preferences for a student
+ *          Returns all optional subjects for the student's class and which ones are skipped.
+ * @route   GET /api/students/:id/subject-preferences
+ * @access  Private (Admin)
+ */
+router.get('/:id/subject-preferences', protect, authorize('admin', 'principal'), async (req, res) => {
+  try {
+    const Subject = require('../models/Subject');
+    const Result = require('../models/Result');
+    const Exam = require('../models/Exam');
+
+    const student = await User.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+      role: 'student'
+    }).select('fullName name class skippedSubjects');
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Fetch all optional subjects for the tenant
+    const optionalSubjects = await Subject.find({
+      tenantId: req.user.tenantId,
+      isOptional: true,
+      isActive: true
+    }).select('name subjectCode isOptional').lean();
+
+    // For each optional subject, check if the student already has marks recorded
+    const subjectsWithMeta = await Promise.all(optionalSubjects.map(async (subj) => {
+      // Find exams for this subject in the student's class
+      const exams = await Exam.find({
+        tenantId: req.user.tenantId,
+        class: student.class,
+        subject: subj.name
+      }).select('_id').lean();
+
+      let hasMarks = false;
+      if (exams.length > 0) {
+        const examIds = exams.map(e => e._id);
+        const markCount = await Result.countDocuments({
+          tenantId: req.user.tenantId,
+          student: student._id,
+          exam: { $in: examIds }
+        });
+        hasMarks = markCount > 0;
+      }
+
+      return {
+        _id: subj._id,
+        name: subj.name,
+        subjectCode: subj.subjectCode,
+        isSkipped: (student.skippedSubjects || []).includes(subj.name),
+        hasMarks
+      };
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        studentId: student._id,
+        studentName: student.fullName || student.name,
+        studentClass: student.class,
+        skippedSubjects: student.skippedSubjects || [],
+        optionalSubjects: subjectsWithMeta
+      }
+    });
+  } catch (error) {
+    logger.error('Get subject preferences error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/**
+ * @desc    Update subject preferences for a student
+ *          Sets which optional subjects this student has opted out of.
+ *          Does NOT delete existing marks — only excludes from display/calculations.
+ * @route   PUT /api/students/:id/subject-preferences
+ * @access  Private (Admin)
+ */
+router.put('/:id/subject-preferences', protect, authorize('admin', 'principal'), [
+  body('skippedSubjects').isArray().withMessage('skippedSubjects must be an array'),
+  body('skippedSubjects.*').isString().trim().notEmpty().withMessage('Each skipped subject must be a non-empty string'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const Subject = require('../models/Subject');
+
+    // Verify student exists
+    const student = await User.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+      role: 'student'
+    }).select('_id').lean();
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    const { skippedSubjects } = req.body;
+
+    // Validate: only optional subjects can be skipped
+    const optionalSubjectNames = await Subject.find({
+      tenantId: req.user.tenantId,
+      isOptional: true,
+      isActive: true
+    }).select('name').lean().then(docs => docs.map(d => d.name));
+
+    const invalidSkips = skippedSubjects.filter(s => !optionalSubjectNames.includes(s));
+    if (invalidSkips.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot skip non-optional subjects: ${invalidSkips.join(', ')}`
+      });
+    }
+
+    // Use findByIdAndUpdate to avoid password validation issues with save()
+    await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: { skippedSubjects } },
+      { runValidators: false }
+    );
+
+    res.json({
+      success: true,
+      message: 'Subject preferences updated successfully',
+      data: { skippedSubjects }
+    });
+  } catch (error) {
+    logger.error('Update subject preferences error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

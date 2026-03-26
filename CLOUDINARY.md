@@ -257,6 +257,6 @@ For Cloudinary-specific issues:
 - Support: [support.cloudinary.com](https://support.cloudinary.com)
 
 For Learnovo integration issues:
-- Check logs in Render dashboard
+- Check logs on VPS: `pm2 logs learnovo-backend`
 - Verify environment variables are set
 - Test with Cloudinary dashboard to isolate issues

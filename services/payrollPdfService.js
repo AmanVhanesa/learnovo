@@ -38,7 +38,7 @@ const C = {
 async function fetchImageBuffer(url) {
     if (!url) return null;
     try {
-        const fullUrl = url.startsWith('http') ? url : `https://learnovo-backend.onrender.com${url}`;
+        const fullUrl = url.startsWith('http') ? url : `https://api.learnovoportal.com${url}`;
         const response = await axios.get(fullUrl, {
             responseType: 'arraybuffer',
             timeout: 8000,

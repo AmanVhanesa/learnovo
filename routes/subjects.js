@@ -87,7 +87,7 @@ router.post('/', [
       });
     }
 
-    const { type, maxMarks, passingMarks } = req.body;
+    const { type, maxMarks, passingMarks, isOptional } = req.body;
 
     const newSubject = new Subject({
       tenantId: req.user.tenantId,
@@ -96,7 +96,8 @@ router.post('/', [
       type: type || 'Theory',
       maxMarks: maxMarks || 100,
       passingMarks: passingMarks || 33,
-      description
+      description,
+      isOptional: isOptional || false
     });
 
     await newSubject.save();
@@ -139,13 +140,14 @@ router.put('/:id', [
       return res.status(404).json({ success: false, message: 'Subject not found' });
     }
 
-    const { name, subjectCode, description, type, maxMarks, passingMarks } = req.body;
+    const { name, subjectCode, description, type, maxMarks, passingMarks, isOptional } = req.body;
     const updates = {};
 
     if (name) updates.name = name;
     if (type !== undefined) updates.type = type;
     if (maxMarks !== undefined) updates.maxMarks = maxMarks;
     if (passingMarks !== undefined) updates.passingMarks = passingMarks;
+    if (isOptional !== undefined) updates.isOptional = isOptional;
 
     // Validate passingMarks <= maxMarks
     const effectiveMax = maxMarks !== undefined ? maxMarks : existingSubject.maxMarks;

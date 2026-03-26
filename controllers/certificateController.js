@@ -197,7 +197,7 @@ exports.previewCertificate = async (req, res) => {
  */
 exports.generateCertificate = async (req, res) => {
     try {
-        const { studentId, type, specificData, autoDeactivate } = req.body; // specificData allows overriding fields like 'leavingReason'
+        const { studentId, type, specificData, autoDeactivate, categoryOverride, classOverride } = req.body; // specificData allows overriding fields like 'leavingReason'
         const tenantId = req.user.tenantId;
 
         // 1. Re-validate (similar to preview)
@@ -230,6 +230,16 @@ exports.generateCertificate = async (req, res) => {
             schoolPhone: settings.institution.contact?.phone || '',
             schoolEmail: settings.institution.contact?.email || '',
         };
+
+        // 3.1 Apply ephemeral overrides (TC only) — these do NOT update the student record
+        if (type === 'TC') {
+            if (categoryOverride !== undefined && categoryOverride !== null) {
+                finalData.categoryOverride = categoryOverride;
+            }
+            if (classOverride !== undefined && classOverride !== null) {
+                finalData.classOverride = classOverride;
+            }
+        }
 
         // 4. Create Record
         const newCert = await GeneratedCertificate.create({

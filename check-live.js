@@ -2,7 +2,7 @@ const axios = require('axios');
 
 async function testLiveApi() {
     try {
-        const loginRes = await axios.post('https://learnovo-backend.onrender.com/api/auth/login', {
+        const loginRes = await axios.post('https://api.learnovoportal.com/api/auth/login', {
             email: 'amanvhanesa@gmail.com',
             password: 'password123'
         });
@@ -10,7 +10,7 @@ async function testLiveApi() {
         const token = loginRes.data.token;
         console.log("Logged in successfully. Token obtained.");
 
-        const studentsRes = await axios.get('https://learnovo-backend.onrender.com/api/students?class=1&section=A&limit=100', {
+        const studentsRes = await axios.get('https://api.learnovoportal.com/api/students?class=1&section=A&limit=100', {
             headers: { Authorization: `Bearer ${token}` }
         });
 

@@ -28,7 +28,7 @@ const uri = process.env.MONGO_URI;
 
 ### Production Secrets
 For production deployments:
-- **Render**: Set environment variables in the Render dashboard
+- **Hostinger VPS**: Set environment variables in `config.env` on the VPS (SSH)
 - **Vercel**: Set environment variables in the Vercel project settings
 - **MongoDB Atlas**: Use IP whitelisting and rotate passwords regularly
 
@@ -64,5 +64,5 @@ Before committing code:
 ## 📚 Additional Resources
 
 - [MongoDB Atlas Security](https://www.mongodb.com/docs/atlas/security/)
-- [Render Environment Variables](https://render.com/docs/environment-variables)
+- [PM2 Documentation](https://pm2.keymetrics.io/docs/usage/quick-start/)
 - [Vercel Environment Variables](https://vercel.com/docs/concepts/projects/environment-variables)

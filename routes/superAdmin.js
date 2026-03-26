@@ -267,40 +267,68 @@ router.delete('/tenants/:id', async (req, res) => {
  */
 router.post('/tenants', async (req, res) => {
     try {
-        const { schoolName, email, password, schoolCode, subdomain, phone, address, subscription } = req.body;
-        if (!schoolName || !email || !password || !schoolCode) {
+        const {
+            schoolName, schoolCode, subdomain, phone, address, plan,
+            // Accept both naming conventions from frontend
+            email, password, adminEmail, adminPassword, adminName
+        } = req.body;
+
+        const resolvedEmail = (adminEmail || email || '').toLowerCase().trim();
+        const resolvedPassword = adminPassword || password;
+
+        if (!schoolName || !resolvedEmail || !resolvedPassword || !schoolCode) {
             return res.status(400).json({ success: false, message: 'schoolName, email, password, and schoolCode are required.', requestId: req.requestId });
         }
 
+        // Check for duplicates
+        const existing = await Tenant.findOne({
+            $or: [
+                { schoolCode: schoolCode.toLowerCase() },
+                { email: resolvedEmail }
+            ]
+        });
+        if (existing) {
+            return res.status(409).json({ success: false, message: 'A tenant with this school code or email already exists.', requestId: req.requestId });
+        }
+
+        const resolvedPlan = plan || 'free';
+        const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
         const tenant = await Tenant.create({
             schoolName: schoolName.trim(),
-            email: email.toLowerCase(),
+            email: resolvedEmail,
             schoolCode: schoolCode.toLowerCase(),
             subdomain: (subdomain || schoolCode).toLowerCase(),
             phone: phone || '',
             address: address || {},
             isActive: true,
-            subscription: subscription || { plan: 'enterprise', status: 'active', maxStudents: 10000, maxTeachers: 500 },
+            subscription: {
+                plan: resolvedPlan,
+                status: resolvedPlan === 'free' ? 'trial' : 'active',
+                trialEndsAt: resolvedPlan === 'free' ? trialEndsAt : undefined,
+                maxStudents: resolvedPlan === 'enterprise' ? 10000 : 100,
+                maxTeachers: resolvedPlan === 'enterprise' ? 500 : 10,
+            },
             settings: { timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', currency: 'INR', academicYear: '2025-2026' }
         });
 
         const adminUser = await User.create({
             tenantId: tenant._id,
-            fullName: `${schoolName.trim()} Admin`,
-            firstName: schoolName.trim(),
-            lastName: 'Admin',
-            email: email.toLowerCase(),
-            password,
+            fullName: adminName || `${schoolName.trim()} Admin`,
+            firstName: adminName || schoolName.trim(),
+            lastName: adminName ? '' : 'Admin',
+            email: resolvedEmail,
+            password: resolvedPassword,
             role: 'admin',
             isActive: true
         });
 
-        await audit(req, 'CREATE_TENANT', 'Tenant', tenant._id, { schoolName, schoolCode, email });
+        await audit(req, 'CREATE_TENANT', 'Tenant', tenant._id, { schoolName, schoolCode, email: resolvedEmail });
 
         return res.status(201).json({
             success: true,
             message: 'Tenant created successfully.',
-            data: { tenant, adminUser: { id: adminUser._id, email: adminUser.email, role: adminUser.role } },
+            data: { tenant, adminUser: { id: adminUser._id, email: adminUser.email, role: adminUser.role }, schoolCode: tenant.schoolCode },
             requestId: req.requestId
         });
     } catch (error) {
@@ -407,6 +435,260 @@ router.patch('/tenants/:id/override-features', async (req, res) => {
     }
 });
 
+// ─── TENANT NOTES ───────────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/tenants/:tenantId/notes
+ * Get internal notes for a tenant
+ */
+router.get('/tenants/:tenantId/notes', async (req, res) => {
+    try {
+        const tenant = await Tenant.findById(req.params.tenantId);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        // Notes stored in audit log with action 'TENANT_NOTE'
+        const notes = await SuperAdminAuditLog.find({
+            targetId: tenant._id,
+            targetType: 'Tenant',
+            action: 'TENANT_NOTE'
+        }).sort({ timestamp: -1 }).lean();
+
+        const formatted = notes.map(n => ({
+            _id: n._id,
+            content: n.changes?.content || '',
+            createdAt: n.timestamp,
+            superAdminId: n.superAdminId
+        }));
+
+        return res.json({ success: true, data: formatted, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: get tenant notes error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error fetching notes.', requestId: req.requestId });
+    }
+});
+
+/**
+ * POST /api/super-admin/tenants/:tenantId/notes
+ * Add an internal note for a tenant
+ */
+router.post('/tenants/:tenantId/notes', async (req, res) => {
+    try {
+        const { content } = req.body;
+        if (!content || !content.trim()) {
+            return res.status(400).json({ success: false, message: 'Note content is required.', requestId: req.requestId });
+        }
+
+        const tenant = await Tenant.findById(req.params.tenantId);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        const note = await SuperAdminAuditLog.create({
+            superAdminId: req.superAdmin._id,
+            action: 'TENANT_NOTE',
+            targetType: 'Tenant',
+            targetId: tenant._id,
+            changes: { content: content.trim() },
+            ip: req.ip || req.connection?.remoteAddress,
+            timestamp: new Date()
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: 'Note added successfully.',
+            data: { _id: note._id, content: content.trim(), createdAt: note.timestamp, superAdminId: req.superAdmin._id },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: add tenant note error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error adding note.', requestId: req.requestId });
+    }
+});
+
+/**
+ * DELETE /api/super-admin/tenants/:tenantId/notes/:noteId
+ * Delete an internal note
+ */
+router.delete('/tenants/:tenantId/notes/:noteId', async (req, res) => {
+    try {
+        const note = await SuperAdminAuditLog.findOneAndDelete({
+            _id: req.params.noteId,
+            targetId: req.params.tenantId,
+            action: 'TENANT_NOTE'
+        });
+        if (!note) return res.status(404).json({ success: false, message: 'Note not found.', requestId: req.requestId });
+
+        return res.json({ success: true, message: 'Note deleted.', requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: delete tenant note error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error deleting note.', requestId: req.requestId });
+    }
+});
+
+// ─── TENANT USERS ───────────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/tenants/:tenantId/users
+ * List users belonging to a specific tenant
+ */
+router.get('/tenants/:tenantId/users', async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const tenant = await Tenant.findById(req.params.tenantId);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        const filter = { tenantId: tenant._id };
+        if (req.query.role) filter.role = req.query.role;
+        if (req.query.search) {
+            filter.$or = [
+                { fullName: { $regex: req.query.search, $options: 'i' } },
+                { firstName: { $regex: req.query.search, $options: 'i' } },
+                { lastName: { $regex: req.query.search, $options: 'i' } },
+                { email: { $regex: req.query.search, $options: 'i' } }
+            ];
+        }
+
+        const [users, total] = await Promise.all([
+            User.find(filter).select('-password').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+            User.countDocuments(filter)
+        ]);
+
+        return res.json({
+            success: true,
+            data: users,
+            pagination: { current: page, pages: Math.ceil(total / limit), total },
+            requestId: req.requestId
+        });
+    } catch (error) {
+        logger.error('Super admin: get tenant users error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error fetching tenant users.', requestId: req.requestId });
+    }
+});
+
+// ─── TENANT INVOICES ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/tenants/:tenantId/invoices
+ * List invoices for a specific tenant
+ */
+router.get('/tenants/:tenantId/invoices', async (req, res) => {
+    try {
+        const tenant = await Tenant.findById(req.params.tenantId);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        const invoices = await PlatformInvoice.find({ tenantId: tenant._id })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        return res.json({ success: true, data: invoices, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: get tenant invoices error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error fetching tenant invoices.', requestId: req.requestId });
+    }
+});
+
+// ─── TENANT ACTIVITY ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/tenants/:tenantId/activity
+ * Get recent activity log for a specific tenant
+ */
+router.get('/tenants/:tenantId/activity', async (req, res) => {
+    try {
+        const tenant = await Tenant.findById(req.params.tenantId);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        const activities = await SuperAdminAuditLog.find({
+            targetId: tenant._id,
+            targetType: 'Tenant',
+            action: { $ne: 'TENANT_NOTE' }
+        }).sort({ timestamp: -1 }).limit(50).lean();
+
+        return res.json({ success: true, data: activities, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: get tenant activity error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error fetching tenant activity.', requestId: req.requestId });
+    }
+});
+
+// ─── RESET ADMIN PASSWORD ───────────────────────────────────────────────────
+
+/**
+ * POST /api/super-admin/tenants/:tenantId/reset-admin-password
+ * Reset the admin password for a tenant and return the temporary password
+ */
+router.post('/tenants/:tenantId/reset-admin-password', async (req, res) => {
+    try {
+        const tenant = await Tenant.findById(req.params.tenantId);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        const admin = await User.findOne({ tenantId: tenant._id, role: 'admin', isActive: true });
+        if (!admin) return res.status(404).json({ success: false, message: 'No active admin found for this tenant.', requestId: req.requestId });
+
+        const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase() + '@1';
+        admin.password = tempPassword;
+        await admin.save();
+
+        await audit(req, 'RESET_ADMIN_PASSWORD', 'Tenant', tenant._id, { adminEmail: admin.email });
+
+        // Attempt to send email (non-blocking)
+        try {
+            const emailService = require('../services/emailService');
+            await emailService.sendEmail({
+                to: admin.email,
+                subject: `Password Reset - ${tenant.schoolName}`,
+                html: `<p>Hi,</p>
+                       <p>Your admin password for <strong>${tenant.schoolName}</strong> has been reset by the platform administrator.</p>
+                       <p><strong>Temporary password:</strong> <code>${tempPassword}</code></p>
+                       <p>Please log in and change your password immediately.</p>`
+            });
+        } catch (emailErr) {
+            logger.warn('Password reset email could not be sent', { requestId: req.requestId, tenantId: tenant._id });
+        }
+
+        return res.json({ success: true, message: 'Admin password has been reset. A notification email has been sent.', requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: reset admin password error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error resetting admin password.', requestId: req.requestId });
+    }
+});
+
+// ─── MODULE OVERRIDES ───────────────────────────────────────────────────────
+
+/**
+ * PATCH /api/super-admin/tenants/:tenantId/module-overrides
+ * Override module access for a specific tenant
+ */
+router.patch('/tenants/:tenantId/module-overrides', async (req, res) => {
+    try {
+        const { modules } = req.body;
+        if (!modules || typeof modules !== 'object') {
+            return res.status(400).json({ success: false, message: 'modules object is required.', requestId: req.requestId });
+        }
+
+        const tenant = await Tenant.findById(req.params.tenantId);
+        if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
+
+        // Store module overrides in settings.features
+        if (!tenant.settings) tenant.settings = {};
+        if (!tenant.settings.features) tenant.settings.features = {};
+
+        Object.entries(modules).forEach(([key, value]) => {
+            tenant.settings.features[key] = value;
+        });
+
+        tenant.markModified('settings');
+        await tenant.save();
+        await audit(req, 'OVERRIDE_MODULES', 'Tenant', tenant._id, { modules });
+
+        return res.json({ success: true, message: 'Module overrides applied successfully.', data: tenant.settings.features, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: module overrides error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error applying module overrides.', requestId: req.requestId });
+    }
+});
+
 // ─── USER MANAGEMENT ─────────────────────────────────────────────────────────
 
 /**
@@ -457,6 +739,23 @@ router.get('/users', async (req, res) => {
     } catch (error) {
         logger.error('Super admin: list users error', error, { requestId: req.requestId });
         return res.status(500).json({ success: false, message: 'Server error listing users.', requestId: req.requestId });
+    }
+});
+
+/**
+ * GET /api/super-admin/users/role-distribution
+ * Visual breakdown of users by role (must be before /:id to avoid param matching)
+ */
+router.get('/users/role-distribution', async (req, res) => {
+    try {
+        const distribution = await User.aggregate([
+            { $group: { _id: '$role', count: { $sum: 1 } } },
+            { $sort: { count: -1 } }
+        ]);
+        return res.json({ success: true, data: distribution, requestId: req.requestId });
+    } catch (error) {
+        logger.error('Super admin: role distribution error', error, { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
     }
 });
 
@@ -730,103 +1029,6 @@ router.get('/audit-logs', async (req, res) => {
     }
 });
 
-// ─── TENANT CREATION ────────────────────────────────────────────────────────
-
-/**
- * POST /api/super-admin/tenants
- * Create a new tenant (school) with admin account
- */
-router.post('/tenants', async (req, res) => {
-    try {
-        const {
-            schoolName, schoolCode, email, phone, address,
-            logo, adminName, adminEmail, adminPhone,
-            plan, trialDays, modules, settings
-        } = req.body;
-
-        if (!schoolName || !schoolCode || !email) {
-            return res.status(400).json({ success: false, message: 'schoolName, schoolCode, and email are required.', requestId: req.requestId });
-        }
-
-        // Check duplicates
-        const existing = await Tenant.findOne({
-            $or: [
-                { schoolCode: schoolCode.toLowerCase() },
-                { email: email.toLowerCase() }
-            ]
-        });
-        if (existing) {
-            return res.status(409).json({ success: false, message: 'A tenant with this school code or email already exists.', requestId: req.requestId });
-        }
-
-        const trialEndsAt = new Date(Date.now() + (trialDays || 14) * 24 * 60 * 60 * 1000);
-
-        const tenant = await Tenant.create({
-            schoolName,
-            schoolCode: schoolCode.toLowerCase(),
-            email: email.toLowerCase(),
-            phone,
-            address,
-            logo,
-            subscription: {
-                plan: plan || 'free',
-                status: 'trial',
-                trialEndsAt,
-                maxStudents: 100,
-                maxTeachers: 10
-            },
-            settings: settings || {}
-        });
-
-        // Create admin user for the tenant
-        let adminUser = null;
-        if (adminEmail) {
-            const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase() + '@1';
-            const salt = await bcrypt.genSalt(12);
-            const hashedPassword = await bcrypt.hash(tempPassword, salt);
-
-            adminUser = await User.create({
-                name: adminName || 'School Admin',
-                email: adminEmail.toLowerCase(),
-                phone: adminPhone,
-                password: hashedPassword,
-                role: 'admin',
-                tenantId: tenant._id,
-                isActive: true
-            });
-
-            // Send welcome email (non-blocking)
-            try {
-                const emailService = require('../services/emailService');
-                await emailService.sendEmail({
-                    to: adminEmail,
-                    subject: `Welcome to Learnovo - ${schoolName}`,
-                    html: `<p>Hi ${adminName || 'Admin'},</p>
-                           <p>Your school <strong>${schoolName}</strong> has been registered on Learnovo.</p>
-                           <p><strong>Login email:</strong> ${adminEmail}</p>
-                           <p><strong>Temporary password:</strong> <code>${tempPassword}</code></p>
-                           <p><strong>School Code:</strong> ${schoolCode}</p>
-                           <p>Please log in and change your password immediately.</p>`
-                });
-            } catch (emailErr) {
-                logger.warn('Welcome email could not be sent', { requestId: req.requestId, tenantId: tenant._id });
-            }
-        }
-
-        await audit(req, 'CREATE_TENANT', 'Tenant', tenant._id, { schoolName, schoolCode, plan: plan || 'free' });
-
-        return res.status(201).json({
-            success: true,
-            message: 'Tenant created successfully.',
-            data: { tenant, adminUser: adminUser ? { id: adminUser._id, email: adminUser.email } : null },
-            requestId: req.requestId
-        });
-    } catch (error) {
-        logger.error('Super admin: create tenant error', error, { requestId: req.requestId });
-        return res.status(500).json({ success: false, message: 'Server error creating tenant.', requestId: req.requestId });
-    }
-});
-
 /**
  * PATCH /api/super-admin/tenants/:id
  * Update tenant profile info
@@ -944,23 +1146,6 @@ router.post('/tenants/:id/impersonate', async (req, res) => {
 });
 
 // ─── USER ROLE DISTRIBUTION ─────────────────────────────────────────────────
-
-/**
- * GET /api/super-admin/users/role-distribution
- * Visual breakdown of users by role
- */
-router.get('/users/role-distribution', async (req, res) => {
-    try {
-        const distribution = await User.aggregate([
-            { $group: { _id: '$role', count: { $sum: 1 } } },
-            { $sort: { count: -1 } }
-        ]);
-        return res.json({ success: true, data: distribution, requestId: req.requestId });
-    } catch (error) {
-        logger.error('Super admin: role distribution error', error, { requestId: req.requestId });
-        return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
-    }
-});
 
 // ─── SUBSCRIPTION PLAN MANAGEMENT ───────────────────────────────────────────
 

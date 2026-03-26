@@ -317,6 +317,15 @@ const userSchema = new mongoose.Schema({
     trim: true
   },
 
+  // ── Student subject preferences ────────────────────────────────────
+  // Subjects this student has opted out of (only optional subjects).
+  // Marks for skipped subjects are excluded from results/report cards
+  // but never deleted — they are simply ignored in calculations.
+  skippedSubjects: [{
+    type: String,
+    trim: true
+  }],
+
   // ── Student additional fields ──────────────────────────────────────
   previousSchool: {
     type: String,

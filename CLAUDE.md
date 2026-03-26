@@ -1,5 +1,11 @@
 # CLAUDE.md — Learnovo Backend
 
+## Hosting & Deployment
+- **Backend:** Hostinger VPS (Node.js + PM2) — `api.learnovoportal.com`
+- **Frontend:** Vercel — `learnovoportal.com` (multi-tenant subdomains: `{school}.learnovoportal.com`)
+- **Database:** MongoDB Atlas
+- Deploy backend by pushing to the VPS via SSH/git. No Render — `render.yaml` was removed.
+
 ## Stack
 Node.js 16+ · Express · MongoDB 4.4+ (Mongoose) · JWT · Nodemailer · Jest · ESLint
 

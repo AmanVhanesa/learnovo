@@ -1,376 +1,157 @@
-# 🚀 Quick Deployment Guide to Render + Vercel
+# Deployment Guide — Hostinger VPS + Vercel
+
+## Architecture
+
+| Component | Host | URL |
+|-----------|------|-----|
+| **Backend** | Hostinger VPS (Node.js + PM2) | `https://api.learnovoportal.com` |
+| **Frontend** | Vercel | `https://learnovoportal.com` |
+| **Database** | MongoDB Atlas | cluster0.soajlb4.mongodb.net |
+
+Multi-tenant subdomains: `{school}.learnovoportal.com` (e.g. `spis.learnovoportal.com`)
+
+---
 
 ## Prerequisites
-- ✅ MongoDB Atlas account
-- ✅ GitHub account
-- ✅ Render account
-- ✅ Vercel account
+
+- Hostinger VPS with SSH access
+- MongoDB Atlas account
+- Vercel account
+- Domain: `learnovoportal.com` (DNS managed via Hostinger/Cloudflare)
 
 ---
 
-## Step 1: Prepare MongoDB Atlas
+## Backend Deployment (Hostinger VPS)
 
-1. Go to https://www.mongodb.com/cloud/atlas
-2. Create a **Free M0 Cluster**
-3. Click **Connect** → **Connect your application**
-4. Copy connection string:
-   ```
-   mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/learnovo?retryWrites=true&w=majority
-   ```
-5. Click **Network Access** → **Add IP Address** → `0.0.0.0/0` (allow all)
-6. Click **Database Access** → **Add New User**
-   - Username: `learnovo_admin`
-   - Password: (generate secure password)
-   - Role: `Atlas Admin`
-
----
-
-## Step 2: Prepare Your Code
-
-### Generate Secure JWT Secret
+### 1. SSH into VPS
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+ssh root@<VPS_IP>
 ```
 
-**Copy this secret** - you'll need it!
-
-### Push to GitHub
+### 2. Install Node.js & PM2
 
 ```bash
-# Navigate to project root
-cd "/Users/amanvhanesa/EvoTech Innovation /Websites/Learnovo"
-
-# Initialize git (if not already)
-git init
-
-# Add all files
-git add .
-
-# Commit
-git commit -m "Initial deployment ready commit"
-
-# Add your GitHub repository (replace with yours)
-git remote add origin https://github.com/YOUR_USERNAME/learnovo.git
-
-# Push
-git push -u origin main
+curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+apt-get install -y nodejs
+npm install -g pm2
 ```
 
----
+### 3. Clone & Setup
 
-## Step 3: Deploy Backend to Render
+```bash
+cd /var/www
+git clone <REPO_URL> learnovo
+cd learnovo/learnovo-backend
+npm install --production
+```
 
-### Create Render Account
-Go to https://dashboard.render.com → Sign up (GitHub login works)
+### 4. Environment Variables
 
-### Create Web Service
-
-1. Click **New +** → **Web Service**
-2. Connect your GitHub account
-3. Select your `learnovo` repository
-4. Click **Apply**
-
-### Configure Backend Service
-
-**Settings:**
-- **Name**: `learnovo-backend`
-- **Region**: Singapore (or closest to you)
-- **Branch**: `main`
-- **Root Directory**: Leave empty
-- **Runtime**: Node
-- **Build Command**: `cd learnovo-backend && npm install`
-- **Start Command**: `cd learnovo-backend && node server.js`
-
-**Environment Variables:**
-
-Add these in Render dashboard:
+Create `config.env` on the VPS (never commit this file):
 
 ```
 NODE_ENV=production
 PORT=5000
-
-# MongoDB (from Step 1)
-MONGODB_URI=mongodb+srv://learnovo_admin:YOUR_PASSWORD@cluster0.xxxxx.mongodb.net/learnovo?retryWrites=true&w=majority
-
-# JWT Secret (from above)
-JWT_SECRET=paste_your_generated_hex_string_here
+MONGODB_URI=mongodb+srv://<user>:<pass>@cluster0.soajlb4.mongodb.net/learnovo?retryWrites=true&w=majority
+JWT_SECRET=<strong-random-hex-string>
 JWT_EXPIRE=7d
-
-# Frontend URL (update after Vercel deployment)
-FRONTEND_URL=https://learnovo.vercel.app
-
-# Email (Optional - you can set these later)
+FRONTEND_URL=https://learnovoportal.com
 EMAIL_HOST=smtp.gmail.com
 EMAIL_PORT=587
 EMAIL_SECURE=false
+EMAIL_USER=<email>
+EMAIL_PASS=<app-password>
+BCRYPT_ROUNDS=12
+LOG_LEVEL=info
 ```
 
-### Deploy
+### 5. Start with PM2
 
-1. Click **Create Web Service**
-2. Wait 5-10 minutes for deployment
-3. Copy your **Service URL**: `https://learnovo-backend.onrender.com`
-
-**⚠️ Free tier warning**: First request may take 30-50 seconds (cold start)
-
----
-
-## Step 4: Deploy Frontend to Vercel
-
-### Create Vercel Account
-Go to https://vercel.com → Sign up (GitHub login works)
-
-### Create Project
-
-1. Click **Add New Project**
-2. Import your GitHub repository
-3. Select your `learnovo` repository
-
-### Configure Frontend
-
-**Framework Preset:** Vite
-
-**Settings:**
-- **Root Directory**: Leave empty
-- **Build Command**: `cd learnovo-frontend && npm run build`
-- **Output Directory**: `learnovo-frontend/dist`
-- **Install Command**: `cd learnovo-frontend && npm install`
-
-**Environment Variables:**
-
-```
-VITE_API_URL=https://learnovo-backend.onrender.com/api
+```bash
+pm2 start server.js --name learnovo-backend --node-args="--max-old-space-size=512"
+pm2 save
+pm2 startup  # auto-start on reboot
 ```
 
-### Deploy
+### 6. Nginx Reverse Proxy
 
-1. Click **Deploy**
-2. Wait 2-5 minutes
-3. Copy your **Domain**: `https://learnovo.vercel.app` (or custom)
+```nginx
+server {
+    listen 80;
+    server_name api.learnovoportal.com;
 
----
-
-## Step 5: Update Backend with Frontend URL
-
-1. Go back to **Render Dashboard**
-2. Open your `learnovo-backend` service
-3. Go to **Environment**
-4. Update `FRONTEND_URL` with your Vercel URL:
-   ```
-   FRONTEND_URL=https://learnovo.vercel.app
-   ```
-5. Click **Save Changes** (will redeploy automatically)
-
----
-
-## Step 6: Test Your Deployment
-
-### Health Check
-Visit: `https://learnovo-backend.onrender.com/health`
-
-Expected response:
-```json
-{
-  "success": true,
-  "status": "ok",
-  "timestamp": "...",
-  "services": {
-    "database": "healthy"
-  }
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        client_max_body_size 10M;
+    }
 }
 ```
 
-### Test Frontend
-Visit: `https://learnovo.vercel.app` or your custom domain
+Then enable SSL:
+```bash
+certbot --nginx -d api.learnovoportal.com
+```
 
-### Test Login
-Use demo credentials:
-- **Admin**: admin@learnovo.com / admin123
-- **Teacher**: sarah.wilson@learnovo.com / teacher123
-- **Student**: john.doe@learnovo.com / student123
-- **Parent**: parent@learnovo.com / parent123
-
----
-
-## Troubleshooting
-
-### Backend Issues
-
-**Problem: "Cannot connect to MongoDB"**
-- ✅ Check MONGODB_URI in Render environment variables
-- ✅ Verify IP whitelist in MongoDB Atlas (should include `0.0.0.0/0`)
-- ✅ Check database user credentials
-
-**Problem: "CORS errors"**
-- ✅ Ensure FRONTEND_URL in Render matches your Vercel URL exactly
-- ✅ Check for trailing slashes
-- ✅ Clear browser cache
-
-**Problem: "Cold start takes too long"**
-- ✅ This is normal for Render free tier
-- ✅ Upgrade to paid plan to avoid cold starts
-
-### Frontend Issues
-
-**Problem: "Cannot connect to server"**
-- ✅ Check VITE_API_URL in Vercel environment variables
-- ✅ Verify backend is running
-- ✅ Check browser console for errors
-
-**Problem: "Blank page"**
-- ✅ Check build logs in Vercel
-- ✅ Look for errors in browser console
-- ✅ Verify all environment variables are set
-
----
-
-## Security Checklist
-
-Before going live:
-
-- [x] JWT_SECRET is a strong random string (32+ characters)
-- [x] MongoDB password is strong
-- [x] CORS is configured with specific frontend URL
-- [x] HTTPS is enabled (automatic on Render/Vercel)
-- [x] Environment variables are not exposed
-- [x] Rate limiting is active
-- [x] Helmet security headers are enabled
-
----
-
-## Cost Estimate (Free Tier)
-
-| Service | Plan | Cost | Limits |
-|---------|------|------|--------|
-| Render Backend | Free | $0 | 750 hrs/month, 512MB RAM |
-| Vercel Frontend | Free | $0 | 100GB bandwidth |
-| MongoDB Atlas | Free M0 | $0 | 512MB storage |
-
-**Total: FREE** 🎉
-
-**Note:** Free tiers have limitations:
-- Render spins down after 15 min inactivity
-- First request can be slow (cold start)
-- Limited bandwidth on Vercel free tier
-
-**Upgrade costs if needed:**
-- Render Starter: $7/month (no cold starts, better performance)
-- Vercel Pro: $20/month (better limits)
-- MongoDB M10: $57/month (production ready)
-
----
-
-## Custom Domain (Optional)
-
-### On Vercel
-
-1. Go to your project → **Settings** → **Domains**
-2. Add your domain: `app.yourdomain.com`
-3. Configure DNS:
-   - Type: **CNAME**
-   - Name: `app`
-   - Value: `cname.vercel-dns.com`
-
-### On Render
-
-1. Go to your service → **Settings** → **Custom Domains**
-2. Add your domain
-3. Configure DNS as instructed
-
-### Update Environment Variables
-
-After adding custom domain:
-- Update `FRONTEND_URL` in Render to use your custom domain
-- Redeploy backend
-
----
-
-## Post-Deployment Monitoring
-
-### Recommended Tools (All Free)
-
-1. **Uptime Monitoring**: https://uptimerobot.com
-   - Add your backend health URL
-   - Get alerts when site is down
-
-2. **Error Tracking**: Sentry.io (free tier)
-   - Catch production errors automatically
-
-3. **Analytics**: Google Analytics or Vercel Analytics
-   - Track user behavior
-
----
-
-## Maintenance
-
-### Regular Tasks
-
-**Weekly:**
-- [ ] Check Render logs for errors
-- [ ] Monitor MongoDB Atlas storage usage
-- [ ] Review Vercel bandwidth usage
-
-**Monthly:**
-- [ ] Update dependencies: `npm audit fix`
-- [ ] Backup database from MongoDB Atlas
-- [ ] Check for security updates
-
-**Quarterly:**
-- [ ] Review and optimize database queries
-- [ ] Check performance metrics
-- [ ] Update documentation
-
----
-
-## Quick Commands Reference
+### 7. Deploy Updates
 
 ```bash
-# Check backend logs (Render)
-# Go to Render Dashboard → Your Service → Logs
-
-# Check frontend logs (Vercel)
-# Go to Vercel Dashboard → Your Project → Deployments → Logs
-
-# Update backend
-git push origin main  # Auto-deploys on Render
-
-# Update frontend
-git push origin main  # Auto-deploys on Vercel
-
-# Rollback backend
-# Render Dashboard → Your Service → Manual Deploy → Previous Version
-
-# Rollback frontend
-# Vercel Dashboard → Deployments → ... → Promote to Production
+ssh root@<VPS_IP>
+cd /var/www/learnovo/learnovo-backend
+git pull origin main
+npm install --production
+pm2 restart learnovo-backend
 ```
 
 ---
 
-## Support
+## Frontend Deployment (Vercel)
 
-Need help?
+### Environment Variable
 
-1. **Render Docs**: https://render.com/docs
-2. **Vercel Docs**: https://vercel.com/docs
-3. **MongoDB Atlas**: https://docs.atlas.mongodb.com
+```
+VITE_API_URL=https://api.learnovoportal.com/api
+```
 
----
+### Auto-Deploy
 
-## Success! 🎉
-
-Your Learnovo application should now be live!
-
-**Backend**: https://learnovo-backend.onrender.com  
-**Frontend**: https://learnovo.vercel.app (or your custom domain)
-
-**Next Steps:**
-- Test all features
-- Set up monitoring
-- Configure custom domain
-- Invite users to try it!
+Push to `main` branch — Vercel auto-deploys.
 
 ---
 
-**Last Updated**: November 2024
+## Health Check
 
+```bash
+curl https://api.learnovoportal.com/health
+```
+
+---
+
+## Useful PM2 Commands
+
+```bash
+pm2 status              # Check running processes
+pm2 logs learnovo-backend  # View logs
+pm2 restart learnovo-backend
+pm2 monit               # Real-time monitoring
+```
+
+---
+
+## Monitoring
+
+- **PM2 logs**: `pm2 logs --lines 100`
+- **Nginx logs**: `/var/log/nginx/access.log`, `/var/log/nginx/error.log`
+- **Uptime**: https://uptimerobot.com (monitor `/health`)
+
+---
+
+**Last Updated**: March 2026

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learnovo - Test Fee Payment (Razorpay)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f4f8;
+            color: #1a202c;
+            padding: 2rem;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .subtitle { color: #718096; margin-bottom: 2rem; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 1.5rem;
+        }
+        .card h2 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 0.3rem;
+        }
+        input, select {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            outline: none;
+        }
+        input:focus, select:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+        button {
+            width: 100%;
+            padding: 0.8rem;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #4338ca; }
+        button:disabled { background: #a0aec0; cursor: not-allowed; }
+        .log {
+            background: #1a202c;
+            color: #68d391;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log .error { color: #fc8181; }
+        .log .info { color: #63b3ed; }
+        .log .success { color: #68d391; }
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 0.5rem;
+            font-size: 0.75rem;
+            color: #a0aec0;
+            border-bottom: 3px solid #e2e8f0;
+        }
+        .step.active { color: #4f46e5; border-color: #4f46e5; font-weight: 600; }
+        .step.done { color: #48bb78; border-color: #48bb78; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Learnovo Fee Payment Tester</h1>
+        <p class="subtitle">Test the complete Razorpay payment flow</p>
+
+        <!-- Step indicators -->
+        <div class="step-indicator">
+            <div class="step" id="step1">1. Configure</div>
+            <div class="step" id="step2">2. Create Order</div>
+            <div class="step" id="step3">3. Pay</div>
+            <div class="step" id="step4">4. Verify</div>
+        </div>
+
+        <!-- Config Card -->
+        <div class="card">
+            <h2>Step 1: Configuration</h2>
+
+            <label>Backend URL</label>
+            <input type="text" id="backendUrl" value="http://localhost:5001" placeholder="http://localhost:5001">
+
+            <label>JWT Token (login first, paste token here)</label>
+            <input type="text" id="jwtToken" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+
+            <label>Invoice ID (from your database)</label>
+            <input type="text" id="invoiceId" placeholder="6650a1b2c3d4e5f678901234">
+        </div>
+
+        <!-- Pay Button -->
+        <div class="card">
+            <h2>Step 2 & 3: Create Order & Pay</h2>
+            <p style="color: #718096; font-size: 0.85rem; margin-bottom: 1rem;">
+                This will create a Razorpay order and open the payment popup.
+            </p>
+            <button id="payBtn">Pay Now</button>
+        </div>
+
+        <!-- Log Output -->
+        <div class="card">
+            <h2>Activity Log</h2>
+            <div class="log" id="log">Waiting for action...\n</div>
+        </div>
+    </div>
+
+    <!-- JS moved to external file to avoid CSP inline-script block -->
+    <script src="/public/test-payment.js"></script>
+</body>
+</html>

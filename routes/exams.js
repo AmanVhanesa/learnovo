@@ -285,7 +285,7 @@ router.get('/result-card/:studentId', protect, examPlanGates, async (req, res) =
                 path: 'exam',
                 select: 'name subject class section date totalMarks passingMarks examSeries examType status'
             })
-            .populate('student', 'name rollNumber admissionNumber class section photo')
+            .populate('student', 'name rollNumber admissionNumber class section photo skippedSubjects')
             .sort({ 'exam.date': 1 });
 
         if (!results.length) {
@@ -299,6 +299,16 @@ router.get('/result-card/:studentId', protect, examPlanGates, async (req, res) =
         let filtered = results.filter(r => r.exam); // ensure exam populated
         if (examSeries) filtered = filtered.filter(r => r.exam.examSeries === examSeries);
         if (className) filtered = filtered.filter(r => r.exam.class === className);
+
+        // Exclude skipped (optional) subjects from results
+        // Skipped subjects still have marks stored but are not displayed or calculated
+        const studentDoc = results[0]?.student;
+        const skippedSubjects = studentDoc?.skippedSubjects || [];
+        if (skippedSubjects.length > 0) {
+            filtered = filtered.filter(r =>
+                !skippedSubjects.includes(r.exam.subject)
+            );
+        }
 
         // Build subject rows
         const subjects = filtered.map(r => ({
@@ -378,7 +388,7 @@ router.get('/result-card/:studentId/pdf', protect, examPlanGates, async (req, re
                 path: 'exam',
                 select: 'name subject class section date totalMarks passingMarks examSeries examType status'
             })
-            .populate('student', 'name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName photo')
+            .populate('student', 'name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName photo skippedSubjects')
             .sort({ 'exam.date': 1 });
 
         if (!results.length) {
@@ -388,6 +398,15 @@ router.get('/result-card/:studentId/pdf', protect, examPlanGates, async (req, re
         let filtered = results.filter(r => r.exam);
         if (examSeries) filtered = filtered.filter(r => r.exam.examSeries === examSeries);
         if (className) filtered = filtered.filter(r => r.exam.class === className);
+
+        // Exclude skipped (optional) subjects from the PDF report card
+        const pdfStudent = results[0]?.student;
+        const pdfSkippedSubjects = pdfStudent?.skippedSubjects || [];
+        if (pdfSkippedSubjects.length > 0) {
+            filtered = filtered.filter(r =>
+                !pdfSkippedSubjects.includes(r.exam.subject)
+            );
+        }
 
         if (!filtered.length) {
             return res.status(404).json({ success: false, message: 'No results found for the given filters' });
@@ -608,11 +627,30 @@ router.post('/:id/results', protect, examPlanGates, authorize('admin', 'teacher'
             return res.status(400).json({ success: false, message: 'No results provided' });
         }
 
+        // Pre-fetch skippedSubjects for all students in this batch
+        // so we can reject marks entry for skipped optional subjects
+        const studentIds = resultsToProcess.map(r => r.studentId).filter(Boolean);
+        const studentsWithPrefs = await User.find({
+            _id: { $in: studentIds },
+            tenantId: req.user.tenantId
+        }).select('_id skippedSubjects').lean();
+        const skippedMap = {};
+        studentsWithPrefs.forEach(s => {
+            skippedMap[s._id.toString()] = s.skippedSubjects || [];
+        });
+
         const processed = [];
         const errors = [];
 
         for (const item of resultsToProcess) {
             try {
+                // Reject marks for subjects the student has opted out of
+                const studentSkipped = skippedMap[item.studentId] || [];
+                if (studentSkipped.includes(exam.subject)) {
+                    errors.push({ studentId: item.studentId, error: `Subject "${exam.subject}" is skipped for this student` });
+                    continue;
+                }
+
                 const marksObtained = Number(item.marks);
 
                 // Validate marks don't exceed total

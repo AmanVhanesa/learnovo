@@ -39,6 +39,12 @@ const subjectSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // When true, students may opt out of this subject via Subject Preferences.
+  // Defaults to false — most subjects are compulsory.
+  isOptional: {
+    type: Boolean,
+    default: false
+  },
   isActive: {
     type: Boolean,
     default: true
