@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learnovo - Student Management System</title>
+    <link rel="stylesheet" href="app-styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <img src="learnovo.png" alt="Learnovo Logo" class="login-logo">
+                <h1>Learnovo</h1>
+                <p>Student Management System</p>
+            </div>
+            
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label>Login As</label>
+                    <select id="userRole" required>
+                        <option value="">Select Role</option>
+                        <option value="admin">Administrator</option>
+                        <option value="teacher">Teacher</option>
+                        <option value="student">Student</option>
+                        <option value="parent">Parent</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Email/Username</label>
+                    <input type="text" id="loginEmail" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                
+                <button type="submit" class="btn-primary btn-full">Login</button>
+                
+                <div class="login-options">
+                    <button type="button" class="btn-outline" onclick="showDemoLogin()">Demo Login</button>
+                    <button type="button" class="btn-link" onclick="showForgotPassword()">Forgot Password?</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="main-app" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="learnovo.png" alt="Learnovo Logo" class="logo-img">
+                <span class="logo-text">Learnovo</span>
+            </div>
+            
+            <ul class="sidebar-menu" id="sidebarMenu">
+                <!-- Menu items will be populated based on user role -->
+            </ul>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <img src="" alt="User Avatar" class="user-avatar" id="userAvatar">
+                    <div class="user-info">
+                        <span class="user-name" id="userName">User Name</span>
+                        <span class="user-role" id="userRoleDisplay">Role</span>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top Navigation -->
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1 class="page-title" id="pageTitle">Dashboard</h1>
+                </div>
+                <div class="header-right">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="globalSearch" placeholder="Search...">
+                    </div>
+                    <div class="notifications" onclick="showNotifications()">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationBadge">0</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content" id="pageContent">
+                <!-- Dashboard Page -->
+                <div id="dashboard-page" class="page active">
+                    <div class="stats-grid" id="dashboardStats">
+                        <!-- Stats will be populated based on user role -->
+                    </div>
+                    
+                    <div class="dashboard-grid" id="dashboardCharts">
+                        <!-- Charts will be populated based on user role -->
+                    </div>
+                    
+                    <div class="recent-activities">
+                        <h3>Recent Activities</h3>
+                        <div class="activity-list" id="recentActivities">
+                            <!-- Activities will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Students Management Page -->
+                <div id="students-page" class="page">
+                    <div class="page-header">
+                        <h2>Student Management</h2>
+                        <button class="btn-primary" onclick="showAddStudentModal()">
+                            <i class="fas fa-plus"></i> Add Student
+                        </button>
+                    </div>
+
+                    <div class="filters">
+                        <div class="filter-group">
+                            <select id="classFilter">
+                                <option value="">All Classes</option>
+                                <option value="1st">1st Grade</option>
+                                <option value="2nd">2nd Grade</option>
+                                <option value="3rd">3rd Grade</option>
+                                <option value="4th">4th Grade</option>
+                                <option value="5th">5th Grade</option>
+                                <option value="6th">6th Grade</option>
+                                <option value="7th">7th Grade</option>
+                                <option value="8th">8th Grade</option>
+                                <option value="9th">9th Grade</option>
+                                <option value="10th">10th Grade</option>
+                                <option value="11th">11th Grade</option>
+                                <option value="12th">12th Grade</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <input type="text" id="searchStudents" placeholder="Search students...">
+                        </div>
+                        <div class="filter-group">
+                            <button class="btn-outline" onclick="exportStudents()">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Photo</th>
+                                    <th>Name</th>
+                                    <th>Roll No.</th>
+                                    <th>Class</th>
+                                    <th>Admission Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentsTableBody">
+                                <!-- Students will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Teachers Management Page -->
+                <div id="teachers-page" class="page">
+                    <div class="page-header">
+                        <h2>Teacher Management</h2>
+                        <button class="btn-primary" onclick="showAddTeacherModal()">
+                            <i class="fas fa-plus"></i> Add Teacher
+                        </button>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Photo</th>
+                                    <th>Name</th>
+                                    <th>Subject</th>
+                                    <th>Qualification</th>
+                                    <th>Assigned Classes</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="teachersTableBody">
+                                <!-- Teachers will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Fees Management Page -->
+                <div id="fees-page" class="page">
+                    <div class="page-header">
+                        <h2>Fee Management</h2>
+                        <button class="btn-primary" onclick="showAddFeeModal()">
+                            <i class="fas fa-plus"></i> Add Fee Payment
+                        </button>
+                    </div>
+
+                    <div class="fees-summary">
+                        <div class="summary-card">
+                            <h3>Total Collected</h3>
+                            <span class="amount" id="totalCollected">$0</span>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Pending Dues</h3>
+                            <span class="amount pending" id="pendingDues">$0</span>
+                        </div>
+                        <div class="summary-card">
+                            <h3>This Month</h3>
+                            <span class="amount" id="thisMonth">$0</span>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Overdue</h3>
+                            <span class="amount overdue" id="overdueAmount">$0</span>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Class</th>
+                                    <th>Amount</th>
+                                    <th>Due Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="feesTableBody">
+                                <!-- Fees will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Admissions Page -->
+                <div id="admissions-page" class="page">
+                    <div class="page-header">
+                        <h2>Admission Management</h2>
+                        <button class="btn-primary" onclick="showAdmissionForm()">
+                            <i class="fas fa-plus"></i> New Admission
+                        </button>
+                    </div>
+
+                    <div class="admission-stats">
+                        <div class="stat-card">
+                            <h3>Total Applications</h3>
+                            <span class="number" id="totalApplications">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Approved</h3>
+                            <span class="number" id="approvedApplications">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Pending</h3>
+                            <span class="number" id="pendingApplications">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Rejected</h3>
+                            <span class="number" id="rejectedApplications">0</span>
+                        </div>
+                    </div>
+
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Application ID</th>
+                                    <th>Student Name</th>
+                                    <th>Class</th>
+                                    <th>Applied Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admissionsTableBody">
+                                <!-- Admissions will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Reports Page -->
+                <div id="reports-page" class="page">
+                    <div class="page-header">
+                        <h2>Reports & Analytics</h2>
+                        <div class="report-actions">
+                            <select id="reportType">
+                                <option value="fees">Fee Collection Report</option>
+                                <option value="students">Student Report</option>
+                                <option value="attendance">Attendance Report</option>
+                                <option value="admissions">Admission Report</option>
+                            </select>
+                            <button class="btn-primary" onclick="generateReport()">
+                                <i class="fas fa-download"></i> Generate Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Fee Collection Trends</h3>
+                            <canvas id="feeCollectionChart"></canvas>
+                        </div>
+                        <div class="report-card">
+                            <h3>Student Enrollment</h3>
+                            <canvas id="enrollmentChart"></canvas>
+                        </div>
+                        <div class="report-card">
+                            <h3>Class-wise Distribution</h3>
+                            <canvas id="classDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notifications Page -->
+                <div id="notifications-page" class="page">
+                    <div class="page-header">
+                        <h2>Notifications & Announcements</h2>
+                        <button class="btn-primary" onclick="showAddNotificationModal()">
+                            <i class="fas fa-plus"></i> Create Notification
+                        </button>
+                    </div>
+
+                    <div class="notifications-grid" id="notificationsGrid">
+                        <!-- Notifications will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Settings Page -->
+                <div id="settings-page" class="page">
+                    <div class="page-header">
+                        <h2>Settings</h2>
+                    </div>
+
+                    <div class="settings-grid">
+                        <div class="settings-card">
+                            <h3>Institution Information</h3>
+                            <form id="institutionForm">
+                                <div class="form-group">
+                                    <label>Institution Name</label>
+                                    <input type="text" id="institutionName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Address</label>
+                                    <textarea id="institutionAddress" rows="3"></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Phone</label>
+                                    <input type="tel" id="institutionPhone">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="institutionEmail">
+                                </div>
+                                <button type="submit" class="btn-primary">Save Changes</button>
+                            </form>
+                        </div>
+
+                        <div class="settings-card">
+                            <h3>User Profile</h3>
+                            <form id="profileForm">
+                                <div class="form-group">
+                                    <label>Full Name</label>
+                                    <input type="text" id="profileName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="profileEmail" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Phone</label>
+                                    <input type="tel" id="profilePhone">
+                                </div>
+                                <div class="form-group">
+                                    <label>Change Password</label>
+                                    <input type="password" id="newPassword" placeholder="New Password">
+                                </div>
+                                <button type="submit" class="btn-primary">Update Profile</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modalContainer"></div>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer"></div>
+
+    <script src="app-script.js"></script>
+</body>
+</html>

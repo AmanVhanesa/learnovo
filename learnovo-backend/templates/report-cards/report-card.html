@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Card — {{student_name}}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+  :root {
+    --rc-primary: {{brand_color}};
+    --rc-primary-light: {{brand_color_light}};
+    --rc-text-primary: #111827;
+    --rc-text-secondary: #6B7280;
+    --rc-text-muted: #9CA3AF;
+    --rc-bg-subtle: #F9FAFB;
+    --rc-border: #E5E7EB;
+    --rc-border-light: #F3F4F6;
+    --rc-grade-excellent: #059669;
+    --rc-grade-good: #2563EB;
+    --rc-grade-average: #D97706;
+    --rc-grade-poor: #DC2626;
+    --rc-pass: #059669;
+    --rc-fail: #DC2626;
+  }
+
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: #FFFFFF;
+    color: var(--rc-text-primary);
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    background: #FFFFFF;
+    padding: 20mm;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .school-logo {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .school-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .school-logo-fallback {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--rc-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    flex-shrink: 0;
+  }
+
+  .school-info {
+    flex: 1;
+  }
+
+  .school-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--rc-text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .school-address {
+    font-size: 9px;
+    color: var(--rc-text-secondary);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .school-meta {
+    font-size: 8px;
+    color: var(--rc-text-muted);
+    margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+
+  .accent-line {
+    height: 2.5px;
+    background: var(--rc-primary);
+    margin: 20px 0;
+    border: none;
+    border-radius: 2px;
+  }
+
+  .report-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 28px;
+  }
+
+  .report-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--rc-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .report-meta {
+    font-size: 10px;
+    color: var(--rc-text-muted);
+    text-align: right;
+  }
+
+  .report-meta span {
+    display: block;
+    line-height: 1.6;
+  }
+
+  .report-meta .exam-type {
+    font-weight: 600;
+    color: var(--rc-text-secondary);
+  }
+
+  /* ── STUDENT INFO ── */
+  .student-card {
+    background: var(--rc-bg-subtle);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 28px;
+  }
+
+  .student-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px 32px;
+  }
+
+  .info-label {
+    font-size: 7.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--rc-text-muted);
+    margin-bottom: 3px;
+  }
+
+  .info-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--rc-text-primary);
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--rc-text-muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── TABLE ── */
+  .marks-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 28px;
+  }
+
+  .marks-table thead th {
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--rc-text-secondary);
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1.5px solid var(--rc-border);
+  }
+
+  .marks-table thead th.num {
+    text-align: right;
+  }
+
+  .marks-table thead th.center {
+    text-align: center;
+  }
+
+  .marks-table tbody td {
+    font-size: 10.5px;
+    color: var(--rc-text-primary);
+    padding: 14px 12px;
+    border-bottom: 0.5px solid var(--rc-border-light);
+    font-weight: 400;
+  }
+
+  .marks-table tbody tr:nth-child(even) {
+    background: rgba(249, 250, 251, 0.5);
+  }
+
+  .marks-table tbody td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .marks-table tbody td.center {
+    text-align: center;
+  }
+
+  .marks-table tbody td.subject-name {
+    font-weight: 500;
+  }
+
+  .marks-table tbody td.subject-name .exam-detail {
+    display: block;
+    font-size: 8px;
+    color: var(--rc-text-muted);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  /* Grade dot */
+  .grade-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+  }
+
+  .grade-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .grade-dot.excellent { background: var(--rc-grade-excellent); }
+  .grade-dot.good { background: var(--rc-grade-good); }
+  .grade-dot.average { background: var(--rc-grade-average); }
+  .grade-dot.poor { background: var(--rc-grade-poor); }
+
+  .pass-text { color: var(--rc-pass); font-weight: 500; font-size: 10px; }
+  .fail-text { color: var(--rc-fail); font-weight: 500; font-size: 10px; }
+
+  /* Grand Total Row */
+  .marks-table tfoot td {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--rc-text-primary);
+    padding: 14px 12px;
+    border-top: 1.5px solid var(--rc-primary);
+    background: var(--rc-primary-light);
+  }
+
+  .marks-table tfoot td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .marks-table tfoot td.center {
+    text-align: center;
+  }
+
+  /* ── RESULT BANNER ── */
+  .result-banner {
+    border-radius: 0 8px 8px 0;
+    padding: 18px 24px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .result-banner.pass {
+    border-left: 3px solid var(--rc-pass);
+    background: rgba(5, 150, 105, 0.04);
+  }
+
+  .result-banner.fail {
+    border-left: 3px solid var(--rc-fail);
+    background: rgba(220, 38, 38, 0.04);
+  }
+
+  .result-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .result-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .result-dot.pass { background: var(--rc-pass); }
+  .result-dot.fail { background: var(--rc-fail); }
+
+  .result-label {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .result-label.pass { color: var(--rc-pass); }
+  .result-label.fail { color: var(--rc-fail); }
+
+  .result-details {
+    text-align: right;
+  }
+
+  .result-perf {
+    font-size: 10px;
+    color: var(--rc-text-secondary);
+    margin-bottom: 2px;
+  }
+
+  .result-stats {
+    font-size: 9px;
+    color: var(--rc-text-muted);
+  }
+
+  /* ── ATTENDANCE ── */
+  .attendance-section {
+    margin-bottom: 28px;
+  }
+
+  .attendance-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  .att-card {
+    background: var(--rc-bg-subtle);
+    border-radius: 8px;
+    padding: 14px 18px;
+    text-align: center;
+  }
+
+  .att-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--rc-text-primary);
+  }
+
+  .att-label {
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--rc-text-muted);
+    margin-top: 4px;
+  }
+
+  /* ── REMARKS ── */
+  .remarks-section {
+    margin-bottom: 36px;
+  }
+
+  .remarks-text {
+    font-size: 10px;
+    color: var(--rc-text-secondary);
+    line-height: 1.6;
+    padding: 12px 0;
+    border-bottom: 0.5px solid var(--rc-border-light);
+    min-height: 36px;
+    font-style: italic;
+  }
+
+  /* ── SIGNATURES ── */
+  .signatures {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-top: 8px;
+  }
+
+  .sig-block {
+    text-align: center;
+    width: 140px;
+  }
+
+  .sig-line {
+    width: 100%;
+    height: 1px;
+    background: var(--rc-border);
+    margin-bottom: 8px;
+    margin-top: 40px;
+    position: relative;
+  }
+
+  .sig-img {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-height: 40px;
+    max-width: 120px;
+    object-fit: contain;
+  }
+
+  .sig-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--rc-text-secondary);
+  }
+
+  .sig-sublabel {
+    font-size: 7px;
+    color: var(--rc-text-muted);
+    margin-top: 2px;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center;
+    padding-top: 16px;
+    border-top: 0.5px solid var(--rc-border-light);
+  }
+
+  .footer-text {
+    font-size: 7px;
+    color: var(--rc-text-muted);
+    letter-spacing: 0.02em;
+    font-style: italic;
+  }
+
+  @media print {
+    body { background: white; }
+    .page { padding: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <!-- LOGO_PLACEHOLDER -->
+    <div class="school-info">
+      <div class="school-name">{{school_name}}</div>
+      <div class="school-address">{{school_address}}</div>
+      <div class="school-meta">{{school_meta}}</div>
+    </div>
+  </div>
+
+  <hr class="accent-line">
+
+  <div class="report-title-row">
+    <div class="report-title">Student Report Card</div>
+    <div class="report-meta">
+      <span class="exam-type">{{exam_type}} Examination</span>
+      <span>Academic Year {{academic_year}} &middot; Issued: {{date_issued}}</span>
+    </div>
+  </div>
+
+  <!-- STUDENT INFO -->
+  <div class="student-card">
+    <div class="student-grid">
+      <div class="info-field">
+        <div class="info-label">Student Name</div>
+        <div class="info-value">{{student_name}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Admission No.</div>
+        <div class="info-value">{{adm_number}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Class / Section</div>
+        <div class="info-value">{{class_section}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Roll Number</div>
+        <div class="info-value">{{roll_number}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Date of Birth</div>
+        <div class="info-value">{{dob}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Parent / Guardian</div>
+        <div class="info-value">{{parent_name}}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACADEMIC TABLE -->
+  <div class="section-label">Academic Performance</div>
+
+  <table class="marks-table">
+    <thead>
+      <tr>
+        <th style="width:28%">Subject</th>
+        <th class="num" style="width:10%">Max</th>
+        <th class="num" style="width:12%">Obtained</th>
+        <th class="num" style="width:10%">%</th>
+        <th class="center" style="width:12%">Grade</th>
+        <th class="center" style="width:10%">Result</th>
+        <th style="width:18%">Remarks</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{subject_rows}}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td>Grand Total</td>
+        <td class="num">{{grand_total_max}}</td>
+        <td class="num">{{grand_total_obtained}}</td>
+        <td class="num">{{overall_percentage}}%</td>
+        <td class="center"><span class="grade-display"><span class="grade-dot {{overall_grade_class}}"></span> {{overall_grade}}</span></td>
+        <td class="center" colspan="2" style="color: var(--rc-{{overall_result_color}}); letter-spacing:0.04em">{{overall_result}}</td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <!-- RESULT BANNER -->
+  <div class="result-banner {{result_banner_class}}">
+    <div class="result-status">
+      <div class="result-dot {{result_banner_class}}"></div>
+      <div class="result-label {{result_banner_class}}">{{result_text}}</div>
+    </div>
+    <div class="result-details">
+      <div class="result-perf">{{performance_tag}}</div>
+      <div class="result-stats">{{result_stats}}</div>
+    </div>
+  </div>
+
+  <!-- ATTENDANCE_SECTION -->
+
+  <!-- REMARKS_SECTION -->
+
+  <!-- SIGNATURES -->
+  <div class="signatures">
+    <div class="sig-block">
+      <div class="sig-line">
+        <!-- CLASS_TEACHER_SIGNATURE_PLACEHOLDER -->
+      </div>
+      <div class="sig-label">Class Teacher</div>
+      <div class="sig-sublabel">Signature &amp; Seal</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line">
+        <!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->
+      </div>
+      <div class="sig-label">Principal</div>
+      <div class="sig-sublabel">Signature &amp; Seal</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line"></div>
+      <div class="sig-label">Parent / Guardian</div>
+      <div class="sig-sublabel">Signature</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-text">This is a computer-generated report card issued by {{school_name}} &middot; Powered by Learnovo</div>
+  </div>
+
+</div>
+</body>
+</html>

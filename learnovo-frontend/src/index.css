@@ -438,8 +438,8 @@ input, select, textarea {
            dark:bg-[#1C1C1E] dark:ring-white/[0.06]
            rounded-t-2xl sm:rounded-2xl sm:mx-4;
     -webkit-overflow-scrolling: touch;
-    -webkit-mask-image: -webkit-radial-gradient(white, white);
-    mask-image: linear-gradient(#fff 0 0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   .modal-box-lg {
@@ -449,8 +449,8 @@ input, select, textarea {
            dark:bg-[#1C1C1E] dark:ring-white/[0.06]
            rounded-t-2xl sm:rounded-2xl sm:mx-4 md:mx-auto md:w-[90%];
     -webkit-overflow-scrolling: touch;
-    -webkit-mask-image: -webkit-radial-gradient(white, white);
-    mask-image: linear-gradient(#fff 0 0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   /* ── Loading ────────────────────────────────────────────────── */
