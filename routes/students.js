@@ -644,6 +644,29 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
     const tenantId = req.user.tenantId;
     const mongoose = require('mongoose');
 
+    // ── Fix stale indexes ────────────────────────────────────────────────
+    // MongoDB does not auto-rebuild indexes when the schema changes.
+    // If the email unique index was created before sparse:true was added,
+    // null-email inserts conflict (every null treated as the same key).
+    // This one-time check drops and recreates it correctly.
+    try {
+      const indexes = await User.collection.indexes();
+      const emailIdx = indexes.find(idx =>
+        idx.key && idx.key.email === 1 && idx.key.tenantId === 1 && idx.unique === true
+      );
+      if (emailIdx && !emailIdx.sparse) {
+        logger.info('Import: fixing non-sparse email index → dropping & recreating as sparse', { requestId: req.requestId, tenantId });
+        await User.collection.dropIndex(emailIdx.name);
+        await User.collection.createIndex(
+          { email: 1, tenantId: 1 },
+          { unique: true, sparse: true, background: true }
+        );
+        logger.info('Import: email index recreated with sparse:true', { requestId: req.requestId, tenantId });
+      }
+    } catch (indexErr) {
+      logger.warn('Import: index sync check failed (non-fatal)', { requestId: req.requestId, tenantId, error: indexErr.message });
+    }
+
     // ── Subscription limit pre-check ────────────────────────────────────
     const Tenant = require('../models/Tenant');
     const tenant = await Tenant.findById(tenantId).lean();
@@ -1234,13 +1257,16 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
           results.success += count;
           logger.info(`Import chunk ${chunkNum}: inserted ${count}/${chunk.length}`, { requestId: req.requestId, tenantId: req.user?.tenantId });
         } catch (bulkErr) {
-          // Mongoose insertMany with ordered:false throws but still inserts valid docs
+          // Mongoose insertMany with ordered:false throws but may still insert some docs.
+          // Error shapes differ between Mongoose ValidationError vs MongoDB BulkWriteError:
+          //   - BulkWriteError: bulkErr.insertedCount / bulkErr.writeErrors (array)
+          //   - ValidationError: bulkErr.errors (object keyed by field name)
           const inserted = bulkErr.insertedDocs?.length ?? bulkErr.insertedCount ?? bulkErr.result?.nInserted ?? 0;
           results.success += inserted;
           logger.error(`Import chunk ${chunkNum}: ${inserted}/${chunk.length} inserted, error: ${bulkErr.message}`, bulkErr, { requestId: req.requestId, tenantId: req.user?.tenantId });
 
-          // Extract individual write errors
-          const writeErrors = bulkErr.writeErrors || bulkErr.errors || [];
+          // Extract individual write errors (MongoDB BulkWriteError)
+          const writeErrors = bulkErr.writeErrors || [];
           if (Array.isArray(writeErrors) && writeErrors.length > 0) {
             writeErrors.forEach(we => {
               results.failed++;
@@ -1248,18 +1274,25 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
               const idx = we.index ?? we.idx;
               results.errors.push(`Insert error (admNo: ${chunk[idx]?.admissionNumber || '?'}): ${errMsg}`);
             });
-          } else if (inserted < chunk.length) {
-            // Bulk error without individual writeErrors — fallback to one-by-one insert
-            const failedDocs = chunk.slice(inserted);
-            logger.info(`Import chunk ${chunkNum}: falling back to individual inserts for ${failedDocs.length} docs`, { requestId: req.requestId, tenantId: req.user?.tenantId });
-            for (const doc of failedDocs) {
+          } else {
+            // Mongoose ValidationError or other non-BulkWrite error — fall back to
+            // individual raw inserts (bypasses Mongoose validation, goes direct to MongoDB)
+            logger.info(`Import chunk ${chunkNum}: falling back to individual inserts for ${chunk.length} docs (bulk error: ${bulkErr.name})`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+            for (const doc of chunk) {
+              // Skip docs that were already inserted (if any)
+              if (inserted > 0) {
+                const alreadyInserted = (bulkErr.insertedDocs || []).some(
+                  d => d.admissionNumber === doc.admissionNumber
+                );
+                if (alreadyInserted) continue;
+              }
               try {
-                // Use collection.insertOne to avoid pre-save hook double-hashing the password
                 await User.collection.insertOne(doc);
                 results.success++;
               } catch (singleErr) {
                 results.failed++;
-                results.errors.push(`Insert error (admNo: ${doc.admissionNumber || '?'}): ${singleErr.message}`);
+                const errMsg = singleErr.message || 'Unknown error';
+                results.errors.push(`Insert error (admNo: ${doc.admissionNumber || '?'}): ${errMsg}`);
               }
             }
           }
