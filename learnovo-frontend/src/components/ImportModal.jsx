@@ -172,16 +172,31 @@ const ImportModal = ({
             });
 
             if (response.data.success) {
+                const result = response.data.data;
                 // Store the response data for completion display
                 setPreviewData(prev => ({
                     ...prev,
-                    data: response.data.data
+                    data: result
                 }));
                 setStep('complete');
-                toast.success(response.data.message);
 
-                if (onSuccess) {
-                    onSuccess(response.data.data);
+                // Log error details to console for debugging
+                if (result?.errorSample?.length > 0) {
+                    console.error('[Import] Error sample from server:', result.errorSample);
+                }
+
+                // Only auto-close (call onSuccess) if there were no significant failures
+                const failCount = result?.failed || 0;
+                const totalProcessed = (result?.success || 0) + (result?.replaced || 0) + (result?.skipped || 0) + failCount;
+                if (failCount === 0 || failCount < totalProcessed * 0.1) {
+                    // Few/no failures — auto-close and notify parent
+                    toast.success(response.data.message);
+                    if (onSuccess) {
+                        onSuccess(result);
+                    }
+                } else {
+                    // Significant failures — stay on complete step so user can see error details
+                    toast.error(`${failCount} of ${totalProcessed} rows failed. Check error details below.`, { duration: 6000 });
                 }
             } else {
                 toast.error(response.data.message || 'Import failed');
