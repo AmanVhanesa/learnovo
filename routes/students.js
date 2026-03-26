@@ -570,6 +570,30 @@ router.post('/import/preview', protect, authorize('admin'), planGate.requireActi
       }
     }
 
+    // Compute accurate counts
+    const totalRows = normalizedRows.length;
+    const validRows = validData.length;
+    const duplicatesInDB = duplicates.length;
+    // Unique rows that had validation errors (not counted as valid or duplicate)
+    const errorRowNumbers = new Set(errors.map(e => e.row));
+    const invalidRows = errorRowNumbers.size;
+
+    // Aggregate error reasons so the user can see at a glance what's wrong
+    const errorsByType = {};
+    errors.forEach(e => {
+      const key = e.message || 'Unknown error';
+      errorsByType[key] = (errorsByType[key] || 0) + 1;
+    });
+
+    logger.info('Import preview summary', {
+      requestId: req.requestId, tenantId: req.user?.tenantId,
+      totalRows, validRows, invalidRows, duplicatesInDB,
+      errorsByType,
+      hint: duplicatesInDB > 0
+        ? `${duplicatesInDB} students already exist by admission number. Select "Replace" to update them.`
+        : undefined
+    });
+
     res.json({
       success: true,
       preview,
@@ -577,11 +601,15 @@ router.post('/import/preview', protect, authorize('admin'), planGate.requireActi
       duplicates, // Students that already exist in the system
       validData, // Send back valid data for the next step
       summary: {
-        totalRows: normalizedRows.length,
-        validRows: validData.length,
-        invalidRows: errors.length > 0 ? normalizedRows.length - validData.length - duplicates.length : 0,
+        totalRows,
+        validRows,
+        invalidRows,
         duplicatesInFile: 0, // Handled in errors logic effectively
-        duplicatesInDB: duplicates.length // New students that already exist
+        duplicatesInDB, // Students that already exist
+        // Extra context so the UI/user can understand the breakdown
+        breakdown: `${totalRows} total = ${validRows} new + ${duplicatesInDB} already exist + ${invalidRows} invalid`,
+        // Aggregated error reasons (e.g. { "Duplicate email x@y.com in file": 500, ... })
+        errorsByType: Object.keys(errorsByType).length > 0 ? errorsByType : undefined
       }
     });
 
@@ -614,6 +642,7 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
     }
 
     const tenantId = req.user.tenantId;
+    const mongoose = require('mongoose');
 
     // ── Subscription limit pre-check ────────────────────────────────────
     const Tenant = require('../models/Tenant');
@@ -1179,31 +1208,64 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
 
     // ── Batch flush: insertMany for new students ──────────────────────────────
     if (docsToInsert.length > 0) {
-      const CHUNK = 200;
+      // Ensure tenantId is a proper ObjectId for all docs
+      const objectIdTenantId = new mongoose.Types.ObjectId(tenantId.toString());
+      docsToInsert.forEach(doc => {
+        doc.tenantId = objectIdTenantId;
+        // Also ensure classId/sectionId/driverId are ObjectIds if present
+        if (doc.classId) doc.classId = new mongoose.Types.ObjectId(doc.classId.toString());
+        if (doc.sectionId) doc.sectionId = new mongoose.Types.ObjectId(doc.sectionId.toString());
+        if (doc.driverId) doc.driverId = new mongoose.Types.ObjectId(doc.driverId.toString());
+        if (doc.subDepartment && mongoose.Types.ObjectId.isValid(doc.subDepartment)) {
+          doc.subDepartment = new mongoose.Types.ObjectId(doc.subDepartment.toString());
+        }
+      });
+
+      const CHUNK = 100; // Smaller chunks for reliability on constrained servers
+      logger.info(`Import: inserting ${docsToInsert.length} new students in ${Math.ceil(docsToInsert.length / CHUNK)} chunks`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+
       for (let i = 0; i < docsToInsert.length; i += CHUNK) {
         const chunk = docsToInsert.slice(i, i + CHUNK);
+        const chunkNum = Math.floor(i / CHUNK) + 1;
         try {
-          const r = await User.collection.insertMany(chunk, { ordered: false });
-          results.success += r.insertedCount || 0;
+          // Use Mongoose insertMany for proper type casting and validation
+          const inserted = await User.insertMany(chunk, { ordered: false, rawResult: true });
+          const count = inserted?.insertedCount ?? inserted?.length ?? chunk.length;
+          results.success += count;
+          logger.info(`Import chunk ${chunkNum}: inserted ${count}/${chunk.length}`, { requestId: req.requestId, tenantId: req.user?.tenantId });
         } catch (bulkErr) {
-          // MongoDB Driver 5+ uses bulkErr.insertedCount; older uses bulkErr.result.nInserted
-          const inserted = bulkErr.insertedCount ?? bulkErr.result?.nInserted ?? 0;
+          // Mongoose insertMany with ordered:false throws but still inserts valid docs
+          const inserted = bulkErr.insertedDocs?.length ?? bulkErr.insertedCount ?? bulkErr.result?.nInserted ?? 0;
           results.success += inserted;
-          const writeErrors = bulkErr.writeErrors || [];
-          writeErrors.forEach(we => {
-            results.failed++;
-            const errMsg = we.errmsg || we.err?.errmsg || we.message || 'Unknown insert error';
-            results.errors.push(`Insert error (admNo: ${chunk[we.index]?.admissionNumber || '?'}): ${errMsg}`);
-          });
-          // If no writeErrors but still an error, log the full error for debugging
-          if (writeErrors.length === 0) {
-            const failedCount = chunk.length - inserted;
-            results.failed += failedCount;
-            results.errors.push(`Bulk insert error (${failedCount} failed): ${bulkErr.message}`);
-            logger.error('Bulk insert error without writeErrors', bulkErr, { requestId: req.requestId, tenantId: req.user?.tenantId, chunkSize: chunk.length, inserted });
+          logger.error(`Import chunk ${chunkNum}: ${inserted}/${chunk.length} inserted, error: ${bulkErr.message}`, bulkErr, { requestId: req.requestId, tenantId: req.user?.tenantId });
+
+          // Extract individual write errors
+          const writeErrors = bulkErr.writeErrors || bulkErr.errors || [];
+          if (Array.isArray(writeErrors) && writeErrors.length > 0) {
+            writeErrors.forEach(we => {
+              results.failed++;
+              const errMsg = we.errmsg || we.err?.errmsg || we.message || 'Unknown insert error';
+              const idx = we.index ?? we.idx;
+              results.errors.push(`Insert error (admNo: ${chunk[idx]?.admissionNumber || '?'}): ${errMsg}`);
+            });
+          } else if (inserted < chunk.length) {
+            // Bulk error without individual writeErrors — fallback to one-by-one insert
+            const failedDocs = chunk.slice(inserted);
+            logger.info(`Import chunk ${chunkNum}: falling back to individual inserts for ${failedDocs.length} docs`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+            for (const doc of failedDocs) {
+              try {
+                // Use collection.insertOne to avoid pre-save hook double-hashing the password
+                await User.collection.insertOne(doc);
+                results.success++;
+              } catch (singleErr) {
+                results.failed++;
+                results.errors.push(`Insert error (admNo: ${doc.admissionNumber || '?'}): ${singleErr.message}`);
+              }
+            }
           }
         }
       }
+      logger.info(`Import: batch insert complete. Success: ${results.success}, Failed: ${results.failed}`, { requestId: req.requestId, tenantId: req.user?.tenantId });
     }
 
     // ── Batch flush: bulkWrite for replace rows ───────────────────────────────
@@ -2527,105 +2589,10 @@ router.post('/promote', protect, authorize('admin'), async (req, res) => {
 });
 
 // ============================================================================
-// IMPORT/EXPORT ROUTES (New Enhanced Version)
+// EXPORT ROUTES
 // ============================================================================
 
-const { uploadSingleFile } = require('../middleware/fileUpload');
-const StudentImportService = require('../services/studentImportService');
 const ImportExportService = require('../services/importExportService');
-
-// @desc    Download CSV template for student import
-// @route   GET /api/students/import/template
-// @access  Private (Admin) — Basic+ plan required
-router.get('/import/template', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, async (req, res) => {
-  try {
-    const template = await StudentImportService.generateTemplate();
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=student_import_template.csv');
-    res.send(template);
-  } catch (error) {
-    logger.error('Generate template error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
-    res.status(500).json({
-      success: false,
-      message: 'Server error while generating template'
-    });
-  }
-});
-
-// @desc    Preview student import (validate without importing)
-// @route   POST /api/students/import/preview
-// @access  Private (Admin) — Basic+ plan required
-router.post('/import/preview', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, (req, res) => {
-  uploadSingleFile(req, res, async (err) => {
-    try {
-      if (err) {
-        return res.status(400).json({
-          success: false,
-          message: err.message || 'File upload error'
-        });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: 'Please upload a CSV or Excel file'
-        });
-      }
-
-      const result = await StudentImportService.previewImport(
-        req.file,
-        req.user.tenantId
-      );
-
-      // Store file info for execute step
-      result.uploadedFile = req.file.originalname;
-
-      res.json(result);
-    } catch (error) {
-      logger.error('Preview import error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
-
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Server error during import preview'
-      });
-    }
-  });
-});
-
-// @desc    Execute student import
-// @route   POST /api/students/import/execute
-// @access  Private (Admin) — Basic+ plan required
-router.post('/import/execute', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, async (req, res) => {
-  try {
-    const { validData, options } = req.body;
-
-    if (!validData || !Array.isArray(validData) || validData.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid data to import'
-      });
-    }
-
-    const result = await StudentImportService.executeImport(
-      validData,
-      req.user.tenantId,
-      options || {}
-    );
-
-    res.json({
-      success: true,
-      message: `Import completed. Created: ${result.created}, Failed: ${result.failed}`,
-      data: result
-    });
-  } catch (error) {
-    logger.error('Execute import error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Server error during import execution'
-    });
-  }
-});
 
 // @desc    Export students to CSV
 // @route   GET /api/students/export
