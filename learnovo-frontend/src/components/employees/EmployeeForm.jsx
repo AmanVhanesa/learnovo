@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Upload, User, Camera, Eye, EyeOff, AlertCircle, Loader2, CheckCircle } from 'lucide-react'
 import employeesService from '../../services/employeesService'
 
@@ -305,7 +306,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
 
     const todayStr = new Date().toISOString().split('T')[0]
 
-    return (
+    return createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal-content !max-w-3xl p-0">
                 {/* Header */}
@@ -820,7 +821,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 

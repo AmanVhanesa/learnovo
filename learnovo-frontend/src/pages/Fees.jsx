@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
 import { Plus, Search, Download, Eye, Edit, CheckCircle, AlertTriangle, X } from 'lucide-react'
@@ -585,7 +586,7 @@ const Fees = () => {
       </div>
 
       {/* Add/Edit Fee Modal */}
-      {showModal && (
+      {showModal && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content p-2 sm:p-4">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-4">
@@ -705,7 +706,8 @@ const Fees = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award } from 'lucide-react';
@@ -219,7 +220,7 @@ const CertificateManager = () => {
             )}
 
             {/* Edit Modal */}
-            {editingCert && (
+            {editingCert && createPortal(
                 <div className="modal-overlay" onClick={() => setEditingCert(null)}>
                     <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-md w-full mx-4 animate-scale-in" onClick={e => e.stopPropagation()}>
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-[#38383A]">
@@ -266,7 +267,8 @@ const CertificateManager = () => {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

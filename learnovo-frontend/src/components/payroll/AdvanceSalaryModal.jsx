@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, DollarSign, User, FileText, StickyNote } from 'lucide-react';
 import payrollService from '../../services/payrollService';
 import employeesService from '../../services/employeesService';
@@ -96,7 +97,7 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="modal-overlay" onClick={() => { onClose(); resetForm(); }}>
             <div
                 className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-lg w-full sm:mx-4 md:mx-auto h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto animate-scale-in"
@@ -346,7 +347,8 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

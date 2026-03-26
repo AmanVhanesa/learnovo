@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Eye, X, Edit, Trash2, AlertTriangle, Copy, Check, Download } from 'lucide-react'
 import { teachersService } from '../services/teachersService'
@@ -222,7 +223,7 @@ const Teachers = () => {
       </div>
 
       {/* Add Teacher Modal */}
-      {showModal && (
+      {showModal && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content p-3 sm:p-4">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-4">
@@ -270,11 +271,12 @@ const Teachers = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Credentials Modal */}
-      {showCredentialsModal && credentials && (
+      {showCredentialsModal && credentials && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content p-6 max-w-md">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] pb-4 mb-4">
@@ -362,7 +364,8 @@ const Teachers = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

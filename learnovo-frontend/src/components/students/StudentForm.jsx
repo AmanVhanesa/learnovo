@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2, Loader2 } from 'lucide-react'
 import api from '../../services/authService'
 import transportService from '../../services/transportService'
@@ -348,7 +349,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         reader.readAsDataURL(file)
     }
 
-    return (
+    return createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal-content max-w-4xl p-0 max-h-[100vh] sm:max-h-[90vh] h-full sm:h-auto">
                 {/* Header */}
@@ -1043,7 +1044,8 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 

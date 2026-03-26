@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Plus, Search, Calendar, Trash2, X, ClipboardList, Edit,
@@ -785,7 +786,7 @@ const Exams = () => {
             {/* ══════════════════════════════════════
                 Schedule New Exam Modal
             ══════════════════════════════════════ */}
-            {showAddModal && (
+            {showAddModal && createPortal(
                 <div className="modal-overlay" role="dialog" aria-modal="true">
                     <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-2xl w-full max-w-2xl mx-2 sm:mx-4 max-h-[92vh] flex flex-col">
 
@@ -1028,7 +1029,8 @@ const Exams = () => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Results Modal */}

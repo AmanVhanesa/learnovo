@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Eye, CheckCircle, XCircle, X, AlertTriangle } from 'lucide-react'
 import { admissionsService } from '../services/admissionsService'
@@ -168,7 +169,7 @@ const Admissions = () => {
       </div>
 
       {/* New Admission */}
-      {showModal && (
+      {showModal && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content p-4">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-4">
@@ -218,7 +219,8 @@ const Admissions = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Calendar, BookOpen, Users, UserPlus, Plus, Check, Lock, Unlock, Power, Trash2, Edit, X } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { academicSessionsService, classesService, subjectsService, classSubjectsService, teacherAssignmentsService } from '../services/academicsService'
@@ -751,7 +752,7 @@ const SessionFormModal = ({ session, onClose, onSuccess }) => {
         }
     }
 
-    return (
+    return createPortal(
         <div className="modal-overlay">
             <div className="modal-content max-w-md">
                 <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
@@ -841,7 +842,8 @@ const SessionFormModal = ({ session, onClose, onSuccess }) => {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 
@@ -908,7 +910,7 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
         }
     }
 
-    return (
+    return createPortal(
         <div className="modal-overlay">
             <div className="modal-content max-w-lg">
                 <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
@@ -1026,7 +1028,8 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 
@@ -1070,7 +1073,7 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
         }
     }
 
-    return (
+    return createPortal(
         <div className="modal-overlay">
             <div className="modal-content max-w-md">
                 <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
@@ -1185,7 +1188,8 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 
@@ -1235,7 +1239,7 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
         }
     }
 
-    return (
+    return createPortal(
         <div className="modal-overlay">
             <div className="modal-content max-w-md">
                 <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] p-6">
@@ -1344,7 +1348,8 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Calendar, Plus, Edit2, Trash2, X } from 'lucide-react'
 import DatePicker from '../../components/ui/DatePicker'
 import Select from '../../components/ui/Select'
@@ -194,7 +195,7 @@ const Holidays = () => {
       )}
 
       {/* Add/Edit Modal */}
-      {showModal && (
+      {showModal && createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-content p-6">
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-[#38383A] pb-4 mb-4">
@@ -292,7 +293,8 @@ const Holidays = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
