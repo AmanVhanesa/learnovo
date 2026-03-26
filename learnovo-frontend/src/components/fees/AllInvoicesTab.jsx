@@ -375,7 +375,12 @@ const AllInvoicesTab = ({
                         <td className="px-4 py-3.5">
                           <span className="text-sm font-mono font-semibold text-primary-600 dark:text-[#3EC4B1]">{invoice.invoiceNumber}</span>
                           {invoice.billingPeriod?.displayText && (
-                            <p className="text-[11px] text-gray-400 dark:text-[#636366] mt-0.5">{invoice.billingPeriod.displayText}</p>
+                            <p className="text-[11px] text-gray-400 dark:text-[#636366] mt-0.5">
+                              {invoice.billingPeriod.displayText}
+                              {invoice.items?.some(item => item.frequency === 'One-time') && (
+                                <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">ONE TIME</span>
+                              )}
+                            </p>
                           )}
                         </td>
                         <td className="px-4 py-3.5">

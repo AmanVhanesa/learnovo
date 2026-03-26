@@ -135,7 +135,10 @@ const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt
                   <div key={idx} className="flex items-center justify-between py-2 px-3 bg-white dark:bg-[#1C1C1E] rounded-lg">
                     <div>
                       <span className="text-sm font-medium text-gray-900 dark:text-white">{item.feeHeadName || item.name}</span>
-                      {item.frequency && (
+                      {item.frequency && item.frequency.toLowerCase() === 'one-time' && (
+                        <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">ONE TIME</span>
+                      )}
+                      {item.frequency && item.frequency.toLowerCase() !== 'one-time' && (
                         <span className="ml-2 text-xs text-gray-400 dark:text-[#636366] capitalize">({item.frequency})</span>
                       )}
                     </div>

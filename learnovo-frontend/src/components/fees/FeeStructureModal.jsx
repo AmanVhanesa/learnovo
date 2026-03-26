@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { Plus, Trash2, GripVertical, Copy, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Copy, AlertCircle, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { feeStructuresService } from '../../services/feesService'
 import { formatCurrency } from '../../utils/formatCurrency'
@@ -13,17 +13,17 @@ const FREQUENCY_OPTIONS = [
   { value: 'one-time', label: 'One-time' },
 ]
 
-const DEFAULT_FEE_HEAD = { name: '', amount: 0, frequency: 'monthly', isCompulsory: true, dueDay: 5 }
+const DEFAULT_FEE_HEAD = { name: '', amount: 0, frequency: 'monthly', isCompulsory: true, dueDay: 5, isAdmissionFee: false }
 
 const PRESET_FEE_HEADS = [
-  { name: 'Tuition Fee', amount: 0, frequency: 'monthly', isCompulsory: true, dueDay: 5 },
-  { name: 'Admission Fee', amount: 0, frequency: 'one-time', isCompulsory: true, dueDay: 5 },
-  { name: 'Exam Fee', amount: 0, frequency: 'half-yearly', isCompulsory: true, dueDay: 5 },
-  { name: 'Library Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5 },
-  { name: 'Transport Fee', amount: 0, frequency: 'monthly', isCompulsory: false, dueDay: 5 },
-  { name: 'Lab Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5 },
-  { name: 'Sports Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5 },
-  { name: 'Computer Fee', amount: 0, frequency: 'monthly', isCompulsory: false, dueDay: 5 },
+  { name: 'Tuition Fee', amount: 0, frequency: 'monthly', isCompulsory: true, dueDay: 5, isAdmissionFee: false },
+  { name: 'Admission Fee', amount: 0, frequency: 'one-time', isCompulsory: true, dueDay: 5, isAdmissionFee: true },
+  { name: 'Exam Fee', amount: 0, frequency: 'half-yearly', isCompulsory: true, dueDay: 5, isAdmissionFee: false },
+  { name: 'Library Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
+  { name: 'Transport Fee', amount: 0, frequency: 'monthly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
+  { name: 'Lab Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
+  { name: 'Sports Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
+  { name: 'Computer Fee', amount: 0, frequency: 'monthly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
 ]
 
 const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSuccess }) => {
@@ -98,6 +98,18 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
     setForm(prev => {
       const updated = [...prev.feeHeads]
       updated[index] = { ...updated[index], [field]: value }
+
+      // Auto-set frequency to one-time when isAdmissionFee is enabled
+      if (field === 'isAdmissionFee' && value) {
+        updated[index].frequency = 'one-time'
+      }
+
+      // Auto-detect admission fee by name
+      if (field === 'name' && value.toLowerCase().trim() === 'admission fee') {
+        updated[index].isAdmissionFee = true
+        updated[index].frequency = 'one-time'
+      }
+
       return { ...prev, feeHeads: updated }
     })
     if (errors[`feeHead_${index}_${field}`]) {
@@ -150,6 +162,7 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
           ...h,
           amount: Number(h.amount),
           dueDay: Number(h.dueDay),
+          isAdmissionFee: h.isAdmissionFee || false,
         })),
       }
 
@@ -278,6 +291,11 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
                           Required
                         </span>
                       )}
+                      {head.isAdmissionFee && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded">
+                          ONE TIME
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       <button
@@ -357,8 +375,8 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
                         max="28"
                       />
                     </div>
-                    <div className="col-span-2 sm:col-span-1 flex items-end">
-                      <label className="flex items-center gap-2 cursor-pointer pb-2">
+                    <div className="col-span-2 sm:col-span-1 flex flex-col gap-1.5 justify-end pb-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={head.isCompulsory}
@@ -367,8 +385,25 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
                         />
                         <span className="text-xs font-medium text-gray-700 dark:text-[#8E8E93]">Compulsory</span>
                       </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={head.isAdmissionFee || false}
+                          onChange={(e) => updateFeeHead(index, 'isAdmissionFee', e.target.checked)}
+                          className="rounded border-gray-300 dark:border-[#38383A] text-amber-600 focus:ring-amber-500 h-4 w-4"
+                        />
+                        <span className="text-xs font-medium text-gray-700 dark:text-[#8E8E93]">Admission Fee</span>
+                      </label>
                     </div>
                   </div>
+                  {head.isAdmissionFee && (
+                    <div className="flex items-start gap-1.5 mt-2 p-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-lg">
+                      <Info className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                        One-time fee charged only once per student at enrollment. Imported students are exempt.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -401,8 +436,8 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
                 onChange={(e) => setForm(prev => ({ ...prev, isActive: e.target.checked }))}
                 className="sr-only"
               />
-              <div className={`w-10 h-6 rounded-full transition-colors ${form.isActive ? 'bg-primary-500' : 'bg-gray-300 dark:bg-[#38383A]'}`}>
-                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform mt-1 ${form.isActive ? 'translate-x-5' : 'translate-x-1'}`} />
+              <div className={`w-10 h-6 rounded-full transition-colors flex items-center ${form.isActive ? 'bg-primary-500' : 'bg-gray-300 dark:bg-[#38383A]'}`}>
+                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform ${form.isActive ? 'translate-x-5' : 'translate-x-1'}`} />
               </div>
             </div>
             <div>
