@@ -112,12 +112,28 @@ router.get('/tenants/:id', async (req, res) => {
         ]);
 
         const planConfig = getPlanConfig(tenant.subscription?.plan) || {};
+        const customLimits = tenant.subscription?.customLimits || {};
+
+        // Resolve limits: custom overrides > plan config > defaults
+        const maxStudents = customLimits.students ?? planConfig.limits?.students ?? 100;
+        const maxTeachers = customLimits.teachers ?? planConfig.limits?.teachers ?? 10;
+        const maxStorage = customLimits.storage ?? planConfig.limits?.storage ?? 1024;
+
+        // Convert Infinity to -1 for JSON serialization (Infinity is not valid JSON)
+        const serializeLimit = (val) => (val === Infinity ? -1 : val);
 
         return res.json({
             success: true,
             data: {
                 ...tenant,
-                usage: { students, teachers, totalUsers },
+                usage: {
+                    students,
+                    teachers,
+                    totalUsers,
+                    maxStudents: serializeLimit(maxStudents),
+                    maxTeachers: serializeLimit(maxTeachers),
+                    maxStorage: serializeLimit(Math.round(maxStorage / 1024)), // Convert MB to GB
+                },
                 planConfig: {
                     limits: planConfig.limits,
                     price: planConfig.price,
@@ -156,7 +172,16 @@ router.patch('/tenants/:id/plan', async (req, res) => {
         if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found.', requestId: req.requestId });
 
         const changes = {};
-        if (plan) { changes['subscription.plan'] = { from: tenant.subscription.plan, to: plan }; tenant.subscription.plan = plan; }
+        if (plan) {
+            changes['subscription.plan'] = { from: tenant.subscription.plan, to: plan };
+            tenant.subscription.plan = plan;
+            // Update stored limits to match new plan (unless custom overrides exist)
+            if (!customLimits && !tenant.subscription.isManualOverride) {
+                const newPlanConfig = getPlanConfig(plan);
+                tenant.subscription.maxStudents = newPlanConfig.limits.students === Infinity ? 0 : newPlanConfig.limits.students;
+                tenant.subscription.maxTeachers = newPlanConfig.limits.teachers === Infinity ? 0 : newPlanConfig.limits.teachers;
+            }
+        }
         if (status) { changes['subscription.status'] = { from: tenant.subscription.status, to: status }; tenant.subscription.status = status; }
         if (customLimits) {
             changes['subscription.customLimits'] = customLimits;
@@ -306,8 +331,8 @@ router.post('/tenants', async (req, res) => {
                 plan: resolvedPlan,
                 status: resolvedPlan === 'free' ? 'trial' : 'active',
                 trialEndsAt: resolvedPlan === 'free' ? trialEndsAt : undefined,
-                maxStudents: resolvedPlan === 'enterprise' ? 10000 : 100,
-                maxTeachers: resolvedPlan === 'enterprise' ? 500 : 10,
+                maxStudents: getPlanConfig(resolvedPlan).limits.students === Infinity ? 0 : getPlanConfig(resolvedPlan).limits.students,
+                maxTeachers: getPlanConfig(resolvedPlan).limits.teachers === Infinity ? 0 : getPlanConfig(resolvedPlan).limits.teachers,
             },
             settings: { timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', currency: 'INR', academicYear: '2025-2026' }
         });
