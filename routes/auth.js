@@ -56,18 +56,26 @@ router.post('/register', protect, getTenantFromRequest, [
       });
     }
 
-    // Check subscription limits
-    const userCount = await User.countDocuments({
-      tenantId: req.tenant._id,
-      role: role
-    });
+    // Check subscription limits using planConfig (single source of truth)
+    const { getPlanConfig } = require('../utils/planConfig');
+    const planConfig = getPlanConfig(req.tenant.subscription?.plan || 'free');
+    const limitKey = role === 'student' ? 'students' : 'teachers';
+    const maxUsers = req.tenant.subscription?.customLimits?.[limitKey]
+      ?? planConfig.limits?.[limitKey]
+      ?? Infinity;
 
-    const maxUsers = role === 'student' ? req.tenant.subscription.maxStudents : req.tenant.subscription.maxTeachers;
-    if (userCount >= maxUsers) {
-      return res.status(400).json({
-        success: false,
-        message: `Maximum ${role}s limit reached for your subscription plan`
+    if (maxUsers !== Infinity) {
+      const userCount = await User.countDocuments({
+        tenantId: req.tenant._id,
+        role: role,
+        isActive: true
       });
+      if (userCount >= maxUsers) {
+        return res.status(400).json({
+          success: false,
+          message: `Maximum ${role}s limit reached for your ${planConfig.name} plan (${maxUsers} allowed)`
+        });
+      }
     }
 
     // Create user

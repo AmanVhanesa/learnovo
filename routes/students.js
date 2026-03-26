@@ -18,6 +18,7 @@ const Class = require('../models/Class');
 const Driver = require('../models/Driver');
 const { logger } = require('../middleware/errorHandler');
 const planGate = require('../middleware/planGate');
+const { getPlanConfig } = require('../utils/planConfig');
 
 const router = express.Router();
 
@@ -614,6 +615,23 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
 
     const tenantId = req.user.tenantId;
 
+    // ── Subscription limit pre-check ────────────────────────────────────
+    const Tenant = require('../models/Tenant');
+    const tenant = await Tenant.findById(tenantId).lean();
+    if (tenant) {
+      const planConfig = getPlanConfig(tenant.subscription?.plan || 'free');
+      const maxStudents = tenant.subscription?.customLimits?.students ?? planConfig.limits?.students ?? Infinity;
+      if (maxStudents !== Infinity) {
+        const currentStudentCount = await User.countDocuments({ tenantId, role: 'student', isActive: true });
+        if (currentStudentCount + validData.length > maxStudents) {
+          return res.status(400).json({
+            success: false,
+            message: `Import would exceed your plan's student limit (${currentStudentCount} existing + ${validData.length} new = ${currentStudentCount + validData.length}, limit: ${maxStudents}). Please upgrade your plan or reduce the import size.`
+          });
+        }
+      }
+    }
+
     // Get settings for UDISE Code
     const settings = await Settings.getSettings(tenantId);
     const defaultUdiseCode = settings.institution?.udiseCode;
@@ -630,8 +648,13 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
     // ALWAYS pre-fetch existing admission numbers to prevent duplicates
     const existingStudentsMap = new Map();
     const existingStudents = await User.find({ tenantId, role: 'student' })
-      .select('_id admissionNumber')
+      .select('_id admissionNumber email')
       .lean();
+    // Pre-build email set to avoid N+1 findOne queries during the row loop
+    const existingEmailsSet = new Set();
+    existingStudents.forEach(s => {
+      if (s.email) existingEmailsSet.add(s.email.toLowerCase());
+    });
     existingStudents.forEach(s => {
       if (s.admissionNumber) {
         existingStudentsMap.set(s.admissionNumber.trim().toUpperCase(), s._id);
@@ -813,10 +836,10 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
 
         // Skip email duplicate check when replacing an already-identified student
         // (the student exists by design; checking email would throw false errors)
+        // Uses pre-fetched existingEmailsSet instead of per-row DB query (N+1 fix)
         if (!existingId && row.email && row.email.trim()) {
           const email = row.email.toLowerCase().trim();
-          const existingStudent = await User.findOne({ email, tenantId }).select('_id').lean();
-          if (existingStudent) {
+          if (existingEmailsSet.has(email)) {
             throw new Error(`Student with email ${email} already exists`);
           }
         }
@@ -1129,6 +1152,8 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
             }
           });
           docsToInsert.push(studentData);
+          // Track email to prevent within-file duplicate insertions
+          if (studentData.email) existingEmailsSet.add(studentData.email.toLowerCase());
         }
 
       } catch (error) {
