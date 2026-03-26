@@ -849,6 +849,15 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       });
     }
 
+    // ── Fix stale email: null in existing records (one-time safe cleanup) ──
+    // MongoDB sparse unique index on { email, tenantId } still indexes null
+    // values, so existing records with email: null block all new null-email
+    // inserts. Unset the field so the sparse index ignores them.
+    await User.collection.updateMany(
+      { tenantId: new mongoose.Types.ObjectId(tenantId.toString()), email: null },
+      { $unset: { email: '' } }
+    );
+
     // Pre-fetch all sub-departments and batch-create any missing ones from the import data
     const allSubDepts = await SubDepartment.find({ tenantId }).lean();
     const subDeptCache = new Map(allSubDepts.map(sd => [sd.name.toUpperCase(), sd]));
@@ -1231,68 +1240,63 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
 
     // ── Batch flush: insertMany for new students ──────────────────────────────
     if (docsToInsert.length > 0) {
-      // Ensure tenantId is a proper ObjectId for all docs
+      // Ensure ObjectId fields are proper ObjectIds and strip falsy values
+      // for fields with unique indexes (email, employeeId, studentId, penNumber)
+      // to avoid E11000 duplicate-key errors on null values.
       const objectIdTenantId = new mongoose.Types.ObjectId(tenantId.toString());
       docsToInsert.forEach(doc => {
         doc.tenantId = objectIdTenantId;
-        // Also ensure classId/sectionId/driverId are ObjectIds if present
         if (doc.classId) doc.classId = new mongoose.Types.ObjectId(doc.classId.toString());
         if (doc.sectionId) doc.sectionId = new mongoose.Types.ObjectId(doc.sectionId.toString());
         if (doc.driverId) doc.driverId = new mongoose.Types.ObjectId(doc.driverId.toString());
         if (doc.subDepartment && mongoose.Types.ObjectId.isValid(doc.subDepartment)) {
           doc.subDepartment = new mongoose.Types.ObjectId(doc.subDepartment.toString());
         }
+        // CRITICAL: Remove falsy values for fields with unique/sparse indexes.
+        // MongoDB sparse indexes skip *missing* fields but still index `null`,
+        // so email: null on 1000 docs = 999 duplicate-key errors.
+        ['email', 'employeeId', 'studentId', 'penNumber'].forEach(field => {
+          if (!doc[field]) delete doc[field];
+        });
       });
 
-      const CHUNK = 100; // Smaller chunks for reliability on constrained servers
+      // Use raw driver insertMany (not Mongoose) to avoid Mongoose adding
+      // schema-defined fields as null (which re-introduces the null-email problem).
+      const CHUNK = 100;
       logger.info(`Import: inserting ${docsToInsert.length} new students in ${Math.ceil(docsToInsert.length / CHUNK)} chunks`, { requestId: req.requestId, tenantId: req.user?.tenantId });
 
       for (let i = 0; i < docsToInsert.length; i += CHUNK) {
         const chunk = docsToInsert.slice(i, i + CHUNK);
         const chunkNum = Math.floor(i / CHUNK) + 1;
         try {
-          // Use Mongoose insertMany for proper type casting and validation
-          const inserted = await User.insertMany(chunk, { ordered: false, rawResult: true });
-          const count = inserted?.insertedCount ?? inserted?.length ?? chunk.length;
+          const r = await User.collection.insertMany(chunk, { ordered: false });
+          const count = r.insertedCount || 0;
           results.success += count;
           logger.info(`Import chunk ${chunkNum}: inserted ${count}/${chunk.length}`, { requestId: req.requestId, tenantId: req.user?.tenantId });
         } catch (bulkErr) {
-          // Mongoose insertMany with ordered:false throws but may still insert some docs.
-          // Error shapes differ between Mongoose ValidationError vs MongoDB BulkWriteError:
-          //   - BulkWriteError: bulkErr.insertedCount / bulkErr.writeErrors (array)
-          //   - ValidationError: bulkErr.errors (object keyed by field name)
-          const inserted = bulkErr.insertedDocs?.length ?? bulkErr.insertedCount ?? bulkErr.result?.nInserted ?? 0;
+          // ordered:false still throws but inserts valid docs
+          const inserted = bulkErr.insertedCount ?? bulkErr.result?.nInserted ?? 0;
           results.success += inserted;
           logger.error(`Import chunk ${chunkNum}: ${inserted}/${chunk.length} inserted, error: ${bulkErr.message}`, bulkErr, { requestId: req.requestId, tenantId: req.user?.tenantId });
 
-          // Extract individual write errors (MongoDB BulkWriteError)
           const writeErrors = bulkErr.writeErrors || [];
           if (Array.isArray(writeErrors) && writeErrors.length > 0) {
             writeErrors.forEach(we => {
               results.failed++;
               const errMsg = we.errmsg || we.err?.errmsg || we.message || 'Unknown insert error';
-              const idx = we.index ?? we.idx;
-              results.errors.push(`Insert error (admNo: ${chunk[idx]?.admissionNumber || '?'}): ${errMsg}`);
+              results.errors.push(`Insert error (admNo: ${chunk[we.index]?.admissionNumber || '?'}): ${errMsg}`);
             });
-          } else {
-            // Mongoose ValidationError or other non-BulkWrite error — fall back to
-            // individual raw inserts (bypasses Mongoose validation, goes direct to MongoDB)
-            logger.info(`Import chunk ${chunkNum}: falling back to individual inserts for ${chunk.length} docs (bulk error: ${bulkErr.name})`, { requestId: req.requestId, tenantId: req.user?.tenantId });
-            for (const doc of chunk) {
-              // Skip docs that were already inserted (if any)
-              if (inserted > 0) {
-                const alreadyInserted = (bulkErr.insertedDocs || []).some(
-                  d => d.admissionNumber === doc.admissionNumber
-                );
-                if (alreadyInserted) continue;
-              }
+          } else if (inserted < chunk.length) {
+            // No writeErrors detail — fall back to one-by-one insert
+            const failedDocs = chunk.slice(inserted);
+            logger.info(`Import chunk ${chunkNum}: falling back to individual inserts for ${failedDocs.length} docs`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+            for (const doc of failedDocs) {
               try {
                 await User.collection.insertOne(doc);
                 results.success++;
               } catch (singleErr) {
                 results.failed++;
-                const errMsg = singleErr.message || 'Unknown error';
-                results.errors.push(`Insert error (admNo: ${doc.admissionNumber || '?'}): ${errMsg}`);
+                results.errors.push(`Insert error (admNo: ${doc.admissionNumber || '?'}): ${singleErr.message}`);
               }
             }
           }

@@ -401,7 +401,13 @@ const userSchema = new mongoose.Schema({
 });
 
 // Index for better performance
-userSchema.index({ email: 1, tenantId: 1 }, { unique: true, sparse: true }); // Email unique per tenant, sparse allows null emails
+// Email unique per tenant — partial filter (not sparse) so null/missing emails
+// are excluded entirely. Sparse indexes still index explicit null values, which
+// causes E11000 duplicate-key errors on bulk import of students without emails.
+userSchema.index(
+  { email: 1, tenantId: 1 },
+  { unique: true, partialFilterExpression: { email: { $type: 'string' } } }
+);
 userSchema.index({ role: 1, tenantId: 1 });
 userSchema.index({ tenantId: 1 });
 userSchema.index({ tenantId: 1, admissionNumber: 1 });
