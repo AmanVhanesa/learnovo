@@ -135,21 +135,22 @@ function InvoiceStatusBadge({ status }) {
 }
 
 function ProgressBar({ current, max, label, unit }) {
-    const pct = max > 0 ? Math.min((current / max) * 100, 100) : 0
-    const isHigh = pct >= 90
-    const isMid = pct >= 70 && pct < 90
+    const isUnlimited = max === -1 || max === null || max === undefined
+    const pct = isUnlimited ? 0 : (max > 0 ? Math.min((current / max) * 100, 100) : 0)
+    const isHigh = !isUnlimited && pct >= 90
+    const isMid = !isUnlimited && pct >= 70 && pct < 90
     return (
         <div className="space-y-1.5">
             <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 dark:text-[#8E8E93]">{label}</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                    {current?.toLocaleString()}{unit ? ` ${unit}` : ''} <span className="text-gray-400 dark:text-[#636366] font-normal">/ {max?.toLocaleString()}{unit ? ` ${unit}` : ''}</span>
+                    {current?.toLocaleString()}{unit ? ` ${unit}` : ''} <span className="text-gray-400 dark:text-[#636366] font-normal">/ {isUnlimited ? 'Unlimited' : `${max?.toLocaleString()}${unit ? ` ${unit}` : ''}`}</span>
                 </span>
             </div>
             <div className="h-2 rounded-full bg-gray-100 dark:bg-[#2C2C2E] overflow-hidden">
                 <div
                     className={`h-full rounded-full transition-all duration-500 ${isHigh ? 'bg-red-500 dark:bg-[#FF453A]' : isMid ? 'bg-amber-500 dark:bg-[#FFD60A]' : 'bg-primary-500 dark:bg-[#3EC4B1]'}`}
-                    style={{ width: `${pct}%` }}
+                    style={{ width: `${isUnlimited ? 0 : pct}%` }}
                 />
             </div>
         </div>
@@ -892,17 +893,17 @@ function OverviewTab({ tenant, schoolName, schoolCode, subdomain, adminEmail, ph
                 <div className="px-5 py-4 space-y-4">
                     <ProgressBar
                         current={usage?.students || usage?.currentStudents || 0}
-                        max={usage?.maxStudents || usage?.studentsLimit || 100}
+                        max={usage?.maxStudents ?? null}
                         label="Students"
                     />
                     <ProgressBar
                         current={usage?.teachers || usage?.currentTeachers || 0}
-                        max={usage?.maxTeachers || usage?.teachersLimit || 20}
+                        max={usage?.maxTeachers ?? null}
                         label="Teachers"
                     />
                     <ProgressBar
                         current={usage?.storageUsed || usage?.currentStorage || 0}
-                        max={usage?.maxStorage || usage?.storageLimit || 10}
+                        max={usage?.maxStorage ?? null}
                         label="Storage"
                         unit="GB"
                     />
