@@ -278,6 +278,14 @@ const userSchema = new mongoose.Schema({
   admissionDate: {
     type: Date
   },
+  isImported: {
+    type: Boolean,
+    default: false
+  },
+  admissionFeePaid: {
+    type: Boolean,
+    default: false
+  },
   guardians: [{
     relation: {
       type: String,

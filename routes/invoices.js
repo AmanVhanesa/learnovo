@@ -291,7 +291,7 @@ router.post('/generate-bulk', protect, authorize('admin'), [
                 });
             }
 
-            // Convert feeHeads to items format
+            // Convert feeHeads to items format, preserving isAdmissionFee flag
             invoiceItems = feeStructure.feeHeads.map(head => {
                 // Capitalize frequency to match FeeInvoice enum
                 let frequency = head.frequency || 'one-time';
@@ -303,7 +303,8 @@ router.post('/generate-bulk', protect, authorize('admin'), [
                 return {
                     feeHeadName: head.name,
                     amount: head.amount,
-                    frequency: frequency
+                    frequency: frequency,
+                    _isAdmissionFee: head.isAdmissionFee || false
                 };
             });
         }
@@ -316,16 +317,58 @@ router.post('/generate-bulk', protect, authorize('admin'), [
             });
         }
 
+        // Separate admission fee items from regular items
+        const admissionFeeItems = invoiceItems.filter(item => item._isAdmissionFee);
+        const regularItems = invoiceItems.filter(item => !item._isAdmissionFee);
+        const admissionFeeHeadNames = admissionFeeItems.map(item => item.feeHeadName);
+
+        // Clean the _isAdmissionFee flag before saving (not in schema)
+        const cleanItems = (items) => items.map(({ _isAdmissionFee, ...rest }) => rest);
+
         // Validate item amounts
         for (const item of invoiceItems) {
             validateAmount(item.amount, { field: item.feeHeadName || 'fee item' });
         }
-        const totalAmount = sumMoney(invoiceItems.map(item => item.amount));
         const results = [];
         const errors = [];
 
         for (const student of students) {
             try {
+                // Determine which items apply to this student
+                let studentItems;
+
+                if (admissionFeeItems.length > 0) {
+                    // Skip admission fees for imported students
+                    if (student.isImported) {
+                        studentItems = cleanItems(regularItems);
+                    }
+                    // Skip admission fees if student already paid
+                    else if (student.admissionFeePaid) {
+                        studentItems = cleanItems(regularItems);
+                    }
+                    // Skip admission fees if an admission fee invoice already exists
+                    else {
+                        const existingAdmissionInvoice = await FeeInvoice.findOne({
+                            tenantId: req.user.tenantId,
+                            studentId: student._id,
+                            'items.feeHeadName': { $in: admissionFeeHeadNames },
+                            status: { $ne: 'Cancelled' }
+                        });
+
+                        if (existingAdmissionInvoice) {
+                            studentItems = cleanItems(regularItems);
+                        } else {
+                            studentItems = cleanItems(invoiceItems);
+                        }
+                    }
+                } else {
+                    studentItems = cleanItems(invoiceItems);
+                }
+
+                // Skip if no items remain after filtering
+                if (studentItems.length === 0) continue;
+
+                const studentTotalAmount = sumMoney(studentItems.map(item => item.amount));
                 const invoiceNumber = await FeeInvoice.generateInvoiceNumber(req.user.tenantId);
 
                 // Determine classId - use student's classId or find from class name
@@ -351,7 +394,7 @@ router.post('/generate-bulk', protect, authorize('admin'), [
                 let billingPeriod = req.body.billingPeriod;
                 if (!billingPeriod || !billingPeriod.displayText) {
                     // Fallback: Calculate period if not provided
-                    const primaryFrequency = invoiceItems[0]?.frequency || 'One-time';
+                    const primaryFrequency = studentItems[0]?.frequency || 'One-time';
                     billingPeriod = FeeInvoice.calculateBillingPeriod(new Date(), primaryFrequency);
                 }
 
@@ -363,9 +406,9 @@ router.post('/generate-bulk', protect, authorize('admin'), [
                     sectionId: student.sectionId || null,
                     academicSessionId,
                     feeStructureId,
-                    items: invoiceItems,
-                    totalAmount,
-                    balanceAmount: totalAmount,
+                    items: studentItems,
+                    totalAmount: studentTotalAmount,
+                    balanceAmount: studentTotalAmount,
                     dueDate,
                     billingPeriod,
                     generatedBy: req.user._id

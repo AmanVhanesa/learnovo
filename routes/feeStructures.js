@@ -104,6 +104,18 @@ router.post('/', protect, authorize('admin'), async (req, res) => {
             });
         }
 
+        // Auto-set frequency and isAdmissionFee for admission fee heads
+        feeHeads.forEach(head => {
+            if (head.isAdmissionFee) {
+                head.frequency = 'one-time';
+            }
+            // Auto-detect by name if not explicitly flagged
+            if (!head.isAdmissionFee && head.name && head.name.toLowerCase().trim() === 'admission fee') {
+                head.isAdmissionFee = true;
+                head.frequency = 'one-time';
+            }
+        });
+
         // Check for duplicate fee structure
         const existingStructure = await FeeStructure.findOne({
             tenantId: req.user.tenantId,
@@ -174,6 +186,19 @@ router.put('/:id', protect, authorize('admin'), async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'At least one fee head is required'
+            });
+        }
+
+        // Auto-set frequency and isAdmissionFee for admission fee heads
+        if (feeHeads) {
+            feeHeads.forEach(head => {
+                if (head.isAdmissionFee) {
+                    head.frequency = 'one-time';
+                }
+                if (!head.isAdmissionFee && head.name && head.name.toLowerCase().trim() === 'admission fee') {
+                    head.isAdmissionFee = true;
+                    head.frequency = 'one-time';
+                }
             });
         }
 

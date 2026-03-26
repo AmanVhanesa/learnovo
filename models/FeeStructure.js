@@ -58,6 +58,10 @@ const feeStructureSchema = new mongoose.Schema({
     isOptional: {
       type: Boolean,
       default: false
+    },
+    isAdmissionFee: {
+      type: Boolean,
+      default: false
     }
   }],
 
