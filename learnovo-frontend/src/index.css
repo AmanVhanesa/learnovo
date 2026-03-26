@@ -38,7 +38,7 @@ input, select, textarea {
 
   /*
    * Fix WebKit/Blink sub-pixel rendering bug:
-   * Elements with border-radius + overflow:hidden show a thin transparent
+   * Elements with border-radius + overflow clipping show a thin transparent
    * seam/strip where child backgrounds don't fully cover the rounded edge.
    * Forcing a GPU-composited mask eliminates the gap.
    */
@@ -46,7 +46,15 @@ input, select, textarea {
   [class*="rounded-lg"][class*="overflow-hidden"],
   [class*="rounded-xl"][class*="overflow-hidden"],
   [class*="rounded-2xl"][class*="overflow-hidden"],
-  [class*="rounded-3xl"][class*="overflow-hidden"] {
+  [class*="rounded-3xl"][class*="overflow-hidden"],
+  [class*="rounded-lg"][class*="overflow-y-auto"],
+  [class*="rounded-xl"][class*="overflow-y-auto"],
+  [class*="rounded-2xl"][class*="overflow-y-auto"],
+  [class*="rounded-3xl"][class*="overflow-y-auto"],
+  [class*="rounded-lg"][class*="overflow-auto"],
+  [class*="rounded-xl"][class*="overflow-auto"],
+  [class*="rounded-2xl"][class*="overflow-auto"],
+  [class*="rounded-3xl"][class*="overflow-auto"] {
     -webkit-mask-image: -webkit-radial-gradient(white, white);
     mask-image: linear-gradient(#fff 0 0);
   }
