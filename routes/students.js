@@ -849,14 +849,32 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       });
     }
 
-    // ── Fix stale email: null in existing records (one-time safe cleanup) ──
-    // MongoDB sparse unique index on { email, tenantId } still indexes null
-    // values, so existing records with email: null block all new null-email
-    // inserts. Unset the field so the sparse index ignores them.
-    await User.collection.updateMany(
-      { tenantId: new mongoose.Types.ObjectId(tenantId.toString()), email: null },
-      { $unset: { email: '' } }
-    );
+    // ── Fix email unique index: replace sparse with partial filter ──────
+    // MongoDB sparse unique indexes still index explicit `null` values,
+    // causing E11000 errors when multiple students lack emails.
+    // Fix: drop the old index and recreate with partialFilterExpression.
+    // This block is idempotent — once the index is correct it's a no-op.
+    try {
+      const usersCol = User.collection;
+      const indexes = await usersCol.indexes();
+      const emailIdx = indexes.find(
+        idx => idx.key && idx.key.email === 1 && idx.key.tenantId === 1
+      );
+      if (emailIdx && !emailIdx.partialFilterExpression) {
+        // Old sparse or non-partial index — drop and recreate
+        logger.info('Import: dropping stale email index and recreating with partial filter', { requestId: req.requestId, tenantId: req.user?.tenantId });
+        await usersCol.dropIndex(emailIdx.name);
+        await usersCol.createIndex(
+          { email: 1, tenantId: 1 },
+          { unique: true, partialFilterExpression: { email: { $type: 'string' } }, name: 'email_1_tenantId_1' }
+        );
+        // Also clean up any existing email: null records
+        await usersCol.updateMany({ email: null }, { $unset: { email: '' } });
+        logger.info('Import: email index fixed successfully', { requestId: req.requestId, tenantId: req.user?.tenantId });
+      }
+    } catch (indexErr) {
+      logger.warn('Import: email index fix skipped', { requestId: req.requestId, tenantId: req.user?.tenantId, error: indexErr.message });
+    }
 
     // Pre-fetch all sub-departments and batch-create any missing ones from the import data
     const allSubDepts = await SubDepartment.find({ tenantId }).lean();
