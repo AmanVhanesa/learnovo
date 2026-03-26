@@ -2,7 +2,7 @@
 
 ## Overview
 
-Learnovo uses Cloudinary for persistent, cloud-based file storage. This replaces local file uploads which don't persist in serverless environments (Vercel/Render).
+Learnovo uses Cloudinary for persistent, cloud-based file storage. This replaces local file uploads which don't persist in ephemeral environments.
 
 ---
 
@@ -43,7 +43,7 @@ All files are organized hierarchically:
 
 ## Environment Variables
 
-Add these to your Render environment:
+Add these to your VPS config.env:
 
 ```env
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -201,7 +201,7 @@ If you have existing files in `uploads/` directory:
 ## Troubleshooting
 
 ### "Invalid API credentials"
-- Check environment variables are set correctly in Render
+- Check environment variables are set correctly on VPS (config.env)
 - Verify no extra spaces in credentials
 - Ensure Cloudinary account is active
 
@@ -233,7 +233,7 @@ If you have existing files in `uploads/` directory:
 
 ### Production Deployment
 
-1. Add credentials to Render environment variables
+1. Add credentials to VPS config.env
 2. Deploy backend
 3. Test logo upload from settings page
 4. Verify files persist after redeployment
@@ -257,6 +257,6 @@ For Cloudinary-specific issues:
 - Support: [support.cloudinary.com](https://support.cloudinary.com)
 
 For Learnovo integration issues:
-- Check logs in Render dashboard
+- Check logs: pm2 logs learnovo-backend
 - Verify environment variables are set
 - Test with Cloudinary dashboard to isolate issues

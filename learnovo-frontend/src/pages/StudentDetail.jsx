@@ -8,6 +8,7 @@ import { examsService } from '../services/examsService'
 import { useAuth } from '../contexts/AuthContext'
 import StudentForm from '../components/students/StudentForm'
 import ClassActionModal from '../components/students/ClassActionModal'
+import SubjectPreferences from '../components/students/SubjectPreferences'
 import ResultCard from '../components/ResultCard'
 import { SERVER_URL } from '../constants/config'
 import toast from 'react-hot-toast'
@@ -107,7 +108,14 @@ const StudentDetail = () => {
             })
             return { previous }
         },
-        onSuccess: (_, { isDeactivation }) => {
+        onSuccess: (response, { isDeactivation }) => {
+            // Update cache with authoritative server response to avoid stale refetch overwriting optimistic update
+            if (response?.data) {
+                queryClient.setQueryData(['student', id], (old) => ({
+                    ...old,
+                    student: response.data
+                }))
+            }
             if (isDeactivation) {
                 toast.success('Student deactivated successfully')
                 setShowDeactivateModal(false)
@@ -121,7 +129,7 @@ const StudentDetail = () => {
             toast.error(`Failed to ${isDeactivation ? 'deactivate' : 'activate'} student`)
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['student', id] })
+            queryClient.invalidateQueries({ queryKey: ['student', id], refetchType: 'none' })
             queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
         },
     })
@@ -219,6 +227,7 @@ const StudentDetail = () => {
 
     const allTabs = [
         { id: 'profile', label: 'Profile' },
+        { id: 'subjects', label: 'Subjects', adminOnly: true },
         { id: 'fees', label: 'Fees', adminOnly: true },
         { id: 'attendance', label: 'Attendance' },
         { id: 'exams', label: 'Exams' },
@@ -554,6 +563,14 @@ const StudentDetail = () => {
                             </div>
                         )}
                     </div>
+                )}
+
+                {activeTab === 'subjects' && student && (
+                    <SubjectPreferences
+                        studentId={id}
+                        studentName={student.fullName || student.name}
+                        studentClass={student.class}
+                    />
                 )}
 
                 {activeTab === 'fees' && (

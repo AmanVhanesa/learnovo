@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Search, Check, FileText, Printer, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Search, Check, FileText, Printer, AlertCircle, AlertTriangle, Edit3 } from 'lucide-react';
 import certificateService from '../../services/certificateService';
 import studentsService from '../../services/studentsService';
 import { toast } from 'react-hot-toast';
@@ -18,6 +18,11 @@ const CertificateGeneration = () => {
     const [autoDeactivate, setAutoDeactivate] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    // TC override fields — ephemeral, only used for this certificate generation
+    const [categoryOverride, setCategoryOverride] = useState('');
+    const [classOverride, setClassOverride] = useState('');
+    const [customCategory, setCustomCategory] = useState(false); // true when admin types a custom category
 
     // Debounce the search term
     useEffect(() => {
@@ -46,6 +51,10 @@ const CertificateGeneration = () => {
         mutationFn: () => certificateService.previewCertificate(selectedStudent._id, certType),
         onSuccess: (data) => {
             setPreviewData(data);
+            // Pre-fill TC override fields from DB values
+            setCategoryOverride(data.category || '');
+            setClassOverride(data.class || '');
+            setCustomCategory(!['General', 'SC', 'ST', 'OBC'].includes(data.category));
             setStep(2);
         },
         onError: (error) => {
@@ -61,7 +70,15 @@ const CertificateGeneration = () => {
     const loading = previewMutation.isPending;
 
     const generateMutation = useMutation({
-        mutationFn: () => certificateService.generateCertificate(selectedStudent._id, certType, previewData, autoDeactivate),
+        mutationFn: () => certificateService.generateCertificate(
+            selectedStudent._id,
+            certType,
+            previewData,
+            autoDeactivate,
+            // Pass TC overrides (only effective for TC type)
+            certType === 'TC' ? categoryOverride : undefined,
+            certType === 'TC' ? classOverride : undefined
+        ),
         onSuccess: async (response) => {
             // Verify we got a valid PDF blob (not a JSON error wrapped as blob)
             const blob = response.data;
@@ -222,6 +239,8 @@ const CertificateGeneration = () => {
                 {/* STEP 2 */}
                 {step === 2 && previewData && (
                     <div className="space-y-6">
+
+                        {/* Read-only confirmation fields */}
                         <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
                             <div className="flex items-center gap-2 mb-4 text-gray-700 dark:text-[#8E8E93] font-semibold border-b border-gray-200 dark:border-[#38383A] pb-3">
                                 <FileText className="h-5 w-5" />
@@ -231,49 +250,140 @@ const CertificateGeneration = () => {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
                                 <div><span className="text-gray-500 dark:text-[#8E8E93]">Student Name:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.studentName}</span></div>
                                 <div><span className="text-gray-500 dark:text-[#8E8E93]">Father's Name:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.fatherName}</span></div>
+                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Mother's Name:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.motherName}</span></div>
+                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Date of Birth:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.dob}</span></div>
                                 <div><span className="text-gray-500 dark:text-[#8E8E93]">Admission No:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.admissionNumber}</span></div>
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Class:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.class}</span></div>
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Fees Status:</span> <span className={`font-medium ml-2 ${previewData.feeStatus?.toLowerCase() === 'clear' || previewData.feeStatus?.toLowerCase() === 'paid' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{previewData.feeStatus}</span></div>
-
-                                {certType === 'TC' && (
-                                    <>
-                                        <div className="col-span-2 mt-2 pt-2 border-t border-gray-200 dark:border-[#38383A]" />
-                                        <div className="col-span-2">
-                                            <label className="label mb-1.5 block">Reason for Leaving</label>
-                                            <div className="space-y-2">
-                                                <select
-                                                    className="input"
-                                                    value={['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(previewData.leavingReason) ? previewData.leavingReason : 'Other'}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        setPreviewData({ ...previewData, leavingReason: val === 'Other' ? '' : val });
-                                                    }}
-                                                >
-                                                    <option value="Parent Request">Parent Request</option>
-                                                    <option value="Completed Studies">Completed Studies</option>
-                                                    <option value="Transfer">Transfer</option>
-                                                    <option value="Medical Grounds">Medical Grounds</option>
-                                                    <option value="Other">Other (Custom)</option>
-                                                </select>
-                                                {!['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(previewData.leavingReason) && (
-                                                    <input type="text" placeholder="Enter custom reason..." className="input bg-gray-50 dark:bg-[#1C1C1E]" value={previewData.leavingReason} onChange={(e) => setPreviewData({ ...previewData, leavingReason: e.target.value })} />
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="col-span-2">
-                                            <label className="label mb-1.5 block">Remarks</label>
-                                            <input type="text" className="input" value={previewData.remarks} onChange={(e) => setPreviewData({ ...previewData, remarks: e.target.value })} />
-                                        </div>
-                                        <div className="col-span-2 mt-4">
-                                            <label className="flex items-center gap-3 cursor-pointer p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-400">
-                                                <input type="checkbox" className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500" checked={autoDeactivate} onChange={(e) => setAutoDeactivate(e.target.checked)} />
-                                                <span className="font-medium text-sm">Automatically deactivate student profile upon generation</span>
-                                            </label>
-                                        </div>
-                                    </>
-                                )}
+                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Date of Issue:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.issueDate}</span></div>
+                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Fees Status:</span> <span className={`font-medium ml-2 ${previewData.feeStatus?.toLowerCase()?.includes('paid') || previewData.feeStatus?.toLowerCase() === 'clear' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{previewData.feeStatus}</span></div>
                             </div>
                         </div>
+
+                        {/* TC-specific: Override / Confirm Details section */}
+                        {certType === 'TC' && (
+                            <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
+                                <div className="flex items-center gap-2 mb-4 text-gray-700 dark:text-[#8E8E93] font-semibold border-b border-gray-200 dark:border-[#38383A] pb-3">
+                                    <Edit3 className="h-5 w-5" />
+                                    Override / Confirm Details
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-[#636366] mb-5">These overrides apply only to this certificate. The student's master record will not be changed.</p>
+
+                                {/* Warning if category or class was empty in DB */}
+                                {(!previewData.category || previewData.category === '-') && (
+                                    <div className="flex items-start gap-2 p-3 mb-4 bg-amber-50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-400 rounded-lg text-xs border border-amber-200 dark:border-amber-800">
+                                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                                        <span>Category was not set in the student record. Please confirm or enter the correct value below.</span>
+                                    </div>
+                                )}
+                                {(!previewData.class || previewData.class === '-') && (
+                                    <div className="flex items-start gap-2 p-3 mb-4 bg-amber-50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-400 rounded-lg text-xs border border-amber-200 dark:border-amber-800">
+                                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                                        <span>Class was not set in the student record. Please confirm or enter the correct value below.</span>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                                    {/* Category / Caste — hybrid dropdown + custom */}
+                                    <div>
+                                        <label className="label mb-1.5 block">Category / Caste</label>
+                                        {!customCategory ? (
+                                            <select
+                                                className="input"
+                                                value={['General', 'SC', 'ST', 'OBC'].includes(categoryOverride) ? categoryOverride : '__custom__'}
+                                                onChange={(e) => {
+                                                    if (e.target.value === '__custom__') {
+                                                        setCustomCategory(true);
+                                                        setCategoryOverride('');
+                                                    } else {
+                                                        setCategoryOverride(e.target.value);
+                                                    }
+                                                }}
+                                            >
+                                                <option value="General">General</option>
+                                                <option value="SC">SC</option>
+                                                <option value="ST">ST</option>
+                                                <option value="OBC">OBC</option>
+                                                <option value="__custom__">Enter custom...</option>
+                                            </select>
+                                        ) : (
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Gupta, Rajput, Brahmin..."
+                                                    className="input flex-1"
+                                                    value={categoryOverride}
+                                                    onChange={(e) => setCategoryOverride(e.target.value)}
+                                                    autoFocus
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setCustomCategory(false);
+                                                        setCategoryOverride(previewData.category || 'General');
+                                                    }}
+                                                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-[#8E8E93] dark:hover:text-white underline whitespace-nowrap"
+                                                >
+                                                    Use dropdown
+                                                </button>
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">DB value: {previewData.category || '-'}</p>
+                                    </div>
+
+                                    {/* Class in which Last Studied — free text */}
+                                    <div>
+                                        <label className="label mb-1.5 block">Class in which Last Studied</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Nursery, LKG, UKG, Class 1..."
+                                            className="input"
+                                            value={classOverride}
+                                            onChange={(e) => setClassOverride(e.target.value)}
+                                        />
+                                        <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">DB value: {previewData.class || '-'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TC-specific: Leaving Reason, Remarks, Auto-deactivate */}
+                        {certType === 'TC' && (
+                            <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
+                                <div className="grid grid-cols-1 gap-y-5">
+                                    <div>
+                                        <label className="label mb-1.5 block">Reason for Leaving</label>
+                                        <div className="space-y-2">
+                                            <select
+                                                className="input"
+                                                value={['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(previewData.leavingReason) ? previewData.leavingReason : 'Other'}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setPreviewData({ ...previewData, leavingReason: val === 'Other' ? '' : val });
+                                                }}
+                                            >
+                                                <option value="Parent Request">Parent Request</option>
+                                                <option value="Completed Studies">Completed Studies</option>
+                                                <option value="Transfer">Transfer</option>
+                                                <option value="Medical Grounds">Medical Grounds</option>
+                                                <option value="Other">Other (Custom)</option>
+                                            </select>
+                                            {!['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(previewData.leavingReason) && (
+                                                <input type="text" placeholder="Enter custom reason..." className="input bg-gray-50 dark:bg-[#1C1C1E]" value={previewData.leavingReason} onChange={(e) => setPreviewData({ ...previewData, leavingReason: e.target.value })} />
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1.5 block">Remarks</label>
+                                        <input type="text" className="input" value={previewData.remarks} onChange={(e) => setPreviewData({ ...previewData, remarks: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="flex items-center gap-3 cursor-pointer p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-400">
+                                            <input type="checkbox" className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500" checked={autoDeactivate} onChange={(e) => setAutoDeactivate(e.target.checked)} />
+                                            <span className="font-medium text-sm">Automatically deactivate student profile upon generation</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-400 rounded-xl text-sm border border-amber-200 dark:border-amber-800">
                             <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />

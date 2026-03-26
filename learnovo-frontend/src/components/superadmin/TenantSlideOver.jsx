@@ -573,19 +573,25 @@ export default function TenantSlideOver({ isOpen, onClose, tenantId, onUpdate })
     // ─── Derived Data ──────────────────────────────────────────────────────
     const schoolName = tenant?.schoolName || tenant?.name || ''
     const schoolCode = tenant?.schoolCode || tenant?.code || ''
-    const status = (tenant?.status || 'pending').toLowerCase()
+    const status = (tenant?.subscription?.status || tenant?.status || 'pending').toLowerCase()
     const plan = tenant?.subscription?.plan || tenant?.plan || 'free'
     const subdomain = tenant?.subdomain || ''
-    const adminEmail = tenant?.adminEmail || tenant?.admin?.email || ''
+    const adminEmail = tenant?.adminEmail || tenant?.email || tenant?.admin?.email || ''
     const phone = tenant?.phone || tenant?.contactPhone || ''
-    const address = tenant?.address || ''
+    const addressObj = tenant?.address || {}
+    const address = typeof addressObj === 'string'
+        ? addressObj
+        : [addressObj.street, addressObj.city, addressObj.state, addressObj.country, addressObj.zipCode].filter(Boolean).join(', ')
     const registrationDate = tenant?.createdAt
     const lastActivity = tenant?.lastActivity || tenant?.updatedAt
-    const trialEnd = tenant?.subscription?.trialEnd || tenant?.trialEnd
+    const trialEnd = tenant?.subscription?.trialEndsAt || tenant?.subscription?.trialEnd || tenant?.trialEnd
     const subscriptionStart = tenant?.subscription?.startDate || tenant?.subscriptionStart
-    const subscriptionEnd = tenant?.subscription?.endDate || tenant?.subscriptionEnd
+    const subscriptionEnd = tenant?.subscription?.endDate || tenant?.subscription?.currentPeriodEnd || tenant?.subscriptionEnd
     const usage = tenant?.usage || {}
-    const features = tenant?.features || tenant?.subscription?.features || []
+    const rawFeatures = tenant?.features || tenant?.subscription?.features || tenant?.settings?.features || []
+    const features = Array.isArray(rawFeatures)
+        ? rawFeatures
+        : Object.entries(rawFeatures).map(([key, value]) => ({ name: key, enabled: value }))
     const quickStats = {
         totalUsers: tenant?.stats?.totalUsers || usage?.totalUsers || 0,
         totalInvoices: tenant?.stats?.totalInvoices || 0,

@@ -42,7 +42,13 @@ const ExamResultsModal = ({ exam, onClose }) => {
             setLoading(true);
             // Pass both class name and classId for robust matching
             const studentsRes = await studentsService.list({ class: exam.class, classId: exam.classId || undefined, section: exam.section || undefined, limit: 200 });
-            const studentList = studentsRes.data || studentsRes.students || [];
+            let studentList = studentsRes.data || studentsRes.students || [];
+
+            // Tag students who have skipped this exam's subject (optional subject opt-out)
+            studentList = studentList.map(s => ({
+                ...s,
+                _subjectSkipped: Array.isArray(s.skippedSubjects) && s.skippedSubjects.includes(exam.subject)
+            }));
             setStudents(studentList);
 
             const resultsRes = await examsService.getResults(exam._id);
@@ -82,8 +88,10 @@ const ExamResultsModal = ({ exam, onClose }) => {
     const handleSave = async () => {
         setSaving(true);
         try {
+            // Exclude students who have this subject skipped
+            const skippedStudentIds = new Set(students.filter(s => s._subjectSkipped).map(s => s._id || s.id));
             const toSave = Object.keys(marks)
-                .filter(id => marks[id] !== undefined && marks[id] !== '')
+                .filter(id => marks[id] !== undefined && marks[id] !== '' && !skippedStudentIds.has(id))
                 .map(id => ({ studentId: id, marks: marks[id], remarks: remarks[id] }));
 
             await examsService.saveResults(exam._id, toSave);
@@ -108,8 +116,8 @@ const ExamResultsModal = ({ exam, onClose }) => {
         return { pct, grade, passed };
     };
 
-    /* ── Summary row (from filled marks) ── */
-    const filled = students.filter(s => marks[s._id] !== undefined && marks[s._id] !== '');
+    /* ── Summary row (from filled marks, excluding skipped students) ── */
+    const filled = students.filter(s => !s._subjectSkipped && marks[s._id] !== undefined && marks[s._id] !== '');
     const passCount = filled.filter(s => Number(marks[s._id]) >= passingMarks).length;
     const failCount = filled.length - passCount;
     const avgPct = filled.length
@@ -230,57 +238,73 @@ const ExamResultsModal = ({ exam, onClose }) => {
                                     {filteredStudents.map(student => {
                                         const id = student._id || student.id;
                                         const stats = getStats(id);
+                                        const isSkipped = student._subjectSkipped;
                                         return (
-                                            <tr key={id}>
+                                            <tr key={id} className={isSkipped ? 'opacity-50' : ''}>
                                                 <td className="text-gray-500 dark:text-[#8E8E93] text-xs">{student.rollNumber || '—'}</td>
                                                 <td className="text-gray-500 dark:text-[#8E8E93] text-xs font-mono">{student.admissionNumber || '—'}</td>
-                                                <td className="font-medium text-gray-900 dark:text-white">{student.fullName || student.name || '—'}</td>
+                                                <td className="font-medium text-gray-900 dark:text-white">
+                                                    {student.fullName || student.name || '—'}
+                                                    {isSkipped && (
+                                                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 dark:bg-[#38383A] dark:text-[#8E8E93]">N/A — Subject Skipped</span>
+                                                    )}
+                                                </td>
                                                 <td>
-                                                    <input
-                                                        type="number"
-                                                        className="input w-24"
-                                                        max={exam.totalMarks}
-                                                        min="0"
-                                                        placeholder="0"
-                                                        value={marks[id] !== undefined ? marks[id] : ''}
-                                                        onChange={e => setMarks(prev => ({ ...prev, [id]: e.target.value }))}
-                                                    />
+                                                    {isSkipped ? (
+                                                        <span className="text-xs text-gray-400 dark:text-[#636366] italic">N/A</span>
+                                                    ) : (
+                                                        <input
+                                                            type="number"
+                                                            className="input w-24"
+                                                            max={exam.totalMarks}
+                                                            min="0"
+                                                            placeholder="0"
+                                                            value={marks[id] !== undefined ? marks[id] : ''}
+                                                            onChange={e => setMarks(prev => ({ ...prev, [id]: e.target.value }))}
+                                                        />
+                                                    )}
                                                 </td>
                                                 <td className="text-sm text-gray-600 dark:text-[#8E8E93]">
-                                                    {stats ? `${stats.pct}%` : '—'}
+                                                    {isSkipped ? '—' : stats ? `${stats.pct}%` : '—'}
                                                 </td>
                                                 <td>
-                                                    {stats ? (
+                                                    {isSkipped ? <span className="text-gray-300 dark:text-[#636366]">—</span> : stats ? (
                                                         <span className={`text-sm ${stats.grade.color}`}>
                                                             {stats.grade.label}
                                                         </span>
                                                     ) : <span className="text-gray-300 dark:text-[#636366]">—</span>}
                                                 </td>
                                                 <td>
-                                                    {stats ? (
+                                                    {isSkipped ? <span className="text-gray-300 dark:text-[#636366] text-xs">—</span> : stats ? (
                                                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${stats.passed ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400'}`}>
                                                             {stats.passed ? 'Pass' : 'Fail'}
                                                         </span>
                                                     ) : <span className="text-gray-300 dark:text-[#636366] text-xs">—</span>}
                                                 </td>
                                                 <td>
-                                                    <input
-                                                        type="text"
-                                                        className="input"
-                                                        placeholder="Optional…"
-                                                        value={remarks[id] || ''}
-                                                        onChange={e => setRemarks(prev => ({ ...prev, [id]: e.target.value }))}
-                                                    />
+                                                    {isSkipped ? (
+                                                        <span className="text-xs text-gray-400 dark:text-[#636366]">—</span>
+                                                    ) : (
+                                                        <input
+                                                            type="text"
+                                                            className="input"
+                                                            placeholder="Optional…"
+                                                            value={remarks[id] || ''}
+                                                            onChange={e => setRemarks(prev => ({ ...prev, [id]: e.target.value }))}
+                                                        />
+                                                    )}
                                                 </td>
                                                 <td>
-                                                    <button
-                                                        type="button"
-                                                        title="View Result Card"
-                                                        className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
-                                                        onClick={() => setResultCardStudent({ id, name: student.fullName || student.name })}
-                                                    >
-                                                        <FileText className="h-4 w-4" />
-                                                    </button>
+                                                    {!isSkipped && (
+                                                        <button
+                                                            type="button"
+                                                            title="View Result Card"
+                                                            className="p-1.5 rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                                                            onClick={() => setResultCardStudent({ id, name: student.fullName || student.name })}
+                                                        >
+                                                            <FileText className="h-4 w-4" />
+                                                        </button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );

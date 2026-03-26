@@ -528,7 +528,12 @@ const AcademicsManagement = () => {
                                                             <div className="flex items-start justify-between gap-2 mb-2">
                                                                 <div className="min-w-0 flex-1">
                                                                     <h4 className="font-semibold text-gray-900 dark:text-white truncate">{subject.name}</h4>
-                                                                    <span className="font-mono text-xs text-gray-500 dark:text-[#8E8E93]">{subject.subjectCode}</span>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="font-mono text-xs text-gray-500 dark:text-[#8E8E93]">{subject.subjectCode}</span>
+                                                                        {subject.isOptional && (
+                                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Optional</span>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                                 {user?.role === 'admin' && (
                                                                     <div className="flex gap-0.5 flex-shrink-0">
@@ -1033,7 +1038,8 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
         type: subject?.type || 'Theory',
         maxMarks: subject?.maxMarks || 100,
         passingMarks: subject?.passingMarks || 33,
-        description: subject?.description || ''
+        description: subject?.description || '',
+        isOptional: subject?.isOptional || false
     })
     const [isSaving, setIsSaving] = useState(false)
 
@@ -1153,6 +1159,20 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
                                 placeholder="Optional description"
                             />
                         </div>
+
+                        {/* Optional subject toggle — students can opt out of optional subjects */}
+                        <label className="flex items-center gap-3 cursor-pointer p-3 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl">
+                            <input
+                                type="checkbox"
+                                className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                                checked={form.isOptional}
+                                onChange={(e) => setForm({ ...form, isOptional: e.target.checked })}
+                            />
+                            <div>
+                                <span className="font-medium text-sm text-gray-900 dark:text-white">Optional Subject</span>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-0.5">Students can skip this subject via Subject Preferences (e.g., Punjabi for out-of-state students)</p>
+                            </div>
+                        </label>
                     </div>
 
                     <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-200 dark:border-[#38383A] mt-6">

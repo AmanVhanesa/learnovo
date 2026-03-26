@@ -104,6 +104,16 @@ export const studentsService = {
   reactivate: async (id) => {
     const res = await api.put(`/students/${id}/reactivate`)
     return res.data
+  },
+
+  // Subject preferences — per-student opt-out of optional subjects
+  getSubjectPreferences: async (id) => {
+    const res = await api.get(`/students/${id}/subject-preferences`)
+    return res.data
+  },
+  updateSubjectPreferences: async (id, skippedSubjects) => {
+    const res = await api.put(`/students/${id}/subject-preferences`, { skippedSubjects })
+    return res.data
   }
 }
 

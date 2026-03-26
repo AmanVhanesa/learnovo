@@ -183,16 +183,18 @@ jobs:
           echo "🚀 Deploying artifact to staging environment..."
 
   deploy-production:
-    name: Deploy to Render
+    name: Deploy to Hostinger VPS
     runs-on: ubuntu-latest
     needs: [build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     steps:
-      - name: Trigger Render Deployment
+      - name: Deploy via SSH
         run: |
-          echo "🚀 Triggering Render deployment via webhook..."
-          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          echo "🚀 Deploying to Hostinger VPS..."
+          # SSH deploy is handled manually or via a deploy hook:
+          #   ssh root@<VPS_IP> "cd /var/www/learnovo/learnovo-backend && git pull && npm install --production && pm2 restart learnovo-backend"
+          echo "ℹ️ Deploy backend manually: ssh into VPS, git pull, pm2 restart"
 
   notify:
     name: Notify Status

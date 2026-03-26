@@ -15,7 +15,7 @@ Always use environment variables for sensitive data:
 
 ```javascript
 // ❌ WRONG - Hardcoded
-const uri = "mongodb+srv://user:password@cluster.mongodb.net/db";
+const uri = "mongodb+srv://...credentials...@cluster.mongodb.net/db";
 
 // ✅ CORRECT - Environment variable
 const uri = process.env.MONGO_URI;
@@ -28,7 +28,7 @@ const uri = process.env.MONGO_URI;
 
 ### Production Secrets
 For production deployments:
-- **Render**: Set environment variables in the Render dashboard
+- **Hostinger VPS**: Set environment variables in config.env on the VPS
 - **Vercel**: Set environment variables in the Vercel project settings
 - **MongoDB Atlas**: Use IP whitelisting and rotate passwords regularly
 
@@ -39,7 +39,7 @@ It will **block commits** containing potential secrets.
 To test it works:
 ```bash
 # This should be blocked
-echo 'const pwd = "mongodb+srv://user:pass@host"' > test.js
+echo 'const pwd = "mongodb+srv://...credentials...@host"' > test.js
 git add test.js
 git commit -m "test"  # Will be blocked
 ```
@@ -64,5 +64,5 @@ Before committing code:
 ## 📚 Additional Resources
 
 - [MongoDB Atlas Security](https://www.mongodb.com/docs/atlas/security/)
-- [Render Environment Variables](https://render.com/docs/environment-variables)
+- [PM2 Documentation](https://pm2.keymetrics.io/docs/usage/quick-start/)
 - [Vercel Environment Variables](https://vercel.com/docs/concepts/projects/environment-variables)

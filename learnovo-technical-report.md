@@ -1233,7 +1233,7 @@
 learnovo-backend/
 ├── server.js                          # Main entry point (Express app)
 ├── package.json                       # Dependencies
-├── render.yaml                        # Render.com deployment config
+├── DEPLOY.md                          # Hostinger VPS deployment guide
 ├── jest.config.js                     # Test configuration
 ├── .eslintrc.js                       # ESLint config
 ├── .lintstagedrc.json                 # Lint-staged config
@@ -1547,7 +1547,7 @@ learnovo-frontend/
 | Component | Platform | Details |
 |-----------|----------|---------|
 | **Frontend** | Vercel | URL: `https://learnovoapp.vercel.app` |
-| **Backend** | Render.com | Region: Singapore, Plan: free tier |
+| **Backend** | Hostinger VPS | Node.js + PM2, `api.learnovoportal.com` |
 | **Database** | MongoDB Atlas | Cloud-hosted (connection via `MONGODB_URI`) |
 | **Image Storage** | Cloudinary | Tenant-isolated folders |
 | **Document Storage** | AWS S3 | Region: ap-south-1, Bucket: learnovo-files |
@@ -1560,9 +1560,9 @@ learnovo-frontend/
 - Asset caching: `Cache-Control: public, max-age=31536000, immutable`
 - Framework: Vite
 
-**Backend Deployment Config (render.yaml):**
-- Build: `cd learnovo-backend && npm install`
-- Start: `cd learnovo-backend && node server.js`
+**Backend Deployment (Hostinger VPS):**
+- PM2 process: `pm2 start server.js --name learnovo-backend`
+- Nginx reverse proxy → `api.learnovoportal.com`
 - Auto-deploy on push
 
 ---
