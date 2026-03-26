@@ -407,6 +407,17 @@ input, select, textarea {
     height: 100dvh;
   }
 
+  /* Paint an opaque outline ON TOP of the modal's border-radius edge,
+     covering sub-pixel anti-aliasing that lets the backdrop bleed through. */
+  .modal-overlay > div {
+    outline: 2px solid #ffffff;
+    outline-offset: -2px;
+  }
+
+  .dark .modal-overlay > div {
+    outline-color: #1C1C1E;
+  }
+
   .modal-content {
     @apply bg-white shadow-glass-lg
            max-w-md w-full max-h-[100vh] sm:max-h-[90vh] overflow-y-auto
