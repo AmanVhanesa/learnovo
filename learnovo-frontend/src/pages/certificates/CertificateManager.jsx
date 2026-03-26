@@ -221,7 +221,7 @@ const CertificateManager = () => {
             {/* Edit Modal */}
             {editingCert && (
                 <div className="modal-overlay" onClick={() => setEditingCert(null)}>
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-black/[0.03] dark:ring-white/[0.06] max-w-md w-full mx-4 animate-scale-in" onClick={e => e.stopPropagation()}>
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-md w-full mx-4 animate-scale-in" onClick={e => e.stopPropagation()}>
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-[#38383A]">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Certificate Details</h3>
                         </div>

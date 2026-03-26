@@ -99,7 +99,7 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
     return (
         <div className="modal-overlay" onClick={() => { onClose(); resetForm(); }}>
             <div
-                className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg ring-1 ring-black/[0.03] dark:ring-white/[0.06] max-w-lg w-full sm:mx-4 md:mx-auto h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto animate-scale-in"
+                className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-lg w-full sm:mx-4 md:mx-auto h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto animate-scale-in"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}

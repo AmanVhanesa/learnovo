@@ -36,29 +36,6 @@ input, select, textarea {
     -webkit-tap-highlight-color: transparent;
   }
 
-  /*
-   * Fix WebKit/Blink sub-pixel rendering bug:
-   * Elements with border-radius + overflow clipping show a thin transparent
-   * seam/strip where child backgrounds don't fully cover the rounded edge.
-   * Forcing a GPU-composited mask eliminates the gap.
-   */
-  .overflow-hidden[class*="rounded"],
-  [class*="rounded-lg"][class*="overflow-hidden"],
-  [class*="rounded-xl"][class*="overflow-hidden"],
-  [class*="rounded-2xl"][class*="overflow-hidden"],
-  [class*="rounded-3xl"][class*="overflow-hidden"],
-  [class*="rounded-lg"][class*="overflow-y-auto"],
-  [class*="rounded-xl"][class*="overflow-y-auto"],
-  [class*="rounded-2xl"][class*="overflow-y-auto"],
-  [class*="rounded-3xl"][class*="overflow-y-auto"],
-  [class*="rounded-lg"][class*="overflow-auto"],
-  [class*="rounded-xl"][class*="overflow-auto"],
-  [class*="rounded-2xl"][class*="overflow-auto"],
-  [class*="rounded-3xl"][class*="overflow-auto"] {
-    -webkit-mask-image: -webkit-radial-gradient(white, white);
-    mask-image: linear-gradient(#fff 0 0);
-  }
-
   body {
     @apply bg-gray-50 text-gray-900 font-sans dark:bg-[#000000] dark:text-white;
     -webkit-font-smoothing: antialiased;
@@ -433,22 +410,20 @@ input, select, textarea {
   .modal-content {
     @apply bg-white shadow-glass-lg
            max-w-md w-full max-h-[100vh] sm:max-h-[90vh] overflow-y-auto
-           border border-white/80 dark:border-[#1C1C1E]/80
+           ring-1 ring-white
            animate-scale-in
-           dark:bg-[#1C1C1E]
+           dark:bg-[#1C1C1E] dark:ring-[#1C1C1E]
            rounded-t-2xl sm:rounded-2xl sm:mx-4;
     -webkit-overflow-scrolling: touch;
-    transform: translateZ(0);
   }
 
   .modal-box-lg {
     @apply bg-white shadow-glass-lg
            w-full max-w-2xl max-h-[100vh] sm:max-h-[90vh] overflow-y-auto
-           border border-white/80 dark:border-[#1C1C1E]/80
-           dark:bg-[#1C1C1E]
+           ring-1 ring-white
+           dark:bg-[#1C1C1E] dark:ring-[#1C1C1E]
            rounded-t-2xl sm:rounded-2xl sm:mx-4 md:mx-auto md:w-[90%];
     -webkit-overflow-scrolling: touch;
-    transform: translateZ(0);
   }
 
   /* ── Loading ────────────────────────────────────────────────── */
