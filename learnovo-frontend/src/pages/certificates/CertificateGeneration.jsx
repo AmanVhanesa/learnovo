@@ -111,16 +111,30 @@ const CertificateGeneration = () => {
             navigate('/app/certificates');
         },
         onError: async (error) => {
-            // Extract error message from blob error responses
+            // Extract error message from blob error responses (409 duplicate, 400 validation, 500 server)
             let message = 'Generation failed';
-            if (error.response?.data instanceof Blob) {
-                try {
-                    const text = await error.response.data.text();
+            try {
+                const respData = error.response?.data;
+                if (respData instanceof Blob) {
+                    const text = await respData.text();
                     const parsed = JSON.parse(text);
                     message = parsed.message || message;
-                } catch { /* use default */ }
-            } else if (error.message) {
-                message = error.message;
+                } else if (respData && typeof respData === 'object' && respData.message) {
+                    message = respData.message;
+                } else if (respData && typeof respData.text === 'function') {
+                    // ArrayBuffer or other blob-like
+                    const text = await respData.text();
+                    const parsed = JSON.parse(text);
+                    message = parsed.message || message;
+                } else if (error.message) {
+                    message = error.message;
+                }
+            } catch {
+                // If all parsing fails, use the status-based message
+                if (error.response?.status === 409) {
+                    const certLabel = certType === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
+                    message = `${certLabel} has already been generated for this student. You can download it from the Certificate Manager.`;
+                }
             }
             toast.error(message);
         },

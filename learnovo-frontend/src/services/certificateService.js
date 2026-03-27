@@ -42,9 +42,25 @@ const certificateService = {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
                 },
-                responseType: 'blob'
+                responseType: 'blob',
+                // Treat 409 (duplicate cert) as a resolved response so we can parse the JSON body
+                validateStatus: (status) => (status >= 200 && status < 300) || status === 409
             }
         );
+
+        // If server returned 409 (certificate already exists), parse the JSON blob and throw
+        if (response.status === 409) {
+            let message = 'Certificate has already been generated for this student.';
+            try {
+                const text = await response.data.text();
+                const parsed = JSON.parse(text);
+                message = parsed.message || message;
+            } catch { /* use default */ }
+            const err = new Error(message);
+            err.response = { status: 409, data: { message } };
+            throw err;
+        }
+
         return response;
     },
 

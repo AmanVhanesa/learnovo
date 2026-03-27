@@ -24,7 +24,8 @@ async function getBrowser() {
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--font-render-hinting=none',
+                '--font-render-hinting=medium',
+                '--force-device-scale-factor=2',
                 '--no-first-run',
                 '--no-zygote',
                 '--disable-extensions',
@@ -412,6 +413,9 @@ const pdfService = {
         const page = await browser.newPage();
 
         try {
+            // Set high-DPI viewport for sharper rendering
+            await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
+
             // Use 'domcontentloaded' — the Google Fonts @import loads async;
             // 'networkidle0' can timeout waiting for external font requests.
             await page.setContent(html, {
