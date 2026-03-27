@@ -367,8 +367,8 @@ exports.generateCertificate = async (req, res) => {
 exports.getGeneratedCertificates = async (req, res) => {
     try {
         const certs = await GeneratedCertificate.find({ tenantId: req.user.tenantId })
-            .populate('student', 'fullName admissionNumber class')
-            .populate('issuedBy', 'fullName')
+            .populate('student', 'fullName name admissionNumber class')
+            .populate('issuedBy', 'fullName name')
             .sort({ issueDate: -1 });
         res.json(certs);
     } catch (error) {

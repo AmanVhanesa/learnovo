@@ -165,7 +165,7 @@ const CertificateManager = () => {
                                 <td className="px-5 py-3.5 text-sm font-medium text-gray-900 dark:text-white">{cert.certificateNumber}</td>
                                 <td className="px-5 py-3.5 text-sm text-gray-700 dark:text-[#8E8E93]">{cert.student?.fullName || 'Unknown Student'}</td>
                                 <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(cert.issueDate).toLocaleDateString()}</td>
-                                <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8E8E93]">{cert.issuedBy?.fullName || '-'}</td>
+                                <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8E8E93]">{cert.issuedBy?.fullName || cert.issuedBy?.name || '-'}</td>
                                 <td className="px-5 py-3.5 text-right">
                                     <div className="flex items-center justify-end gap-1">
                                         <button onClick={() => handlePreviewCert(cert)} className="btn-icon" title="Preview"><Eye className="h-4 w-4" /></button>
