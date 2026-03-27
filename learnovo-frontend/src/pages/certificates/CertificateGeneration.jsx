@@ -28,6 +28,8 @@ const CertificateGeneration = () => {
     const [penOverride, setPenOverride] = useState('');
     const [customCategory, setCustomCategory] = useState(false); // true when admin types a custom category
     const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [showFeesModal, setShowFeesModal] = useState(false);
+    const [feesSkipped, setFeesSkipped] = useState(false);
 
     // Debounce the search term
     useEffect(() => {
@@ -84,7 +86,8 @@ const CertificateGeneration = () => {
             // Pass TC overrides (only effective for TC type)
             certType === 'TC' ? categoryOverride : undefined,
             certType === 'TC' ? classOverride : undefined,
-            certType === 'TC' ? penOverride : undefined
+            certType === 'TC' ? penOverride : undefined,
+            certType === 'TC' ? feesSkipped : undefined
         ),
         onSuccess: async (response) => {
             // Verify we got a valid PDF blob (not a JSON error wrapped as blob)
@@ -144,6 +147,18 @@ const CertificateGeneration = () => {
     });
 
     const handleGenerate = () => {
+        // Gate: check pending fees for TC before generating
+        if (certType === 'TC' && previewData?.pendingFeesInfo?.hasPending && !feesSkipped) {
+            setShowFeesModal(true);
+            return;
+        }
+        generateMutation.mutate();
+    };
+
+    const handleSkipFees = () => {
+        setFeesSkipped(true);
+        setShowFeesModal(false);
+        // Proceed with generation after marking fees as skipped
         generateMutation.mutate();
     };
 
@@ -621,6 +636,95 @@ const CertificateGeneration = () => {
                                 className="btn btn-outline w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
                             >
                                 Close
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── Pending Fees Warning Modal ── */}
+            {showFeesModal && previewData?.pendingFeesInfo && createPortal(
+                <div className="modal-overlay" onClick={() => setShowFeesModal(false)}>
+                    <div
+                        className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-black/5 dark:ring-[#38383A] max-w-md w-full mx-4 animate-scale-in"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="p-6 pb-0">
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Pending Fees Found</h3>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6 space-y-4">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-gray-500 dark:text-[#8E8E93]">Student</span>
+                                <span className="font-semibold text-gray-900 dark:text-white">{selectedStudent?.fullName || selectedStudent?.name}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-gray-500 dark:text-[#8E8E93]">Total Pending</span>
+                                <span className="font-bold text-red-600 dark:text-red-400 text-lg">
+                                    {'\u20B9'}{previewData.pendingFeesInfo.totalAmount?.toLocaleString('en-IN')}
+                                </span>
+                            </div>
+
+                            {/* Fee Breakdown */}
+                            {previewData.pendingFeesInfo.breakdown?.length > 0 && (
+                                <div className="border border-gray-100 dark:border-[#38383A] rounded-xl overflow-hidden">
+                                    <div className="px-3 py-2 bg-gray-50 dark:bg-[#2C2C2E] text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">
+                                        Fee Breakdown ({previewData.pendingFeesInfo.count} items)
+                                    </div>
+                                    <div className="max-h-40 overflow-y-auto divide-y divide-gray-100 dark:divide-[#38383A]">
+                                        {previewData.pendingFeesInfo.breakdown.map((fee, i) => (
+                                            <div key={fee.id || i} className="px-3 py-2 flex items-center justify-between text-sm">
+                                                <div>
+                                                    <p className="text-gray-800 dark:text-gray-200 font-medium">{fee.description}</p>
+                                                    <p className="text-xs text-gray-400 dark:text-[#636366] capitalize">{fee.feeType} &middot; {fee.status}</p>
+                                                </div>
+                                                <span className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">{'\u20B9'}{fee.balance?.toLocaleString('en-IN')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <p className="text-xs text-gray-400 dark:text-[#636366] leading-relaxed">
+                                This student has outstanding fees. You can pay them first or skip and proceed with TC generation. Skipping will be recorded in the certificate audit.
+                            </p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="p-6 pt-0 flex flex-col gap-2">
+                            <button
+                                onClick={() => {
+                                    setShowFeesModal(false);
+                                    navigate(`/fees?student=${selectedStudent._id}`);
+                                }}
+                                className="btn btn-primary w-full gap-2"
+                            >
+                                Pay Fees Now
+                            </button>
+                            <button
+                                onClick={handleSkipFees}
+                                disabled={generating}
+                                className="btn w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white"
+                            >
+                                {generating ? (
+                                    <><Loader2 className="animate-spin" /> Generating...</>
+                                ) : (
+                                    'Skip & Issue TC'
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setShowFeesModal(false)}
+                                className="btn btn-outline w-full"
+                            >
+                                Cancel
                             </button>
                         </div>
                     </div>

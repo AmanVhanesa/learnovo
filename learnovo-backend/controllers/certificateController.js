@@ -127,19 +127,31 @@ exports.previewCertificate = async (req, res) => {
             });
         }
 
-        // --- Validation for TC ---
+        // --- Check pending fees for TC (warning, not blocking) ---
+        let pendingFeesInfo = null;
         if (type === 'TC') {
-            // Check for pending fees
             const pendingFees = await Fee.find({
                 student: studentId,
                 status: { $in: ['pending', 'overdue', 'partially_paid'] }
             });
 
             if (pendingFees.length > 0) {
-                return res.status(400).json({
-                    message: 'Cannot generate Leaving Certificate. Student has pending fees.',
-                    details: pendingFees
-                });
+                const totalPending = pendingFees.reduce((sum, f) => sum + (f.balance > 0 ? f.balance : f.amount - (f.paidAmount || 0)), 0);
+                pendingFeesInfo = {
+                    hasPending: true,
+                    totalAmount: totalPending,
+                    count: pendingFees.length,
+                    breakdown: pendingFees.map(f => ({
+                        id: f._id,
+                        description: f.description,
+                        feeType: f.feeType,
+                        amount: f.amount,
+                        paidAmount: f.paidAmount || 0,
+                        balance: f.balance > 0 ? f.balance : f.amount - (f.paidAmount || 0),
+                        status: f.status,
+                        dueDate: f.dueDate,
+                    })),
+                };
             }
         }
 
@@ -205,7 +217,7 @@ exports.previewCertificate = async (req, res) => {
             srNumber: student.srNumber || student.admissionNumber || '-', // LC: SR/GR number
         };
 
-        res.json(data);
+        res.json({ ...data, pendingFeesInfo });
 
     } catch (error) {
         console.error(error);
@@ -219,7 +231,7 @@ exports.previewCertificate = async (req, res) => {
  */
 exports.generateCertificate = async (req, res) => {
     try {
-        const { studentId, type, specificData, autoDeactivate, categoryOverride, classOverride, penOverride } = req.body; // specificData allows overriding fields like 'leavingReason'
+        const { studentId, type, specificData, autoDeactivate, categoryOverride, classOverride, penOverride, feesSkipped } = req.body;
         const tenantId = req.user.tenantId;
 
         // 1. Re-validate (similar to preview)
@@ -283,6 +295,10 @@ exports.generateCertificate = async (req, res) => {
             }
             if (penOverride !== undefined && penOverride !== null) {
                 finalData.penNumber = penOverride;
+            }
+            if (feesSkipped) {
+                finalData.feesSkippedAtTC = true;
+                finalData.feesSkippedDate = new Date().toISOString();
             }
         }
 
