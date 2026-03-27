@@ -107,6 +107,26 @@ exports.previewCertificate = async (req, res) => {
 
         const settings = await Settings.getSettings(tenantId);
 
+        // --- Check if certificate already exists for this student ---
+        const existingCert = await GeneratedCertificate.findOne({
+            tenantId,
+            student: studentId,
+            type,
+            status: 'ACTIVE'
+        });
+
+        if (existingCert) {
+            const label = type === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
+            return res.status(409).json({
+                message: `${label} has already been generated for this student (${existingCert.certificateNumber}). You can download it from the Certificate Manager.`,
+                existingCertificate: {
+                    id: existingCert._id,
+                    certificateNumber: existingCert.certificateNumber,
+                    issueDate: existingCert.issueDate
+                }
+            });
+        }
+
         // --- Validation for TC ---
         if (type === 'TC') {
             // Check for pending fees
@@ -203,6 +223,26 @@ exports.generateCertificate = async (req, res) => {
         // 1. Re-validate (similar to preview)
         const student = await User.findOne({ _id: studentId, tenantId });
         if (!student) return res.status(404).json({ message: 'Student not found' });
+
+        // 1.1 Check if certificate already exists for this student
+        const existingCert = await GeneratedCertificate.findOne({
+            tenantId,
+            student: studentId,
+            type,
+            status: 'ACTIVE'
+        });
+
+        if (existingCert) {
+            const label = type === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
+            return res.status(409).json({
+                message: `${label} has already been generated for this student (${existingCert.certificateNumber}). You can download it from the Certificate Manager.`,
+                existingCertificate: {
+                    id: existingCert._id,
+                    certificateNumber: existingCert.certificateNumber,
+                    issueDate: existingCert.issueDate
+                }
+            });
+        }
 
         // 2. Generate Sequence Number
         const currentYear = new Date().getFullYear().toString();
