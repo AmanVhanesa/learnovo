@@ -7,6 +7,18 @@ import StudentForm from '../components/students/StudentForm'
 import ClassActionModal from '../components/students/ClassActionModal'
 import toast from 'react-hot-toast'
 
+function getStudiedDuration(admissionDate) {
+    if (!admissionDate) return 'N/A';
+    const start = new Date(admissionDate);
+    const now = new Date();
+    let years = now.getFullYear() - start.getFullYear();
+    let months = now.getMonth() - start.getMonth();
+    if (months < 0) { years--; months += 12; }
+    if (years === 0) return `${months} month${months !== 1 ? 's' : ''}`;
+    if (months === 0) return `${years} year${years !== 1 ? 's' : ''}`;
+    return `${years} year${years !== 1 ? 's' : ''}, ${months} month${months !== 1 ? 's' : ''}`;
+}
+
 const StudentDetail = () => {
     const { id } = useParams()
     const navigate = useNavigate()
@@ -283,6 +295,20 @@ const StudentDetail = () => {
                                 <p className="text-xs text-gray-500 uppercase">Admission Class</p>
                                 <p className="text-sm font-medium text-gray-900 mt-1">{admissionClassInfo}</p>
                             </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase">Admission Date</p>
+                                <p className="text-sm font-medium text-gray-900 mt-1">
+                                    {student.admissionDate
+                                        ? new Date(student.admissionDate).toLocaleDateString('en-GB')
+                                        : 'N/A'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase">Studied For</p>
+                                <p className="text-sm font-medium text-gray-900 mt-1">
+                                    {getStudiedDuration(student.admissionDate)}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -480,6 +506,20 @@ const StudentDetail = () => {
                                     </p>
                                 </div>
                             </div>
+                            {student.admissionDate && (
+                                <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-gray-900">
+                                            {student.isImported
+                                                ? `Student imported with admission date: ${new Date(student.admissionDate).toLocaleDateString('en-GB')}`
+                                                : `Admission date: ${new Date(student.admissionDate).toLocaleDateString('en-GB')}`}
+                                        </p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Studied for {getStudiedDuration(student.admissionDate)}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                             {student.updatedAt && student.updatedAt !== student.createdAt && (
                                 <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                                     <div className="flex-1">

@@ -1325,6 +1325,12 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
         }
       }
       logger.info(`Import: batch insert complete. Success: ${results.success}, Failed: ${results.failed}`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+
+      // Log students imported with admission dates
+      const withAdmissionDate = docsToInsert.filter(d => d.admissionDate);
+      if (withAdmissionDate.length > 0) {
+        logger.info(`Import: ${withAdmissionDate.length} students imported with admission dates`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+      }
     }
 
     // ── Batch flush: bulkWrite for replace rows ───────────────────────────────
@@ -1893,6 +1899,13 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
 
     const student = await User.create(studentData);
 
+    if (admissionDate) {
+      logger.info('Admission date set on student creation', {
+        requestId: req.requestId, tenantId, studentId: student._id,
+        admissionDate: student.admissionDate
+      });
+    }
+
     // ── Auto-generate admission fee invoice for manually enrolled students ──
     let admissionFeeGenerated = false;
     try {
@@ -2157,6 +2170,14 @@ router.put('/:id', protect, canAccessStudent, [
         logger.error('Error looking up sectionId during update', err, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
         // Continue without sectionId - will save section string only
       }
+    }
+
+    // Log admission date changes
+    if (updatePayload.admissionDate && updatePayload.admissionDate !== student.admissionDate?.toISOString()?.substring(0, 10)) {
+      logger.info('Admission date updated', {
+        requestId: req.requestId, tenantId: req.user.tenantId, studentId: req.params.id,
+        previousAdmissionDate: student.admissionDate, newAdmissionDate: updatePayload.admissionDate
+      });
     }
 
     const updatedStudent = await User.findByIdAndUpdate(
