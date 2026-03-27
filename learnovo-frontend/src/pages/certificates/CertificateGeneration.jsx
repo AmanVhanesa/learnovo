@@ -25,6 +25,7 @@ const CertificateGeneration = () => {
     // TC override fields — ephemeral, only used for this certificate generation
     const [categoryOverride, setCategoryOverride] = useState('');
     const [classOverride, setClassOverride] = useState('');
+    const [penOverride, setPenOverride] = useState('');
     const [customCategory, setCustomCategory] = useState(false); // true when admin types a custom category
     const [showPreviewModal, setShowPreviewModal] = useState(false);
 
@@ -58,6 +59,7 @@ const CertificateGeneration = () => {
             // Pre-fill TC override fields from DB values
             setCategoryOverride(data.category || '');
             setClassOverride(data.class || '');
+            setPenOverride(data.penNumber || '');
             setCustomCategory(!['General', 'SC', 'ST', 'OBC'].includes(data.category));
             setStep(2);
         },
@@ -81,7 +83,8 @@ const CertificateGeneration = () => {
             autoDeactivate,
             // Pass TC overrides (only effective for TC type)
             certType === 'TC' ? categoryOverride : undefined,
-            certType === 'TC' ? classOverride : undefined
+            certType === 'TC' ? classOverride : undefined,
+            certType === 'TC' ? penOverride : undefined
         ),
         onSuccess: async (response) => {
             // Verify we got a valid PDF blob (not a JSON error wrapped as blob)
@@ -151,7 +154,7 @@ const CertificateGeneration = () => {
         if (!previewData) return {};
         return {
             ...previewData,
-            ...(certType === 'TC' ? { category: categoryOverride || previewData.category, class: classOverride || previewData.class } : {}),
+            ...(certType === 'TC' ? { category: categoryOverride || previewData.category, class: classOverride || previewData.class, penNumber: penOverride || previewData.penNumber } : {}),
         };
     };
 
@@ -441,6 +444,19 @@ const CertificateGeneration = () => {
                                             onChange={(e) => setClassOverride(e.target.value)}
                                         />
                                         <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">DB value: {previewData.class || '-'}</p>
+                                    </div>
+
+                                    {/* PEN Number — free text */}
+                                    <div>
+                                        <label className="label mb-1.5 block">PEN Number</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter PEN Number..."
+                                            className="input"
+                                            value={penOverride}
+                                            onChange={(e) => setPenOverride(e.target.value)}
+                                        />
+                                        <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">DB value: {previewData.penNumber || '-'}</p>
                                     </div>
                                 </div>
                             </div>

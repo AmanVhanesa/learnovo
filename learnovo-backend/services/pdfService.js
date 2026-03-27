@@ -119,6 +119,7 @@ function buildPlaceholderMap(data) {
         reason_for_leaving: data.leavingReason || '',
         remarks: data.remarks || '-',
         purpose: data.purpose || 'general purpose',
+        pen_number: data.penNumber || '-',
         sr_number: data.srNumber || data.admissionNumber || '-',
     };
 }

@@ -198,6 +198,8 @@ exports.previewCertificate = async (req, res) => {
             leavingReason: 'Parent Request', // Allow override from frontend
             remarks: '',
 
+            penNumber: student.penNumber || '', // PEN Number from student profile
+
             // New fields for premium templates
             purpose: 'general purpose', // Bonafide: purpose of certificate
             srNumber: student.srNumber || student.admissionNumber || '-', // LC: SR/GR number
@@ -217,7 +219,7 @@ exports.previewCertificate = async (req, res) => {
  */
 exports.generateCertificate = async (req, res) => {
     try {
-        const { studentId, type, specificData, autoDeactivate, categoryOverride, classOverride } = req.body; // specificData allows overriding fields like 'leavingReason'
+        const { studentId, type, specificData, autoDeactivate, categoryOverride, classOverride, penOverride } = req.body; // specificData allows overriding fields like 'leavingReason'
         const tenantId = req.user.tenantId;
 
         // 1. Re-validate (similar to preview)
@@ -278,6 +280,9 @@ exports.generateCertificate = async (req, res) => {
             }
             if (classOverride !== undefined && classOverride !== null) {
                 finalData.classOverride = classOverride;
+            }
+            if (penOverride !== undefined && penOverride !== null) {
+                finalData.penNumber = penOverride;
             }
         }
 
@@ -368,7 +373,7 @@ exports.getGeneratedCertificates = async (req, res) => {
     try {
         const certs = await GeneratedCertificate.find({ tenantId: req.user.tenantId })
             .populate('student', 'fullName name admissionNumber class')
-            .populate('issuedBy', 'fullName name')
+            .populate('issuedBy', 'fullName name firstName lastName')
             .sort({ issueDate: -1 });
         res.json(certs);
     } catch (error) {
