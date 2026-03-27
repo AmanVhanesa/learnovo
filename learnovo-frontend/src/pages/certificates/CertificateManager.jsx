@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award } from 'lucide-react';
+import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award, Eye, X } from 'lucide-react';
 import certificateService from '../../services/certificateService';
+import { generateCertificateDocx } from '../../utils/certificateDocxExport';
+import { reportsService } from '../../services/reportsService';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
@@ -14,6 +16,7 @@ const CertificateManager = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [editingCert, setEditingCert] = useState(null);
     const [editForm, setEditForm] = useState({});
+    const [previewCert, setPreviewCert] = useState(null);
 
     const { data: history = [], isLoading: loading } = useQuery({
         queryKey: ['certificate-history'],
@@ -26,6 +29,12 @@ const CertificateManager = () => {
     const handleDownload = async (cert) => {
         try {
             await certificateService.downloadCertificate(cert._id, `${cert.type}_${cert.certificateNumber}.pdf`);
+            const certLabel = cert.type === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
+            reportsService.logActivity({
+                type: 'certificate', action: 'pdf_export',
+                message: `${certLabel} (${cert.certificateNumber}) exported as PDF`,
+                studentName: cert.student?.fullName || cert.student?.name
+            });
             toast.success('Download started');
         } catch (error) {
             toast.error('Download failed');
@@ -75,6 +84,60 @@ const CertificateManager = () => {
         updateMutation.mutate({ id: editingCert._id, data: editForm });
     };
 
+    const handleExportWord = async (cert) => {
+        try {
+            const snap = cert.contentSnapshot || {};
+            await generateCertificateDocx(cert.type, {
+                ...snap,
+                certificateNumber: cert.certificateNumber,
+                issueDate: snap.issueDate || new Date(cert.issueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            });
+            const certLabel = cert.type === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
+            reportsService.logActivity({
+                type: 'certificate', action: 'word_export',
+                message: `${certLabel} (${cert.certificateNumber}) exported as Word document`,
+                studentName: cert.student?.fullName || cert.student?.name
+            });
+            toast.success('Word document exported!');
+        } catch {
+            toast.error('Failed to export Word document');
+        }
+    };
+
+    const handlePreviewCert = (cert) => {
+        setPreviewCert(cert);
+        const certLabel = cert.type === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
+        reportsService.logActivity({
+            type: 'certificate', action: 'preview',
+            message: `${certLabel} (${cert.certificateNumber}) previewed for ${cert.student?.fullName || cert.student?.name || 'Unknown'}`,
+            studentName: cert.student?.fullName || cert.student?.name
+        });
+    };
+
+    const getPreviewRows = (cert) => {
+        const d = cert.contentSnapshot || {};
+        if (cert.type === 'TC') {
+            return [
+                ['Student Name', d.studentName], ["Father's / Guardian's Name", d.fatherName],
+                ["Mother's Name", d.motherName], ['Nationality', d.nationality], ['Category', d.category],
+                ['Date of Birth', d.dob], ['Date of Birth (in words)', d.dobWords],
+                ['Admission Number', d.admissionNumber], ['Date of First Admission', d.admissionDate],
+                ['Class in which Last Studied', d.class], ['Section', d.section],
+                ['Academic Year', d.academicYear], ['Board Examination Result', d.boardResult],
+                ['Promotion Status', d.promotionStatus], ['Subjects Studied', d.subjects],
+                ['Fee Status', d.feeStatus], ['General Conduct', d.conduct],
+                ['Date of Application', d.applicationDate], ['Date of Issue', d.issueDate],
+                ['Reason for Leaving', d.leavingReason], ['Remarks', d.remarks],
+            ];
+        }
+        return [
+            ['Student Name', d.studentName], ["Father's Name", d.fatherName],
+            ["Mother's Name", d.motherName], ['Admission Number', d.admissionNumber],
+            ['Date of Birth', d.dob], ['Class', d.class], ['Section', d.section],
+            ['Academic Year', d.academicYear], ['Category', d.category], ['Purpose', d.purpose],
+        ];
+    };
+
     const filteredHistory = history.filter(cert =>
         cert.student?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cert.certificateNumber?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -105,6 +168,7 @@ const CertificateManager = () => {
                                 <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8E8E93]">{cert.issuedBy?.fullName || '-'}</td>
                                 <td className="px-5 py-3.5 text-right">
                                     <div className="flex items-center justify-end gap-1">
+                                        <button onClick={() => handlePreviewCert(cert)} className="btn-icon" title="Preview"><Eye className="h-4 w-4" /></button>
                                         <button onClick={() => handleDownload(cert)} className="btn-icon" title="Download"><Download className="h-4 w-4" /></button>
                                         <button onClick={() => openEditModal(cert)} className="btn-icon" title="Edit"><Edit className="h-4 w-4" /></button>
                                         <button onClick={() => handleDelete(cert._id)} className="btn-icon hover:!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/20" title="Delete"><Trash2 className="h-4 w-4" /></button>
@@ -266,6 +330,107 @@ const CertificateManager = () => {
                                 <button type="submit" className="btn btn-primary">Save Changes</button>
                             </div>
                         </form>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Certificate Preview Modal */}
+            {previewCert && createPortal(
+                <div className="modal-overlay" onClick={() => setPreviewCert(null)} style={{ zIndex: 50 }}>
+                    <div className="flex flex-col items-center max-h-[95vh] w-full max-w-3xl mx-4" onClick={e => e.stopPropagation()}>
+                        {/* Modal header */}
+                        <div className="w-full flex items-center justify-between bg-[#1C1C1E] px-5 py-3 rounded-t-2xl">
+                            <h3 className="text-white font-semibold text-sm">
+                                Certificate Preview — {previewCert.certificateNumber}
+                            </h3>
+                            <button onClick={() => setPreviewCert(null)} className="text-gray-400 hover:text-white">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* A4 Paper area */}
+                        <div className="w-full flex-1 overflow-y-auto bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
+                            <div className="bg-white w-full max-w-[595px] min-h-[842px] shadow-2xl relative overflow-hidden" style={{ fontFamily: 'serif' }}>
+                                {/* PREVIEW Watermark */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none" style={{ zIndex: 1 }}>
+                                    <span className="text-gray-200 font-bold tracking-widest" style={{ fontSize: '72px', transform: 'rotate(-35deg)', opacity: 0.35 }}>PREVIEW</span>
+                                </div>
+
+                                {/* Certificate content */}
+                                <div className="relative p-8 sm:p-12" style={{ zIndex: 2 }}>
+                                    <div className="border-2 p-6 sm:p-8" style={{ borderColor: '#b08d57' }}>
+                                        <h1 className="text-center font-bold text-lg sm:text-xl text-gray-900 mb-1">
+                                            {previewCert.contentSnapshot?.schoolName || 'School Name'}
+                                        </h1>
+                                        <p className="text-center text-xs text-gray-500 mb-4">
+                                            {previewCert.contentSnapshot?.schoolAddress}
+                                        </p>
+
+                                        <h2 className="text-center font-bold text-base sm:text-lg underline mb-4 text-gray-800">
+                                            {previewCert.type === 'TC' ? 'SCHOOL LEAVING CERTIFICATE' : 'BONAFIDE CERTIFICATE'}
+                                        </h2>
+
+                                        <div className="text-right text-xs text-gray-600 mb-4 space-y-0.5">
+                                            <p>Certificate No: <span className="font-medium">{previewCert.certificateNumber}</span></p>
+                                            <p>Date: <span className="font-medium">{previewCert.contentSnapshot?.issueDate || new Date(previewCert.issueDate).toLocaleDateString()}</span></p>
+                                        </div>
+
+                                        {previewCert.type === 'BONAFIDE' && (
+                                            <p className="text-sm text-gray-700 mb-4">
+                                                This is to certify that <strong>{previewCert.contentSnapshot?.studentName}</strong> is a bonafide student of this school. The details are as follows:
+                                            </p>
+                                        )}
+
+                                        <table className="w-full text-xs border-collapse mb-6">
+                                            <tbody>
+                                                {getPreviewRows(previewCert).map(([label, value], i) => (
+                                                    <tr key={i} className="border-b border-gray-200">
+                                                        <td className="py-1.5 pr-3 font-semibold text-gray-700 w-2/5 align-top">{label}</td>
+                                                        <td className="py-1.5 text-gray-900">{value || 'N/A'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+
+                                        <div className="flex justify-between mt-10 pt-4">
+                                            <div className="text-center">
+                                                <div className="w-32 border-t border-gray-400 mb-1"></div>
+                                                <p className="text-xs font-semibold text-gray-700">Class Teacher</p>
+                                            </div>
+                                            <div className="text-center">
+                                                <div className="w-32 border-t border-gray-400 mb-1"></div>
+                                                <p className="text-xs font-semibold text-gray-700">Principal</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal footer */}
+                        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-[#1C1C1E] px-5 py-4 rounded-b-2xl">
+                            <button
+                                onClick={() => { setPreviewCert(null); handleDownload(previewCert); }}
+                                className="btn btn-primary gap-2 w-full sm:w-auto text-sm"
+                            >
+                                <Download className="h-4 w-4" />
+                                Export as PDF
+                            </button>
+                            <button
+                                onClick={() => handleExportWord(previewCert)}
+                                className="btn gap-2 w-full sm:w-auto text-sm bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                                <FileText className="h-4 w-4" />
+                                Export as Word
+                            </button>
+                            <button
+                                onClick={() => setPreviewCert(null)}
+                                className="btn btn-outline w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
+                            >
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>,
                 document.body

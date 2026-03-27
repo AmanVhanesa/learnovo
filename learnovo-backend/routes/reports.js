@@ -8,6 +8,8 @@ const User = require('../models/User');
 const Admission = require('../models/Admission');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const Class = require('../models/Class');
+const GeneratedCertificate = require('../models/GeneratedCertificate');
+const ActivityLog = require('../models/ActivityLog');
 
 const planGate = require('../middleware/planGate');
 
@@ -652,7 +654,43 @@ router.get('/activities', protect, async (req, res) => {
 
     activities = [...activities, ...employeeActivities];
 
-    // 4. Sort combined activities by date descending
+    // 4. Get recent certificate activities
+    const recentCerts = await GeneratedCertificate.find({ tenantId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate('student', 'name fullName')
+      .populate('issuedBy', 'name fullName');
+
+    const certActivities = recentCerts.map(cert => ({
+      id: `cert-${cert._id}`,
+      type: 'certificate',
+      status: 'success',
+      message: `${cert.type === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate'} (${cert.certificateNumber}) issued for ${cert.student?.fullName || cert.student?.name || 'Unknown'}`,
+      date: cert.createdAt,
+      studentName: cert.student?.fullName || cert.student?.name
+    }));
+
+    activities = [...activities, ...certActivities];
+
+    // 5. Get custom activity log entries (preview, Word export, etc.)
+    try {
+      const logEntries = await ActivityLog.find({ tenantId })
+        .sort({ createdAt: -1 })
+        .limit(limit);
+
+      const logActivities = logEntries.map(entry => ({
+        id: `log-${entry._id}`,
+        type: entry.type || 'certificate',
+        status: 'success',
+        message: entry.message,
+        date: entry.createdAt,
+        studentName: entry.studentName
+      }));
+
+      activities = [...activities, ...logActivities];
+    } catch { /* ActivityLog may not exist yet */ }
+
+    // 6. Sort combined activities by date descending
     activities.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // 4. Apply limit
@@ -668,6 +706,30 @@ router.get('/activities', protect, async (req, res) => {
       success: false,
       message: 'Server error while fetching activities'
     });
+  }
+});
+
+// @desc    Log an activity (for client-side events like preview, Word export)
+// @route   POST /api/reports/activities/log
+// @access  Private
+router.post('/activities/log', protect, async (req, res) => {
+  try {
+    const { type, action, message, studentName } = req.body;
+    if (!message) return res.status(400).json({ success: false, message: 'Message is required' });
+
+    await ActivityLog.create({
+      tenantId: req.user.tenantId,
+      type: type || 'certificate',
+      action: action || 'log',
+      message,
+      studentName,
+      userId: req.user._id
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Activity log error:', error);
+    res.status(500).json({ success: false, message: 'Failed to log activity' });
   }
 });
 

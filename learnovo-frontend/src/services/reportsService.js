@@ -42,6 +42,12 @@ export const reportsService = {
     const params = { date, ...filters };
     const { data } = await api.get('/fees/daily', { params });
     return data;
+  },
+
+  logActivity: async ({ type, action, message, studentName }) => {
+    try {
+      await api.post('/reports/activities/log', { type, action, message, studentName });
+    } catch { /* non-critical, don't block UI */ }
   }
 }
 

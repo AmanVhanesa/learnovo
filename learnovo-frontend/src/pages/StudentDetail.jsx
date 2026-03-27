@@ -425,6 +425,30 @@ const StudentDetail = () => {
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Admission Class</p>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{admissionClassInfo}</p>
                             </div>
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Admission Date</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                                    {student.admissionDate
+                                        ? new Date(student.admissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                        : 'N/A'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Studied For</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                                    {(() => {
+                                        if (!student.admissionDate) return 'N/A';
+                                        const start = new Date(student.admissionDate);
+                                        const now = new Date();
+                                        let years = now.getFullYear() - start.getFullYear();
+                                        let months = now.getMonth() - start.getMonth();
+                                        if (months < 0) { years--; months += 12; }
+                                        if (years === 0) return months + ' month' + (months !== 1 ? 's' : '');
+                                        if (months === 0) return years + ' year' + (years !== 1 ? 's' : '');
+                                        return years + ' year' + (years !== 1 ? 's' : '') + ', ' + months + ' month' + (months !== 1 ? 's' : '');
+                                    })()}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>

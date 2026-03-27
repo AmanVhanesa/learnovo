@@ -1330,6 +1330,19 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       const withAdmissionDate = docsToInsert.filter(d => d.admissionDate);
       if (withAdmissionDate.length > 0) {
         logger.info(`Import: ${withAdmissionDate.length} students imported with admission dates`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+        try {
+          const ActivityLog = require('../models/ActivityLog');
+          for (const doc of withAdmissionDate) {
+            await ActivityLog.create({
+              tenantId: req.user.tenantId,
+              type: 'student',
+              action: 'import_with_admission_date',
+              message: `Student imported with admission date: ${doc.admissionDate instanceof Date ? doc.admissionDate.toISOString().substring(0, 10) : doc.admissionDate}`,
+              studentName: doc.fullName || doc.name || doc.firstName,
+              userId: req.user._id
+            });
+          }
+        } catch { /* non-critical */ }
       }
     }
 
@@ -2178,6 +2191,18 @@ router.put('/:id', protect, canAccessStudent, [
         requestId: req.requestId, tenantId: req.user.tenantId, studentId: req.params.id,
         previousAdmissionDate: student.admissionDate, newAdmissionDate: updatePayload.admissionDate
       });
+      // Write to ActivityLog for UI activity feed
+      try {
+        const ActivityLog = require('../models/ActivityLog');
+        await ActivityLog.create({
+          tenantId: req.user.tenantId,
+          type: 'student',
+          action: 'admission_date_update',
+          message: `Admission date updated to: ${updatePayload.admissionDate} for ${student.fullName || student.name}`,
+          studentName: student.fullName || student.name,
+          userId: req.user._id
+        });
+      } catch { /* non-critical */ }
     }
 
     const updatedStudent = await User.findByIdAndUpdate(
