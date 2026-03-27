@@ -32,3 +32,4 @@ dist-ssr
 build/
 dist/
 
+.vercel
