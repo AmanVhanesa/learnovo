@@ -186,7 +186,7 @@ async function fetchImageAsDataUri(imagePath) {
  * Replaces <!-- LOGO_PLACEHOLDER --> with an <img> tag or fallback SVG
  */
 async function injectLogo(html, logoPath) {
-    const fallbackSvg = '<svg width="50" height="50" viewBox="0 0 50 50" fill="none"><circle cx="25" cy="25" r="20" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/><text x="25" y="30" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="10" font-family="Playfair Display,serif">LOGO</text></svg>';
+    const fallbackSvg = '<svg width="50" height="50" viewBox="0 0 50 50" fill="none"><circle cx="25" cy="25" r="20" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/><text x="25" y="30" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="10" font-family="Georgia,serif">LOGO</text></svg>';
 
     if (!logoPath) {
         return html.replace('<!-- LOGO_PLACEHOLDER -->', fallbackSvg);
