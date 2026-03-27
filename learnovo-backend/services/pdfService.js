@@ -414,17 +414,13 @@ const pdfService = {
 
         try {
             // Set high-DPI viewport for sharper rendering
-            await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
+            await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 3 });
 
-            // Use 'domcontentloaded' — the Google Fonts @import loads async;
-            // 'networkidle0' can timeout waiting for external font requests.
+            // No external fonts — system fonts load instantly, so 'load' is safe and fast
             await page.setContent(html, {
-                waitUntil: 'domcontentloaded',
-                timeout: 30000
+                waitUntil: 'load',
+                timeout: 15000
             });
-
-            // Small delay to let fonts/CSS settle
-            await new Promise(r => setTimeout(r, 500));
 
             const pdfUint8 = await page.pdf({
                 format: 'A4',

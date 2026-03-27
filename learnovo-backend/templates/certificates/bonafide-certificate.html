@@ -5,21 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bonafide Certificate - {{student_name}}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
-
   @page { size: A4 portrait; margin: 0; }
 
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; font-feature-settings: 'zero' 0; }
 
   html, body {
     width: 794px;
     height: 1123px;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Helvetica Neue', 'Arial', 'Noto Sans', sans-serif;
     color: #1C1C2E;
     background: #FAFBFF;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    text-rendering: optimizeLegibility;
+    text-rendering: geometricPrecision;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -84,7 +82,7 @@
   .watermark {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%,-50%) rotate(-35deg);
-    font-family: 'Playfair Display', serif; font-size: 72px; font-weight: 700;
+    font-family: 'Georgia', 'Times New Roman', serif; font-size: 72px; font-weight: 700;
     color: rgba(26,46,90,0.035); letter-spacing: 18px;
     white-space: nowrap; z-index: 1; pointer-events: none; text-transform: uppercase;
   }
@@ -136,7 +134,7 @@
   .school-info { flex: 1; text-align: center; padding: 0 16px; }
 
   .school-name {
-    font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700;
+    font-family: 'Georgia', 'Times New Roman', serif; font-size: 28px; font-weight: 700;
     color: #FFFFFF; letter-spacing: 1.5px; line-height: 1.2;
     text-transform: uppercase;
   }
@@ -152,7 +150,7 @@
   .title-section { text-align: center; padding: 28px 40px 0; flex-shrink: 0; }
 
   .cert-title {
-    font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700;
+    font-family: 'Georgia', 'Times New Roman', serif; font-size: 28px; font-weight: 700;
     color: #1A2E5A; letter-spacing: 6px; text-transform: uppercase;
     position: relative; display: inline-block; padding-bottom: 10px;
   }
@@ -177,7 +175,7 @@
   .cert-number-badge {
     display: inline-flex; align-items: center; gap: 6px;
     background: #F0F4FF; border: 1px solid #DDE3F0; border-radius: 20px;
-    padding: 5px 14px; font-family: 'Inter', sans-serif;
+    padding: 5px 14px; font-family: 'Helvetica Neue', 'Arial', sans-serif;
     font-size: 12px; font-weight: 500; color: #1A2E5A; letter-spacing: 0.5px;
   }
 
@@ -190,7 +188,7 @@
   .body-section { padding: 22px 34px 0; flex-shrink: 0; }
 
   .to-whom {
-    font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600;
+    font-family: 'Georgia', 'Times New Roman', serif; font-size: 15px; font-weight: 600;
     color: #1A2E5A; text-align: center; letter-spacing: 2px;
     text-transform: uppercase; margin-bottom: 22px; position: relative;
   }
