@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>School Leaving Certificate - {{student_name}}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 
   @page { size: A4 portrait; margin: 0; }
 
@@ -174,7 +174,7 @@
   .cert-number-badge {
     display: inline-flex; align-items: center; gap: 5px;
     background: #F0F4FF; border: 1px solid #DDE3F0; border-radius: 16px;
-    padding: 3px 10px; font-family: 'JetBrains Mono', monospace;
+    padding: 3px 10px; font-family: 'Inter', sans-serif;
     font-size: 12px; font-weight: 500; color: #1A2E5A;
   }
 
@@ -205,7 +205,7 @@
   .lc-table tr:last-child td { border-bottom: none; }
 
   .lc-table .row-num {
-    width: 28px; font-family: 'JetBrains Mono', monospace;
+    width: 28px; font-family: 'Inter', sans-serif;
     font-size: 12px; font-weight: 600; color: #C9A84C;
     text-align: center; padding-right: 2px;
   }
@@ -445,7 +445,7 @@
         <tr>
           <td class="row-num">07</td>
           <td class="row-label">Admission Number</td>
-          <td class="row-value" style="font-family:'JetBrains Mono',monospace;letter-spacing:0.5px;">{{admission_no}}</td>
+          <td class="row-value" style="letter-spacing:0.5px;">{{admission_no}}</td>
         </tr>
         <tr>
           <td class="row-num">08</td>
