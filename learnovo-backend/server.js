@@ -95,8 +95,10 @@ app.use(compression());
 app.use(express.json({
   limit: '10mb',
   verify: (req, res, buf) => {
-    // Only save rawBody for the webhook route (to save memory on other routes)
-    if (req.originalUrl === '/api/fee-payments/webhook') {
+    // Only save rawBody for webhook/callback routes (to save memory on other routes)
+    if (req.originalUrl === '/api/fee-payments/webhook' ||
+        req.originalUrl === '/api/student-fees/payment/icici-return' ||
+        req.originalUrl === '/api/student-fees/payment/notify') {
       req.rawBody = buf.toString();
     }
   }

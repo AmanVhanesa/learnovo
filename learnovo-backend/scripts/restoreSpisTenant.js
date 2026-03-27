@@ -9,13 +9,13 @@ async function restore() {
   console.log('Connected to MongoDB');
 
   // Check if tenant already exists
-  let tenant = await Tenant.findOne({ schoolCode: 'spis' });
+  let tenant = await Tenant.findOne({ schoolCode: 'spis-test' });
   if (tenant) {
     console.log('Tenant already exists:', tenant._id);
   } else {
     tenant = await Tenant.create({
-      schoolName: 'SP International School',
-      schoolCode: 'spis',
+      schoolName: 'SP International School (Test)',
+      schoolCode: 'spis-test',
       email: 'spinternationalschool2021@gmail.com',
       phone: '',
       address: { city: '', country: 'India' },
@@ -51,7 +51,7 @@ async function restore() {
     // Pass plain text — the pre-save hook will hash it once
     await User.create({
       tenantId: tenant._id,
-      fullName: 'SP International Admin',
+      fullName: 'SP International Admin (Test)',
       firstName: 'SP International',
       lastName: 'Admin',
       email: 'spinternationalschool2021@gmail.com',
@@ -63,7 +63,7 @@ async function restore() {
   }
 
   console.log('\nDone! Login with:');
-  console.log('  School Code : spis');
+  console.log('  School Code : spis-test');
   console.log('  Email       : spinternationalschool2021@gmail.com');
   console.log('  Password    : Sp@2021');
 

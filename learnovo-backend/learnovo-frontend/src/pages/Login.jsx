@@ -172,7 +172,7 @@ const Login = () => {
                   value={formData.schoolCode}
                   onChange={handleChange}
                   className="input"
-                  placeholder="e.g. spis"
+                  placeholder="e.g. spis-test"
                 />
               </div>
 

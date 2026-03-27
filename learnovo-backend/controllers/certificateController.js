@@ -276,7 +276,20 @@ exports.generateCertificate = async (req, res) => {
         const template = await CertificateTemplate.findOne({ tenantId, type }) || { type };
 
         // 6. Generate PDF (returns Buffer directly)
-        const pdfBuffer = await pdfService.generateCertificate(finalData, template);
+        let pdfBuffer;
+        try {
+            pdfBuffer = await pdfService.generateCertificate(finalData, template);
+        } catch (pdfErr) {
+            // PDF generation failed — clean up the already-created certificate record
+            // so the user can retry without hitting a duplicate key error
+            console.error('PDF generation failed, rolling back certificate record:', pdfErr.message);
+            try {
+                await GeneratedCertificate.deleteOne({ _id: newCert._id });
+            } catch (delErr) {
+                console.error('Failed to delete orphaned certificate record:', delErr.message);
+            }
+            throw pdfErr; // re-throw so the outer catch handles response + counter rollback
+        }
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${type}_${student.admissionNumber}.pdf"`);
@@ -294,7 +307,7 @@ exports.generateCertificate = async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Certificate generation error:', error);
+        console.error('Certificate generation error:', error.message, error.stack);
 
         // Rollback certificate counter so the number doesn't get skipped
         try {

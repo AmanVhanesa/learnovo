@@ -71,12 +71,8 @@ const StudentFeesDashboard = () => {
 
             if (res.data?.success && res.data.data.paymentUrl) {
                 toast.success('Redirecting to payment gateway...');
-                // The mock gateway returns a URL. We could redirect here.
-                // For demonstration, we'll open it in a new tab to simulate the checkout flow
-                window.open(res.data.data.paymentUrl, '_blank');
-
-                // Refresh data to show it's now PROCESSING
-                setTimeout(fetchData, 1000);
+                // Redirect the browser to the payment gateway (ICICI EazyPay uses full redirect)
+                window.location.href = res.data.data.paymentUrl;
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to initiate payment');

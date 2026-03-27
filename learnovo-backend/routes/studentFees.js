@@ -11,9 +11,10 @@ const Receipt = require('../models/Receipt');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 
-// Initialize Mock Gateway for now
-const MockPaymentGateway = require('../services/payment/MockPaymentGateway');
-const gateway = new MockPaymentGateway();
+// Payment gateway — resolved per tenant via factory
+const { getGateway } = require('../services/payment/GatewayFactory');
+const ICICIEazypayGateway = require('../services/payment/ICICIEazypayGateway');
+const Tenant = require('../models/Tenant');
 
 const planGate = require('../middleware/planGate');
 
@@ -172,7 +173,18 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // 2. Safely call external gateway now that our DB knows an attempt started
+    // 2. Resolve the payment gateway for this tenant
+    const tenant = await Tenant.findById(req.user.tenantId).lean();
+    const gateway = getGateway(tenant);
+
+    if (!gateway) {
+      // No gateway configured for this tenant in production
+      await PaymentAttempt.findByIdAndUpdate(attempt._id, { status: 'FAILED' });
+      await createAuditLog(attempt._id, null, req.user.tenantId, 'INITIATED', 'FAILED', 'STUDENT_PORTAL', 'No payment gateway configured for this school');
+      return res.status(400).json({ success: false, message: 'Online payments are not yet configured for your school. Please contact the school office.' });
+    }
+
+    // 3. Safely call external gateway now that our DB knows an attempt started
     let gatewayResult;
     try {
       gatewayResult = await gateway.initiatePayment({
@@ -323,6 +335,10 @@ router.get('/payment/:id/status', protect, authorize('student'), async(req, res)
     }
 
     // It is PENDING or PROCESSING, verify with gateway
+    const tenant = await Tenant.findById(req.user.tenantId).lean();
+    const gateway = getGateway(tenant);
+    if (!gateway) return res.json({ success: true, data: attempt });
+
     const gwResult = await gateway.checkStatus(attempt.gatewayRefId);
 
     if (gwResult.status !== attempt.status && ['SUCCESS', 'FAILED'].includes(gwResult.status)) {
@@ -602,8 +618,12 @@ router.post('/payment/notify', async(req, res) => {
       return res.status(200).json({ success: false, message: 'Unknown payment reference' });
     }
 
+    // Resolve gateway for the attempt's tenant
+    const tenant = await Tenant.findById(attempt.tenantId).lean();
+    const gateway = getGateway(tenant);
+
     // Verify webhook signature using the gateway adapter
-    const isValid = gateway.verifyWebhookSignature(req.headers, JSON.stringify(req.body));
+    const isValid = gateway ? gateway.verifyWebhookSignature(req.headers, JSON.stringify(req.body)) : false;
     if (!isValid) {
       console.error(`[webhook] Invalid signature for gatewayRefId: ${gatewayRefId}`);
       return res.status(403).json({ success: false, message: 'Invalid webhook signature' });
@@ -678,6 +698,128 @@ router.post('/payment/notify', async(req, res) => {
     console.error('[webhook] Payment notify error:', error);
     // Return 500 so the gateway retries
     res.status(500).json({ success: false, message: 'Webhook processing failed' });
+  }
+});
+
+/**
+ * @desc    ICICI EazyPay return URL handler
+ * @route   POST /api/student-fees/payment/icici-return
+ * @access  Public (called by ICICI's redirect — NO auth, student's browser is redirected here)
+ *
+ * Flow:
+ *   1. ICICI POSTs response params to this URL after payment
+ *   2. We verify the SHA-512 signature (RS field)
+ *   3. Update PaymentAttempt + Invoice
+ *   4. Redirect student's browser to the frontend status page
+ */
+router.post('/payment/icici-return', express.urlencoded({ extended: true }), async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+  try {
+    const data = req.body;
+    const referenceNo = data.ReferenceNo || '';
+
+    // Parse the response
+    const parsed = ICICIEazypayGateway.parseResponse(data);
+
+    // Find the payment attempt by our reference number
+    const attempt = await PaymentAttempt.findOne({
+      idempotencyKey: referenceNo
+    });
+
+    if (!attempt) {
+      console.error('[icici-return] Payment attempt not found for reference:', referenceNo);
+      return res.redirect(`${frontendUrl}/payment/status?status=error&message=Payment+reference+not+found`);
+    }
+
+    // Prevent re-processing terminal states
+    if (['SUCCESS', 'FAILED', 'VERIFIED'].includes(attempt.status)) {
+      const statusParam = attempt.status === 'SUCCESS' || attempt.status === 'VERIFIED' ? 'success' : 'failed';
+      return res.redirect(`${frontendUrl}/payment/status?status=${statusParam}&ref=${referenceNo}`);
+    }
+
+    // Resolve the gateway for this tenant to verify signature
+    const tenant = await Tenant.findById(attempt.tenantId).lean();
+    const gateway = getGateway(tenant);
+
+    // Verify SHA-512 signature
+    let signatureValid = false;
+    if (gateway && typeof gateway.verifyResponseSignature === 'function') {
+      signatureValid = gateway.verifyResponseSignature(data);
+    }
+
+    if (!signatureValid) {
+      console.error('[icici-return] Signature verification FAILED for reference:', referenceNo);
+      // Still record the attempt details for audit
+      attempt.gatewayResponse = data;
+      await attempt.save();
+      await createAuditLog(attempt._id, null, attempt.tenantId, attempt.status, attempt.status, 'WEBHOOK', 'ICICI return: signature verification failed');
+      return res.redirect(`${frontendUrl}/payment/status?status=error&message=Payment+verification+failed`);
+    }
+
+    // Signature valid — process the result
+    const previousStatus = attempt.status;
+
+    if (parsed.isSuccess) {
+      // ── SUCCESS PATH ──────────────────────────────────────
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        attempt.status = 'SUCCESS';
+        attempt.gatewayRefId = parsed.uniqueRefNumber;
+        attempt.gatewayResponse = data;
+        await attempt.save({ session });
+
+        // Update invoice
+        const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
+        if (invoice) {
+          invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
+          await invoice.save({ session });
+        }
+
+        // Generate receipt
+        const receiptNum = await Receipt.generateReceiptNumber(attempt.tenantId);
+        await Receipt.create([{
+          tenantId: attempt.tenantId,
+          paymentAttemptId: attempt._id,
+          studentId: attempt.studentId,
+          invoiceId: attempt.invoiceId,
+          receiptNumber: receiptNum,
+          amount: attempt.amount,
+          paymentMode: 'ONLINE',
+          paymentDate: new Date(),
+          transactionRefId: parsed.uniqueRefNumber
+        }], { session });
+
+        await createAuditLog(attempt._id, session, attempt.tenantId, previousStatus, 'SUCCESS', 'WEBHOOK',
+          `ICICI EazyPay payment successful. Bank Ref: ${parsed.uniqueRefNumber}`);
+
+        await session.commitTransaction();
+        session.endSession();
+      } catch (txErr) {
+        await session.abortTransaction();
+        session.endSession();
+        throw txErr;
+      }
+
+      return res.redirect(`${frontendUrl}/payment/status?status=success&ref=${referenceNo}&bankRef=${parsed.uniqueRefNumber}&amount=${parsed.amount}`);
+
+    } else {
+      // ── FAILURE PATH ──────────────────────────────────────
+      attempt.status = 'FAILED';
+      attempt.gatewayResponse = data;
+      await attempt.save();
+
+      await createAuditLog(attempt._id, null, attempt.tenantId, previousStatus, 'FAILED', 'WEBHOOK',
+        `ICICI EazyPay payment failed: ${parsed.responseCode} — ${parsed.responseMessage}`);
+
+      return res.redirect(`${frontendUrl}/payment/status?status=failed&ref=${referenceNo}&code=${parsed.responseCode}&message=${encodeURIComponent(parsed.responseMessage)}`);
+    }
+  } catch (error) {
+    console.error('[icici-return] Error processing ICICI return:', error);
+    const frontendFallback = process.env.FRONTEND_URL || 'http://localhost:5173';
+    return res.redirect(`${frontendFallback}/payment/status?status=error&message=Payment+processing+error`);
   }
 });
 

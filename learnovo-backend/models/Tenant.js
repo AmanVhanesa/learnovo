@@ -138,6 +138,27 @@ const tenantSchema = new mongoose.Schema({
     }
   },
 
+  // Payment Gateway Configuration (per-tenant)
+  paymentGateway: {
+    provider: {
+      type: String,
+      enum: ['none', 'mock', 'icici_eazypay', 'razorpay'],
+      default: 'none'
+    },
+    // ICICI EazyPay credentials
+    icici: {
+      merchantId: { type: String, default: '' },
+      encryptionKey: { type: String, default: '' },
+      subMerchantId: { type: String, default: '' },
+      // 9 = all modes, 1 = Net Banking, 2 = Credit Card, 3 = Debit Card, 4 = Cash, 6 = UPI, etc.
+      paymode: { type: String, default: '9' }
+    },
+    isActive: {
+      type: Boolean,
+      default: false
+    }
+  },
+
   // Status and metadata
   isActive: {
     type: Boolean,

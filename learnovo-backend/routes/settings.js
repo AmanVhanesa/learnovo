@@ -480,4 +480,85 @@ router.post('/upload-signature', protect, authorize('admin'), upload.single('sig
   }
 });
 
+// ── Payment Gateway Configuration ─────────────────────────────────
+const Tenant = require('../models/Tenant');
+const { clearCache } = require('../services/payment/GatewayFactory');
+
+/**
+ * @desc    Get payment gateway config for this tenant
+ * @route   GET /api/settings/payment-gateway
+ * @access  Private (Admin only)
+ */
+router.get('/payment-gateway', protect, authorize('admin'), async (req, res) => {
+  try {
+    const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway');
+    if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });
+
+    // Mask the encryption key for security (only show last 4 chars)
+    const config = tenant.paymentGateway?.toObject?.() || tenant.paymentGateway || {};
+    if (config.icici?.encryptionKey) {
+      const key = config.icici.encryptionKey;
+      config.icici.encryptionKey = key.length > 4 ? '****' + key.slice(-4) : '****';
+    }
+
+    res.json({ success: true, data: config });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * @desc    Update payment gateway config for this tenant
+ * @route   PUT /api/settings/payment-gateway
+ * @access  Private (Admin only)
+ *
+ * Body: {
+ *   provider: 'icici_eazypay' | 'mock' | 'none',
+ *   icici: { merchantId, encryptionKey, subMerchantId, paymode },
+ *   isActive: true/false
+ * }
+ */
+router.put('/payment-gateway', protect, authorize('admin'), [
+  body('provider').isIn(['none', 'mock', 'icici_eazypay']).withMessage('Invalid provider'),
+  body('isActive').optional().isBoolean()
+], handleValidationErrors, async (req, res) => {
+  try {
+    const { provider, icici, isActive } = req.body;
+    const update = { 'paymentGateway.provider': provider };
+
+    if (typeof isActive === 'boolean') {
+      update['paymentGateway.isActive'] = isActive;
+    }
+
+    if (provider === 'icici_eazypay' && icici) {
+      if (icici.merchantId) update['paymentGateway.icici.merchantId'] = icici.merchantId;
+      // Only update encryption key if it's not the masked value
+      if (icici.encryptionKey && !icici.encryptionKey.startsWith('****')) {
+        update['paymentGateway.icici.encryptionKey'] = icici.encryptionKey;
+      }
+      if (icici.subMerchantId) update['paymentGateway.icici.subMerchantId'] = icici.subMerchantId;
+      if (icici.paymode) update['paymentGateway.icici.paymode'] = icici.paymode;
+    }
+
+    const tenant = await Tenant.findByIdAndUpdate(
+      req.user.tenantId,
+      { $set: update },
+      { new: true, runValidators: true }
+    ).select('paymentGateway');
+
+    if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });
+
+    // Clear the cached gateway instance so it picks up the new config
+    clearCache(req.user.tenantId);
+
+    res.json({
+      success: true,
+      message: 'Payment gateway configuration updated',
+      data: { provider: tenant.paymentGateway.provider, isActive: tenant.paymentGateway.isActive }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

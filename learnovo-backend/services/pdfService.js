@@ -12,6 +12,11 @@ const IDLE_TIMEOUT_MS = 60_000; // Close Chromium after 60s of no PDF requests
 async function getBrowser() {
     clearIdleTimer();
     if (!browserInstance || !browserInstance.isConnected()) {
+        // Close stale instance if it exists but disconnected
+        if (browserInstance) {
+            try { await browserInstance.close(); } catch (e) { /* ignore */ }
+            browserInstance = null;
+        }
         browserInstance = await puppeteer.launch({
             headless: true,
             args: [
@@ -22,7 +27,7 @@ async function getBrowser() {
                 '--font-render-hinting=none',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process'
+                '--disable-extensions',
             ]
         });
     }

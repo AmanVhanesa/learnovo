@@ -51,6 +51,7 @@ import Activities from './pages/Activities'
 import Payroll from './pages/Payroll'
 import Homework from './pages/Homework'
 import StudentFeesDashboard from './pages/student/StudentFeesDashboard'
+import PaymentStatus from './pages/PaymentStatus'
 
 function App() {
   return (
@@ -90,6 +91,8 @@ function App() {
                   <Route path="/" element={<Landing />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
+                  {/* Public payment status page — student lands here after ICICI redirect */}
+                  <Route path="/payment/status" element={<PaymentStatus />} />
                   <Route path="/app" element={
                     <ProtectedRoute>
                       <Layout />
