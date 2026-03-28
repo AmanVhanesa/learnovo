@@ -451,6 +451,7 @@ router.get('/result-card/:studentId/pdf', protect, examPlanGates, async (req, re
                 email: inst.contact?.email || '',
                 board: inst.board || '',
                 affiliation: inst.affiliationNumber || '',
+                schoolCode: inst.schoolCode || '',
                 udise: inst.udiseCode || '',
                 logo: inst.logo || null,
                 brand_color: inst.brandColor || '#1E3A5F',

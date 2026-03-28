@@ -261,13 +261,8 @@ function buildReportCardPlaceholders(data) {
     const { school, student, exam, subjects, summary, attendance } = data;
     const brandColor = school.brand_color || school.brandColor || '#1E3A5F';
 
-    // Build address line
-    const addressParts = [school.address, school.phone ? `Phone: ${school.phone}` : '', school.email].filter(Boolean);
-    const addressLine = addressParts.join(' \u00B7 ');
-
-    // Build meta line (board, affiliation, UDISE)
-    const metaParts = [school.board, school.affiliation ? `Affil: ${school.affiliation}` : '', school.udise ? `UDISE: ${school.udise}` : ''].filter(Boolean);
-    const metaLine = metaParts.join(' \u00B7 ');
+    // Address line (just the address, no phone/email)
+    const addressLine = school.address || '';
 
     // Build subject rows HTML
     const subjectRowsHtml = (subjects || []).map(s => buildSubjectRow(s)).join('\n');
@@ -291,7 +286,11 @@ function buildReportCardPlaceholders(data) {
         brand_color_light: `${brandColor}0A`,
         school_name: school.name || '',
         school_address: addressLine,
-        school_meta: metaLine,
+        school_phone: school.phone || '',
+        school_email: school.email || '',
+        affiliation_no: school.affiliation || '',
+        school_code: school.schoolCode || school.school_code || '',
+        udise_no: school.udise || '',
         exam_type: exam.type || exam.examSeries || 'Mid Term',
         academic_year: exam.academic_year || exam.academicYear || '',
         date_issued: dateIssued,
