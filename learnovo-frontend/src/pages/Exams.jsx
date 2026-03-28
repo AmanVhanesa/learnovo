@@ -12,6 +12,7 @@ import { teachersService } from '../services/teachersService';
 import ExamResultsModal from '../components/ExamResultsModal';
 import ResultCard from '../components/ResultCard';
 import toast from 'react-hot-toast';
+import { formatDate } from '../utils/formatDate';
 import { useAuth } from '../contexts/AuthContext';
 import Select from '../components/ui/Select';
 import DatePicker from '../components/ui/DatePicker';
@@ -349,7 +350,7 @@ const Exams = () => {
                                 <td className="px-5 py-3 text-gray-700 dark:text-[#8E8E93]">
                                     <div className="flex items-center gap-1.5">
                                         <Calendar className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
-                                        {new Date(exam.date).toLocaleDateString()}
+                                        {formatDate(exam.date)}
                                     </div>
                                 </td>
                                 <td className="px-5 py-3">
@@ -487,7 +488,7 @@ const Exams = () => {
                                                 </td>
                                                 <td className="px-5 py-3">
                                                     <div className="text-gray-700 dark:text-[#8E8E93]">{s.examName}</div>
-                                                    <div className="text-xs text-gray-400 dark:text-[#636366]">{s.examSeries} {s.date ? `\u2022 ${new Date(s.date).toLocaleDateString()}` : ''}</div>
+                                                    <div className="text-xs text-gray-400 dark:text-[#636366]">{s.examSeries} {s.date ? `\u2022 ${formatDate(s.date)}` : ''}</div>
                                                 </td>
                                                 <td className="px-5 py-3 text-center font-bold text-gray-900 dark:text-white">{s.marksObtained}/{s.totalMarks}</td>
                                                 <td className="px-5 py-3 text-center text-gray-700 dark:text-[#8E8E93]">{s.percentage}%</td>
@@ -699,7 +700,7 @@ const Exams = () => {
                                                                 <td className="px-5 py-3">
                                                                     <div className="flex items-center gap-1.5 text-gray-700 dark:text-[#8E8E93]">
                                                                         <Calendar className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366] shrink-0" />
-                                                                        {new Date(exam.date).toLocaleDateString()}
+                                                                        {formatDate(exam.date)}
                                                                     </div>
                                                                 </td>
                                                                 <td className="px-5 py-3">

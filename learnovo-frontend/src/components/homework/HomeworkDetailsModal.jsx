@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, BookOpen, User, Download, File, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import homeworkService from '../../services/homeworkService';
+import { formatDateTime } from '../../utils/formatDate';
 import toast from 'react-hot-toast';
 
 const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
@@ -45,15 +46,6 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
         }
     };
 
-    const formatDate = (date) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
 
     const isImage = (fileType) => fileType?.startsWith('image/');
 
@@ -85,11 +77,11 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
                             </div>
                             <div>
                                 <p className="text-gray-600 dark:text-[#8E8E93]">Assigned</p>
-                                <p className="font-medium text-gray-900 dark:text-white">{formatDate(homework.assignedDate)}</p>
+                                <p className="font-medium text-gray-900 dark:text-white">{formatDateTime(homework.assignedDate)}</p>
                             </div>
                             <div>
                                 <p className="text-gray-600 dark:text-[#8E8E93]">Due Date</p>
-                                <p className="font-medium text-gray-900 dark:text-white">{formatDate(homework.dueDate)}</p>
+                                <p className="font-medium text-gray-900 dark:text-white">{formatDateTime(homework.dueDate)}</p>
                             </div>
                         </div>
                     </div>
@@ -198,7 +190,7 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
                                             )}
 
                                             {submission.submittedAt && (
-                                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Submitted: {formatDate(submission.submittedAt)}</p>
+                                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Submitted: {formatDateTime(submission.submittedAt)}</p>
                                             )}
 
                                             {/* Feedback Form */}

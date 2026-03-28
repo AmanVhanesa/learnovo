@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award, Eye, X } from 'lucide-react';
 import certificateService from '../../services/certificateService';
+import { formatDate } from '../../utils/formatDate';
 import { reportsService } from '../../services/reportsService';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
+import CertificatePreviewContent from './CertificatePreviewContent';
 
 const CertificateManager = () => {
     const navigate = useNavigate();
@@ -94,30 +96,6 @@ const CertificateManager = () => {
         });
     };
 
-    const getPreviewRows = (cert) => {
-        const d = cert.contentSnapshot || {};
-        if (cert.type === 'TC') {
-            return [
-                ['Student Name', d.studentName], ["Father's / Guardian's Name", d.fatherName],
-                ["Mother's Name", d.motherName], ['Nationality', d.nationality], ['Category', d.category],
-                ['Date of Birth', d.dob], ['Date of Birth (in words)', d.dobWords],
-                ['Admission Number', d.admissionNumber], ['Date of First Admission', d.admissionDate],
-                ['Class in which Last Studied', d.class], ['Section', d.section],
-                ['Academic Year', d.academicYear], ['Board Examination Result', d.boardResult],
-                ['Promotion Status', d.promotionStatus], ['Subjects Studied', d.subjects],
-                ['Fee Status', d.feeStatus], ['General Conduct', d.conduct],
-                ['Date of Application', d.applicationDate], ['Date of Issue', d.issueDate],
-                ['Reason for Leaving', d.leavingReason], ['Remarks', d.remarks],
-            ];
-        }
-        return [
-            ['Student Name', d.studentName], ["Father's Name", d.fatherName],
-            ["Mother's Name", d.motherName], ['Admission Number', d.admissionNumber],
-            ['Date of Birth', d.dob], ['Class', d.class], ['Section', d.section],
-            ['Academic Year', d.academicYear], ['Category', d.category], ['Purpose', d.purpose],
-        ];
-    };
-
     const filteredHistory = history.filter(cert =>
         cert.student?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cert.certificateNumber?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -144,7 +122,7 @@ const CertificateManager = () => {
                             <tr key={cert._id} className="hover:bg-gray-50/50 dark:hover:bg-[#2C2C2E]/50 transition-colors">
                                 <td className="px-5 py-3.5 text-sm font-medium text-gray-900 dark:text-white">{cert.certificateNumber}</td>
                                 <td className="px-5 py-3.5 text-sm text-gray-700 dark:text-[#8E8E93]">{cert.student?.fullName || 'Unknown Student'}</td>
-                                <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(cert.issueDate).toLocaleDateString()}</td>
+                                <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8E8E93]">{formatDate(cert.issueDate)}</td>
                                 <td className="px-5 py-3.5 text-sm text-gray-500 dark:text-[#8E8E93]">{cert.issuedBy?.fullName || cert.issuedBy?.name || (cert.issuedBy?.firstName ? `${cert.issuedBy.firstName} ${cert.issuedBy.lastName || ''}`.trim() : '-')}</td>
                                 <td className="px-5 py-3.5 text-right">
                                     <div className="flex items-center justify-end gap-1">
@@ -331,61 +309,12 @@ const CertificateManager = () => {
 
                         {/* A4 Paper area */}
                         <div className="w-full flex-1 overflow-y-auto bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
-                            <div className="bg-white w-full max-w-[595px] min-h-[842px] shadow-2xl relative overflow-hidden" style={{ fontFamily: 'serif' }}>
-                                {/* PREVIEW Watermark */}
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none" style={{ zIndex: 1 }}>
-                                    <span className="text-gray-200 font-bold tracking-widest" style={{ fontSize: '72px', transform: 'rotate(-35deg)', opacity: 0.35 }}>PREVIEW</span>
-                                </div>
-
-                                {/* Certificate content */}
-                                <div className="relative p-8 sm:p-12" style={{ zIndex: 2 }}>
-                                    <div className="border-2 p-6 sm:p-8" style={{ borderColor: '#b08d57' }}>
-                                        <h1 className="text-center font-bold text-lg sm:text-xl text-gray-900 mb-1">
-                                            {previewCert.contentSnapshot?.schoolName || 'School Name'}
-                                        </h1>
-                                        <p className="text-center text-xs text-gray-500 mb-4">
-                                            {previewCert.contentSnapshot?.schoolAddress}
-                                        </p>
-
-                                        <h2 className="text-center font-bold text-base sm:text-lg underline mb-4 text-gray-800">
-                                            {previewCert.type === 'TC' ? 'SCHOOL LEAVING CERTIFICATE' : 'BONAFIDE CERTIFICATE'}
-                                        </h2>
-
-                                        <div className="text-right text-xs text-gray-600 mb-4 space-y-0.5">
-                                            <p>Certificate No: <span className="font-medium">{previewCert.certificateNumber}</span></p>
-                                            <p>Date: <span className="font-medium">{previewCert.contentSnapshot?.issueDate || new Date(previewCert.issueDate).toLocaleDateString()}</span></p>
-                                        </div>
-
-                                        {previewCert.type === 'BONAFIDE' && (
-                                            <p className="text-sm text-gray-700 mb-4">
-                                                This is to certify that <strong>{previewCert.contentSnapshot?.studentName}</strong> is a bonafide student of this school. The details are as follows:
-                                            </p>
-                                        )}
-
-                                        <table className="w-full text-xs border-collapse mb-6">
-                                            <tbody>
-                                                {getPreviewRows(previewCert).map(([label, value], i) => (
-                                                    <tr key={i} className="border-b border-gray-200">
-                                                        <td className="py-1.5 pr-3 font-semibold text-gray-700 w-2/5 align-top">{label}</td>
-                                                        <td className="py-1.5 text-gray-900">{value || 'N/A'}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-
-                                        <div className="flex justify-between mt-10 pt-4">
-                                            <div className="text-center">
-                                                <div className="w-32 border-t border-gray-400 mb-1"></div>
-                                                <p className="text-xs font-semibold text-gray-700">Class Teacher</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <div className="w-32 border-t border-gray-400 mb-1"></div>
-                                                <p className="text-xs font-semibold text-gray-700">Principal</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <CertificatePreviewContent
+                                type={previewCert.type}
+                                data={previewCert.contentSnapshot}
+                                certificateNumber={previewCert.certificateNumber}
+                                showPreviewWatermark={true}
+                            />
                         </div>
 
                         {/* Modal footer */}

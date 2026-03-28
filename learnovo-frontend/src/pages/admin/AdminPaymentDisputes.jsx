@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminDisputesService } from '../../services/adminDisputesService';
+import { formatDate } from '../../utils/formatDate';
 
 const AdminPaymentDisputes = () => {
     const [disputes, setDisputes] = useState([]);
@@ -123,7 +124,7 @@ const AdminPaymentDisputes = () => {
                                     )}
                                     {disputes.map(dispute => (
                                         <tr key={dispute._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
-                                            <td className="px-6 py-4 text-gray-700 dark:text-[#8E8E93]">{new Date(dispute.createdAt).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-gray-700 dark:text-[#8E8E93]">{formatDate(dispute.createdAt)}</td>
                                             <td className="px-6 py-4">
                                                 <p className="font-medium text-gray-900 dark:text-white">{dispute.studentId?.fullName}</p>
                                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{dispute.studentId?.email}</p>

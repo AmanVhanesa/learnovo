@@ -1551,7 +1551,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
 
       // Academic
       academicYear: { label: 'Academic Year', extract: (s) => s.academicYear || '' },
-      admissionDate: { label: 'Admission Date', extract: (s) => s.admissionDate ? new Date(s.admissionDate).toLocaleDateString() : '' },
+      admissionDate: { label: 'Admission Date', extract: (s) => s.admissionDate ? new Date(s.admissionDate).toLocaleDateString('en-IN') : '' },
       penNumber: { label: 'PEN Number', extract: (s) => s.penNumber || '' },
       subDepartment: { label: 'Sub Department', extract: (s) => s.subDepartment?.name || '' },
 
@@ -1599,7 +1599,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async (req, res) =
       address: { label: 'Address', extract: (s) => `"${(s.address || '').replace(/"/g, '""')}"` },
 
       // Personal
-      dob: { label: 'DOB', extract: (s) => s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString() : '' },
+      dob: { label: 'DOB', extract: (s) => s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString('en-IN') : '' },
       gender: { label: 'Gender', extract: (s) => s.gender || '' },
       bloodGroup: { label: 'Blood Group', extract: (s) => s.bloodGroup || '' },
       category: { label: 'Category', extract: (s) => s.category || '' },

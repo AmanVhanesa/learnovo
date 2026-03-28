@@ -331,7 +331,7 @@ router.get('/:id/export/pdf', protect, async (req, res) => {
         // Generated Date and Subtitle mapping
         doc.font('Helvetica').fontSize(10).fillColor('#666666');
         doc.text(`List: ${list.name}`, 40, doc.y, { continued: true });
-        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, { align: 'right' });
+        doc.text(`Generated on: ${new Date().toLocaleDateString('en-IN')}`, { align: 'right' });
         doc.moveDown(1);
 
         if (list.description) {

@@ -461,7 +461,7 @@ async function notifyFeeInvoiceGenerated(fee, student, tenantId) {
             tenantId,
             userId: student._id,
             title: 'New Fee Invoice Generated',
-            message: `Fee invoice for ${fee.description} - ${fee.currency} ${fee.amount.toLocaleString()} has been generated. Due date: ${new Date(fee.dueDate).toLocaleDateString()}`,
+            message: `Fee invoice for ${fee.description} - ${fee.currency} ${fee.amount.toLocaleString()} has been generated. Due date: ${new Date(fee.dueDate).toLocaleDateString('en-IN')}`,
             type: 'info',
             category: 'fee_due',
             actionUrl: `/app/fees`,
@@ -488,7 +488,7 @@ async function notifyFeeInvoiceGenerated(fee, student, tenantId) {
                     tenantId,
                     userId: parent._id,
                     title: 'Fee Invoice for Your Child',
-                    message: `Fee invoice for ${student.name} - ${fee.description}: ${fee.currency} ${fee.amount.toLocaleString()}. Due: ${new Date(fee.dueDate).toLocaleDateString()}`,
+                    message: `Fee invoice for ${student.name} - ${fee.description}: ${fee.currency} ${fee.amount.toLocaleString()}. Due: ${new Date(fee.dueDate).toLocaleDateString('en-IN')}`,
                     type: 'info',
                     category: 'fee_reminder',
                     actionUrl: `/app/students/${student._id}`,
@@ -578,7 +578,7 @@ async function notifyFeeReminder(fee, student, tenantId) {
             tenantId,
             userId: student._id,
             title: 'Fee Payment Reminder',
-            message: `Reminder: ${fee.description} payment of ${fee.currency} ${fee.amount.toLocaleString()} is due in ${daysUntilDue} days (${new Date(fee.dueDate).toLocaleDateString()}).`,
+            message: `Reminder: ${fee.description} payment of ${fee.currency} ${fee.amount.toLocaleString()} is due in ${daysUntilDue} days (${new Date(fee.dueDate).toLocaleDateString('en-IN')}).`,
             type: 'warning',
             category: 'fee_reminder',
             actionUrl: `/app/fees`,
@@ -774,7 +774,7 @@ async function notifyStudentAbsent(attendance, student, tenantId) {
             tenantId,
             userId: student._id,
             title: 'Attendance: Absent',
-            message: `You were marked absent on ${new Date(attendance.date).toLocaleDateString()}.`,
+            message: `You were marked absent on ${new Date(attendance.date).toLocaleDateString('en-IN')}.`,
             type: 'warning',
             category: 'attendance',
             actionUrl: `/app/attendance`,
@@ -799,7 +799,7 @@ async function notifyStudentAbsent(attendance, student, tenantId) {
                     tenantId,
                     userId: parent._id,
                     title: 'Student Absence Alert',
-                    message: `${student.name} was marked absent on ${new Date(attendance.date).toLocaleDateString()}.`,
+                    message: `${student.name} was marked absent on ${new Date(attendance.date).toLocaleDateString('en-IN')}.`,
                     type: 'warning',
                     category: 'attendance',
                     actionUrl: `/app/students/${student._id}`,
@@ -828,7 +828,7 @@ async function notifyAttendanceNotSubmitted(teacher, classData, date, tenantId) 
             tenantId,
             userId: teacher._id,
             title: 'Attendance Submission Reminder',
-            message: `Please submit attendance for ${classData.name} for ${new Date(date).toLocaleDateString()}.`,
+            message: `Please submit attendance for ${classData.name} for ${new Date(date).toLocaleDateString('en-IN')}.`,
             type: 'warning',
             category: 'attendance',
             actionUrl: `/app/attendance`,
@@ -933,7 +933,7 @@ async function notifyExamScheduled(exam, students, tenantId) {
             tenantId,
             userId: student._id,
             title: 'Exam Scheduled',
-            message: `${exam.name} has been scheduled for ${new Date(exam.date).toLocaleDateString()}.`,
+            message: `${exam.name} has been scheduled for ${new Date(exam.date).toLocaleDateString('en-IN')}.`,
             type: 'info',
             category: 'exam',
             actionUrl: `/app/exams`,
@@ -1039,7 +1039,7 @@ async function notifyHomeworkAssigned(homework, assignedByUserId, tenantId) {
         const classId = homework.class?._id || homework.class;
         const subjectName = homework.subject?.name || 'a subject';
         const dueDate = homework.dueDate
-            ? new Date(homework.dueDate).toLocaleDateString()
+            ? new Date(homework.dueDate).toLocaleDateString('en-IN')
             : 'TBD';
 
         // 1. Notify all students in the class

@@ -5,6 +5,7 @@ import {
     CheckCircle2, ArrowRight, Sparkles
 } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
+import { formatDateCompact } from '../utils/formatDate';
 
 const TYPE_CONFIG = {
     success: {
@@ -51,7 +52,7 @@ const formatTimeAgo = (dateString) => {
     if (hours < 24) return `${hours}h ago`;
     const days = Math.floor(hours / 24);
     if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatDateCompact(date);
 };
 
 const NotificationDropdown = ({ onClose, bellRef }) => {

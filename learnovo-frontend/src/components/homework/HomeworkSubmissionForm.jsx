@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Upload, Trash2, File, Image as ImageIcon } from 'lucide-react';
 import homeworkService from '../../services/homeworkService';
+import { formatDateShort } from '../../utils/formatDate';
 import toast from 'react-hot-toast';
 
 const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
@@ -75,13 +76,6 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
 
     const isImage = (fileType) => fileType?.startsWith('image/');
 
-    const formatDate = (date) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
 
     return (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
@@ -107,7 +101,7 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                             </div>
                             <div>
                                 <p className="text-gray-600 dark:text-[#8E8E93]">Due Date</p>
-                                <p className="font-medium text-gray-900 dark:text-white">{formatDate(homework.dueDate)}</p>
+                                <p className="font-medium text-gray-900 dark:text-white">{formatDateShort(homework.dueDate)}</p>
                             </div>
                         </div>
 

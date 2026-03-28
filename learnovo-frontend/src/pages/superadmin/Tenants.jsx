@@ -8,6 +8,7 @@ import {
 import { superAdminService } from '../../services/superAdminService'
 import TenantSlideOver from '../../components/superadmin/TenantSlideOver'
 import toast from 'react-hot-toast'
+import { formatDate, formatDateShort } from '../../utils/formatDate'
 
 const SuperAdminTenants = () => {
     const queryClient = useQueryClient()
@@ -89,7 +90,7 @@ const SuperAdminTenants = () => {
             t.subscription?.status || '',
             t.usage?.students || 0,
             t.usage?.teachers || 0,
-            t.createdAt ? new Date(t.createdAt).toLocaleDateString() : ''
+            t.createdAt ? formatDate(t.createdAt) : ''
         ])
         const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n')
         const blob = new Blob([csv], { type: 'text/csv' })
@@ -299,7 +300,7 @@ const SuperAdminTenants = () => {
                                                         <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5 text-gray-400" />{tenant.usage?.teachers || 0}</span>
                                                     </td>
                                                     <td className="px-5 py-3.5 text-xs text-gray-500 dark:text-[#8E8E93]">
-                                                        {new Date(tenant.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                                        {formatDateShort(tenant.createdAt)}
                                                     </td>
                                                     <td className="px-5 py-3.5 text-right">
                                                         <div className="flex items-center justify-end gap-1">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
+import { formatDate } from '../utils/formatDate'
 import {
   Users,
   GraduationCap,
@@ -620,7 +621,7 @@ const Dashboard = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-indigo-600">
-                        {new Date(exam.date).toLocaleDateString()}
+                        {formatDate(exam.date)}
                       </p>
                     </div>
                   </div>

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Download, Eye, Power, PowerOff, Edit, Key, Users } from 'lucide-react'
 import { employeesService } from '../services/employeesService'
 import { exportCSV } from '../utils/exportHelpers'
+import { formatDate } from '../utils/formatDate'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import EmployeeForm from '../components/employees/EmployeeForm'
@@ -204,7 +205,7 @@ const Employees = () => {
                 e.phone || '',
                 e.email || '',
                 e.department || '',
-                e.dateOfJoining ? new Date(e.dateOfJoining).toLocaleDateString() : '',
+                e.dateOfJoining ? formatDate(e.dateOfJoining) : '',
                 e.salary || '',
                 e.isActive ? 'Active' : 'Inactive'
             ])
@@ -406,7 +407,7 @@ const Employees = () => {
                                         <td className="text-sm text-gray-900 dark:text-white">{employee.phone || '-'}</td>
                                         <td className="text-sm text-gray-900 dark:text-white">{employee.department || '-'}</td>
                                         <td className="text-sm text-gray-900 dark:text-white">
-                                            {employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString() : '-'}
+                                            {employee.dateOfJoining ? formatDate(employee.dateOfJoining) : '-'}
                                         </td>
                                         <td>
                                             <span

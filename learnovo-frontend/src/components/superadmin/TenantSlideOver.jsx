@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
 import { superAdminService } from '../../services/superAdminService'
+import { formatDateShort as formatDate, formatDateTime } from '../../utils/formatDate'
 import toast from 'react-hot-toast'
 import {
     X, Building2, Users, FileText, Activity, StickyNote, Settings, ChevronRight,
@@ -59,17 +60,6 @@ function getAvatarColor(name) {
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-function formatDate(date) {
-    if (!date) return 'N/A'
-    return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-function formatDateTime(date) {
-    if (!date) return 'N/A'
-    return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-    })
-}
 
 function getTrialCountdown(trialEnd) {
     if (!trialEnd) return null

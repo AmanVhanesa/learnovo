@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Eye, CheckCircle, XCircle, X, AlertTriangle } from 'lucide-react'
 import { admissionsService } from '../services/admissionsService'
+import { formatDate } from '../utils/formatDate'
 
 const Admissions = () => {
   const queryClient = useQueryClient()
@@ -137,7 +138,7 @@ const Admissions = () => {
                 <td className="text-sm text-gray-900 dark:text-white">{admission?.personalInfo ? `${admission.personalInfo.firstName} ${admission.personalInfo.lastName}` : ''}</td>
                 <td className="text-sm text-gray-900 dark:text-white">{admission.academicInfo?.classApplied}</td>
                 <td className="text-sm text-gray-900 dark:text-white">
-                  {new Date(admission.createdAt).toLocaleDateString()}
+                  {formatDate(admission.createdAt)}
                 </td>
                 <td>
                   <span className={`status-badge status-${admission.status}`}>

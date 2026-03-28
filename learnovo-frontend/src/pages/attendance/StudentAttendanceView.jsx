@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { Calendar, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
+import { formatMonthYear } from '../../utils/formatDate'
 
 const statusColors = {
   present: 'bg-green-500',
@@ -75,7 +76,7 @@ const StudentAttendanceView = () => {
   // Build calendar
   const daysInMonth = new Date(currentYear, currentMonth, 0).getDate()
   const firstDay = new Date(currentYear, currentMonth - 1, 1).getDay()
-  const monthName = new Date(currentYear, currentMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const monthName = formatMonthYear(new Date(currentYear, currentMonth - 1))
 
   // Map records by date
   const recordMap = {}

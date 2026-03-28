@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { FileText, Eye, Edit3 } from 'lucide-react'
+import { formatDate } from '../../utils/formatDate'
 
 const RulesRegulationsSection = ({ form, updateField }) => {
     const [isEditing, setIsEditing] = useState(false)
@@ -43,7 +44,7 @@ const RulesRegulationsSection = ({ form, updateField }) => {
                         {form.rulesAndRegulations.lastUpdatedAt && (
                             <span className="ml-4">
                                 <span className="font-medium">Last Updated:</span>{' '}
-                                {new Date(form.rulesAndRegulations.lastUpdatedAt).toLocaleDateString()}
+                                {formatDate(form.rulesAndRegulations.lastUpdatedAt)}
                             </span>
                         )}
                     </div>

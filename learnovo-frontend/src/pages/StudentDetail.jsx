@@ -12,6 +12,7 @@ import SubjectPreferences from '../components/students/SubjectPreferences'
 import ResultCard from '../components/ResultCard'
 import { SERVER_URL } from '../constants/config'
 import toast from 'react-hot-toast'
+import { formatDate, formatDateShort } from '../utils/formatDate'
 
 const StudentDetail = () => {
     const { id } = useParams()
@@ -370,16 +371,16 @@ const StudentDetail = () => {
                                     <div>
                                         <span className="text-red-600 dark:text-red-400 font-medium">Deactivated on: </span>
                                         <span className="text-gray-800 dark:text-gray-200">
-                                            {new Date(student.removalDate || student.inactivatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                            {formatDateShort(student.removalDate || student.inactivatedAt)}
                                         </span>
                                     </div>
                                     {student.createdAt && (
                                         <div>
                                             <span className="text-red-600 dark:text-red-400 font-medium">Active period: </span>
                                             <span className="text-gray-800 dark:text-gray-200">
-                                                {new Date(student.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                {formatDateShort(student.createdAt)}
                                                 {' — '}
-                                                {new Date(student.removalDate || student.inactivatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                {formatDateShort(student.removalDate || student.inactivatedAt)}
                                                 {' '}
                                                 ({(() => {
                                                     const start = new Date(student.createdAt);
@@ -429,7 +430,7 @@ const StudentDetail = () => {
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Admission Date</p>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
                                     {student.admissionDate
-                                        ? new Date(student.admissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                        ? formatDate(student.admissionDate)
                                         : 'N/A'}
                                 </p>
                             </div>
@@ -483,7 +484,7 @@ const StudentDetail = () => {
                                 <div>
                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Date of Birth</p>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-                                        {student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : 'N/A'}
+                                        {student.dateOfBirth ? formatDate(student.dateOfBirth) : 'N/A'}
                                     </p>
                                 </div>
                                 <div>
@@ -613,7 +614,7 @@ const StudentDetail = () => {
                                         <div>
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">{fee.title}</p>
                                             <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
-                                                Due: {new Date(fee.dueDate).toLocaleDateString()}
+                                                Due: {formatDate(fee.dueDate)}
                                             </p>
                                         </div>
                                         <div className="text-right">
@@ -676,7 +677,7 @@ const StudentDetail = () => {
                                         <div className="space-y-2">
                                             {attendanceData.records.slice(0, 10).map((record, idx) => (
                                                 <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg">
-                                                    <span className="text-sm text-gray-700 dark:text-[#8E8E93]">{new Date(record.date).toLocaleDateString()}</span>
+                                                    <span className="text-sm text-gray-700 dark:text-[#8E8E93]">{formatDate(record.date)}</span>
                                                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                                                         record.status === 'present' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                                                         record.status === 'absent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
@@ -743,7 +744,7 @@ const StudentDetail = () => {
                                             </p>
                                             <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
                                                 {result.subject}{result.examSeries ? ` \u2022 ${result.examSeries}` : ''}
-                                                {result.date ? ` \u2022 ${new Date(result.date).toLocaleDateString()}` : ''}
+                                                {result.date ? ` \u2022 ${formatDate(result.date)}` : ''}
                                             </p>
                                         </div>
                                         <div className="text-right flex items-center gap-3">
@@ -826,7 +827,7 @@ const StudentDetail = () => {
                                         <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white dark:bg-[#1C1C1E] p-4 rounded-lg border border-gray-100 dark:border-[#38383A] shadow-sm">
                                             <div className="flex items-center justify-between mb-1">
                                                 <span className={`font-semibold capitalize ${item.actionType === 'promoted' ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>{item.actionType}</span>
-                                                <time className="text-xs font-medium text-gray-500 dark:text-[#8E8E93]">{new Date(item.createdAt).toLocaleDateString()}</time>
+                                                <time className="text-xs font-medium text-gray-500 dark:text-[#8E8E93]">{formatDate(item.createdAt)}</time>
                                             </div>
                                             <p className="text-sm text-gray-700 dark:text-[#8E8E93]">
                                                 Moved from <strong>{item.fromClass} {item.fromSection && `(${item.fromSection})`}</strong> to <strong>{item.toClass} {item.toSection && `(${item.toSection})`}</strong>

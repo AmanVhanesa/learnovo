@@ -9,6 +9,7 @@ import CreateStudentListModal from '../components/students/CreateStudentListModa
 import AddMoreStudentsModal from '../components/students/AddMoreStudentsModal';
 import { exportPDF, exportExcel } from '../utils/exportHelpers';
 import { useSettings } from '../contexts/SettingsContext';
+import { formatDate } from '../utils/formatDate';
 
 const StudentLists = () => {
     const { settings } = useSettings();
@@ -160,7 +161,7 @@ const StudentLists = () => {
                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] line-clamp-1">{list.description}</p>
                                 )}
                                 <p className="text-[10px] text-gray-400 dark:text-[#636366] mt-2">
-                                    Created {new Date(list.createdAt).toLocaleDateString()}
+                                    Created {formatDate(list.createdAt)}
                                 </p>
                             </button>
                         ))
@@ -199,7 +200,7 @@ const StudentLists = () => {
                                             <Users className="w-4 h-4 text-gray-400 dark:text-[#636366]" />
                                             <span className="font-medium text-gray-900 dark:text-white">{activeListData.students.length}</span> students
                                         </span>
-                                        <span>Created: {new Date(activeListData.createdAt).toLocaleDateString()}</span>
+                                        <span>Created: {formatDate(activeListData.createdAt)}</span>
                                     </div>
                                 </div>
 

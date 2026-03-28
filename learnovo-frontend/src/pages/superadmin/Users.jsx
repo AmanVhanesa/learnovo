@@ -9,6 +9,7 @@ import {
 import { superAdminService } from '../../services/superAdminService'
 import { useSuperAdminAuth } from '../../contexts/SuperAdminContext'
 import toast from 'react-hot-toast'
+import { formatDateShort, formatDateTime } from '../../utils/formatDate'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const USERS_PER_PAGE = 20
@@ -22,15 +23,7 @@ const ROLE_COLORS = {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function formatDate(dateStr) {
-    if (!dateStr) return '—'
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatDateTime(dateStr) {
-    if (!dateStr) return '—'
-    return new Date(dateStr).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
+const formatDate = formatDateShort
 
 function getUserName(user) {
     return user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User'

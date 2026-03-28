@@ -6,6 +6,7 @@ import Select from '../../components/ui/Select'
 import { attendanceService } from '../../services/attendanceService'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
+import { formatMonthYear } from '../../utils/formatDate'
 
 const typeLabels = {
   public_holiday: 'Public Holiday',
@@ -120,7 +121,7 @@ const Holidays = () => {
   holidays.forEach(h => {
     const d = new Date(h.date)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const label = formatMonthYear(d)
     if (!grouped[key]) grouped[key] = { label, holidays: [] }
     grouped[key].holidays.push(h)
   })

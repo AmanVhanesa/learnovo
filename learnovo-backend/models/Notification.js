@@ -233,7 +233,7 @@ notificationSchema.virtual('timeAgo').get(function () {
     if (diff < 3600000) return `${Math.floor(diff / 60000)} minutes ago`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)} hours ago`;
     if (diff < 604800000) return `${Math.floor(diff / 86400000)} days ago`;
-    return this.createdAt.toLocaleDateString();
+    return this.createdAt.toLocaleDateString('en-IN');
 });
 
 // Ensure virtuals are included in JSON

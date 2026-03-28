@@ -13,6 +13,7 @@ import {
 } from 'chart.js'
 import toast from 'react-hot-toast'
 import { superAdminService } from '../../services/superAdminService'
+import { formatDate } from '../../utils/formatDate'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler)
 
@@ -502,7 +503,7 @@ const Reports = () => {
                                             <td className="px-4 sm:px-5 py-3 text-xs sm:text-sm text-gray-700 dark:text-white">{(row.students || 0).toLocaleString()}</td>
                                             <td className="px-4 sm:px-5 py-3 text-xs sm:text-sm text-gray-700 dark:text-white">{(row.teachers || 0).toLocaleString()}</td>
                                             <td className="px-4 sm:px-5 py-3 text-xs sm:text-sm text-gray-700 dark:text-white">
-                                                {row.lastActive ? new Date(row.lastActive).toLocaleDateString() : '-'}
+                                                {row.lastActive ? formatDate(row.lastActive) : '-'}
                                             </td>
                                             <td className="px-4 sm:px-5 py-3">
                                                 <StatusBadge status={row.status} />

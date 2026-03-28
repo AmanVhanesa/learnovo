@@ -11,6 +11,7 @@ import {
     LineElement, ArcElement, Title, Tooltip, Legend, Filler
 } from 'chart.js'
 import { superAdminService } from '../../services/superAdminService'
+import { formatDate } from '../../utils/formatDate'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler)
 
@@ -269,7 +270,7 @@ const SuperAdminDashboard = () => {
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{t.schoolName}</p>
-                                                <p className="text-xs text-gray-400">Expires {trialEnd.toLocaleDateString()}</p>
+                                                <p className="text-xs text-gray-400">Expires {formatDate(trialEnd)}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -335,7 +336,7 @@ const SuperAdminDashboard = () => {
                                         <td className="px-4 sm:px-5 py-3">
                                             <StatusBadge status={t.subscription?.status} />
                                         </td>
-                                        <td className="px-4 sm:px-5 py-3 text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(t.createdAt).toLocaleDateString()}</td>
+                                        <td className="px-4 sm:px-5 py-3 text-sm text-gray-500 dark:text-[#8E8E93]">{formatDate(t.createdAt)}</td>
                                         <td className="px-4 sm:px-5 py-3 text-right">
                                             <div className="flex items-center justify-end gap-1.5">
                                                 <button

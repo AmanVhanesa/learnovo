@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { feesService } from '../services/feesService'
 import { studentsService } from '../services/studentsService'
 import { exportCSV } from '../utils/exportHelpers'
+import { formatDate } from '../utils/formatDate'
 import toast from 'react-hot-toast'
 import { sortByRelevance } from '../utils/searchRelevance'
 
@@ -443,7 +444,7 @@ const Fees = () => {
                   f.feeType || '',
                   f.amount || 0,
                   f.status || '',
-                  f.dueDate ? new Date(f.dueDate).toLocaleDateString() : '',
+                  f.dueDate ? formatDate(f.dueDate) : '',
                   f.paymentMethod || '',
                   f.description || ''
                 ]))
@@ -541,7 +542,7 @@ const Fees = () => {
                   {formatCurrency(fee.amount, fee.currency)}
                 </td>
                 <td className="text-sm text-gray-900 dark:text-white">
-                  {new Date(fee.dueDate).toLocaleDateString()}
+                  {formatDate(fee.dueDate)}
                 </td>
                 <td>
                   <span className={`status-badge status-${fee.status}`}>

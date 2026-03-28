@@ -74,7 +74,7 @@ exports.sendFeeReminder = async(student, fee) => {
               <h3>Fee Details:</h3>
               <p><strong>Description:</strong> ${fee.description}</p>
               <p><strong>Amount:</strong> <span class="amount">${fee.amount}</span></p>
-              <p><strong>Due Date:</strong> ${new Date(fee.dueDate).toLocaleDateString()}</p>
+              <p><strong>Due Date:</strong> ${new Date(fee.dueDate).toLocaleDateString('en-IN')}</p>
               <p><strong>Student ID:</strong> ${student.studentId}</p>
               <p><strong>Class:</strong> ${student.class}</p>
             </div>
@@ -140,7 +140,7 @@ exports.sendOverdueFeeReminder = async(student, fee) => {
               <h3>Overdue Fee Details:</h3>
               <p><strong>Description:</strong> ${fee.description}</p>
               <p><strong>Amount:</strong> <span class="amount">${fee.amount}</span></p>
-              <p><strong>Due Date:</strong> ${new Date(fee.dueDate).toLocaleDateString()}</p>
+              <p><strong>Due Date:</strong> ${new Date(fee.dueDate).toLocaleDateString('en-IN')}</p>
               <p><strong>Days Overdue:</strong> ${Math.ceil((new Date() - new Date(fee.dueDate)) / (1000 * 60 * 60 * 24))} days</p>
               <p><strong>Student ID:</strong> ${student.studentId}</p>
               <p><strong>Class:</strong> ${student.class}</p>
@@ -205,7 +205,7 @@ exports.sendAdmissionApproval = async(student, admission) => {
               <p><strong>Application Number:</strong> ${admission.applicationNumber}</p>
               <p><strong>Student ID:</strong> ${admission.admissionInfo.studentId}</p>
               <p><strong>Class:</strong> ${admission.academicInfo.classApplied}</p>
-              <p><strong>Admission Date:</strong> ${new Date(admission.admissionInfo.admissionDate).toLocaleDateString()}</p>
+              <p><strong>Admission Date:</strong> ${new Date(admission.admissionInfo.admissionDate).toLocaleDateString('en-IN')}</p>
               <p><strong>Roll Number:</strong> ${admission.admissionInfo.rollNumber}</p>
             </div>
             

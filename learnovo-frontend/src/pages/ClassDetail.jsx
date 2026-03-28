@@ -9,6 +9,7 @@ import { teachersService } from '../services/teachersService'
 import { subjectsService } from '../services/subjectsService'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
+import { formatDate } from '../utils/formatDate'
 
 const ClassDetail = () => {
   const { id } = useParams()
@@ -237,7 +238,7 @@ const ClassDetail = () => {
                           <td className="text-sm text-gray-900 dark:text-white">{student.email}</td>
                           <td className="text-sm text-gray-900 dark:text-white">{student.rollNumber}</td>
                           <td className="text-sm text-gray-900 dark:text-white">
-                            {student.admissionDate ? new Date(student.admissionDate).toLocaleDateString() : '-'}
+                            {student.admissionDate ? formatDate(student.admissionDate) : '-'}
                           </td>
                         </tr>
                       ))}

@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import { useSettings } from '../contexts/SettingsContext'
 
 import { SERVER_URL } from '../constants/config'
+import { formatDate } from '../utils/formatDate'
 
 const StudentPhotoCell = ({ student }) => {
   const [imgFailed, setImgFailed] = React.useState(false)
@@ -975,7 +976,7 @@ const Students = () => {
                       {!student.isActive && (student.removalDate || student.inactivatedAt) && (
                         <div className="mt-1 text-xs text-gray-500 dark:text-[#8E8E93] space-y-0.5">
                           <div>
-                            Deactivated: {new Date(student.removalDate || student.inactivatedAt).toLocaleDateString()}
+                            Deactivated: {formatDate(student.removalDate || student.inactivatedAt)}
                           </div>
                           {student.createdAt && (
                             <div>

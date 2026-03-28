@@ -7,6 +7,7 @@ import { teachersService } from '../services/teachersService'
 import { feesService } from '../services/feesService'
 import { assignmentsService } from '../services/assignmentsService'
 import { sortStudentsByRelevance, sortByRelevance } from '../utils/searchRelevance'
+import { formatDate } from '../utils/formatDate'
 
 const Search = () => {
   const [searchParams] = useSearchParams()
@@ -272,7 +273,7 @@ const Search = () => {
                       </div>
                       <div className="text-right ml-4">
                         <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
-                          Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                          Due: {formatDate(assignment.dueDate)}
                         </p>
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${assignment.status === 'active' ? 'bg-green-100 text-green-800' :
                           assignment.status === 'completed' ? 'bg-blue-100 text-blue-800' :

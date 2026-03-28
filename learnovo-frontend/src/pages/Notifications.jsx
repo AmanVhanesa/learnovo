@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationContext'
 import notificationsService from '../services/notificationsService'
+import { formatDateShort } from '../utils/formatDate'
 
 const TYPE_CONFIG = {
   success: {
@@ -60,7 +61,7 @@ const formatDate = (dateString) => {
   if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`
   const days = Math.floor(hours / 24)
   if (days < 7) return `${days} day${days !== 1 ? 's' : ''} ago`
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return formatDateShort(date)
 }
 
 const Notifications = () => {

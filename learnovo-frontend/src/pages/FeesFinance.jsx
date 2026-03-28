@@ -13,6 +13,7 @@ import {
 import { academicSessionsService, classesService } from '../services/academicsService'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../utils/formatCurrency'
+import { formatDate } from '../utils/formatDate'
 import { sortByRelevance } from '../utils/searchRelevance'
 import { buildReceiptHtml, downloadReceiptAsPdf } from '../utils/receiptHelpers'
 import toast from 'react-hot-toast'
@@ -894,7 +895,7 @@ const RefundsTab = () => {
                   <td className="px-5 py-4 text-sm text-gray-600 dark:text-[#8E8E93] max-w-xs truncate">{r.reason}</td>
                   <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93] capitalize">{r.refundMethod || 'Original'}</td>
                   <td className="px-5 py-4 whitespace-nowrap"><span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize ${badgeCls(r.status)}`}>{r.status}</span></td>
-                  <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(r.createdAt).toLocaleDateString()}</td>
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{formatDate(r.createdAt)}</td>
                   <td className="px-5 py-4 whitespace-nowrap"><div className="flex gap-1">
                     {r.status === 'pending' && <><button onClick={() => handleApprove(r._id)} disabled={processingId === r._id} className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg"><Check className="h-4 w-4" /></button><button onClick={() => setRejectModal({ isOpen: true, refundId: r._id })} className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Ban className="h-4 w-4" /></button></>}
                     {r.status === 'approved' && <button onClick={() => handleProcess(r._id)} disabled={processingId === r._id} className="btn btn-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/30">{processingId === r._id ? '...' : 'Process'}</button>}

@@ -8,6 +8,7 @@ import { subjectsService } from '../services/subjectsService'
 import { attendanceService } from '../services/attendanceService'
 import { teacherAssignmentsService } from '../services/academicsService'
 import { exportCSV } from '../utils/exportHelpers'
+import { formatDate } from '../utils/formatDate'
 import toast from 'react-hot-toast'
 
 const Assignments = () => {
@@ -223,7 +224,7 @@ const Assignments = () => {
         a.title,
         a.class,
         a.subject,
-        new Date(a.dueDate).toLocaleDateString(),
+        formatDate(a.dueDate),
         a.status,
         a.totalMarks || 100
       ])

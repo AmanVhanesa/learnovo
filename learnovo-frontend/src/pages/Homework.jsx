@@ -11,6 +11,7 @@ import HomeworkForm from '../components/homework/HomeworkForm';
 import HomeworkDetailsModal from '../components/homework/HomeworkDetailsModal';
 import HomeworkSubmissionForm from '../components/homework/HomeworkSubmissionForm';
 import toast from 'react-hot-toast';
+import { formatDateShort } from '../utils/formatDate';
 
 const Homework = () => {
     const { user } = useAuth();
@@ -165,13 +166,7 @@ const Homework = () => {
         }
     };
 
-    const formatDate = (date) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    };
+    const formatDate = (date) => formatDateShort(date);
 
     return (
         <div className="space-y-6">

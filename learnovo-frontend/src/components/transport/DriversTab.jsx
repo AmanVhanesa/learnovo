@@ -3,6 +3,7 @@ import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, User, Downloa
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
 import { exportCSV } from '../../utils/exportHelpers';
+import { formatDate } from '../../utils/formatDate';
 
 const DriversTab = ({ onStatsUpdate }) => {
     const [drivers, setDrivers] = useState([]);
@@ -132,8 +133,8 @@ const DriversTab = ({ onStatsUpdate }) => {
                                 d.email || '',
                                 d.licenseNumber || '',
                                 d.licenseType || '',
-                                d.licenseExpiry ? new Date(d.licenseExpiry).toLocaleDateString() : '',
-                                d.dateOfJoining ? new Date(d.dateOfJoining).toLocaleDateString() : '',
+                                d.licenseExpiry ? formatDate(d.licenseExpiry) : '',
+                                d.dateOfJoining ? formatDate(d.dateOfJoining) : '',
                                 d.salary || '',
                                 d.isActive ? 'Active' : 'Inactive'
                             ]))
@@ -205,7 +206,7 @@ const DriversTab = ({ onStatsUpdate }) => {
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm text-gray-900 dark:text-white">{driver.licenseNumber}</div>
                                         <div className="text-sm text-gray-500 dark:text-[#8E8E93]">
-                                            Expires: {new Date(driver.licenseExpiry).toLocaleDateString()}
+                                            Expires: {formatDate(driver.licenseExpiry)}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">

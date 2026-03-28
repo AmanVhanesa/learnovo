@@ -9,6 +9,7 @@ import { teacherAssignmentsService } from '../services/academicsService'
 import { useAuth } from '../contexts/AuthContext'
 import EmployeeForm from '../components/employees/EmployeeForm'
 import toast from 'react-hot-toast'
+import { formatDate } from '../utils/formatDate'
 
 const EmployeeDetail = () => {
     const { id } = useParams()
@@ -362,7 +363,7 @@ const EmployeeDetail = () => {
                             <div>
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Joining Date</p>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-                                    {employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString() : 'N/A'}
+                                    {employee.dateOfJoining ? formatDate(employee.dateOfJoining) : 'N/A'}
                                 </p>
                             </div>
                             <div>
@@ -450,7 +451,7 @@ const EmployeeDetail = () => {
                                 <div>
                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Date of Birth</p>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-                                        {employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : 'N/A'}
+                                        {employee.dateOfBirth ? formatDate(employee.dateOfBirth) : 'N/A'}
                                     </p>
                                 </div>
                                 <div>
