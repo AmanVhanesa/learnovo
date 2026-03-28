@@ -94,8 +94,8 @@
   .header {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 20px 26px 16px;
+    gap: 16px;
+    padding: 22px 26px 10px;
     flex-shrink: 0;
   }
 
@@ -121,7 +121,7 @@
     border: 1.5px dashed #d1d5db;
   }
 
-  .school-info { flex: 1; min-width: 0; }
+  .school-info { flex: 1; min-width: 0; text-align: center; }
 
   .school-name {
     font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -129,7 +129,7 @@
     font-weight: 800;
     color: #1A2E5A;
     line-height: 1.1;
-    letter-spacing: 0.5px;
+    letter-spacing: 2.5px;
     white-space: nowrap;
     text-transform: uppercase;
   }
@@ -142,10 +142,12 @@
     margin-top: 3px;
   }
 
-  .aff-block {
-    margin-left: auto;
-    text-align: right;
-    flex-shrink: 0;
+  .aff-row {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 6px;
+    flex-wrap: wrap;
   }
 
   .aff-line {
@@ -169,7 +171,7 @@
 
   /* ═══ TITLE ═══ */
   .title-section {
-    padding: 14px 26px;
+    padding: 18px 26px;
     text-align: center;
     display: flex;
     flex-direction: column;
@@ -209,7 +211,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 26px;
+    padding: 10px 26px;
     background: #f9fafb;
     border-top: 1px solid #e5e7eb;
     border-bottom: 1px solid #e5e7eb;
@@ -443,12 +445,11 @@
       <div class="school-name">{{school_name}}</div>
       <div class="school-addr">{{school_address}}</div>
       <div class="school-contact">Phone: {{school_phone}} &nbsp;|&nbsp; Email: {{school_email}}</div>
-    </div>
-
-    <div class="aff-block">
-      <div class="aff-line">Affiliation No: <b>{{affiliation_no}}</b></div>
-      <div class="aff-line">School Code: <b>{{school_code}}</b></div>
-      <div class="aff-line">UDISE: <b>{{udise_no}}</b></div>
+      <div class="aff-row">
+        <div class="aff-line">Affiliation No: <b>{{affiliation_no}}</b></div>
+        <div class="aff-line">School Code: <b>{{school_code}}</b></div>
+        <div class="aff-line">UDISE: <b>{{udise_no}}</b></div>
+      </div>
     </div>
   </div>
 
