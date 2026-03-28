@@ -673,7 +673,26 @@ router.get('/', protect, authorize('admin', 'accountant'), async(req, res) => {
       // Escape regex special chars to prevent ReDoS
       const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchRegex = new RegExp(escaped, 'i');
-      const searchFilter = { ...queryFilter, invoiceNumber: searchRegex };
+
+      // Search by invoice number, student name, or admission number
+      const User = require('../models/User');
+      const matchingStudents = await User.find({
+        tenantId: req.tenant._id,
+        $or: [
+          { fullName: searchRegex },
+          { name: searchRegex },
+          { admissionNumber: searchRegex }
+        ]
+      }).select('_id');
+      const studentIds = matchingStudents.map(s => s._id);
+
+      const searchFilter = {
+        ...queryFilter,
+        $or: [
+          { invoiceNumber: searchRegex },
+          ...(studentIds.length > 0 ? [{ studentId: { $in: studentIds } }] : [])
+        ]
+      };
 
       const searchCount = await FeeInvoice.countDocuments(searchFilter);
       paginationTotal = searchCount;
@@ -1077,6 +1096,168 @@ router.put('/:id/apply-late-fee', protect, authorize('admin', 'accountant'), [
   }
 });
 
+// @desc    Apply discount / waiver to an invoice
+// @route   POST /api/invoices/:invoiceId/discount
+// @access  Private (Admin, Accountant)
+router.post('/:invoiceId/discount', protect, authorize('admin', 'accountant'), [
+  body('type').notEmpty().withMessage('Discount type is required'),
+  body('amount').isNumeric().toFloat().custom(v => v > 0).withMessage('Valid positive amount is required'),
+  body('reason').notEmpty().withMessage('Reason is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    const { type, amount, percentage, reason } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const invoice = await FeeInvoice.findOne({ _id: invoiceId, tenantId });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    if (invoice.status === 'Paid') {
+      return res.status(400).json({ success: false, message: 'Cannot apply discount to a fully paid invoice' });
+    }
+
+    if (invoice.status === 'Cancelled') {
+      return res.status(400).json({ success: false, message: 'Cannot apply discount to a cancelled invoice' });
+    }
+
+    if (toNumber(invoice.discountAmount) > 0) {
+      return res.status(400).json({ success: false, message: 'A discount has already been applied to this invoice. Remove it first.' });
+    }
+
+    const discountAmt = roundToRupee(toNumber(amount));
+    if (discountAmt > toNumber(invoice.totalAmount)) {
+      return res.status(400).json({ success: false, message: 'Discount cannot exceed the total amount' });
+    }
+
+    // Check discount doesn't make the balance negative after existing payments
+    const effectiveTotal = toNumber(invoice.totalAmount) + toNumber(invoice.lateFeeApplied) - discountAmt;
+    if (toNumber(invoice.paidAmount) > effectiveTotal + 0.01) {
+      return res.status(400).json({ success: false, message: 'Discount would make balance negative given existing payments' });
+    }
+
+    invoice.discountAmount = discountAmt;
+    invoice.discountType = type;
+    invoice.discountReason = reason;
+    invoice.discountAppliedBy = req.user._id;
+    invoice.discountAppliedAt = new Date();
+
+    await invoice.save(); // pre-save hook recalculates balance & status
+
+    // Audit log (best effort)
+    try {
+      await FeeAuditLog.logAction({
+        tenantId,
+        action: 'DISCOUNT_APPLIED',
+        entityType: 'FeeInvoice',
+        entityId: invoice._id,
+        userId: req.user._id,
+        userName: req.user.name || req.user.fullName || 'Admin',
+        userRole: req.user.role,
+        details: {
+          invoiceNumber: invoice.invoiceNumber,
+          discountAmount: discountAmt,
+          discountType: type,
+          reason,
+          percentage: percentage || null
+        },
+        ipAddress: req.ip
+      });
+    } catch (auditErr) {
+      console.error('Audit log failed (non-fatal):', auditErr.message);
+    }
+
+    // Update student balance (best effort)
+    try {
+      await StudentBalance.updateBalance(tenantId, invoice.studentId, invoice.academicSessionId);
+    } catch (balanceErr) {
+      console.error('Balance update failed (non-fatal):', balanceErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Discount applied successfully',
+      data: invoice
+    });
+  } catch (error) {
+    logger.error('Apply discount error', error);
+    res.status(500).json({ success: false, message: 'Server error while applying discount' });
+  }
+});
+
+// @desc    Remove discount / waiver from an invoice
+// @route   DELETE /api/invoices/:invoiceId/discount
+// @access  Private (Admin, Accountant)
+router.delete('/:invoiceId/discount', protect, authorize('admin', 'accountant'), async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const invoice = await FeeInvoice.findOne({ _id: invoiceId, tenantId });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    if (toNumber(invoice.discountAmount) === 0) {
+      return res.status(400).json({ success: false, message: 'No discount to remove' });
+    }
+
+    if (invoice.status === 'Cancelled') {
+      return res.status(400).json({ success: false, message: 'Cannot modify a cancelled invoice' });
+    }
+
+    const previousDiscount = invoice.discountAmount;
+    const previousType = invoice.discountType;
+
+    invoice.discountAmount = 0;
+    invoice.discountType = undefined;
+    invoice.discountReason = undefined;
+    invoice.discountAppliedBy = undefined;
+    invoice.discountAppliedAt = undefined;
+
+    await invoice.save(); // pre-save hook recalculates balance & status
+
+    // Audit log (best effort)
+    try {
+      await FeeAuditLog.logAction({
+        tenantId,
+        action: 'DISCOUNT_REMOVED',
+        entityType: 'FeeInvoice',
+        entityId: invoice._id,
+        userId: req.user._id,
+        userName: req.user.name || req.user.fullName || 'Admin',
+        userRole: req.user.role,
+        details: {
+          invoiceNumber: invoice.invoiceNumber,
+          removedDiscountAmount: previousDiscount,
+          removedDiscountType: previousType
+        },
+        ipAddress: req.ip
+      });
+    } catch (auditErr) {
+      console.error('Audit log failed (non-fatal):', auditErr.message);
+    }
+
+    // Update student balance (best effort)
+    try {
+      await StudentBalance.updateBalance(tenantId, invoice.studentId, invoice.academicSessionId);
+    } catch (balanceErr) {
+      console.error('Balance update failed (non-fatal):', balanceErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Discount removed successfully',
+      data: invoice
+    });
+  } catch (error) {
+    logger.error('Remove discount error', error);
+    res.status(500).json({ success: false, message: 'Server error while removing discount' });
+  }
+});
+
 // @desc    Collect payment for invoice
 // @route   POST /api/invoices/collect-payment
 // @access  Private (Admin, Accountant)
@@ -1192,27 +1373,31 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
     });
     await studentReceipt.save({ session });
 
-    // Audit log (within transaction)
-    await FeeAuditLog.logAction({
-      tenantId,
-      action: 'PAYMENT_COLLECTED',
-      entityType: 'Payment',
-      entityId: payment._id,
-      userId: req.user._id,
-      userName: req.user.name,
-      userRole: req.user.role,
-      details: {
-        invoiceNumber: invoice.invoiceNumber,
-        receiptNumber,
-        amount,
-        paymentMethod,
-        studentId
-      },
-      ipAddress: req.ip
-    });
-
     await session.commitTransaction();
     session.endSession();
+
+    // Audit log (outside transaction — best effort)
+    try {
+      await FeeAuditLog.logAction({
+        tenantId,
+        action: 'PAYMENT_COLLECTED',
+        entityType: 'Payment',
+        entityId: payment._id,
+        userId: req.user._id,
+        userName: req.user.name || req.user.fullName || 'Admin',
+        userRole: req.user.role,
+        details: {
+          invoiceNumber: invoice.invoiceNumber,
+          receiptNumber,
+          amount,
+          paymentMethod,
+          studentId
+        },
+        ipAddress: req.ip
+      });
+    } catch (auditErr) {
+      console.error('Audit log failed (non-fatal):', auditErr.message);
+    }
 
     // Update student balance (outside transaction — best effort)
     try {

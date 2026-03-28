@@ -51,11 +51,12 @@ function isFullyPaid(paid, total) {
 }
 
 /**
- * Safe balance calculation: total + lateFee - paid, rounded to whole rupee.
+ * Safe balance calculation: total + lateFee - discount - paid, rounded to whole rupee.
  * Clamps to 0 (no negative balances from floating-point dust).
+ * The discount parameter is optional for backward compatibility.
  */
-function calcBalance(total, lateFee, paid) {
-  const balance = roundToRupee(toNumber(total) + toNumber(lateFee) - toNumber(paid));
+function calcBalance(total, lateFee, paid, discount) {
+  const balance = roundToRupee(toNumber(total) + toNumber(lateFee) - toNumber(discount) - toNumber(paid));
   return Math.max(0, balance);
 }
 

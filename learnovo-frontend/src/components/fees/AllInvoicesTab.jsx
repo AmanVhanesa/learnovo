@@ -274,7 +274,7 @@ const AllInvoicesTab = ({
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
             <input
               type="text"
-              placeholder="Search by invoice no..."
+              placeholder="Search by name, admission no, or invoice no..."
               value={filters.search}
               onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
               className="input pl-10 pr-10"

@@ -25,6 +25,8 @@ const feeAuditLogSchema = new mongoose.Schema({
       'PAYMENT_COLLECTED',
       'PAYMENT_CONFIRMED',
       'PAYMENT_REVERSED',
+      'DISCOUNT_APPLIED',
+      'DISCOUNT_REMOVED',
       'BALANCE_UPDATED',
       'BALANCE_CARRY_FORWARD'
     ],

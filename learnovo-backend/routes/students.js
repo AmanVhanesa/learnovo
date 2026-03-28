@@ -1923,6 +1923,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
 
     // ── Auto-generate admission fee invoice for manually enrolled students ──
     let admissionFeeGenerated = false;
+    let admissionFeeSkipReason = null;
     try {
       // Find active academic session
       const activeSession = await AcademicSession.findOne({
@@ -1930,7 +1931,11 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
         isActive: true
       });
 
-      if (activeSession && student.classId) {
+      if (!activeSession) {
+        admissionFeeSkipReason = 'No active academic session found';
+      } else if (!student.classId) {
+        admissionFeeSkipReason = 'Student has no class assigned';
+      } else {
         // Find fee structure for this class/session with an admission fee head
         const feeStructure = await FeeStructure.findOne({
           tenantId,
@@ -1940,7 +1945,21 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
           'feeHeads.isAdmissionFee': true
         });
 
-        if (feeStructure) {
+        if (!feeStructure) {
+          // Also try without academicSessionId filter in case fee structure is not session-specific
+          const anyFeeStructure = await FeeStructure.findOne({
+            tenantId,
+            classId: student.classId,
+            isActive: true,
+            'feeHeads.isAdmissionFee': true
+          });
+
+          if (!anyFeeStructure) {
+            admissionFeeSkipReason = 'No fee structure with admission fee heads found for this class';
+          } else {
+            admissionFeeSkipReason = 'Fee structure found but not linked to the active academic session';
+          }
+        } else {
           // Get only the admission fee heads
           const admissionFeeHeads = feeStructure.feeHeads.filter(h => h.isAdmissionFee);
 
@@ -1953,7 +1972,9 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
               status: { $ne: 'Cancelled' }
             });
 
-            if (!existingAdmissionInvoice) {
+            if (existingAdmissionInvoice) {
+              admissionFeeSkipReason = 'Admission fee invoice already exists';
+            } else {
               const invoiceItems = admissionFeeHeads.map(h => ({
                 feeHeadName: h.name,
                 amount: h.amount,
@@ -1984,16 +2005,26 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
           }
         }
       }
+
+      if (admissionFeeSkipReason) {
+        logger.info('Admission fee not auto-generated', { requestId: req.requestId, tenantId, studentId: student._id, reason: admissionFeeSkipReason });
+      }
     } catch (feeErr) {
       // Non-fatal: student was created, just log the fee generation failure
+      admissionFeeSkipReason = feeErr.message;
       logger.error('Admission fee auto-generation failed', feeErr, { requestId: req.requestId, route: req.route?.path, tenantId, studentId: student._id });
+    }
+
+    let studentMessage = 'Student created successfully';
+    if (admissionFeeGenerated) {
+      studentMessage = 'Student created successfully. Admission fee invoice generated.';
+    } else if (admissionFeeSkipReason) {
+      studentMessage = `Student created successfully. Admission fee not generated: ${admissionFeeSkipReason}`;
     }
 
     res.status(201).json({
       success: true,
-      message: admissionFeeGenerated
-        ? 'Student created successfully. Admission fee invoice generated.'
-        : 'Student created successfully',
+      message: studentMessage,
       requestId: req.requestId,
       data: {
         id: student._id,
