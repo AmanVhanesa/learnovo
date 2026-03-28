@@ -851,6 +851,97 @@ router.put('/:id', protect, authorize('admin', 'accountant'), [
   }
 });
 
+// @desc    Delete multiple invoices by IDs
+// @route   DELETE /api/invoices/batch
+// @access  Private (Admin)
+router.delete('/batch', protect, authorize('admin'), [
+  body('invoiceIds').isArray({ min: 1 }).withMessage('At least one invoice ID is required'),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const { invoiceIds } = req.body;
+    const tenantId = req.user.tenantId;
+
+    logger.info('Batch delete request', { count: invoiceIds.length, tenantId });
+
+    // Find all matching invoices for this tenant
+    const invoices = await FeeInvoice.find({
+      _id: { $in: invoiceIds },
+      tenantId,
+    });
+
+    if (invoices.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No invoices found'
+      });
+    }
+
+    // Separate deletable vs non-deletable
+    const deletable = invoices.filter(inv => inv.paidAmount === 0);
+    const skipped = invoices.length - deletable.length;
+
+    if (deletable.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'None of the selected invoices can be deleted — they all have payments.'
+      });
+    }
+
+    const deletableIds = deletable.map(inv => inv._id);
+
+    // Soft delete: cancel invoices
+    await FeeInvoice.updateMany(
+      { _id: { $in: deletableIds } },
+      { $set: { status: 'Cancelled', balanceAmount: 0 } }
+    );
+
+    // Update student balances
+    const distinctStudents = [...new Set(deletable.map(inv => `${inv.studentId}|${inv.academicSessionId}`))];
+    await Promise.all(
+      distinctStudents.map(key => {
+        const [studentId, academicSessionId] = key.split('|');
+        return StudentBalance.updateBalance(tenantId, studentId, academicSessionId);
+      })
+    );
+
+    // Log action (best-effort)
+    try {
+      await FeeAuditLog.logAction({
+        tenantId,
+        action: 'INVOICE_BATCH_DELETED',
+        entityType: 'FeeInvoice',
+        entityId: null,
+        userId: req.user._id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        details: {
+          count: deletable.length,
+          skipped,
+          invoiceIds: deletableIds,
+        },
+        ipAddress: req.ip
+      });
+    } catch (auditErr) {
+      console.error('Audit log failed (non-fatal):', auditErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully deleted ${deletable.length} invoice(s)${skipped > 0 ? `. ${skipped} skipped (have payments).` : ''}`,
+      deleted: deletable.length,
+      skipped,
+    });
+
+  } catch (error) {
+    logger.error('Batch delete error', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while deleting invoices'
+    });
+  }
+});
+
 // @desc    Delete invoice
 // @route   DELETE /api/invoices/:id
 // @access  Private (Admin, Accountant)

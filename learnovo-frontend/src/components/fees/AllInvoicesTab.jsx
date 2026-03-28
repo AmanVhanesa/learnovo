@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, X, Filter, Download, Eye, Edit, Trash2, DollarSign, Tag,
@@ -39,6 +39,7 @@ const AllInvoicesTab = ({
   const [viewingInvoice, setViewingInvoice] = useState(null)
   const [discountInvoice, setDiscountInvoice] = useState(null)
   const [selectedIds, setSelectedIds] = useState([])
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Debounce search input
   useEffect(() => {
@@ -99,6 +100,56 @@ const AllInvoicesTab = ({
 
   const handleToggleSelect = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  // Single delete with immediate UI update
+  const handleSingleDelete = async (id) => {
+    if (!window.confirm('Delete this invoice? This cannot be undone.')) return
+    try {
+      await invoicesService.delete(id)
+      toast.success('Invoice deleted')
+      // Remove from selection if selected
+      setSelectedIds(prev => prev.filter(x => x !== id))
+      // Immediately refetch to update UI
+      queryClient.invalidateQueries({ queryKey: ['all-invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete invoice')
+    }
+  }
+
+  // Batch delete selected invoices
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return
+
+    const confirmMsg = selectedIds.length === 1
+      ? 'Delete 1 selected invoice? This cannot be undone.'
+      : `Delete ${selectedIds.length} selected invoices? This cannot be undone.`
+
+    if (!window.confirm(confirmMsg)) return
+
+    try {
+      setIsDeleting(true)
+      const res = await invoicesService.deleteBatch(selectedIds)
+      const data = res.data || res
+      const deleted = data.deleted || selectedIds.length
+      const skipped = data.skipped || 0
+
+      if (skipped > 0) {
+        toast.success(`Deleted ${deleted} invoice(s). ${skipped} skipped (have payments).`)
+      } else {
+        toast.success(`Deleted ${deleted} invoice(s)`)
+      }
+
+      setSelectedIds([])
+      // Immediately refetch to update UI
+      queryClient.invalidateQueries({ queryKey: ['all-invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete invoices')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   const handleExportCSV = () => {
@@ -187,7 +238,7 @@ const AllInvoicesTab = ({
         </div>
       </div>
 
-      {/* Status filter tabs — counts always from server stats (unfiltered by status) */}
+      {/* Status filter tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1 scrollbar-hide">
         {statusTabs.map(tab => {
           const isActive = filters.status === tab.key
@@ -308,8 +359,16 @@ const AllInvoicesTab = ({
             )}
           </div>
           {selectedIds.length > 0 && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-primary-600 dark:text-[#3EC4B1]">{selectedIds.length} selected</span>
+              <button
+                onClick={handleDeleteSelected}
+                disabled={isDeleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 border border-red-200 dark:border-red-800/30 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {isDeleting ? 'Deleting...' : `Delete (${selectedIds.length})`}
+              </button>
               <button onClick={() => setSelectedIds([])} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-white">
                 Clear
               </button>
@@ -358,9 +417,11 @@ const AllInvoicesTab = ({
                       <tr
                         key={invoice._id}
                         className={`group transition-colors cursor-pointer ${
-                          isOverdue
-                            ? 'bg-red-50/40 hover:bg-red-50/70 dark:bg-red-950/10 dark:hover:bg-red-950/20'
-                            : 'bg-white hover:bg-gray-50/80 dark:bg-[#1C1C1E] dark:hover:bg-[#2C2C2E]'
+                          selectedIds.includes(invoice._id)
+                            ? 'bg-primary-50/60 dark:bg-primary-900/10'
+                            : isOverdue
+                              ? 'bg-red-50/40 hover:bg-red-50/70 dark:bg-red-950/10 dark:hover:bg-red-950/20'
+                              : 'bg-white hover:bg-gray-50/80 dark:bg-[#1C1C1E] dark:hover:bg-[#2C2C2E]'
                         }`}
                         onClick={() => setViewingInvoice(invoice)}
                       >
@@ -448,7 +509,7 @@ const AllInvoicesTab = ({
                               </button>
                             )}
                             {invoice.status === 'Pending' && (
-                              <button onClick={() => onDeleteInvoice(invoice._id)} className="!p-1.5 !rounded-lg text-gray-400 dark:text-[#636366] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Invoice">
+                              <button onClick={() => handleSingleDelete(invoice._id)} className="!p-1.5 !rounded-lg text-gray-400 dark:text-[#636366] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Invoice">
                                 <Trash2 className="h-4 w-4" />
                               </button>
                             )}

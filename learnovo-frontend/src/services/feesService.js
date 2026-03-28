@@ -73,6 +73,11 @@ export const invoicesService = {
     return res.data
   },
 
+  deleteBatch: async (invoiceIds) => {
+    const res = await api.delete('/invoices/batch', { data: { invoiceIds } })
+    return res.data
+  },
+
   update: async (id, data) => {
     const res = await api.put(`/invoices/${id}`, data)
     return res.data

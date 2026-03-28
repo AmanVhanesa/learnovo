@@ -176,7 +176,7 @@ const FeesFinance = () => {
 
   const deleteInvoiceMutation = useMutation({
     mutationFn: (id) => invoicesService.delete(id),
-    onSuccess: () => { toast.success('Invoice deleted'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) },
+    onSuccess: () => { toast.success('Invoice deleted'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['all-invoices'] }) },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to delete invoice'),
   })
 
