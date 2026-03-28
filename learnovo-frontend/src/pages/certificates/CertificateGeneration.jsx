@@ -7,6 +7,7 @@ import certificateService from '../../services/certificateService';
 import studentsService from '../../services/studentsService';
 import { reportsService } from '../../services/reportsService';
 import { toast } from 'react-hot-toast';
+import CertificatePreviewContent from './CertificatePreviewContent';
 
 const Loader2 = ({ className }) => <svg className={`w-5 h-5 ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>;
 
@@ -201,48 +202,6 @@ const CertificateGeneration = () => {
             message: `${certLabel} previewed for student ${selectedStudent.fullName || selectedStudent.name}`,
             studentName: selectedStudent.fullName || selectedStudent.name
         });
-    };
-
-    // Certificate preview rows helper
-    const getPreviewRows = () => {
-        const d = getMergedData();
-        if (certType === 'TC') {
-            return [
-                ['Student Name', d.studentName],
-                ["Father's / Guardian's Name", d.fatherName],
-                ["Mother's Name", d.motherName],
-                ['Nationality', d.nationality],
-                ['Category', d.category],
-                ['Date of Birth', d.dob],
-                ['Date of Birth (in words)', d.dobWords],
-                ['Admission Number', d.admissionNumber],
-                ['Date of First Admission', d.admissionDate],
-                ['Class in which Last Studied', d.class],
-                ['Section', d.section],
-                ['Academic Year', d.academicYear],
-                ['Board Examination Result', d.boardResult],
-                ['Promotion Status', d.promotionStatus],
-                ['Subjects Studied', d.subjects],
-                ['Fee Status', d.feeStatus],
-                ['General Conduct', d.conduct],
-                ['Date of Application', d.applicationDate],
-                ['Date of Issue', d.issueDate],
-                ['Reason for Leaving', d.leavingReason],
-                ['Remarks', d.remarks],
-            ];
-        }
-        return [
-            ['Student Name', d.studentName],
-            ["Father's Name", d.fatherName],
-            ["Mother's Name", d.motherName],
-            ['Admission Number', d.admissionNumber],
-            ['Date of Birth', d.dob],
-            ['Class', d.class],
-            ['Section', d.section],
-            ['Academic Year', d.academicYear],
-            ['Category', d.category],
-            ['Purpose', d.purpose],
-        ];
     };
 
     return (
@@ -568,64 +527,12 @@ const CertificateGeneration = () => {
 
                         {/* A4 Paper area with dark background */}
                         <div className="w-full flex-1 overflow-y-auto bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
-                            <div className="bg-white w-full max-w-[595px] min-h-[842px] shadow-2xl relative overflow-hidden" style={{ fontFamily: 'serif' }}>
-                                {/* PREVIEW Watermark */}
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none" style={{ zIndex: 1 }}>
-                                    <span className="text-gray-200 font-bold tracking-widest" style={{ fontSize: '72px', transform: 'rotate(-35deg)', opacity: 0.35 }}>PREVIEW</span>
-                                </div>
-
-                                {/* Certificate content */}
-                                <div className="relative p-8 sm:p-12" style={{ zIndex: 2 }}>
-                                    {/* Border frame */}
-                                    <div className="border-2 border-gray-400 p-6 sm:p-8" style={{ borderColor: '#b08d57' }}>
-                                        {/* School name */}
-                                        <h1 className="text-center font-bold text-lg sm:text-xl text-gray-900 mb-1">{getMergedData().schoolName || 'School Name'}</h1>
-                                        <p className="text-center text-xs text-gray-500 mb-4">{getMergedData().schoolAddress}</p>
-
-                                        {/* Certificate title */}
-                                        <h2 className="text-center font-bold text-base sm:text-lg underline mb-4 text-gray-800">
-                                            {certType === 'TC' ? 'SCHOOL LEAVING CERTIFICATE' : 'BONAFIDE CERTIFICATE'}
-                                        </h2>
-
-                                        {/* Certificate number & date */}
-                                        <div className="text-right text-xs text-gray-600 mb-4 space-y-0.5">
-                                            <p>Certificate No: <span className="font-medium">To be assigned</span></p>
-                                            <p>Date: <span className="font-medium">{getMergedData().issueDate}</span></p>
-                                        </div>
-
-                                        {/* Bonafide declaration */}
-                                        {certType === 'BONAFIDE' && (
-                                            <p className="text-sm text-gray-700 mb-4">
-                                                This is to certify that <strong>{getMergedData().studentName}</strong> is a bonafide student of this school. The details are as follows:
-                                            </p>
-                                        )}
-
-                                        {/* Data table */}
-                                        <table className="w-full text-xs border-collapse mb-6">
-                                            <tbody>
-                                                {getPreviewRows().map(([label, value], i) => (
-                                                    <tr key={i} className="border-b border-gray-200">
-                                                        <td className="py-1.5 pr-3 font-semibold text-gray-700 w-2/5 align-top">{label}</td>
-                                                        <td className="py-1.5 text-gray-900">{value || 'N/A'}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-
-                                        {/* Signature block */}
-                                        <div className="flex justify-between mt-10 pt-4">
-                                            <div className="text-center">
-                                                <div className="w-32 border-t border-gray-400 mb-1"></div>
-                                                <p className="text-xs font-semibold text-gray-700">Class Teacher</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <div className="w-32 border-t border-gray-400 mb-1"></div>
-                                                <p className="text-xs font-semibold text-gray-700">Principal</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <CertificatePreviewContent
+                                type={certType}
+                                data={getMergedData()}
+                                certificateNumber="To be assigned"
+                                showPreviewWatermark={true}
+                            />
                         </div>
 
                         {/* Modal footer with action buttons */}
