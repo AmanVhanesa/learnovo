@@ -1,0 +1,594 @@
+<!-- PREMIUM TC TEMPLATE v1 - SP INTERNATIONAL SCHOOL -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Leaving Certificate — SP International School</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 210mm;
+    font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    color: #0D1B2A;
+    background: #90a4ae;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    position: relative;
+    overflow: hidden;
+    background: #FFFFFF;
+  }
+
+  /* ── OUTER FRAME ── */
+  .frame-outer {
+    position: absolute; inset: 5mm;
+    border: 2.5px solid #1565C0;
+    pointer-events: none; z-index: 2;
+  }
+  .frame-inner {
+    position: absolute; inset: 7.5mm;
+    border: 1px solid rgba(41,182,246,0.4);
+    pointer-events: none; z-index: 2;
+  }
+
+  /* Corner accents — gold L-marks */
+  .corner-mark {
+    position: absolute;
+    width: 12px; height: 12px;
+    z-index: 3; pointer-events: none;
+  }
+  .corner-mark::before,
+  .corner-mark::after {
+    content: '';
+    position: absolute;
+    background: #F5A623;
+  }
+  .corner-mark::before { width: 12px; height: 2px; top: 0; left: 0; }
+  .corner-mark::after  { width: 2px; height: 12px; top: 0; left: 0; }
+
+  .cm-tl { top: calc(7.5mm - 1px); left: calc(7.5mm - 1px); }
+  .cm-tr { top: calc(7.5mm - 1px); right: calc(7.5mm - 1px); }
+  .cm-tr::before { right: 0; left: auto; }
+  .cm-tr::after  { right: 0; left: auto; }
+  .cm-bl { bottom: calc(7.5mm - 1px); left: calc(7.5mm - 1px); }
+  .cm-bl::before { bottom: 0; top: auto; }
+  .cm-bl::after  { bottom: 0; top: auto; }
+  .cm-br { bottom: calc(7.5mm - 1px); right: calc(7.5mm - 1px); }
+  .cm-br::before { bottom: 0; top: auto; right: 0; left: auto; }
+  .cm-br::after  { bottom: 0; top: auto; right: 0; left: auto; }
+
+  /* ── CONTENT ── */
+  .content {
+    position: relative;
+    margin: 9mm;
+    padding: 1mm 5mm 4mm;
+    display: flex;
+    flex-direction: column;
+    z-index: 4;
+    min-height: calc(297mm - 18mm);
+  }
+
+  /* ═══════════ HEADER ═══════════ */
+  .header {
+    display: grid;
+    grid-template-columns: 70px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+  }
+
+  .header .logo {
+    width: 70px; height: 70px;
+    object-fit: contain;
+    justify-self: center;
+  }
+
+  .header .school-center {
+    text-align: center;
+  }
+
+  .header .school-name {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22pt; font-weight: 700;
+    color: #1565C0;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.15;
+  }
+
+  .header .school-addr {
+    font-size: 8.5pt; color: #4A5568;
+    margin-top: 4px;
+  }
+
+  .header .school-contact {
+    font-size: 8pt; color: #718096;
+    margin-top: 2px;
+  }
+
+  .header .affiliation {
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  .header .aff-row {
+    font-size: 7pt; color: #718096;
+    white-space: nowrap;
+  }
+
+  .header .aff-row b {
+    font-size: 7.5pt; color: #1565C0; font-weight: 700;
+  }
+
+  /* Gradient divider */
+  .header-divider {
+    height: 3px;
+    background: linear-gradient(90deg, #1565C0 0%, #29B6F6 40%, #F5A623 60%, #D32F2F 100%);
+    flex-shrink: 0;
+  }
+
+  /* ═══════════ TITLE ═══════════ */
+  .title-section {
+    background: #1565C0;
+    padding: 12px 20px 10px;
+    text-align: center;
+  }
+
+  .title-section h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 17pt; font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    margin: 0; line-height: 1;
+  }
+
+  .title-ornament {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .title-ornament .line {
+    width: 40px; height: 1px;
+    background: rgba(245,166,35,0.6);
+  }
+
+  .title-ornament .diamond {
+    color: #F5A623;
+    font-size: 8pt;
+    line-height: 1;
+  }
+
+  /* ═══════════ META BAR ═══════════ */
+  .meta-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 14px;
+    background: #F8FCFF;
+    border-bottom: 1px solid #BEE3F8;
+  }
+
+  .tc-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #EBF8FF;
+    border: 1.5px solid #29B6F6;
+    border-radius: 20px;
+    padding: 4px 16px;
+    font-size: 9.5pt; font-weight: 700;
+    color: #0D1B2A;
+  }
+
+  .tc-badge .hash { color: #1565C0; font-weight: 800; }
+
+  .meta-date {
+    font-size: 9.5pt; color: #4A5568;
+  }
+
+  .meta-date b { color: #0D1B2A; font-weight: 700; }
+
+  /* ═══════════ TABLE ═══════════ */
+  .fields {
+    width: 100%;
+    border-collapse: collapse;
+    border-left: 1.5px solid #BEE3F8;
+    border-right: 1.5px solid #BEE3F8;
+    border-bottom: 1.5px solid #BEE3F8;
+  }
+
+  .fields tr:nth-child(even) { background: #FFFFFF; }
+  .fields tr:nth-child(odd) { background: #EBF8FF; }
+
+  .fields td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #BEE3F8;
+    vertical-align: middle;
+    line-height: 1.35;
+  }
+
+  .fields tr:last-child td { border-bottom: none; }
+
+  .fields .num {
+    width: 32px;
+    text-align: center;
+    font-size: 8.5pt; font-weight: 700;
+    color: #29B6F6;
+    border-right: 1px solid #BEE3F8;
+  }
+
+  .fields .label {
+    width: 46%;
+    font-size: 9.5pt; font-weight: 600;
+    color: #1565C0;
+    border-right: 1px solid #BEE3F8;
+    padding-left: 14px;
+  }
+
+  .fields .val {
+    font-size: 9.5pt; font-weight: 400;
+    color: #0D1B2A;
+    padding-left: 14px;
+  }
+
+  .fields tr.bold .val {
+    font-weight: 700;
+    color: #0D1B2A;
+  }
+
+  /* ═══════════ NOTE ═══════════ */
+  .note-section { margin-top: 8px; padding: 0 2px; }
+
+  .note-box {
+    background: #EBF8FF;
+    border-left: 4px solid #1565C0;
+    border-radius: 0 4px 4px 0;
+    padding: 8px 14px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .note-icon {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    fill: #1565C0;
+  }
+
+  .note-content {}
+
+  .note-content .note-title {
+    font-size: 8pt; font-weight: 700;
+    color: #1565C0;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .note-content p {
+    font-size: 8.5pt; color: #4A5568;
+    line-height: 1.4; margin-top: 2px;
+  }
+
+  /* ═══════════ SPACER ═══════════ */
+  .spacer { flex: 1; min-height: 8px; }
+
+  /* ═══════════ FOOTER ═══════════ */
+  .footer { padding: 0 6px; }
+
+  .cert-para {
+    font-size: 8.5pt; color: #4A5568;
+    line-height: 1.45; font-style: italic;
+    max-width: 440px;
+  }
+
+  .place-line {
+    font-size: 9pt; color: #0D1B2A;
+    font-weight: 500;
+    margin-top: 6px;
+  }
+
+  .sig-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin-top: 4px;
+  }
+
+  .sig-col { text-align: center; }
+
+  .sig-col .sig-line {
+    width: 110px; height: 1.5px;
+    background: #0D1B2A;
+    margin: 32px auto 6px;
+  }
+
+  .sig-col .sig-label {
+    font-size: 8.5pt; color: #4A5568;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+
+  .sig-col.stamp-col {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .stamp-space { width: 90px; height: 90px; }
+
+  /* ═══════════ BOTTOM STRIP ═══════════ */
+  .bottom-strip {
+    margin-top: 14px;
+    position: relative;
+  }
+
+  .bottom-strip-gradient {
+    height: 2px;
+    background: linear-gradient(90deg, #1565C0 0%, #29B6F6 40%, #F5A623 60%, #D32F2F 100%);
+  }
+
+  .bottom-strip-bar {
+    background: #0D1B2A;
+    padding: 7px 16px;
+    text-align: center;
+  }
+
+  .bottom-strip-bar span {
+    font-size: 7pt;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 500;
+  }
+
+  .bottom-strip-bar .hl {
+    color: #29B6F6; font-weight: 700;
+  }
+
+  @media print {
+    html, body { width: 210mm; }
+    .page { width: 210mm; min-height: 297mm; page-break-after: avoid; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Frame -->
+  <div class="frame-outer"></div>
+  <div class="frame-inner"></div>
+  <div class="corner-mark cm-tl"></div>
+  <div class="corner-mark cm-tr"></div>
+  <div class="corner-mark cm-bl"></div>
+  <div class="corner-mark cm-br"></div>
+
+  <div class="content">
+
+    <!-- ═══ HEADER ═══ -->
+    <div class="header">
+      <!-- Logo -->
+      <!-- schoolLogo injected by backend/Puppeteer at render time -->
+      <svg class="logo" viewBox="0 0 200 230" xmlns="http://www.w3.org/2000/svg">
+        <path d="M100 8 L188 45 L188 130 Q188 195 100 222 Q12 195 12 130 L12 45 Z" fill="#fff" stroke="#29B6F6" stroke-width="7"/>
+        <path d="M100 20 L178 52 L178 128 Q178 188 100 212 Q22 188 22 128 L22 52 Z" fill="#fff" stroke="#F5A623" stroke-width="3"/>
+        <g transform="translate(100,72)">
+          <circle r="14" fill="#F5A623"/>
+          <g fill="#F5A623">
+            <rect x="-1.5" y="-28" width="3" height="12" rx="1.5"/>
+            <rect x="-1.5" y="-28" width="3" height="12" rx="1.5" transform="rotate(45)"/>
+            <rect x="-1.5" y="-28" width="3" height="12" rx="1.5" transform="rotate(90)"/>
+            <rect x="-1.5" y="-28" width="3" height="12" rx="1.5" transform="rotate(135)"/>
+            <rect x="-1.5" y="-28" width="3" height="12" rx="1.5" transform="rotate(180)"/>
+            <rect x="-1.5" y="-28" width="3" height="12" rx="1.5" transform="rotate(225)"/>
+            <rect x="-1.5" y="-28" width="3" height="12" rx="1.5" transform="rotate(270)"/>
+            <rect x="-1.5" y="-28" width="3" height="12" rx="1.5" transform="rotate(315)"/>
+          </g>
+        </g>
+        <path d="M66 114 L100 104 L134 114 L134 140 L100 130 L66 140 Z" fill="#1565C0" opacity="0.7"/>
+        <path d="M96 90 L100 134 L104 90 L100 84 Z" fill="#D32F2F"/>
+        <text x="100" y="170" text-anchor="middle" font-family="serif" font-size="24" font-weight="bold" fill="#F5A623">SP</text>
+        <path d="M30 136 L10 150 L18 144 L10 164" stroke="#D32F2F" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M170 136 L190 150 L182 144 L190 164" stroke="#D32F2F" stroke-width="4" fill="none" stroke-linecap="round"/>
+      </svg>
+
+      <!-- School Info -->
+      <div class="school-center">
+        <div class="school-name">SP International School</div>
+        <div class="school-addr">A.L.G Road, Firozpur Cantt, Punjab — 152003</div>
+        <div class="school-contact">Phone: 9888468343 &nbsp;|&nbsp; spinternationalschool2021@gmail.com</div>
+      </div>
+
+      <!-- Affiliation -->
+      <div class="affiliation">
+        <div class="aff-row">Affiliation No: <b>SAA/RTE/2021/355277</b></div>
+        <div class="aff-row">School Code: <b>0283234</b></div>
+        <div class="aff-row">UDISE: <b>03110720110</b></div>
+      </div>
+    </div>
+
+    <!-- Gradient Divider -->
+    <div class="header-divider"></div>
+
+    <!-- ═══ TITLE ═══ -->
+    <div class="title-section">
+      <h1>School Leaving Certificate</h1>
+      <div class="title-ornament">
+        <div class="line"></div>
+        <span class="diamond">&#9670;</span>
+        <div class="line"></div>
+      </div>
+    </div>
+
+    <!-- ═══ META BAR ═══ -->
+    <div class="meta-bar">
+      <div class="tc-badge"><span class="hash">#</span> TC/2026/0007</div>
+      <div class="meta-date">Date: <b>27 Mar 2026</b></div>
+    </div>
+
+    <!-- ═══ TABLE ═══ -->
+    <table class="fields">
+      <tr class="bold">
+        <td class="num">01</td>
+        <td class="label">Name of the Student</td>
+        <td class="val">ARYAN SAHEBRAO PATIL</td>
+      </tr>
+      <tr>
+        <td class="num">02</td>
+        <td class="label">Father's / Guardian's Name</td>
+        <td class="val">SAHEBRAO BHASKAR PATIL</td>
+      </tr>
+      <tr>
+        <td class="num">03</td>
+        <td class="label">Mother's Name</td>
+        <td class="val">SUVARNA PATIL</td>
+      </tr>
+      <tr>
+        <td class="num">04</td>
+        <td class="label">Nationality</td>
+        <td class="val">Indian</td>
+      </tr>
+      <tr>
+        <td class="num">05</td>
+        <td class="label">Category (Gen / SC / ST / OBC)</td>
+        <td class="val">OBC</td>
+      </tr>
+      <tr class="bold">
+        <td class="num">06</td>
+        <td class="label">Date of Birth</td>
+        <td class="val">11 Jul 2015</td>
+      </tr>
+      <tr>
+        <td class="num">07</td>
+        <td class="label">Admission Number</td>
+        <td class="val">5770</td>
+      </tr>
+      <tr>
+        <td class="num">08</td>
+        <td class="label">PEN Number</td>
+        <td class="val">-</td>
+      </tr>
+      <tr>
+        <td class="num">09</td>
+        <td class="label">Date of First Admission in School</td>
+        <td class="val">15 Jul 2025</td>
+      </tr>
+      <tr class="bold">
+        <td class="num">10</td>
+        <td class="label">Class in which Last Studied</td>
+        <td class="val">Class 4</td>
+      </tr>
+      <tr>
+        <td class="num">11</td>
+        <td class="label">Board Examination Last Taken</td>
+        <td class="val">Passed</td>
+      </tr>
+      <tr>
+        <td class="num">12</td>
+        <td class="label">Whether Qualified for Promotion</td>
+        <td class="val">Yes</td>
+      </tr>
+      <tr>
+        <td class="num">13</td>
+        <td class="label">Subjects Studied</td>
+        <td class="val">English, Hindi, Maths, Science, Social Science</td>
+      </tr>
+      <tr>
+        <td class="num">14</td>
+        <td class="label">Month up to which Fees Paid</td>
+        <td class="val">Paid up to date</td>
+      </tr>
+      <tr>
+        <td class="num">15</td>
+        <td class="label">General Conduct</td>
+        <td class="val">Good</td>
+      </tr>
+      <tr>
+        <td class="num">16</td>
+        <td class="label">Date of Application for Certificate</td>
+        <td class="val">27 Mar 2026</td>
+      </tr>
+      <tr>
+        <td class="num">17</td>
+        <td class="label">Date of Issue of Certificate</td>
+        <td class="val">27 Mar 2026</td>
+      </tr>
+      <tr class="bold">
+        <td class="num">18</td>
+        <td class="label">Reason for Leaving the School</td>
+        <td class="val">Parent Request</td>
+      </tr>
+      <tr>
+        <td class="num">19</td>
+        <td class="label">Any Other Remarks</td>
+        <td class="val">-</td>
+      </tr>
+    </table>
+
+    <!-- ═══ NOTE ═══ -->
+    <div class="note-section">
+      <div class="note-box">
+        <svg class="note-icon" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 12a1 1 0 110-2 1 1 0 010 2zm1-4.5a1 1 0 01-2 0V7a1 1 0 112 0v2.5z"/>
+        </svg>
+        <div class="note-content">
+          <div class="note-title">Important Note</div>
+          <p>This certificate is issued based on school records. No alteration shall be made on this certificate. Erasing or overwriting renders it invalid.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- ═══ FOOTER ═══ -->
+    <div class="footer">
+      <div class="cert-para">
+        Certified that the above information is in accordance with the school records.
+        This certificate does not entitle the holder to any benefits unless countersigned by the competent authority.
+      </div>
+      <div class="place-line">Place: Firozpur Cantt</div>
+
+      <div class="sig-row">
+        <div class="sig-col">
+          <div class="sig-line"></div>
+          <div class="sig-label">Class Teacher</div>
+        </div>
+        <div class="sig-col stamp-col">
+          <div class="stamp-space"></div>
+        </div>
+        <div class="sig-col">
+          <div class="sig-line"></div>
+          <div class="sig-label">Principal</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ BOTTOM STRIP ═══ -->
+    <div class="bottom-strip">
+      <div class="bottom-strip-gradient"></div>
+      <div class="bottom-strip-bar">
+        <span>Powered by <span class="hl">Learnovo</span> &mdash; School Management System</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

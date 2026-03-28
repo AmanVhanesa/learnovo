@@ -47,6 +47,25 @@ const CertificateGeneration = () => {
         enabled: debouncedSearch.length >= 2,
     });
 
+    const getMatchedField = (student) => {
+        if (!debouncedSearch) return null;
+        const term = debouncedSearch.toLowerCase();
+        const fields = [
+            { key: 'admissionNumber', label: 'Admission No' },
+            { key: 'name', label: 'Name' },
+            { key: 'fullName', label: 'Name' },
+            { key: 'rollNumber', label: 'Roll No' },
+            { key: 'studentId', label: 'Student ID' },
+            { key: 'phone', label: 'Phone' },
+            { key: 'email', label: 'Email' },
+        ];
+        for (const { key, label } of fields) {
+            const val = student[key];
+            if (val && String(val).toLowerCase().includes(term)) return { label, value: String(val) };
+        }
+        return null;
+    };
+
     const selectStudent = (student) => {
         setSelectedStudent(student);
         setSearchTerm('');
@@ -304,7 +323,15 @@ const CertificateGeneration = () => {
                                         >
                                             <div>
                                                 <p className="text-sm font-medium text-gray-900 dark:text-white">{student.fullName}</p>
-                                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{student.admissionNumber} | Class {student.class}</p>
+                                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                                                    {student.admissionNumber} | Class {student.class}
+                                                    {(() => {
+                                                        const match = getMatchedField(student);
+                                                        return match && match.label !== 'Name' && match.value !== String(student.admissionNumber)
+                                                            ? <span className="ml-1 text-amber-600 dark:text-amber-400"> · Matched {match.label}: {match.value}</span>
+                                                            : null;
+                                                    })()}
+                                                </p>
                                             </div>
                                             <span className="text-xs font-medium text-primary-600 dark:text-primary-400">Select</span>
                                         </div>
