@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>School Leaving Certificate - {{student_name}}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   @page { size: A4 portrait; margin: 0; }
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -99,7 +100,7 @@
   }
 
   .logo-wrap {
-    width: 68px; height: 68px;
+    width: 90px; height: 90px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -110,7 +111,7 @@
 
   .logo-wrap img,
   .logo-wrap svg {
-    width: 68px; height: 68px;
+    width: 90px; height: 90px;
     object-fit: contain;
   }
 
@@ -123,12 +124,14 @@
   .school-info { flex: 1; }
 
   .school-name {
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 26px;
-    font-weight: 700;
-    color: #111827;
-    line-height: 1.15;
-    letter-spacing: 0.5px;
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-size: 30px;
+    font-weight: 800;
+    color: #1A2E5A;
+    line-height: 1.1;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    text-transform: uppercase;
   }
 
   .school-addr,
