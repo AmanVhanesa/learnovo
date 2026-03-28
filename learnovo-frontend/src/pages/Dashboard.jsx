@@ -73,17 +73,21 @@ const Dashboard = () => {
   const { data: stats = defaultStats, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: async () => {
-      const [res, activitiesRes] = await Promise.all([
+      const [res, activitiesRes] = await Promise.allSettled([
         reportsService.getDashboardStats(),
         reportsService.getRecentActivities()
       ])
-      if (res?.success && res?.data) {
+      const dashData = res.status === 'fulfilled' ? res.value : null
+      const actData = activitiesRes.status === 'fulfilled' ? activitiesRes.value : null
+      if (dashData?.success && dashData?.data) {
         return {
           ...defaultStats,
-          ...res.data,
-          recentActivities: activitiesRes.success ? activitiesRes.data : []
+          ...dashData.data,
+          recentActivities: actData?.success ? actData.data : []
         }
       }
+      // If the dashboard stats request itself failed, re-throw so React Query shows the error
+      if (res.status === 'rejected') throw res.reason
       return defaultStats
     },
     refetchInterval: 60 * 1000,
