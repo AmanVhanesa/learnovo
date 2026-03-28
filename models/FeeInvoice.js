@@ -106,6 +106,32 @@ const feeInvoiceSchema = new mongoose.Schema({
         default: Date.now
     },
 
+    // Discount / Waiver
+    discountAmount: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+
+    discountType: {
+        type: String,
+        trim: true
+    },
+
+    discountReason: {
+        type: String,
+        trim: true
+    },
+
+    discountAppliedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+
+    discountAppliedAt: {
+        type: Date
+    },
+
     // Late Fee Tracking
     lateFeeApplied: {
         type: Number,
@@ -164,10 +190,11 @@ feeInvoiceSchema.pre('save', function (next) {
     // Skip status recalculation for cancelled invoices
     if (this.status === 'Cancelled') return next();
 
-    this.balanceAmount = calcBalance(this.totalAmount, this.lateFeeApplied, this.paidAmount);
+    this.balanceAmount = calcBalance(this.totalAmount, this.lateFeeApplied, this.paidAmount, this.discountAmount);
 
     // Update status based on payment (use tolerance-based comparison)
-    if (isFullyPaid(this.paidAmount, toNumber(this.totalAmount) + toNumber(this.lateFeeApplied))) {
+    const effectiveTotal = toNumber(this.totalAmount) + toNumber(this.lateFeeApplied) - toNumber(this.discountAmount);
+    if (isFullyPaid(this.paidAmount, effectiveTotal)) {
         this.status = 'Paid';
         this.balanceAmount = 0; // Clamp to exactly 0
     } else if (toNumber(this.paidAmount) > 0 && this.balanceAmount > 0) {
