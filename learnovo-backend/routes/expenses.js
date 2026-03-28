@@ -198,12 +198,19 @@ router.get('/', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
-    const { page = 1, limit = 20, status, category, paymentMethod, startDate, endDate, search, sortBy = 'expenseDate', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 20, status, category, paymentMethod, startDate, endDate, search, sortBy = 'expenseDate', sortOrder = 'desc', source } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
 
     if (status) filter.status = status;
     if (category) filter.category = category;
     if (paymentMethod) filter.paymentMethod = paymentMethod;
+    // Source filter: 'manual' | 'payroll' | 'all' (default: all)
+    if (source === 'manual') {
+      filter.isSystemGenerated = { $ne: true };
+    } else if (source === 'payroll') {
+      filter.referenceType = 'payroll';
+      filter.isSystemGenerated = true;
+    }
     if (startDate || endDate) {
       filter.expenseDate = {};
       if (startDate) filter.expenseDate.$gte = new Date(startDate);
@@ -317,6 +324,11 @@ router.put('/:id', [
       return res.status(404).json({ success: false, message: 'Expense not found', requestId: req.requestId });
     }
 
+    // Prevent editing system-generated records (auto-synced from payroll)
+    if (expense.isSystemGenerated) {
+      return res.status(403).json({ success: false, message: 'System-generated expense records cannot be edited. This record was auto-created from payroll.', requestId: req.requestId });
+    }
+
     const { category, title, amount, expenseDate, paymentMethod, paymentReference, description, receiptUrl, academicYear } = req.body;
     if (category !== undefined) expense.category = category;
     if (title !== undefined) expense.title = title;
@@ -347,6 +359,12 @@ router.delete('/:id', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
+    // Check if system-generated before deleting
+    const expenseCheck = await Expense.findOne({ _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false });
+    if (expenseCheck && expenseCheck.isSystemGenerated) {
+      return res.status(403).json({ success: false, message: 'System-generated expense records cannot be deleted. This record was auto-created from payroll.', requestId: req.requestId });
+    }
+
     const expense = await Expense.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false },
       { isDeleted: true },
@@ -437,8 +455,9 @@ router.delete('/bulk/delete', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
+    // Only delete manual records — skip system-generated ones
     const result = await Expense.updateMany(
-      { _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false },
+      { _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false, isSystemGenerated: { $ne: true } },
       { isDeleted: true }
     );
 

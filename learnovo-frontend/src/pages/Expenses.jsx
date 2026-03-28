@@ -51,7 +51,7 @@ const Expenses = () => {
 
   // List
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
-  const [filters, setFilters] = useState({ search: '', status: '', category: '', paymentMethod: '', startDate: '', endDate: '' })
+  const [filters, setFilters] = useState({ search: '', status: '', category: '', paymentMethod: '', startDate: '', endDate: '', source: '' })
   const [selectedIds, setSelectedIds] = useState([])
   const [debouncedFilters, setDebouncedFilters] = useState(filters)
 
@@ -342,6 +342,10 @@ const Expenses = () => {
   }
 
   const handleEditExpenseFromDetail = (exp) => {
+    if (exp.isSystemGenerated) {
+      toast.error('System-generated records cannot be modified')
+      return
+    }
     setViewingExpense(null)
     setEditingExpense(exp)
     setShowExpenseForm(true)
@@ -351,9 +355,10 @@ const Expenses = () => {
   const toggleSelect = (id) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
+  const selectableExpenses = expenses.filter(e => !e.isSystemGenerated)
   const toggleSelectAll = () => {
-    if (selectedIds.length === expenses.length) setSelectedIds([])
-    else setSelectedIds(expenses.map(e => e._id))
+    if (selectedIds.length === selectableExpenses.length) setSelectedIds([])
+    else setSelectedIds(selectableExpenses.map(e => e._id))
   }
 
   // Pagination helper
@@ -567,6 +572,7 @@ const Expenses = () => {
             <select value={filters.status} onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))} className="input w-full sm:w-auto min-w-0 sm:min-w-[130px]"><option value="">All Status</option><option value="Pending">Pending</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option></select>
             <select value={filters.category} onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))} className="input w-full sm:w-auto min-w-0 sm:min-w-[140px]"><option value="">All Categories</option>{categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select>
             <select value={filters.paymentMethod} onChange={(e) => setFilters(prev => ({ ...prev, paymentMethod: e.target.value }))} className="input w-full sm:w-auto min-w-0 sm:min-w-[150px]"><option value="">All Methods</option>{PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}</select>
+            <select value={filters.source} onChange={(e) => setFilters(prev => ({ ...prev, source: e.target.value }))} className="input w-full sm:w-auto min-w-0 sm:min-w-[140px]"><option value="">All Sources</option><option value="manual">Manual</option><option value="payroll">From Payroll</option></select>
             <input type="date" value={filters.startDate} onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))} className="input w-full sm:w-auto" placeholder="Start date" />
             <input type="date" value={filters.endDate} onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))} className="input w-full sm:w-auto" placeholder="End date" />
           </div>
@@ -590,10 +596,10 @@ const Expenses = () => {
         <div className="card overflow-hidden">
           {listLoading ? <LoadingSpinner /> : expenses.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
+              <table className="w-full min-w-[800px] text-sm">
                 <thead>
                   <tr className="bg-gray-50/80 dark:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A]">
-                    <th className="py-3.5 px-4 w-10"><input type="checkbox" checked={selectedIds.length === expenses.length && expenses.length > 0} onChange={toggleSelectAll} className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500" /></th>
+                    <th className="py-3.5 px-4 w-10"><input type="checkbox" checked={selectedIds.length === selectableExpenses.length && selectableExpenses.length > 0} onChange={toggleSelectAll} className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500" /></th>
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Date</th>
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Title</th>
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Category</th>
@@ -601,13 +607,14 @@ const Expenses = () => {
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Method</th>
                     <th className="text-center py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Status</th>
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Added By</th>
+                    <th className="text-center py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Source</th>
                     <th className="text-center py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {expenses.map(exp => (
                     <tr key={exp._id} className="border-b border-gray-50 dark:border-[#38383A]/20 hover:bg-primary-50/40 dark:hover:bg-primary-500/[0.03] transition-colors">
-                      <td className="py-3.5 px-4"><input type="checkbox" checked={selectedIds.includes(exp._id)} onChange={() => toggleSelect(exp._id)} className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500" /></td>
+                      <td className="py-3.5 px-4"><input type="checkbox" checked={selectedIds.includes(exp._id)} onChange={() => toggleSelect(exp._id)} disabled={exp.isSystemGenerated} className={`rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500${exp.isSystemGenerated ? ' opacity-50 cursor-not-allowed' : ''}`} /></td>
                       <td className="py-3.5 px-4 text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{new Date(exp.expenseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</td>
                       <td className="py-3.5 px-4 font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{exp.title}</td>
                       <td className="py-3.5 px-4"><span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: exp.category?.color || '#6B7280' }} /><span className="text-gray-600 dark:text-[#8E8E93] whitespace-nowrap">{exp.category?.name || '\u2014'}</span></span></td>
@@ -615,17 +622,23 @@ const Expenses = () => {
                       <td className="py-3.5 px-4 text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{exp.paymentMethod}</td>
                       <td className="py-3.5 px-4 text-center"><StatusBadge status={exp.status} /></td>
                       <td className="py-3.5 px-4 text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{exp.addedBy?.name || '\u2014'}</td>
+                      <td className="py-3.5 px-4 text-center">
+                        {exp.isSystemGenerated || exp.referenceType === 'payroll'
+                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">From Payroll</span>
+                          : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Manual</span>
+                        }
+                      </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center justify-center gap-0.5">
                           <button onClick={() => setViewingExpense(exp)} className="btn-icon" title="View"><Eye className="h-4 w-4" /></button>
-                          <button onClick={() => { setEditingExpense(exp); setShowExpenseForm(true) }} className="btn-icon" title="Edit"><Edit className="h-4 w-4" /></button>
-                          {exp.status === 'Pending' && (
+                          <button onClick={() => { if (exp.isSystemGenerated) return; setEditingExpense(exp); setShowExpenseForm(true) }} className={`btn-icon${exp.isSystemGenerated ? ' opacity-50 cursor-not-allowed' : ''}`} disabled={exp.isSystemGenerated} title={exp.isSystemGenerated ? 'System-generated records cannot be modified' : 'Edit'}><Edit className="h-4 w-4" /></button>
+                          {exp.status === 'Pending' && !exp.isSystemGenerated && (
                             <>
                               <button onClick={() => handleApprove(exp._id)} className="p-2 rounded-xl text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all" title="Approve"><Check className="h-4 w-4" /></button>
                               <button onClick={() => handleReject(exp._id, '')} className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all" title="Reject"><Ban className="h-4 w-4" /></button>
                             </>
                           )}
-                          <button onClick={() => handleDelete(exp._id)} className="p-2 rounded-xl text-gray-400 dark:text-[#636366] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                          <button onClick={() => { if (exp.isSystemGenerated) return; handleDelete(exp._id) }} className={`p-2 rounded-xl text-gray-400 dark:text-[#636366] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all${exp.isSystemGenerated ? ' opacity-50 cursor-not-allowed' : ''}`} disabled={exp.isSystemGenerated} title={exp.isSystemGenerated ? 'System-generated records cannot be modified' : 'Delete'}><Trash2 className="h-4 w-4" /></button>
                         </div>
                       </td>
                     </tr>

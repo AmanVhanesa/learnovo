@@ -87,18 +87,26 @@ const Sidebar = ({ isOpen, onClose }) => {
       sections.push({ label: 'Academics', items: academicItems })
     }
 
-    // ── Finance ───────────────────────────────────────────────────
-    const financeItems = [
+    // ── Fee Collection (Student fees — collection, invoices, receipts) ──
+    const feeCollectionItems = [
       { name: 'My Fees', href: '/app/student/fees', icon: CreditCard, roles: ['student', 'parent'] },
-      { name: 'Finance Dashboard', href: '/app/finance-dashboard', icon: PieChart, roles: ['admin'] },
       { name: 'Fees & Finance', href: '/app/fees-finance', icon: CreditCard, roles: ['admin'] },
+    ].filter(i => i.roles.includes(r))
+
+    if (feeCollectionItems.length > 0) {
+      sections.push({ label: 'Fee Collection', items: feeCollectionItems })
+    }
+
+    // ── School Finance (Income, expenses, payroll, overview) ─────
+    const schoolFinanceItems = [
+      { name: 'Finance Dashboard', href: '/app/finance-dashboard', icon: PieChart, roles: ['admin'] },
       { name: 'Income', href: '/app/income', icon: CircleDollarSign, roles: ['admin'] },
       { name: 'Expenses', href: '/app/expenses', icon: ReceiptText, roles: ['admin'] },
       { name: 'Payroll', href: '/app/payroll', icon: Wallet, roles: ['admin'] },
     ].filter(i => i.roles.includes(r))
 
-    if (financeItems.length > 0) {
-      sections.push({ label: 'Finance', items: financeItems })
+    if (schoolFinanceItems.length > 0) {
+      sections.push({ label: 'School Finance', items: schoolFinanceItems })
     }
 
     // ── Operations ────────────────────────────────────────────────

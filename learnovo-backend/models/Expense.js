@@ -66,6 +66,25 @@ const expenseSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Cross-module reference for auto-created records (payroll, etc.)
+  referenceType: {
+    type: String,
+    enum: ['payroll', 'manual'],
+    default: 'manual'
+  },
+  referenceId: {
+    type: mongoose.Schema.Types.ObjectId
+  },
+  referenceModel: {
+    type: String,
+    enum: ['Payroll'],
+    default: null
+  },
+  // System-generated records (from payroll) cannot be edited/deleted by users
+  isSystemGenerated: {
+    type: Boolean,
+    default: false
+  },
   isDeleted: {
     type: Boolean,
     default: false
@@ -79,5 +98,7 @@ expenseSchema.index({ tenantId: 1, category: 1 });
 expenseSchema.index({ tenantId: 1, expenseDate: -1 });
 expenseSchema.index({ tenantId: 1, isDeleted: 1 });
 expenseSchema.index({ tenantId: 1, academicYear: 1 });
+expenseSchema.index({ tenantId: 1, referenceType: 1, referenceId: 1 }, { sparse: true });
+expenseSchema.index({ tenantId: 1, isSystemGenerated: 1 });
 
 module.exports = mongoose.model('Expense', expenseSchema);

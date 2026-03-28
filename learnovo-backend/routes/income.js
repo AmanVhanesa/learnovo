@@ -177,11 +177,18 @@ router.get('/', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
-    const { page = 1, limit = 20, category, paymentMethod, startDate, endDate, search, sortBy = 'incomeDate', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 20, category, paymentMethod, startDate, endDate, search, sortBy = 'incomeDate', sortOrder = 'desc', source } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
 
     if (category) filter.category = category;
     if (paymentMethod) filter.paymentMethod = paymentMethod;
+    // Source filter: 'manual' | 'fee_collection' | 'all' (default: all)
+    if (source === 'manual') {
+      filter.isSystemGenerated = { $ne: true };
+    } else if (source === 'fee_collection') {
+      filter.referenceType = 'fee_payment';
+      filter.isSystemGenerated = true;
+    }
     if (startDate || endDate) {
       filter.incomeDate = {};
       if (startDate) filter.incomeDate.$gte = new Date(startDate);
@@ -296,6 +303,11 @@ router.put('/:id', [
       return res.status(404).json({ success: false, message: 'Income record not found', requestId: req.requestId });
     }
 
+    // Prevent editing system-generated records (auto-synced from fee payments)
+    if (income.isSystemGenerated) {
+      return res.status(403).json({ success: false, message: 'System-generated income records cannot be edited. This record was auto-created from a fee payment.', requestId: req.requestId });
+    }
+
     const { category, title, amount, incomeDate, paymentMethod, paymentReference, receivedBy, description, receiptUrl, academicYear } = req.body;
     if (category !== undefined) income.category = category;
     if (title !== undefined) income.title = title;
@@ -326,6 +338,12 @@ router.delete('/:id', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
+    // Check if system-generated before deleting
+    const incomeCheck = await Income.findOne({ _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false });
+    if (incomeCheck && incomeCheck.isSystemGenerated) {
+      return res.status(403).json({ success: false, message: 'System-generated income records cannot be deleted. This record was auto-created from a fee payment.', requestId: req.requestId });
+    }
+
     const income = await Income.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false },
       { isDeleted: true },
@@ -349,8 +367,9 @@ router.delete('/bulk/delete', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
+    // Only delete manual records — skip system-generated ones
     const result = await Income.updateMany(
-      { _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false },
+      { _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false, isSystemGenerated: { $ne: true } },
       { isDeleted: true }
     );
 

@@ -1,10 +1,12 @@
 const express = require('express');
 const { body, query } = require('express-validator');
 const Payroll = require('../models/Payroll');
+const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const payrollService = require('../services/payrollService');
 const payrollPdfService = require('../services/payrollPdfService');
+const { syncPayrollToExpense, reversePayrollExpense } = require('../services/financeAutoSyncService');
 
 const router = express.Router();
 
@@ -144,6 +146,9 @@ router.put('/:id', protect, authorize('admin'), [
 
     const { baseSalary, bonuses, otherDeductions, paymentStatus, paymentDate, paymentMethod, paymentReference, notes } = req.body;
 
+    // Track previous status for finance sync
+    const previousStatus = payroll.paymentStatus;
+
     if (baseSalary !== undefined) payroll.baseSalary = baseSalary;
     if (bonuses !== undefined) payroll.bonuses = bonuses;
     if (otherDeductions !== undefined) payroll.otherDeductions = otherDeductions;
@@ -155,6 +160,34 @@ router.put('/:id', protect, authorize('admin'), [
 
     payroll.updatedBy = req.user._id;
     await payroll.save(); // Pre-save hook will recalculate netSalary
+
+    // Auto-sync to Finance module on status transitions (non-blocking)
+    if (paymentStatus === 'paid' && previousStatus !== 'paid') {
+      try {
+        const employee = await User.findById(payroll.employeeId).select('name fullName').lean();
+        await syncPayrollToExpense({
+          tenantId: payroll.tenantId,
+          payrollId: payroll._id,
+          netSalary: payroll.netSalary,
+          paymentDate: payroll.paymentDate || new Date(),
+          paymentMethod: payroll.paymentMethod,
+          month: payroll.month,
+          year: payroll.year,
+          employeeName: employee?.fullName || employee?.name || 'Employee',
+          addedBy: req.user._id,
+          paymentReference: payroll.paymentReference
+        });
+      } catch (syncErr) {
+        console.error('[Finance-AutoSync] payroll paid sync failed (non-fatal):', syncErr.message);
+      }
+    } else if (paymentStatus === 'cancelled' && previousStatus === 'paid') {
+      // Reverse the expense if payroll was cancelled after being paid
+      try {
+        await reversePayrollExpense(payroll.tenantId, payroll._id);
+      } catch (syncErr) {
+        console.error('[Finance-AutoSync] payroll cancel reverse failed (non-fatal):', syncErr.message);
+      }
+    }
 
     res.json({
       success: true,

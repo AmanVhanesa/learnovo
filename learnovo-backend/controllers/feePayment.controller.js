@@ -2,8 +2,10 @@ const crypto = require('crypto');
 const FeePaymentOrder = require('../models/FeePaymentOrder');
 const FeeInvoice = require('../models/FeeInvoice');
 const Payment = require('../models/Payment');
+const User = require('../models/User');
 const { toNumber } = require('../utils/money');
 const { logger } = require('../middleware/errorHandler');
+const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
 
 // ─── Initialize Razorpay (lazy load) ────────────────────────────
 let razorpayInstance = null;
@@ -295,6 +297,25 @@ exports.verifyPayment = async(req, res, next) => {
       collectedBy: req.user._id
     });
 
+    // Auto-sync to Finance module (non-blocking)
+    try {
+      const student = await User.findById(paymentOrder.studentId).select('name fullName').lean();
+      await syncFeePaymentToIncome({
+        tenantId: paymentOrder.tenantId,
+        paymentId: paymentOrder._id,
+        amount: paymentOrder.amount,
+        paymentDate: new Date(),
+        paymentMethod: 'Online',
+        studentName: student?.fullName || student?.name || 'Student',
+        invoiceNumber: invoice?.invoiceNumber,
+        addedBy: req.user._id,
+        paymentReference: razorpay_payment_id,
+        referenceModel: 'FeePaymentOrder'
+      });
+    } catch (syncErr) {
+      logger.error('[Finance-AutoSync] verifyPayment sync failed (non-fatal)', syncErr);
+    }
+
     res.json({
       success: true,
       message: 'Payment verified and recorded successfully',
@@ -437,6 +458,25 @@ exports.handleWebhook = async(req, res) => {
           confirmedBy: paymentOrder.paidBy,
           collectedBy: paymentOrder.paidBy
         });
+
+        // Auto-sync to Finance module (non-blocking)
+        try {
+          const student = await User.findById(paymentOrder.studentId).select('name fullName').lean();
+          await syncFeePaymentToIncome({
+            tenantId: paymentOrder.tenantId,
+            paymentId: paymentOrder._id,
+            amount: paymentOrder.amount,
+            paymentDate: new Date(),
+            paymentMethod: 'Online',
+            studentName: student?.fullName || student?.name || 'Student',
+            invoiceNumber: invoice?.invoiceNumber,
+            addedBy: paymentOrder.paidBy,
+            paymentReference: paymentId,
+            referenceModel: 'FeePaymentOrder'
+          });
+        } catch (syncErr) {
+          logger.error('[Finance-AutoSync] webhook sync failed (non-fatal)', syncErr);
+        }
       }
 
       logger.info('Webhook: payment processed', null, {

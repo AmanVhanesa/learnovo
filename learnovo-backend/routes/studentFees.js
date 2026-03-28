@@ -7,8 +7,10 @@ const PaymentAttempt = require('../models/PaymentAttempt');
 const PaymentAuditLog = require('../models/PaymentAuditLog');
 const PaymentDispute = require('../models/PaymentDispute');
 const Receipt = require('../models/Receipt');
+const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
 
 // Payment gateway — resolved per tenant via factory
 const { getGateway } = require('../services/payment/GatewayFactory');
@@ -580,6 +582,26 @@ router.post('/admin/verify-payment/:attemptId', protect, authorize('admin', 'acc
     await session.commitTransaction();
     session.endSession();
 
+    // Auto-sync to Finance module (non-blocking, outside transaction)
+    try {
+      const student = await User.findById(attempt.studentId).select('name fullName').lean();
+      const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber').lean();
+      await syncFeePaymentToIncome({
+        tenantId: req.user.tenantId,
+        paymentId: attempt._id,
+        amount: attempt.amount,
+        paymentDate: attempt.paymentDate || attempt.createdAt,
+        paymentMethod: attempt.paymentMode || 'Cash',
+        studentName: student?.fullName || student?.name || 'Student',
+        invoiceNumber: inv?.invoiceNumber,
+        addedBy: req.user._id,
+        paymentReference: attempt.transactionRefId,
+        referenceModel: 'PaymentAttempt'
+      });
+    } catch (syncErr) {
+      console.error('[Finance-AutoSync] admin verify sync failed (non-fatal):', syncErr.message);
+    }
+
     res.json({
       success: true,
       message: 'Payment verified and receipt generated.',
@@ -685,6 +707,28 @@ router.post('/payment/notify', async(req, res) => {
 
       await session.commitTransaction();
       session.endSession();
+
+      // Auto-sync to Finance module (non-blocking, outside transaction)
+      if (newStatus === 'SUCCESS') {
+        try {
+          const student = await User.findById(attempt.studentId).select('name fullName').lean();
+          const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber').lean();
+          await syncFeePaymentToIncome({
+            tenantId: attempt.tenantId,
+            paymentId: attempt._id,
+            amount: attempt.amount,
+            paymentDate: new Date(),
+            paymentMethod: 'Online',
+            studentName: student?.fullName || student?.name || 'Student',
+            invoiceNumber: inv?.invoiceNumber,
+            addedBy: attempt.studentId,
+            paymentReference: attempt.gatewayRefId,
+            referenceModel: 'PaymentAttempt'
+          });
+        } catch (syncErr) {
+          console.error('[Finance-AutoSync] notify webhook sync failed (non-fatal):', syncErr.message);
+        }
+      }
 
       // Always return 200 to acknowledge receipt to the gateway
       res.status(200).json({ success: true, message: `Payment ${newStatus.toLowerCase()}` });
@@ -796,6 +840,26 @@ router.post('/payment/icici-return', express.urlencoded({ extended: true }), asy
 
         await session.commitTransaction();
         session.endSession();
+
+        // Auto-sync to Finance module (non-blocking, outside transaction)
+        try {
+          const student = await User.findById(attempt.studentId).select('name fullName').lean();
+          const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber').lean();
+          await syncFeePaymentToIncome({
+            tenantId: attempt.tenantId,
+            paymentId: attempt._id,
+            amount: attempt.amount,
+            paymentDate: new Date(),
+            paymentMethod: 'Online',
+            studentName: student?.fullName || student?.name || 'Student',
+            invoiceNumber: inv?.invoiceNumber,
+            addedBy: attempt.studentId,
+            paymentReference: parsed.uniqueRefNumber,
+            referenceModel: 'PaymentAttempt'
+          });
+        } catch (syncErr) {
+          console.error('[Finance-AutoSync] ICICI return sync failed (non-fatal):', syncErr.message);
+        }
       } catch (txErr) {
         await session.abortTransaction();
         session.endSession();

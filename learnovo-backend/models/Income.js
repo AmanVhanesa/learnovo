@@ -56,6 +56,25 @@ const incomeSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Cross-module reference for auto-created records (fee payments, etc.)
+  referenceType: {
+    type: String,
+    enum: ['fee_payment', 'manual'],
+    default: 'manual'
+  },
+  referenceId: {
+    type: mongoose.Schema.Types.ObjectId
+  },
+  referenceModel: {
+    type: String,
+    enum: ['Payment', 'PaymentAttempt', 'FeePaymentOrder'],
+    default: null
+  },
+  // System-generated records (from fee payments) cannot be edited/deleted by users
+  isSystemGenerated: {
+    type: Boolean,
+    default: false
+  },
   isDeleted: {
     type: Boolean,
     default: false
@@ -68,5 +87,7 @@ incomeSchema.index({ tenantId: 1, category: 1 });
 incomeSchema.index({ tenantId: 1, incomeDate: -1 });
 incomeSchema.index({ tenantId: 1, isDeleted: 1 });
 incomeSchema.index({ tenantId: 1, academicYear: 1 });
+incomeSchema.index({ tenantId: 1, referenceType: 1, referenceId: 1 }, { sparse: true });
+incomeSchema.index({ tenantId: 1, isSystemGenerated: 1 });
 
 module.exports = mongoose.model('Income', incomeSchema);

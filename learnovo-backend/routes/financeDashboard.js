@@ -1,8 +1,11 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const Income = require('../models/Income');
 const Expense = require('../models/Expense');
+const FeeInvoice = require('../models/FeeInvoice');
+const Payment = require('../models/Payment');
 
 // All routes require auth + admin role
 router.use(protect, authorize('admin'));
@@ -327,6 +330,93 @@ router.get('/report', async(req, res, next) => {
         incomes,
         expenses,
         period: { startDate: startDate || null, endDate: endDate || null }
+      },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── GET /api/finance/income-breakdown ────────────────────────────────────────
+// Income breakdown by category for pie/donut chart
+router.get('/income-breakdown', async(req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const filter = { tenantId: req.user.tenantId, isDeleted: false };
+
+    if (startDate || endDate) {
+      filter.incomeDate = {};
+      if (startDate) filter.incomeDate.$gte = new Date(startDate);
+      if (endDate) filter.incomeDate.$lte = new Date(endDate);
+    }
+
+    const breakdown = await Income.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$category',
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'incomecategories',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'categoryInfo'
+        }
+      },
+      { $unwind: { path: '$categoryInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          total: 1,
+          count: 1,
+          name: { $ifNull: ['$categoryInfo.name', 'Uncategorized'] },
+          color: { $ifNull: ['$categoryInfo.color', '#6B7280'] }
+        }
+      },
+      { $sort: { total: -1 } }
+    ]);
+
+    res.json({ success: true, data: breakdown, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── GET /api/finance/fee-collection-rate ─────────────────────────────────────
+// Fee collection rate from the Fees module
+router.get('/fee-collection-rate', async(req, res, next) => {
+  try {
+    const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
+
+    // Total invoiced (all non-cancelled invoices)
+    const invoicedAgg = await FeeInvoice.aggregate([
+      { $match: { tenantId, status: { $ne: 'Cancelled' } } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }
+    ]);
+
+    // Total collected (confirmed, non-reversed payments)
+    const collectedAgg = await Payment.aggregate([
+      { $match: { tenantId, isConfirmed: true, isReversed: { $ne: true } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+
+    const totalInvoiced = invoicedAgg[0]?.total || 0;
+    const totalCollected = collectedAgg[0]?.total || 0;
+    const totalInvoices = invoicedAgg[0]?.count || 0;
+    const collectionRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalInvoiced,
+        totalCollected,
+        totalInvoices,
+        collectionRate
       },
       requestId: req.requestId
     });

@@ -16,6 +16,7 @@ const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, sumMoney, validateAmount } = require('../utils/money');
 
 const planGate = require('../middleware/planGate');
+const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
 
 const router = express.Router();
 
@@ -1218,6 +1219,25 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       await StudentBalance.updateBalance(tenantId, studentId, invoice.academicSessionId);
     } catch (balanceErr) {
       console.error('Balance update failed (non-fatal):', balanceErr.message);
+    }
+
+    // Auto-sync to Finance module (non-blocking, outside transaction)
+    try {
+      const student = await User.findById(studentId).select('name fullName').lean();
+      await syncFeePaymentToIncome({
+        tenantId,
+        paymentId: payment._id,
+        amount,
+        paymentDate: new Date(paymentDate),
+        paymentMethod,
+        studentName: student?.fullName || student?.name || 'Student',
+        invoiceNumber: invoice.invoiceNumber,
+        addedBy: req.user._id,
+        paymentReference: transactionDetails?.referenceNumber || receiptNumber,
+        referenceModel: 'Payment'
+      });
+    } catch (syncErr) {
+      console.error('[Finance-AutoSync] collect-payment sync failed (non-fatal):', syncErr.message);
     }
 
     res.json({

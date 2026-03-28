@@ -14,6 +14,7 @@ export const expensesService = {
     if (filters.search) params.append('search', filters.search)
     if (filters.sortBy) params.append('sortBy', filters.sortBy)
     if (filters.sortOrder) params.append('sortOrder', filters.sortOrder)
+    if (filters.source) params.append('source', filters.source)
 
     const url = `/expenses${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)

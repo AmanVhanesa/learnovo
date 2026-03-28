@@ -47,7 +47,7 @@ const Income = () => {
 
   // List
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
-  const [filters, setFilters] = useState({ search: '', category: '', paymentMethod: '', startDate: '', endDate: '' })
+  const [filters, setFilters] = useState({ search: '', category: '', paymentMethod: '', startDate: '', endDate: '', source: '' })
   const [selectedIds, setSelectedIds] = useState([])
   const [debouncedFilters, setDebouncedFilters] = useState(filters)
 
@@ -271,6 +271,10 @@ const Income = () => {
   }
 
   const handleEditIncomeFromDetail = (inc) => {
+    if (inc.isSystemGenerated) {
+      toast.error('System-generated records cannot be modified')
+      return
+    }
     setViewingIncome(null)
     setEditingIncome(inc)
     setShowIncomeForm(true)
@@ -280,8 +284,9 @@ const Income = () => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
   const toggleSelectAll = () => {
-    if (selectedIds.length === incomes.length) setSelectedIds([])
-    else setSelectedIds(incomes.map(i => i._id))
+    const selectableIncomes = incomes.filter(i => !i.isSystemGenerated)
+    if (selectedIds.length === selectableIncomes.length) setSelectedIds([])
+    else setSelectedIds(selectableIncomes.map(i => i._id))
   }
 
   const goToPage = (page) => {
@@ -474,6 +479,7 @@ const Income = () => {
             </div>
             <select value={filters.category} onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))} className="input w-full sm:w-auto min-w-0 sm:min-w-[140px]"><option value="">All Categories</option>{categories.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select>
             <select value={filters.paymentMethod} onChange={(e) => setFilters(prev => ({ ...prev, paymentMethod: e.target.value }))} className="input w-full sm:w-auto min-w-0 sm:min-w-[150px]"><option value="">All Methods</option>{PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}</select>
+            <select value={filters.source} onChange={(e) => setFilters(prev => ({ ...prev, source: e.target.value }))} className="input w-full sm:w-auto min-w-0 sm:min-w-[140px]"><option value="">All Sources</option><option value="manual">Manual</option><option value="fee_collection">From Fees</option></select>
             <input type="date" value={filters.startDate} onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))} className="input w-full sm:w-auto" />
             <input type="date" value={filters.endDate} onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))} className="input w-full sm:w-auto" />
           </div>
@@ -494,12 +500,13 @@ const Income = () => {
         <div className="card overflow-hidden">
           {listLoading ? <LoadingSpinner /> : incomes.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
+              <table className="w-full min-w-[800px] text-sm">
                 <thead>
                   <tr className="bg-gray-50/80 dark:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A]">
-                    <th className="py-3.5 px-4 w-10"><input type="checkbox" checked={selectedIds.length === incomes.length && incomes.length > 0} onChange={toggleSelectAll} className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500" /></th>
+                    <th className="py-3.5 px-4 w-10"><input type="checkbox" checked={selectedIds.length === incomes.filter(i => !i.isSystemGenerated).length && incomes.filter(i => !i.isSystemGenerated).length > 0} onChange={toggleSelectAll} className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500" /></th>
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Date</th>
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Title</th>
+                    <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Source</th>
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Category</th>
                     <th className="text-right py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Amount</th>
                     <th className="text-left py-3.5 px-4 text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Method</th>
@@ -510,9 +517,10 @@ const Income = () => {
                 <tbody>
                   {incomes.map(inc => (
                     <tr key={inc._id} className="border-b border-gray-50 dark:border-[#38383A]/20 hover:bg-primary-50/40 dark:hover:bg-primary-500/[0.03] transition-colors">
-                      <td className="py-3.5 px-4"><input type="checkbox" checked={selectedIds.includes(inc._id)} onChange={() => toggleSelect(inc._id)} className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500" /></td>
+                      <td className="py-3.5 px-4">{inc.isSystemGenerated ? <input type="checkbox" disabled className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 opacity-50 cursor-not-allowed" title="System-generated records cannot be modified" /> : <input type="checkbox" checked={selectedIds.includes(inc._id)} onChange={() => toggleSelect(inc._id)} className="rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500" />}</td>
                       <td className="py-3.5 px-4 text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{new Date(inc.incomeDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</td>
                       <td className="py-3.5 px-4 font-medium text-gray-900 dark:text-white max-w-[200px] truncate">{inc.title}</td>
+                      <td className="py-3.5 px-4">{inc.isSystemGenerated || inc.referenceType === 'fee_payment' ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">From Fees</span> : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Manual</span>}</td>
                       <td className="py-3.5 px-4"><span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: inc.category?.color || '#6B7280' }} /><span className="text-gray-600 dark:text-[#8E8E93] whitespace-nowrap">{inc.category?.name || '\u2014'}</span></span></td>
                       <td className="py-3.5 px-4 text-right font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap tabular-nums">+{formatCurrency(inc.amount)}</td>
                       <td className="py-3.5 px-4 text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{inc.paymentMethod}</td>
@@ -520,8 +528,8 @@ const Income = () => {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center justify-center gap-0.5">
                           <button onClick={() => setViewingIncome(inc)} className="btn-icon" title="View"><Eye className="h-4 w-4" /></button>
-                          <button onClick={() => { setEditingIncome(inc); setShowIncomeForm(true) }} className="btn-icon" title="Edit"><Edit className="h-4 w-4" /></button>
-                          <button onClick={() => handleDelete(inc._id)} className="p-2 rounded-xl text-gray-400 dark:text-[#636366] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                          <button onClick={() => { if (!inc.isSystemGenerated) { setEditingIncome(inc); setShowIncomeForm(true) } }} className={`btn-icon ${inc.isSystemGenerated ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={inc.isSystemGenerated} title={inc.isSystemGenerated ? 'System-generated records cannot be modified' : 'Edit'}><Edit className="h-4 w-4" /></button>
+                          <button onClick={() => { if (!inc.isSystemGenerated) handleDelete(inc._id) }} className={`p-2 rounded-xl transition-all ${inc.isSystemGenerated ? 'text-gray-400 dark:text-[#636366] opacity-50 cursor-not-allowed' : 'text-gray-400 dark:text-[#636366] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10'}`} disabled={inc.isSystemGenerated} title={inc.isSystemGenerated ? 'System-generated records cannot be modified' : 'Delete'}><Trash2 className="h-4 w-4" /></button>
                         </div>
                       </td>
                     </tr>

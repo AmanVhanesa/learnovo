@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, TrendingDown, IndianRupee, ArrowUpRight, ArrowDownRight,
   BarChart3, PieChart, Clock, AlertTriangle, Download, Printer,
-  Calendar, List
+  Calendar, List, Target
 } from 'lucide-react'
 import { financeDashboardService } from '../services/financeDashboardService'
 import { formatCurrency } from '../utils/formatCurrency'
@@ -53,6 +53,24 @@ const FinanceDashboard = () => {
     queryFn: async () => {
       const res = await financeDashboardService.getExpenseBreakdown()
       return res.data || []
+    }
+  })
+
+  // Income breakdown
+  const { data: incomeBreakdown = [] } = useQuery({
+    queryKey: ['finance-income-breakdown'],
+    queryFn: async () => {
+      const res = await financeDashboardService.getIncomeBreakdown()
+      return res.data || []
+    }
+  })
+
+  // Fee collection rate
+  const { data: feeCollectionRate } = useQuery({
+    queryKey: ['finance-fee-collection-rate'],
+    queryFn: async () => {
+      const res = await financeDashboardService.getFeeCollectionRate()
+      return res.data
     }
   })
 
@@ -111,6 +129,17 @@ const FinanceDashboard = () => {
     }]
   }
 
+  // Income breakdown donut
+  const incomeBreakdownChartData = {
+    labels: incomeBreakdown.map(d => d.name),
+    datasets: [{
+      data: incomeBreakdown.map(d => d.total),
+      backgroundColor: incomeBreakdown.map(d => d.color || '#6B7280'),
+      borderWidth: 0,
+      hoverOffset: 8
+    }]
+  }
+
   const netMonth = dashData?.netBalanceMonth || 0
   const netYear = dashData?.netBalanceYear || 0
 
@@ -129,7 +158,7 @@ const FinanceDashboard = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
         <KpiCard
           title="Net Balance (Month)"
           value={formatCurrency(Math.abs(netMonth))}
@@ -160,6 +189,34 @@ const FinanceDashboard = () => {
           onPrimary={() => navigate('/app/expenses')}
           primaryLabel="Review"
         />
+        <div className="stat-card group relative">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="p-2.5 rounded-xl bg-primary-50 dark:bg-[rgba(62,196,177,0.12)] ring-1 ring-primary-100 dark:ring-[rgba(62,196,177,0.2)] flex-shrink-0">
+                <Target className="h-5 w-5 text-primary-600 dark:text-[#3EC4B1]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Fee Collection Rate</h3>
+                <div className="mt-1.5 text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                  {feeCollectionRate ? `${Math.round(feeCollectionRate.collectionRate)}%` : '--'}
+                </div>
+              </div>
+            </div>
+          </div>
+          {feeCollectionRate && (
+            <div className="mt-3">
+              <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-[#2C2C2E] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary-500 dark:bg-[#3EC4B1] transition-all duration-500"
+                  style={{ width: `${Math.min(feeCollectionRate.collectionRate, 100)}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-gray-500 dark:text-[#8E8E93]">
+                {formatCurrency(feeCollectionRate.totalCollected)} collected of {formatCurrency(feeCollectionRate.totalInvoiced)} invoiced
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Year totals */}
@@ -180,10 +237,10 @@ const FinanceDashboard = () => {
         </div>
       </div>
 
-      {/* Charts Row */}
+      {/* Charts Row — Bar Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Income vs Expense comparison */}
-        <div className="stat-card lg:col-span-2">
+        <div className="stat-card lg:col-span-3">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93]">Income vs Expenses</h3>
             <select value={reportRange} onChange={(e) => setReportRange(e.target.value)} className="input w-auto text-xs !py-1.5 !px-2.5">
@@ -211,7 +268,10 @@ const FinanceDashboard = () => {
             )}
           </div>
         </div>
+      </div>
 
+      {/* Breakdown Charts Row — Donut Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Expense category breakdown */}
         <div className="stat-card">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] mb-4">Expense Breakdown</h3>
@@ -228,6 +288,26 @@ const FinanceDashboard = () => {
               }} />
             ) : (
               <EmptyState icon={PieChart} title="No data" description="Add expenses to see breakdown" />
+            )}
+          </div>
+        </div>
+
+        {/* Income category breakdown */}
+        <div className="stat-card">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] mb-4">Income Breakdown</h3>
+          <div className="h-72 flex items-center justify-center">
+            {incomeBreakdown.length > 0 ? (
+              <Doughnut data={incomeBreakdownChartData} options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                  legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', padding: 10, font: { size: 10 } } },
+                  tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatCurrency(ctx.raw)}` } }
+                }
+              }} />
+            ) : (
+              <EmptyState icon={PieChart} title="No data" description="Add income records to see breakdown" />
             )}
           </div>
         </div>

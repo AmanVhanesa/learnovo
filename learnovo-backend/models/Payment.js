@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 const Counter = require('./Counter');
 
+// Lazy-loaded to avoid circular dependency — resolved on first use
+let _financeAutoSync = null;
+function getFinanceAutoSync() {
+  if (!_financeAutoSync) {
+    _financeAutoSync = require('../services/financeAutoSyncService');
+  }
+  return _financeAutoSync;
+}
+
 const paymentSchema = new mongoose.Schema({
   // Multi-tenant support
   tenantId: {
@@ -186,7 +195,18 @@ paymentSchema.methods.reverse = async function(userId, reason) {
   this.reversalReason = reason;
   this.reversalPaymentId = reversalPayment._id;
 
-  return this.save();
+  await this.save();
+
+  // Auto-reverse the corresponding Income record in Finance module (non-blocking)
+  // TODO: When a payment reversal route is added, ensure this still runs correctly.
+  try {
+    const { reverseFeePaymentIncome } = getFinanceAutoSync();
+    await reverseFeePaymentIncome(this.tenantId, this._id);
+  } catch (syncErr) {
+    console.error('[Finance-AutoSync] payment reversal income delete failed (non-fatal):', syncErr.message);
+  }
+
+  return this;
 };
 
 // Prevent modification of confirmed payments

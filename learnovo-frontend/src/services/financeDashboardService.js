@@ -20,6 +20,20 @@ export const financeDashboardService = {
     return res.data
   },
 
+  getIncomeBreakdown: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
+    const url = `/finance/income-breakdown${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url)
+    return res.data
+  },
+
+  getFeeCollectionRate: async () => {
+    const res = await api.get('/finance/fee-collection-rate')
+    return res.data
+  },
+
   getReport: async (filters = {}) => {
     const params = new URLSearchParams()
     if (filters.startDate) params.append('startDate', filters.startDate)
