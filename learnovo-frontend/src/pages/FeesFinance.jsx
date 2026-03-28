@@ -563,28 +563,93 @@ const FeeStructureTab = ({ feeStructures, classes, onCreateNew, onEdit, onDelete
 const InvoicesTab = ({ classes, feeStructures, activeSession, onShowIndividual }) => {
   const queryClient = useQueryClient()
   return (
-    <div className="space-y-4">
-      <div className="bg-gradient-to-r from-blue-50 to-primary-50 dark:from-blue-900/15 dark:to-primary-900/15 rounded-xl p-4 border border-blue-100 dark:border-blue-800/30">
+    <div className="space-y-5">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-blue-50 to-primary-50 dark:from-blue-900/15 dark:to-primary-900/15 rounded-xl p-5 border border-blue-100 dark:border-blue-800/30">
         <div className="flex items-start gap-3">
-          <div className="p-2.5 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex-shrink-0"><Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" /></div>
-          <div><h3 className="text-sm font-semibold text-gray-900 dark:text-white">Generate Invoices</h3><p className="text-xs text-gray-600 dark:text-[#8E8E93] mt-0.5">Create invoices for individual students or in bulk for an entire class.</p></div>
+          <div className="p-2.5 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex-shrink-0">
+            <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Generate Invoices</h3>
+            <p className="text-sm text-gray-600 dark:text-[#8E8E93] mt-0.5">
+              Create invoices for individual students or generate in bulk for an entire class or section.
+            </p>
+          </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="card p-5">
-          <div className="flex items-center gap-3 mb-4"><div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl"><Receipt className="h-6 w-6 text-blue-600 dark:text-blue-400" /></div><div><h4 className="font-semibold text-gray-900 dark:text-white">Individual Invoice</h4><p className="text-xs text-gray-500 dark:text-[#636366]">Generate for a single student</p></div></div>
-          <ul className="text-xs text-gray-600 dark:text-[#8E8E93] space-y-1.5 mb-4">
-            {['Search and select any student', 'Choose fee structure & billing period', 'Preview fee breakdown before generating'].map(t => <li key={t} className="flex items-center gap-1.5"><Check className="h-3 w-3 text-green-500 flex-shrink-0" /> {t}</li>)}
+
+      {/* Individual + Bulk side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Individual Invoice Card */}
+        <div className="card p-5 flex flex-col">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2.5 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex-shrink-0">
+              <Receipt className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 dark:text-white">Individual Invoice</h4>
+              <p className="text-xs text-gray-500 dark:text-[#636366]">Generate for a single student</p>
+            </div>
+          </div>
+          <ul className="text-xs text-gray-600 dark:text-[#8E8E93] space-y-2 mb-5 flex-1">
+            {[
+              'Search and select any student',
+              'Choose fee structure & billing period',
+              'Preview fee breakdown before generating',
+            ].map(t => (
+              <li key={t} className="flex items-center gap-2">
+                <Check className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                {t}
+              </li>
+            ))}
           </ul>
-          <button onClick={onShowIndividual} className="w-full btn btn-primary">Generate Individual Invoice</button>
+          <button onClick={onShowIndividual} className="w-full btn btn-primary flex items-center justify-center gap-2">
+            <Receipt className="h-4 w-4" />
+            Generate Individual Invoice
+          </button>
         </div>
+
+        {/* Bulk Invoice Card */}
         <div className="card p-5">
-          <div className="flex items-center gap-3 mb-4"><div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-xl"><Users className="h-6 w-6 text-green-600 dark:text-green-400" /></div><div><h4 className="font-semibold text-gray-900 dark:text-white">Bulk Invoice</h4><p className="text-xs text-gray-500 dark:text-[#636366]">Generate for entire class at once</p></div></div>
-          <BulkInvoiceForm classes={classes} feeStructures={feeStructures} activeSession={activeSession} onSuccess={() => { toast.success('Bulk invoices generated'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex-shrink-0">
+              <Users className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 dark:text-white">Bulk Invoice</h4>
+              <p className="text-xs text-gray-500 dark:text-[#636366]">Generate for entire class or section at once</p>
+            </div>
+          </div>
+          <BulkInvoiceForm
+            classes={classes}
+            feeStructures={feeStructures}
+            activeSession={activeSession}
+            onSuccess={() => {
+              toast.success('Bulk invoices generated')
+              queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })
+            }}
+          />
         </div>
-        <div className="card p-5 border-red-200 dark:border-red-900/50">
-          <div className="flex items-center gap-3 mb-4"><div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-xl"><Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" /></div><div><h4 className="font-semibold text-gray-900 dark:text-white">Bulk Delete</h4><p className="text-xs text-gray-500 dark:text-[#636366]">Remove pending invoices for a class</p></div></div>
-          <BulkDeleteInvoiceForm classes={classes} activeSession={activeSession} onSuccess={() => queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })} />
+      </div>
+
+      {/* Bulk Delete - separate row, full width */}
+      <div className="card p-5 border-red-200/60 dark:border-red-900/40">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2.5 bg-red-100 dark:bg-red-900/30 rounded-xl flex-shrink-0">
+            <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+          </div>
+          <div>
+            <h4 className="font-semibold text-gray-900 dark:text-white">Bulk Delete Pending Invoices</h4>
+            <p className="text-xs text-gray-500 dark:text-[#636366]">Remove all pending invoices for a class. Only invoices with no payments will be deleted.</p>
+          </div>
+        </div>
+        <div className="max-w-md">
+          <BulkDeleteInvoiceForm
+            classes={classes}
+            activeSession={activeSession}
+            onSuccess={() => queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })}
+          />
         </div>
       </div>
     </div>
