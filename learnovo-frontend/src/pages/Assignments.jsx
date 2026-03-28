@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Download, Eye, Edit, Trash2, Calendar, BookOpen, Users, FileText, X, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -503,7 +504,7 @@ const Assignments = () => {
       </div>
 
       {/* Create/Edit Modal */}
-      {showModal && !isStudent && (
+      {showModal && !isStudent && createPortal(
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] flex-shrink-0">
@@ -642,11 +643,12 @@ const Assignments = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Details Modal */}
-      {showDetailsModal && selectedAssignment && (
+      {showDetailsModal && selectedAssignment && createPortal(
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] flex-shrink-0">
@@ -743,7 +745,8 @@ const Assignments = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

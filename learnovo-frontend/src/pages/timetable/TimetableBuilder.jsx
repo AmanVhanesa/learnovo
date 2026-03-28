@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
@@ -58,7 +59,7 @@ const ROOM_TYPES = [
 
 const Modal = ({ show, onClose, title, children, width = 'max-w-lg' }) => {
   if (!show) return null
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className={`relative bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full ${width} max-h-[90vh] flex flex-col`}>
@@ -70,7 +71,8 @@ const Modal = ({ show, onClose, title, children, width = 'max-w-lg' }) => {
         </div>
         <div className="p-5 overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

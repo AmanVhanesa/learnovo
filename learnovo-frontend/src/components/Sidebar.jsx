@@ -141,7 +141,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl shadow-glass-lg border-r border-gray-200/60 dark:border-[#38383A] transform transition-transform duration-300 ease-in-out flex flex-col',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl shadow-glass-lg border-r border-gray-200 dark:border-[#38383A] transform transition-transform duration-300 ease-in-out flex flex-col',
           'xl:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}

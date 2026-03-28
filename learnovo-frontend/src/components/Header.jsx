@@ -126,7 +126,7 @@ const Header = ({ onToggleSidebar }) => {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1rem)] bg-white/95 dark:bg-[#2C2C2E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-black/[0.04] dark:ring-[#48484A] py-1 z-50 animate-slide-down">
+              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1rem)] bg-white/95 dark:bg-[#2C2C2E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#2C2C2E] py-1 z-50 animate-slide-down">
                 <div className="px-4 py-3 border-b border-gray-100 dark:border-[#38383A]">
                   <div className="flex items-center gap-3">
                     <UserAvatar photoUrl={photoUrl} initials={initials} alt={user?.name} size="lg" />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import payrollService from '../../services/payrollService';
 
@@ -53,7 +54,7 @@ const PayrollDetailsModal = ({ isOpen, onClose, payrollId }) => {
 
     if (!isOpen) return null;
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="p-6 border-b border-gray-200 dark:border-[#38383A]">
@@ -211,7 +212,8 @@ const PayrollDetailsModal = ({ isOpen, onClose, payrollId }) => {
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

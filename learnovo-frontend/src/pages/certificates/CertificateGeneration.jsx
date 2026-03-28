@@ -561,7 +561,7 @@ const CertificateGeneration = () => {
             {showFeesModal && previewData?.pendingFeesInfo && createPortal(
                 <div className="modal-overlay" onClick={() => setShowFeesModal(false)}>
                     <div
-                        className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-black/5 dark:ring-[#38383A] max-w-md w-full mx-4 animate-scale-in"
+                        className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-md w-full mx-4 animate-scale-in"
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Header */}

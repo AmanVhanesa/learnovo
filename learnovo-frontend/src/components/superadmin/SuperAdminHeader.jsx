@@ -55,7 +55,7 @@ const SuperAdminHeader = ({ onToggleSidebar }) => {
     const initials = displayName.charAt(0)?.toUpperCase() || 'S'
 
     return (
-        <header className="h-16 bg-white/80 dark:bg-[#000000]/80 backdrop-blur-lg border-b border-gray-200/60 dark:border-[#38383A]">
+        <header className="h-16 bg-white/80 dark:bg-[#000000]/80 backdrop-blur-lg border-b border-gray-200 dark:border-[#38383A]">
             <div className="flex items-center justify-between h-full px-3 sm:px-4 md:px-6">
                 {/* Left: hamburger + breadcrumb */}
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">

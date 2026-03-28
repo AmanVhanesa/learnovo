@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Send, MessageSquare, Clock, Trash2, X, Users, Search, AlertCircle } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -322,7 +323,7 @@ const TeacherCommunication = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
+      {showDeleteConfirm && createPortal(
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete Announcement?</h3>
@@ -338,7 +339,8 @@ const TeacherCommunication = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import payrollService from '../../services/payrollService';
 
@@ -73,7 +74,7 @@ const EditPayrollModal = ({ isOpen, onClose, payrollData, onSuccess }) => {
         'July', 'August', 'September', 'October', 'November', 'December'
     ];
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999]">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
                 {/* Header */}
@@ -228,7 +229,8 @@ const EditPayrollModal = ({ isOpen, onClose, payrollData, onSuccess }) => {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

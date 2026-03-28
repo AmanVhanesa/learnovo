@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Upload, Trash2, File, Image as ImageIcon, CheckCircle, Camera } from 'lucide-react';
 import homeworkService from '../../services/homeworkService';
 import { formatDateShort } from '../../utils/formatDate';
@@ -81,7 +82,7 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
 
     const isEditing = homework.mySubmission && homework.mySubmission.status !== 'pending';
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
@@ -296,7 +297,8 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                     </form>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

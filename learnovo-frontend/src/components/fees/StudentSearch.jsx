@@ -87,7 +87,7 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
       </div>
 
       {isOpen && searchResults.length > 0 && (
-        <div className="absolute z-20 w-full mt-1.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg max-h-72 overflow-y-auto ring-1 ring-black/5 dark:ring-white/5">
+        <div className="absolute z-20 w-full mt-1.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg max-h-72 overflow-y-auto ring-1 ring-white dark:ring-[#1C1C1E]">
           <div className="px-3 py-2 border-b border-gray-100 dark:border-[#38383A]">
             <span className="text-[10px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wide">
               {searchResults.length} student{searchResults.length !== 1 ? 's' : ''} found

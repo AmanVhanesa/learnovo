@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, AlertCircle } from 'lucide-react'
 
 const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => {
@@ -21,7 +22,7 @@ const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => 
         }))
     }
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl max-w-md w-full max-h-[90vh] flex flex-col">
                 {/* Header */}
@@ -134,7 +135,8 @@ const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => 
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     )
 }
 

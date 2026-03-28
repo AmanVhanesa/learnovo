@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Calendar, Clock, BookOpen, User, Download, File, Image as ImageIcon, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import homeworkService from '../../services/homeworkService';
@@ -49,7 +50,7 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
 
     const isImage = (fileType) => fileType?.startsWith('image/');
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col mx-2 sm:mx-auto">
                 {/* Header */}
@@ -281,7 +282,8 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

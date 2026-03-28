@@ -77,13 +77,13 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
             {/* Sidebar — 256px (w-64) to match main app, with backdrop-blur */}
             <div
                 className={cn(
-                    'fixed inset-y-0 left-0 z-50 w-64 bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl border-r border-gray-200/60 dark:border-[#38383A] transform transition-transform duration-300 ease-in-out flex flex-col',
+                    'fixed inset-y-0 left-0 z-50 w-64 bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl border-r border-gray-200 dark:border-[#38383A] transform transition-transform duration-300 ease-in-out flex flex-col',
                     'xl:translate-x-0',
                     isOpen ? 'translate-x-0' : '-translate-x-full'
                 )}
             >
                 {/* Logo header — h-16 to match main sidebar */}
-                <div className="flex items-center justify-between h-16 px-5 border-b border-gray-200/60 dark:border-[#38383A] flex-shrink-0">
+                <div className="flex items-center justify-between h-16 px-5 border-b border-gray-200 dark:border-[#38383A] flex-shrink-0">
                     <div className="flex items-center">
                         <div className="flex-shrink-0">
                             <SuperAdminLogo />
@@ -143,7 +143,7 @@ const SuperAdminSidebar = ({ isOpen, onClose }) => {
                 </nav>
 
                 {/* User Profile + Sign out */}
-                <div className="p-3 border-t border-gray-200/60 dark:border-[#38383A] flex-shrink-0">
+                <div className="p-3 border-t border-gray-200 dark:border-[#38383A] flex-shrink-0">
                     <div className="w-full flex items-center gap-3 mb-2 px-2 py-1.5 rounded-xl text-left">
                         <div className="h-9 w-9 rounded-full overflow-hidden bg-primary-500 flex items-center justify-center flex-shrink-0">
                             <span className="text-sm font-bold text-white">{initials}</span>

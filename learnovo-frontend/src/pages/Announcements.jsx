@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Megaphone, Users, Calendar, AlertCircle, Trash2, X, Clock, Search, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -315,7 +316,7 @@ const Announcements = () => {
             )}
 
             {/* Create Announcement Modal */}
-            {showCreateModal && (
+            {showCreateModal && createPortal(
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
                     <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
@@ -417,7 +418,8 @@ const Announcements = () => {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

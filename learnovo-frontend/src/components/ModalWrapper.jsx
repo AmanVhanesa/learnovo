@@ -6,7 +6,7 @@ const ModalWrapper = ({ title, onClose, maxWidth = 'max-w-2xl', children }) => {
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className={`bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg ring-1 ring-black/[0.03] dark:ring-white/[0.06] ${maxWidth} w-full sm:mx-4 md:mx-auto h-full sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden animate-scale-in`}
+        className={`bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] ${maxWidth} w-full sm:mx-4 md:mx-auto h-full sm:h-auto sm:max-h-[90vh] flex flex-col overflow-hidden animate-scale-in`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#2C2C2E] px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">

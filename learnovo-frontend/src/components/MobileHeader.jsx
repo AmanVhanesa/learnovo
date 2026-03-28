@@ -24,7 +24,7 @@ const MobileHeader = ({ onMenuClick }) => {
   }
 
   return (
-    <div className="xl:hidden bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl border-b border-gray-200/60 dark:border-[#2C2C2E] sticky top-0 z-30">
+    <div className="xl:hidden bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#2C2C2E] sticky top-0 z-30">
       <div className="flex items-center justify-between h-14 px-3">
         {/* Left side - Menu button and logo */}
         <div className="flex items-center space-x-2 min-w-0">
@@ -77,7 +77,7 @@ const MobileHeader = ({ onMenuClick }) => {
 
             {/* Dropdown — right-aligned and constrained to viewport */}
             {profileOpen && (
-              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-black/[0.04] dark:ring-white/[0.06] py-1 z-[200] animate-slide-down">
+              <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] py-1 z-[200] animate-slide-down">
                 {/* User info header */}
                 <div className="px-4 py-3 border-b border-gray-100 dark:border-[#38383A]">
                   <div className="flex items-center gap-3">

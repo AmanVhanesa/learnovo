@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check } from 'lucide-react';
 
 const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
@@ -92,7 +93,7 @@ const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
         onClose();
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
                 {/* Header */}
@@ -194,7 +195,8 @@ const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

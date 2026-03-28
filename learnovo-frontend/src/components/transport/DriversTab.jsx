@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, User, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
@@ -361,7 +362,7 @@ const DriverModal = ({ driver, onClose }) => {
         ? formData.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
         : 'DR';
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                 <div className="sticky top-0 bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-between items-center">
@@ -687,7 +688,8 @@ const DriverModal = ({ driver, onClose }) => {
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

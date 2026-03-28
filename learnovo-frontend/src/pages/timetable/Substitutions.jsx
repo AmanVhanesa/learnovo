@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
@@ -471,7 +472,7 @@ const Substitutions = () => {
       </div>
 
       {/* Mark Teacher Absent Modal */}
-      {showAbsentModal && (
+      {showAbsentModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAbsentModal(false)} />
           <div className="relative bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
@@ -596,11 +597,12 @@ const Substitutions = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Teacher Report Absence Modal */}
-      {showReportModal && (
+      {showReportModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
           <div className="relative bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full max-w-sm">
@@ -632,7 +634,8 @@ const Substitutions = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

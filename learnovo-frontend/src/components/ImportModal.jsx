@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Upload, FileText, AlertTriangle, CheckCircle, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/authService';
@@ -268,7 +269,7 @@ const ImportModal = ({
         onClose();
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-[9999]">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-t-2xl sm:rounded-2xl shadow-xl w-full max-w-4xl sm:mx-4 h-full sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
@@ -639,7 +640,8 @@ const ImportModal = ({
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

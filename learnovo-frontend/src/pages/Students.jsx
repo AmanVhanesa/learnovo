@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsService } from '../services/studentsService'
@@ -682,7 +683,7 @@ const Students = () => {
         </div>
 
         {/* ── Export Options Modal ── */}
-        {showExportModal && (
+        {showExportModal && createPortal(
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
               <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
@@ -789,7 +790,8 @@ const Students = () => {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Active Filters Display */}
