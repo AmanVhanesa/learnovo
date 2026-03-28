@@ -27,6 +27,12 @@ const homeworkSubmissionSchema = new mongoose.Schema({
     trim: true
   },
 
+  // Mark as done (for notebook-based homework)
+  markedAsDone: {
+    type: Boolean,
+    default: false
+  },
+
   // Attachments (images and files)
   attachments: [{
     fileName: {

@@ -137,6 +137,17 @@ const Homework = () => {
         setShowSubmissionModal(true);
     };
 
+    const handleDeleteSubmission = async (hw) => {
+        if (!window.confirm('Are you sure you want to delete your submission?')) return;
+        try {
+            await homeworkService.deleteSubmission(hw._id);
+            toast.success('Submission deleted successfully');
+            queryClient.invalidateQueries({ queryKey: ['homework'] });
+        } catch {
+            toast.error('Failed to delete submission');
+        }
+    };
+
     const handleFormSuccess = () => {
         setShowCreateModal(false);
         setEditingHomework(null);
@@ -376,12 +387,19 @@ const Homework = () => {
                                             <Eye className="h-4 w-4" />
                                             View
                                         </button>
-                                        {(!hw.mySubmission || hw.mySubmission.status === 'pending') && (
+                                        <button
+                                            onClick={() => handleSubmitHomework(hw)}
+                                            className="flex-1 btn btn-sm btn-primary flex items-center justify-center gap-1"
+                                        >
+                                            <Edit className="h-4 w-4" />
+                                            {hw.mySubmission && hw.mySubmission.status !== 'pending' ? 'Edit Submission' : hw.mySubmission ? 'Edit' : 'Submit'}
+                                        </button>
+                                        {hw.mySubmission && hw.mySubmission.status !== 'pending' && (
                                             <button
-                                                onClick={() => handleSubmitHomework(hw)}
-                                                className="flex-1 btn btn-sm btn-primary flex items-center justify-center gap-1"
+                                                onClick={() => handleDeleteSubmission(hw)}
+                                                className="btn btn-sm btn-outline text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center justify-center gap-1"
                                             >
-                                                {hw.mySubmission ? 'Edit' : 'Submit'}
+                                                <Trash2 className="h-4 w-4" />
                                             </button>
                                         )}
                                     </>

@@ -290,4 +290,29 @@ router.put('/submissions/:id', protect, authorize('teacher', 'admin'), async(req
   }
 });
 
+/**
+ * @route   DELETE /api/homework/:id/submission
+ * @desc    Delete own submission (student only)
+ * @access  Private (Student)
+ */
+router.delete('/:id/submission', protect, authorize('student'), async(req, res) => {
+  try {
+    await homeworkService.deleteSubmission(
+      req.params.id,
+      req.user._id,
+      req.user.tenantId
+    );
+
+    res.json({
+      success: true,
+      message: 'Submission deleted successfully'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 module.exports = router;

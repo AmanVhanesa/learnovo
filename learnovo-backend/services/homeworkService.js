@@ -435,6 +435,7 @@ class HomeworkService {
       if (submission) {
         submission.submissionText = data.submissionText;
         submission.attachments = data.attachments || [];
+        submission.markedAsDone = data.markedAsDone || false;
         submission.status = 'submitted';
         submission.submittedAt = new Date();
       } else {
@@ -444,6 +445,7 @@ class HomeworkService {
           tenantId,
           submissionText: data.submissionText,
           attachments: data.attachments || [],
+          markedAsDone: data.markedAsDone || false,
           status: 'submitted',
           submittedAt: new Date()
         });
@@ -455,6 +457,23 @@ class HomeworkService {
       return submission;
     } catch (error) {
       throw new Error(`Failed to submit homework: ${error.message}`);
+    }
+  }
+
+  /**
+     * Delete own submission (student)
+     */
+  async deleteSubmission(homeworkId, studentId, tenantId) {
+    try {
+      const submission = await HomeworkSubmission.findOne({ homeworkId, studentId, tenantId });
+      if (!submission) {
+        throw new Error('Submission not found');
+      }
+
+      await HomeworkSubmission.deleteOne({ _id: submission._id });
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to delete submission: ${error.message}`);
     }
   }
 

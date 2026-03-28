@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, Trash2, File, Image as ImageIcon } from 'lucide-react';
+import { X, Upload, Trash2, File, Image as ImageIcon, CheckCircle, Camera } from 'lucide-react';
 import homeworkService from '../../services/homeworkService';
 import { formatDateShort } from '../../utils/formatDate';
 import toast from 'react-hot-toast';
 
 const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
     const [submissionText, setSubmissionText] = useState('');
+    const [markedAsDone, setMarkedAsDone] = useState(false);
     const [files, setFiles] = useState([]);
     const [existingAttachments, setExistingAttachments] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -13,6 +14,7 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
     useEffect(() => {
         if (homework.mySubmission) {
             setSubmissionText(homework.mySubmission.submissionText || '');
+            setMarkedAsDone(homework.mySubmission.markedAsDone || false);
             setExistingAttachments(homework.mySubmission.attachments || []);
         }
     }, [homework]);
@@ -49,8 +51,8 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        if (!submissionText.trim() && files.length === 0 && existingAttachments.length === 0) {
-            toast.error('Please provide an answer or attach files');
+        if (!markedAsDone && !submissionText.trim() && files.length === 0 && existingAttachments.length === 0) {
+            toast.error('Please mark as done, write an answer, or attach photos of your work');
             return;
         }
 
@@ -62,7 +64,8 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
 
             await homeworkService.submitHomework(homework._id, {
                 submissionText,
-                attachments: allAttachments
+                attachments: allAttachments,
+                markedAsDone
             });
 
             toast.success('Homework submitted successfully');
@@ -76,13 +79,16 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
 
     const isImage = (fileType) => fileType?.startsWith('image/');
 
+    const isEditing = homework.mySubmission && homework.mySubmission.status !== 'pending';
 
     return (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] flex-shrink-0">
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Submit Homework</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                        {isEditing ? 'Edit Submission' : 'Submit Homework'}
+                    </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
                         <X className="h-6 w-6" />
                     </button>
@@ -133,45 +139,56 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
 
                     {/* Submission Form */}
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Answer Text */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
-                                Your Answer
-                            </label>
-                            <textarea
-                                value={submissionText}
-                                onChange={(e) => setSubmissionText(e.target.value)}
-                                rows={6}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
-                                placeholder="Write your answer here..."
+                        {/* Mark as Done */}
+                        <label className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 dark:bg-[#2C2C2E] cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={markedAsDone}
+                                onChange={(e) => setMarkedAsDone(e.target.checked)}
+                                className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                             />
-                        </div>
+                            <div>
+                                <p className="font-medium text-gray-900 dark:text-white">Mark as Done</p>
+                                <p className="text-sm text-gray-500 dark:text-[#8E8E93]">
+                                    I have completed this homework in my notebook
+                                </p>
+                            </div>
+                        </label>
 
-                        {/* File Upload */}
+                        {/* Photo Upload - Prominent */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">
-                                Attach Files (Optional)
+                                Upload Photos of Your Work
                             </label>
 
-                            <label className="flex items-center justify-center w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-[#38383A] rounded-md cursor-pointer hover:border-primary-500 transition-colors">
-                                <Upload className="h-5 w-5 text-gray-400 dark:text-[#636366] mr-2" />
-                                <span className="text-sm text-gray-600 dark:text-[#8E8E93]">Click to upload images or files</span>
+                            <label className="flex flex-col items-center justify-center w-full px-4 py-6 border-2 border-dashed border-gray-300 dark:border-[#38383A] rounded-xl cursor-pointer hover:border-primary-500 hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-all">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-primary-50 dark:bg-primary-500/10 rounded-lg">
+                                        <Camera className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93]">
+                                            Take a photo or upload images
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-[#636366]">
+                                            JPG, PNG, GIF, PDF, DOC (Max 5MB each)
+                                        </p>
+                                    </div>
+                                </div>
                                 <input
                                     type="file"
                                     multiple
                                     accept="image/*,.pdf,.doc,.docx"
+                                    capture="environment"
                                     onChange={handleFileChange}
                                     className="hidden"
                                 />
                             </label>
-                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
-                                Supported: JPG, PNG, GIF, PDF, DOC, DOCX (Max 5MB each)
-                            </p>
 
                             {/* Existing Attachments */}
                             {existingAttachments.length > 0 && (
                                 <div className="mt-4">
-                                    <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Existing Attachments:</p>
+                                    <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Uploaded Photos:</p>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                         {existingAttachments.map((attachment, index) => (
                                             <div key={index} className="relative group border border-gray-200 dark:border-[#38383A] rounded-md p-2">
@@ -203,7 +220,7 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                             {/* New Files Preview */}
                             {files.length > 0 && (
                                 <div className="mt-4">
-                                    <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">New Files:</p>
+                                    <p className="text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">New Photos:</p>
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                         {files.map((file, index) => (
                                             <div key={index} className="relative group border border-gray-200 dark:border-[#38383A] rounded-md p-2">
@@ -233,10 +250,24 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                             )}
                         </div>
 
+                        {/* Answer Text - Optional */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
+                                Additional Notes <span className="text-gray-400 font-normal">(Optional)</span>
+                            </label>
+                            <textarea
+                                value={submissionText}
+                                onChange={(e) => setSubmissionText(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                                placeholder="Add any notes or comments about your homework..."
+                            />
+                        </div>
+
                         {/* Previous Feedback */}
                         {homework.mySubmission?.teacherFeedback && (
                             <div className="p-4 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
-                                <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">Previous Feedback:</p>
+                                <p className="text-sm font-medium text-blue-900 dark:text-blue-300 mb-1">Teacher Feedback:</p>
                                 <p className="text-sm text-blue-800 dark:text-blue-400">{homework.mySubmission.teacherFeedback}</p>
                                 {homework.mySubmission.grade != null && (
                                     <p className="text-sm text-blue-800 dark:text-blue-400 mt-1">Grade: {homework.mySubmission.grade}</p>
@@ -259,7 +290,7 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                                 className="btn btn-primary w-full sm:w-auto"
                                 disabled={isLoading}
                             >
-                                {isLoading ? 'Submitting...' : homework.mySubmission ? 'Update Submission' : 'Submit Homework'}
+                                {isLoading ? 'Submitting...' : isEditing ? 'Update Submission' : 'Submit Homework'}
                             </button>
                         </div>
                     </form>

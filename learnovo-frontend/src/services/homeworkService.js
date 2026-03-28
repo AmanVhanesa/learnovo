@@ -58,6 +58,14 @@ class HomeworkService {
     }
 
     /**
+     * Delete own submission (student)
+     */
+    async deleteSubmission(homeworkId) {
+        const response = await api.delete(`/homework/${homeworkId}/submission`);
+        return response.data;
+    }
+
+    /**
      * Get submissions for homework (teacher)
      */
     async getSubmissions(homeworkId) {

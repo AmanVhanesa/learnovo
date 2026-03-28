@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, BookOpen, User, Download, File, Image as ImageIcon } from 'lucide-react';
+import { X, Calendar, Clock, BookOpen, User, Download, File, Image as ImageIcon, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import homeworkService from '../../services/homeworkService';
 import { formatDateTime } from '../../utils/formatDate';
@@ -123,7 +123,15 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
                     {!isTeacher && homework.mySubmission && (
                         <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-lg p-4">
                             <h4 className="font-semibold text-gray-900 dark:text-white mb-3">My Submission</h4>
-                            <p className="text-gray-700 dark:text-[#8E8E93] mb-2">{homework.mySubmission.submissionText}</p>
+                            {homework.mySubmission.markedAsDone && (
+                                <div className="flex items-center gap-2 mb-3 text-green-600 dark:text-green-400">
+                                    <CheckCircle className="h-5 w-5" />
+                                    <span className="font-medium text-sm">Marked as Done</span>
+                                </div>
+                            )}
+                            {homework.mySubmission.submissionText && (
+                                <p className="text-gray-700 dark:text-[#8E8E93] mb-2">{homework.mySubmission.submissionText}</p>
+                            )}
                             {homework.mySubmission.teacherFeedback && (
                                 <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-500/10 rounded">
                                     <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Teacher Feedback:</p>
@@ -164,6 +172,13 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
                                                     {submission.status}
                                                 </span>
                                             </div>
+
+                                            {submission.markedAsDone && (
+                                                <div className="flex items-center gap-2 mb-2 text-green-600 dark:text-green-400">
+                                                    <CheckCircle className="h-4 w-4" />
+                                                    <span className="text-sm font-medium">Marked as Done</span>
+                                                </div>
+                                            )}
 
                                             {submission.submissionText && (
                                                 <p className="text-gray-700 dark:text-[#8E8E93] text-sm mb-2">{submission.submissionText}</p>
