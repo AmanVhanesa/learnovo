@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Bell, CheckCircle2, X, AlertTriangle, Info,
   ChevronLeft, ChevronRight, CheckCheck, Trash2,
-  Sparkles, ArrowRight, Filter
+  Sparkles, ArrowRight, Filter, ArrowLeft
 } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationContext'
 import notificationsService from '../services/notificationsService'
@@ -180,7 +180,14 @@ const Notifications = () => {
 
       {/* Page Header */}
       <div className="page-header">
-        <div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/app/communication')}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-lg flex-shrink-0"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
+          </button>
+          <div>
           <h1 className="page-title flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
               <Bell className="h-5 w-5 text-primary-600 dark:text-primary-400" />
@@ -193,6 +200,7 @@ const Notifications = () => {
               : 'You\'re all caught up'
             }
           </p>
+          </div>
         </div>
         {unreadCount > 0 && (
           <button

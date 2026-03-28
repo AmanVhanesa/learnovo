@@ -187,6 +187,7 @@ const Announcements = () => {
                     <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
                         {isAdmin ? 'Create and manage school-wide announcements' : 'Stay updated with school announcements'}
                     </p>
+                    </div>
                 </div>
                 {isAdmin && (
                     <button
