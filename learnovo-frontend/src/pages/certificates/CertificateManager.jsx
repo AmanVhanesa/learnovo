@@ -27,7 +27,8 @@ const CertificateManager = () => {
 
     const handleDownload = async (cert) => {
         try {
-            await certificateService.downloadCertificate(cert._id, `${cert.type}_${cert.certificateNumber}.pdf`);
+            const studentName = (cert.student?.fullName || cert.student?.name || 'certificate').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
+            await certificateService.downloadCertificate(cert._id, `${cert.type}_${studentName}.pdf`);
             const certLabel = cert.type === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
             reportsService.logActivity({
                 type: 'certificate', action: 'pdf_export',

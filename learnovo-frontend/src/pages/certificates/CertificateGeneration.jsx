@@ -100,7 +100,8 @@ const CertificateGeneration = () => {
             const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `${certType}_${selectedStudent.fullName || selectedStudent.name || 'certificate'}.pdf`);
+            const studentName = (selectedStudent.fullName || selectedStudent.name || 'certificate').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
+            link.setAttribute('download', `${certType}_${studentName}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -491,12 +492,14 @@ const CertificateGeneration = () => {
                                         <label className="label mb-1.5 block">Remarks</label>
                                         <input type="text" className="input" value={previewData.remarks} onChange={(e) => setPreviewData({ ...previewData, remarks: e.target.value })} />
                                     </div>
+                                    {selectedStudent?.isActive !== false && (
                                     <div>
                                         <label className="flex items-center gap-3 cursor-pointer p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-400">
                                             <input type="checkbox" className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500" checked={autoDeactivate} onChange={(e) => setAutoDeactivate(e.target.checked)} />
                                             <span className="font-medium text-sm">Automatically deactivate student profile upon generation</span>
                                         </label>
                                     </div>
+                                    )}
                                 </div>
                             </div>
                         )}
