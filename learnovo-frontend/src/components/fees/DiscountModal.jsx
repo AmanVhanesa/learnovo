@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { discountsService } from '../../services/feesService'
 import { formatCurrency } from '../../utils/formatCurrency'
@@ -22,6 +22,14 @@ const DiscountModal = ({ isOpen, onClose, invoice, onSuccess }) => {
     reason: ''
   })
   const [isSaving, setIsSaving] = useState(false)
+
+  // Reset form state whenever the modal opens or the invoice changes
+  useEffect(() => {
+    if (isOpen) {
+      setMode('fixed')
+      setForm({ type: '', amount: '', percentage: '', reason: '' })
+    }
+  }, [isOpen, invoice?._id])
 
   if (!isOpen || !invoice) return null
 
@@ -145,8 +153,8 @@ const DiscountModal = ({ isOpen, onClose, invoice, onSuccess }) => {
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
                 max={invoice.totalAmount}
-                min="1"
-                step="1"
+                min="0"
+                step="any"
                 placeholder="Enter discount amount"
                 required
               />
