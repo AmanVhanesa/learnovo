@@ -466,17 +466,16 @@ router.post('/generate-bulk', protect, authorize('admin'), [
   }
 });
 
-// @desc    Bulk delete invoices for class
+// @desc    Bulk delete invoices for class or all classes
 // @route   DELETE /api/invoices/bulk
 // @access  Private (Admin)
 router.delete('/bulk', protect, authorize('admin'), [
-  body('classId').notEmpty().withMessage('Class ID is required'),
   body('academicSessionId').notEmpty().withMessage('Academic Session ID is required'),
   handleValidationErrors
 ], async(req, res) => {
   try {
-    const { classId, sectionId, academicSessionId } = req.body;
-    logger.info('Bulk delete request', { classId, sectionId, academicSessionId });
+    const { classId, sectionId, academicSessionId, deleteAll } = req.body;
+    logger.info('Bulk delete request', { classId, sectionId, academicSessionId, deleteAll });
 
     const query = {
       tenantId: req.user.tenantId,
@@ -485,23 +484,20 @@ router.delete('/bulk', protect, authorize('admin'), [
       paidAmount: 0      // Double check no payments made
     };
 
-    // Handle classId/class logic similar to generation
-    const _classConditions = [{ classId: classId }];
-    try {
-      const Class = require('../models/Class');
-      const classDoc = await Class.findOne({ _id: classId, tenantId: req.user.tenantId });
-      if (classDoc && classDoc.name) {
-        // If invoices stored class name instead of ID (legacy support)
-        // But generally we should rely on classId.
-        // However, let's keep it safe and just query by classId as that's what we store now.
-        // Actually created invoices have classId.
+    // If deleteAll is true, skip class filtering — delete all pending invoices for the session
+    if (!deleteAll) {
+      if (!classId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Class ID is required when not deleting all'
+        });
       }
-    } catch (err) { /* empty */ }
 
-    query.classId = classId;
+      query.classId = classId;
 
-    if (sectionId) {
-      query.sectionId = sectionId;
+      if (sectionId) {
+        query.sectionId = sectionId;
+      }
     }
 
     logger.info('Bulk delete query', { query });
@@ -510,8 +506,7 @@ router.delete('/bulk', protect, authorize('admin'), [
     let invoicesToDelete = await FeeInvoice.find(query);
 
     // FALLBACK: If no invoices found by classId, try finding by students in that class
-    // This handles cases where invoices were generated without classId or with wrong classId
-    if (invoicesToDelete.length === 0) {
+    if (!deleteAll && invoicesToDelete.length === 0 && classId) {
       logger.info('No invoices found by classId directly, trying via student lookup');
 
       const User = require('../models/User');
@@ -561,17 +556,14 @@ router.delete('/bulk', protect, authorize('admin'), [
     if (count === 0) {
       return res.status(404).json({
         success: false,
-        message: 'No pending invoices found to delete for this class'
+        message: deleteAll ? 'No pending invoices found to delete' : 'No pending invoices found to delete for this class'
       });
     }
 
     // Update balances for all affected students
-    // This might be heavy if many students.
-    // We can do it in background or iterate.
-    // For distinct students:
     const distinctStudentIds = [...new Set(invoicesToDelete.map(inv => inv.studentId.toString()))];
 
-    // Update balances for all affected students in parallel (much faster than sequential)
+    // Update balances for all affected students in parallel
     await Promise.all(
       distinctStudentIds.map(studentId =>
         StudentBalance.updateBalance(req.user.tenantId, studentId, academicSessionId)
@@ -589,8 +581,9 @@ router.delete('/bulk', protect, authorize('admin'), [
         userName: req.user.name,
         userRole: req.user.role,
         details: {
-          classId,
+          classId: classId || 'ALL',
           sectionId,
+          deleteAll: !!deleteAll,
           count,
           academicSessionId
         },
