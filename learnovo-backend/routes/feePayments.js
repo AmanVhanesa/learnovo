@@ -2,10 +2,10 @@ const express = require('express');
 const { protect } = require('../middleware/auth');
 const { getTenantFromRequest, validateTenantAccess } = require('../middleware/tenant');
 const {
-    createOrder,
-    verifyPayment,
-    handleWebhook,
-    getPaymentStatus
+  createOrder,
+  verifyPayment,
+  handleWebhook,
+  getPaymentStatus
 } = require('../controllers/feePayment.controller');
 
 const router = express.Router();
@@ -16,27 +16,27 @@ const router = express.Router();
 // logged in to create orders and verify payments.
 
 router.post(
-    '/create-order',
-    protect,
-    getTenantFromRequest,
-    validateTenantAccess,
-    createOrder
+  '/create-order',
+  protect,
+  getTenantFromRequest,
+  validateTenantAccess,
+  createOrder
 );
 
 router.post(
-    '/verify',
-    protect,
-    getTenantFromRequest,
-    validateTenantAccess,
-    verifyPayment
+  '/verify',
+  protect,
+  getTenantFromRequest,
+  validateTenantAccess,
+  verifyPayment
 );
 
 router.get(
-    '/status/:orderId',
-    protect,
-    getTenantFromRequest,
-    validateTenantAccess,
-    getPaymentStatus
+  '/status/:orderId',
+  protect,
+  getTenantFromRequest,
+  validateTenantAccess,
+  getPaymentStatus
 );
 
 // ─── PUBLIC ROUTE (called by Razorpay, not by a user) ──────────

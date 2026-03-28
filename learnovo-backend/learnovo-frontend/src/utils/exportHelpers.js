@@ -1,23 +1,23 @@
 import * as XLSX from 'xlsx';
 
 export const exportCSV = (filename, rows) => {
-  const processRow = (row) => row.map((v) => '"' + String(v ?? '').replaceAll('"', '""') + '"').join(',')
-  const csvContent = rows.map(processRow).join('\n')
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const link = document.createElement('a')
-  const url = URL.createObjectURL(blob)
-  link.setAttribute('href', url)
-  link.setAttribute('download', filename)
-  link.click()
-  URL.revokeObjectURL(url)
-}
+  const processRow = (row) => row.map((v) => `"${  String(v ?? '').replaceAll('"', '""')  }"`).join(',');
+  const csvContent = rows.map(processRow).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.click();
+  URL.revokeObjectURL(url);
+};
 
 export const exportExcel = (filename, rows, sheetName = 'Sheet1') => {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, filename);
-}
+};
 
 // Export data in both CSV and Excel formats
 export const exportData = (baseFilename, rows, format = 'csv') => {
@@ -28,7 +28,7 @@ export const exportData = (baseFilename, rows, format = 'csv') => {
   } else {
     exportCSV(`${filenameWithoutExt}.csv`, rows);
   }
-}
+};
 
 /**
  * Export data as PDF using jsPDF + autoTable (client-side)
@@ -37,7 +37,7 @@ export const exportData = (baseFilename, rows, format = 'csv') => {
  * @param {string[][]} rows  - 2-D array of cell values
  * @param {object} schoolData - Optional tenant settings to render school header
  */
-export const exportPDF = async (filename, headers, rows, schoolData = null) => {
+export const exportPDF = async(filename, headers, rows, schoolData = null) => {
   // Lazy-import to avoid bundle cost when not needed
   const { jsPDF } = await import('jspdf');
   const { default: autoTable } = await import('jspdf-autotable');
@@ -185,34 +185,34 @@ export const exportPDF = async (filename, headers, rows, schoolData = null) => {
       fillColor: [15, 118, 110],  // teal
       textColor: 255,
       fontStyle: 'bold',
-      fontSize: 8,
+      fontSize: 8
     },
     bodyStyles: { fontSize: 7.5, textColor: 40, fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [255, 255, 255] }, // White rows everywhere
     margin: { left: 40, right: 40 },
     tableWidth: 'auto',
-    styles: { overflow: 'linebreak', cellPadding: 3, lineColor: [220, 220, 220], lineWidth: 0.1 },
+    styles: { overflow: 'linebreak', cellPadding: 3, lineColor: [220, 220, 220], lineWidth: 0.1 }
   });
 
   doc.save(filename);
-}
+};
 
 export const exportPNGPlaceholder = (filename) => {
-  const canvas = document.createElement('canvas')
-  canvas.width = 1200
-  canvas.height = 600
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  ctx.fillStyle = '#111827'
-  ctx.font = '20px sans-serif'
-  ctx.fillText('Export placeholder. Replace with chart library export.', 40, 60)
+  const canvas = document.createElement('canvas');
+  canvas.width = 1200;
+  canvas.height = 600;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#111827';
+  ctx.font = '20px sans-serif';
+  ctx.fillText('Export placeholder. Replace with chart library export.', 40, 60);
   canvas.toBlob((blob) => {
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.href = url
-    link.download = filename
-    link.click()
-    URL.revokeObjectURL(url)
-  })
-}
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  });
+};

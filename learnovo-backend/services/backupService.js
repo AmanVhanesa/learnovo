@@ -42,8 +42,8 @@ async function createBackupBuffer(tenantId) {
     metadata: {
       collectionsCount: Object.keys(backupData).length,
       documentsCount: totalDocs,
-      sizeBytes: buffer.length,
-    },
+      sizeBytes: buffer.length
+    }
   };
 }
 
@@ -75,7 +75,7 @@ async function createAndUploadBackup(tenantId, performedBy, type = 'manual') {
       status: 'success',
       type,
       driveFileId: driveResult?.fileId || undefined,
-      storageLocation,
+      storageLocation
     });
 
     logger.info('Backup completed', {
@@ -86,7 +86,7 @@ async function createAndUploadBackup(tenantId, performedBy, type = 'manual') {
       documents: metadata.documentsCount,
       sizeBytes: metadata.sizeBytes,
       durationMs: Date.now() - startTime,
-      driveFileId: driveResult?.fileId,
+      driveFileId: driveResult?.fileId
     });
 
     return { log, driveResult, metadata };
@@ -100,7 +100,7 @@ async function createAndUploadBackup(tenantId, performedBy, type = 'manual') {
         status: 'failed',
         errorMessage: error.message,
         type,
-        storageLocation: 'google_drive',
+        storageLocation: 'google_drive'
       });
     } catch {
       // ignore logging errors
@@ -131,7 +131,7 @@ async function createLocalBackup(tenantId, performedBy, type = 'manual') {
       documentsCount: metadata.documentsCount,
       status: 'success',
       type,
-      storageLocation: 'local',
+      storageLocation: 'local'
     });
 
     logger.info('Local backup completed', {
@@ -141,7 +141,7 @@ async function createLocalBackup(tenantId, performedBy, type = 'manual') {
       collections: metadata.collectionsCount,
       documents: metadata.documentsCount,
       sizeBytes: metadata.sizeBytes,
-      durationMs: Date.now() - startTime,
+      durationMs: Date.now() - startTime
     });
 
     return { log, metadata, buffer };
@@ -154,7 +154,7 @@ async function createLocalBackup(tenantId, performedBy, type = 'manual') {
         status: 'failed',
         errorMessage: error.message,
         type,
-        storageLocation: 'local',
+        storageLocation: 'local'
       });
     } catch {
       // ignore logging errors
@@ -168,5 +168,5 @@ async function createLocalBackup(tenantId, performedBy, type = 'manual') {
 module.exports = {
   createBackupBuffer,
   createAndUploadBackup,
-  createLocalBackup,
+  createLocalBackup
 };

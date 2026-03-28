@@ -165,7 +165,7 @@ const formatErrorResponse = (error, req) => {
     errorResponse.error = error.message;
     errorResponse.errorName = error.name;
     errorResponse.errorCode = error.code;
-    
+
     // Include validation errors if present
     if (error.errors && typeof error.errors === 'object' && Object.keys(error.errors).length > 0) {
       errorResponse.validationErrors = Object.keys(error.errors).map(key => ({
@@ -175,7 +175,7 @@ const formatErrorResponse = (error, req) => {
         value: error.errors[key].value
       }));
     }
-    
+
     // Include duplicate key info if present
     if (error.keyPattern || error.keyValue) {
       errorResponse.duplicateKey = {
@@ -183,7 +183,7 @@ const formatErrorResponse = (error, req) => {
         value: error.keyValue
       };
     }
-    
+
     // Include stack trace in development
     if (error.stack) {
       errorResponse.stack = error.stack.split('\n').slice(0, 15).join('\n');
@@ -194,7 +194,7 @@ const formatErrorResponse = (error, req) => {
 };
 
 // Global error handler middleware
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, req, res, _next) => {
   const errorResponse = formatErrorResponse(err, req);
 
   // Determine status code based on error type

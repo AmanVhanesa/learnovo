@@ -47,7 +47,7 @@ platformInvoiceSchema.index({ dueDate: 1, status: 1 });
 platformInvoiceSchema.index({ createdAt: -1 });
 
 // Auto-generate invoice number
-platformInvoiceSchema.pre('save', async function (next) {
+platformInvoiceSchema.pre('save', async function(next) {
   if (this.isNew && !this.invoiceNumber) {
     const count = await this.constructor.countDocuments();
     const date = new Date();

@@ -40,8 +40,8 @@ function paginatedResponse(data, total, page, limit) {
       current: page,      // backward-compat alias
       limit,
       totalPages,
-      pages: totalPages,  // backward-compat alias (frontend reads this)
-    },
+      pages: totalPages  // backward-compat alias (frontend reads this)
+    }
   };
 }
 

@@ -1,5 +1,5 @@
 const router = require('express').Router({ mergeParams: true });
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
 const TimetableEntry = require('../models/TimetableEntry');
 const TimetableTemplate = require('../models/TimetableTemplate');
 const { authorize } = require('../middleware/auth');
@@ -26,7 +26,7 @@ const validateEntry = [
   body('sectionId').optional({ nullable: true }).isMongoId().withMessage('sectionId must be a valid ID'),
   body('subjectId').isMongoId().withMessage('Valid subjectId is required'),
   body('teacherId').isMongoId().withMessage('Valid teacherId is required'),
-  body('roomId').optional({ nullable: true }).isMongoId().withMessage('roomId must be a valid ID'),
+  body('roomId').optional({ nullable: true }).isMongoId().withMessage('roomId must be a valid ID')
 ];
 
 // ─── Helper: load and validate template ─────────────────────────────────────
@@ -47,7 +47,7 @@ function requireDraft(template, res) {
   if (template.status !== 'draft') {
     res.status(400).json({
       success: false,
-      message: `Cannot modify entries for a ${template.status} template`,
+      message: `Cannot modify entries for a ${template.status} template`
     });
     return false;
   }
@@ -57,7 +57,7 @@ function requireDraft(template, res) {
 // ════════════════════════════════════════════════════════════════════════════
 //  GET / — List entries for a template
 // ════════════════════════════════════════════════════════════════════════════
-router.get('/', async (req, res, next) => {
+router.get('/', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -94,7 +94,7 @@ router.get('/', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: entries,
-      message: `Found ${entries.length} entry(ies)`,
+      message: `Found ${entries.length} entry(ies)`
     });
   } catch (error) {
     next(error);
@@ -104,7 +104,7 @@ router.get('/', async (req, res, next) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  POST / — Create single entry (admin only)
 // ════════════════════════════════════════════════════════════════════════════
-router.post('/', authorize('admin'), validateEntry, handleValidationErrors, async (req, res, next) => {
+router.post('/', authorize('admin'), validateEntry, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -125,7 +125,7 @@ router.post('/', authorize('admin'), validateEntry, handleValidationErrors, asyn
       return res.status(409).json({
         success: false,
         message: 'Scheduling conflict detected',
-        conflicts,
+        conflicts
       });
     }
 
@@ -139,7 +139,7 @@ router.post('/', authorize('admin'), validateEntry, handleValidationErrors, asyn
       subjectId,
       teacherId,
       roomId: roomId || null,
-      isManual: true,
+      isManual: true
     });
 
     const populated = await TimetableEntry.findById(entry._id)
@@ -154,7 +154,7 @@ router.post('/', authorize('admin'), validateEntry, handleValidationErrors, asyn
     return res.status(201).json({
       success: true,
       data: populated,
-      message: 'Entry created successfully',
+      message: 'Entry created successfully'
     });
   } catch (error) {
     next(error);
@@ -164,7 +164,7 @@ router.post('/', authorize('admin'), validateEntry, handleValidationErrors, asyn
 // ════════════════════════════════════════════════════════════════════════════
 //  PUT /:entryId — Update entry (admin only)
 // ════════════════════════════════════════════════════════════════════════════
-router.put('/:entryId', authorize('admin'), validateEntry, handleValidationErrors, async (req, res, next) => {
+router.put('/:entryId', authorize('admin'), validateEntry, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -192,7 +192,7 @@ router.put('/:entryId', authorize('admin'), validateEntry, handleValidationError
       return res.status(409).json({
         success: false,
         message: 'Scheduling conflict detected',
-        conflicts,
+        conflicts
       });
     }
 
@@ -219,7 +219,7 @@ router.put('/:entryId', authorize('admin'), validateEntry, handleValidationError
     return res.status(200).json({
       success: true,
       data: populated,
-      message: 'Entry updated successfully',
+      message: 'Entry updated successfully'
     });
   } catch (error) {
     next(error);
@@ -229,7 +229,7 @@ router.put('/:entryId', authorize('admin'), validateEntry, handleValidationError
 // ════════════════════════════════════════════════════════════════════════════
 //  DELETE /:entryId — Delete entry (admin only)
 // ════════════════════════════════════════════════════════════════════════════
-router.delete('/:entryId', authorize('admin'), async (req, res, next) => {
+router.delete('/:entryId', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -247,7 +247,7 @@ router.delete('/:entryId', authorize('admin'), async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: null,
-      message: 'Entry deleted successfully',
+      message: 'Entry deleted successfully'
     });
   } catch (error) {
     next(error);
@@ -267,8 +267,8 @@ router.post('/bulk', authorize('admin'), [
   body('entries.*.sectionId').optional({ nullable: true }).isMongoId(),
   body('entries.*.subjectId').isMongoId().withMessage('Each entry must have a valid subjectId'),
   body('entries.*.teacherId').isMongoId().withMessage('Each entry must have a valid teacherId'),
-  body('entries.*.roomId').optional({ nullable: true }).isMongoId(),
-], handleValidationErrors, async (req, res, next) => {
+  body('entries.*.roomId').optional({ nullable: true }).isMongoId()
+], handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -290,7 +290,7 @@ router.post('/bulk', authorize('admin'), [
           classId: item.classId,
           sectionId: item.sectionId || null,
           teacherId: item.teacherId,
-          roomId: item.roomId || null,
+          roomId: item.roomId || null
         }
       );
 
@@ -309,7 +309,7 @@ router.post('/bulk', authorize('admin'), [
         subjectId: item.subjectId,
         teacherId: item.teacherId,
         roomId: item.roomId || null,
-        isManual: true,
+        isManual: true
       });
       created.push(entry);
     }
@@ -320,9 +320,9 @@ router.post('/bulk', authorize('admin'), [
         createdCount: created.length,
         skippedCount: skipped.length,
         created,
-        skipped,
+        skipped
       },
-      message: `${created.length} entry(ies) created, ${skipped.length} skipped due to conflicts`,
+      message: `${created.length} entry(ies) created, ${skipped.length} skipped due to conflicts`
     });
   } catch (error) {
     next(error);
@@ -332,7 +332,7 @@ router.post('/bulk', authorize('admin'), [
 // ════════════════════════════════════════════════════════════════════════════
 //  POST /generate — Trigger auto-generation (admin only)
 // ════════════════════════════════════════════════════════════════════════════
-router.post('/generate', authorize('admin'), async (req, res, next) => {
+router.post('/generate', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -345,13 +345,13 @@ router.post('/generate', authorize('admin'), async (req, res, next) => {
 
     const result = await timetableGeneratorService.generateTimetable(tenantId, templateId, {
       keepLocked,
-      classId,
+      classId
     });
 
     return res.status(200).json({
       success: true,
       data: result,
-      message: `Timetable generated: ${result.entriesCreated} entries created in ${result.generationTimeMs}ms`,
+      message: `Timetable generated: ${result.entriesCreated} entries created in ${result.generationTimeMs}ms`
     });
   } catch (error) {
     next(error);
@@ -361,7 +361,7 @@ router.post('/generate', authorize('admin'), async (req, res, next) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  DELETE /clear — Clear all non-locked entries (admin only)
 // ════════════════════════════════════════════════════════════════════════════
-router.delete('/clear', authorize('admin'), async (req, res, next) => {
+router.delete('/clear', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -373,13 +373,13 @@ router.delete('/clear', authorize('admin'), async (req, res, next) => {
     const result = await TimetableEntry.deleteMany({
       tenantId,
       templateId,
-      lockedByUser: { $ne: true },
+      lockedByUser: { $ne: true }
     });
 
     return res.status(200).json({
       success: true,
       data: { deletedCount: result.deletedCount },
-      message: `${result.deletedCount} non-locked entry(ies) cleared`,
+      message: `${result.deletedCount} non-locked entry(ies) cleared`
     });
   } catch (error) {
     next(error);
@@ -389,7 +389,7 @@ router.delete('/clear', authorize('admin'), async (req, res, next) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  POST /:entryId/lock — Lock an entry (admin only)
 // ════════════════════════════════════════════════════════════════════════════
-router.post('/:entryId/lock', authorize('admin'), async (req, res, next) => {
+router.post('/:entryId/lock', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -406,7 +406,7 @@ router.post('/:entryId/lock', authorize('admin'), async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: entry,
-      message: 'Entry locked successfully',
+      message: 'Entry locked successfully'
     });
   } catch (error) {
     next(error);
@@ -416,7 +416,7 @@ router.post('/:entryId/lock', authorize('admin'), async (req, res, next) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  POST /:entryId/unlock — Unlock an entry (admin only)
 // ════════════════════════════════════════════════════════════════════════════
-router.post('/:entryId/unlock', authorize('admin'), async (req, res, next) => {
+router.post('/:entryId/unlock', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.templateId || req._templateId || req.params.id;
@@ -433,7 +433,7 @@ router.post('/:entryId/unlock', authorize('admin'), async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: entry,
-      message: 'Entry unlocked successfully',
+      message: 'Entry unlocked successfully'
     });
   } catch (error) {
     next(error);

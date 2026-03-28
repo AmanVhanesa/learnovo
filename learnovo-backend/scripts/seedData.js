@@ -25,7 +25,7 @@ const seedData = async() => {
     await Settings.deleteMany({});
 
     // Create default settings
-    const settings = await Settings.create({
+    const _settings = await Settings.create({
       institution: {
         name: 'Learnovo International School',
         address: {
@@ -165,7 +165,7 @@ const seedData = async() => {
     console.log('✅ Settings created');
 
     // Create admin user
-    const admin = await User.create({
+    const _admin = await User.create({
       name: 'Admin User',
       email: 'admin@learnovo.com',
       password: 'admin123',
@@ -176,7 +176,7 @@ const seedData = async() => {
     console.log('✅ Admin user created');
 
     // Create teachers
-    const teachers = await User.create([
+    const _teachers = await User.create([
       {
         name: 'Dr. Sarah Wilson',
         email: 'sarah.wilson@learnovo.com',
@@ -283,7 +283,7 @@ const seedData = async() => {
     console.log('✅ Students created');
 
     // Create parent user
-    const parent = await User.create({
+    const _parent = await User.create({
       name: 'Parent User',
       email: 'parent@learnovo.com',
       password: 'parent123',
@@ -295,7 +295,7 @@ const seedData = async() => {
     console.log('✅ Parent user created');
 
     // Create fees
-    const fees = await Fee.create([
+    const _fees = await Fee.create([
       {
         student: students[0]._id,
         amount: 11000,
@@ -360,7 +360,7 @@ const seedData = async() => {
     console.log('✅ Fees created');
 
     // Create admission applications
-    const admissions = await Admission.create([
+    const _admissions = await Admission.create([
       {
         applicationNumber: 'APP-2024-001',
         student: students[0]._id,

@@ -1,4 +1,4 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 
 /**
  * Counter Model
@@ -28,68 +28,68 @@ const counterSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
-})
+});
 
 // Compound index for efficient lookups
-counterSchema.index({ name: 1, year: 1 })
-counterSchema.index({ name: 1, year: 1, tenantId: 1 })
+counterSchema.index({ name: 1, year: 1 });
+counterSchema.index({ name: 1, year: 1, tenantId: 1 });
 
 /**
  * Get next sequence number for a given counter and year
  * Creates counter if it doesn't exist
  */
-counterSchema.statics.getNextSequence = async function (name, year, tenantId = null) {
-  const filter = { name, year }
-  if (tenantId) filter.tenantId = tenantId
+counterSchema.statics.getNextSequence = async function(name, year, tenantId = null) {
+  const filter = { name, year };
+  if (tenantId) filter.tenantId = tenantId;
 
   const counter = await this.findOneAndUpdate(
     filter,
     { $inc: { sequence: 1 } },
     { new: true, upsert: true }
-  )
+  );
 
-  return counter.sequence
-}
+  return counter.sequence;
+};
 
 /**
  * Format admission number from sequence
  */
 counterSchema.statics.formatAdmissionNumber = (sequence, year) => {
-  const paddedSequence = String(sequence).padStart(4, '0')
-  return `ADM-${year}-${paddedSequence}`
-}
+  const paddedSequence = String(sequence).padStart(4, '0');
+  return `ADM-${year}-${paddedSequence}`;
+};
 
 /**
  * Format receipt number from sequence
  */
 counterSchema.statics.formatReceiptNumber = (sequence, year) => {
-  const paddedSequence = String(sequence).padStart(6, '0')
-  return `REC-${year}-${paddedSequence}`
-}
+  const paddedSequence = String(sequence).padStart(6, '0');
+  return `REC-${year}-${paddedSequence}`;
+};
 
 /**
  * Rollback a sequence after a failed document save.
  * Decrements the counter so the number can be reused.
  */
-counterSchema.statics.rollbackSequence = async function (name, year, tenantId = null) {
-  const filter = { name, year }
-  if (tenantId) filter.tenantId = tenantId
+counterSchema.statics.rollbackSequence = async function(name, year, tenantId = null) {
+  const filter = { name, year };
+  if (tenantId) filter.tenantId = tenantId;
 
   await this.findOneAndUpdate(
     filter,
     { $inc: { sequence: -1 } }
-  )
-}
+  );
+};
 
 /**
  * Rollback by composite counter name (for receipt/invoice counters
  * that embed tenantId/year in the name field).
  */
-counterSchema.statics.rollbackByName = async function (counterName) {
+counterSchema.statics.rollbackByName = async function(counterName) {
   await this.findOneAndUpdate(
     { name: counterName },
     { $inc: { sequence: -1 } }
-  )
-}
+  );
+};
 
-module.exports = mongoose.model('Counter', counterSchema)
+module.exports = mongoose.model('Counter', counterSchema);

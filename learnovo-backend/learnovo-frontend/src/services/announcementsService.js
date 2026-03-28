@@ -6,45 +6,45 @@ import api from './authService';
  */
 
 const announcementsService = {
-    /**
+  /**
      * Get all announcements
      */
-    getAnnouncements: async (params = {}) => {
-        const response = await api.get('/announcements', { params });
-        return response.data;
-    },
+  getAnnouncements: async(params = {}) => {
+    const response = await api.get('/announcements', { params });
+    return response.data;
+  },
 
-    /**
+  /**
      * Get single announcement
      */
-    getAnnouncement: async (id) => {
-        const response = await api.get(`/announcements/${id}`);
-        return response.data;
-    },
+  getAnnouncement: async(id) => {
+    const response = await api.get(`/announcements/${id}`);
+    return response.data;
+  },
 
-    /**
+  /**
      * Create new announcement
      */
-    createAnnouncement: async (announcementData) => {
-        const response = await api.post('/announcements', announcementData);
-        return response.data;
-    },
+  createAnnouncement: async(announcementData) => {
+    const response = await api.post('/announcements', announcementData);
+    return response.data;
+  },
 
-    /**
+  /**
      * Update announcement
      */
-    updateAnnouncement: async (id, updates) => {
-        const response = await api.put(`/announcements/${id}`, updates);
-        return response.data;
-    },
+  updateAnnouncement: async(id, updates) => {
+    const response = await api.put(`/announcements/${id}`, updates);
+    return response.data;
+  },
 
-    /**
+  /**
      * Delete announcement
      */
-    deleteAnnouncement: async (id) => {
-        const response = await api.delete(`/announcements/${id}`);
-        return response.data;
-    }
+  deleteAnnouncement: async(id) => {
+    const response = await api.delete(`/announcements/${id}`);
+    return response.data;
+  }
 };
 
 export default announcementsService;

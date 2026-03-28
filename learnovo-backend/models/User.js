@@ -53,9 +53,9 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
     validate: {
-      validator: function (v) {
+      validator: function(v) {
         if (!v || v.trim() === '') return true;
-        return /^[\+]?[1-9][\d]{5,15}$/.test(v);
+        return /^[+]?[1-9][\d]{5,15}$/.test(v);
       },
       message: 'Please enter a valid phone number (e.g., +919876543210 or 9876543210)'
     },
@@ -430,7 +430,7 @@ userSchema.index({ tenantId: 1, employeeId: 1 }, { sparse: true });
 userSchema.index({ tenantId: 1, isActive: 1 });
 
 // Hash password before saving
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
 
   try {
@@ -445,12 +445,12 @@ userSchema.pre('save', async function (next) {
 // Note: Admission number and student ID generation moved to routes for proper async handling
 
 // Compare password method
-userSchema.methods.comparePassword = async function (candidatePassword) {
+userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Get user without sensitive data
-userSchema.methods.toJSON = function () {
+userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
   return user;

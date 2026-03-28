@@ -1,4 +1,4 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 
 /**
  * Employee Attendance Model
@@ -48,10 +48,10 @@ const employeeAttendanceSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
-})
+});
 
 // One record per employee per day per tenant
-employeeAttendanceSchema.index({ tenantId: 1, employeeId: 1, date: 1 }, { unique: true })
-employeeAttendanceSchema.index({ tenantId: 1, date: 1 })
+employeeAttendanceSchema.index({ tenantId: 1, employeeId: 1, date: 1 }, { unique: true });
+employeeAttendanceSchema.index({ tenantId: 1, date: 1 });
 
-module.exports = mongoose.model('EmployeeAttendance', employeeAttendanceSchema)
+module.exports = mongoose.model('EmployeeAttendance', employeeAttendanceSchema);

@@ -13,7 +13,7 @@ module.exports = {
   },
   rules: {
     'no-console': 'warn',
-    'no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
+    'no-unused-vars': ['error', { 'argsIgnorePattern': '^_', 'varsIgnorePattern': '^_' }],
     'no-var': 'error',
     'prefer-const': 'error',
     'prefer-arrow-callback': 'error',
@@ -32,7 +32,7 @@ module.exports = {
     'space-infix-ops': 'error',
     'space-before-blocks': 'error',
     'brace-style': ['error', '1tbs'],
-    'camelcase': ['error', { 'properties': 'never' }],
+    'camelcase': ['error', { 'properties': 'never', 'allow': ['^razorpay_', '^order_', '^tracking_', '^bank_ref', '^payment_', '^enc_', '^merchant_'] }],
     'no-duplicate-imports': 'error',
     'no-useless-return': 'error',
     'prefer-template': 'error'
@@ -41,6 +41,12 @@ module.exports = {
     'node_modules/',
     'coverage/',
     'uploads/',
-    '*.min.js'
+    '*.min.js',
+    'learnovo-frontend/',
+    'public/',
+    'app-script.js',
+    'script.js',
+    'check-*.js',
+    'repair-*.js'
   ]
 };

@@ -1,4 +1,4 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 
 /**
  * Holiday Model
@@ -38,8 +38,8 @@ const holidaySchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
-})
+});
 
-holidaySchema.index({ tenantId: 1, date: 1 })
+holidaySchema.index({ tenantId: 1, date: 1 });
 
-module.exports = mongoose.model('Holiday', holidaySchema)
+module.exports = mongoose.model('Holiday', holidaySchema);

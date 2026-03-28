@@ -2,7 +2,6 @@ const csv = require('csv-parser');
 const fs = require('fs');
 const { logger } = require('../middleware/errorHandler');
 const User = require('../models/User');
-const Tenant = require('../models/Tenant');
 const emailService = require('./emailService');
 
 class CSVImportService {
@@ -269,7 +268,7 @@ class CSVImportService {
   }
 
   // Generate invitation token
-  generateInvitationToken(userId) {
+  generateInvitationToken(_userId) {
     const crypto = require('crypto');
     return crypto.randomBytes(32).toString('hex');
   }

@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const {
   setupTestDB,
   createTestTenant,
@@ -12,7 +11,7 @@ const notificationService = require('../../services/notificationService');
 setupTestDB();
 
 // Also clear Notification + NotificationPreference between tests
-beforeEach(async () => {
+beforeEach(async() => {
   await Promise.all([
     Notification.deleteMany({}),
     NotificationPreference.deleteMany({})
@@ -23,7 +22,7 @@ beforeEach(async () => {
 describe('Notification Service', () => {
   let tenant, admin, teacher;
 
-  beforeEach(async () => {
+  beforeEach(async() => {
     tenant = await createTestTenant();
     admin = await createTestUser(tenant._id, {
       name: 'Admin User',
@@ -42,7 +41,7 @@ describe('Notification Service', () => {
   // ========================================================================
 
   describe('Deduplication', () => {
-    it('should create a notification on first call', async () => {
+    it('should create a notification on first call', async() => {
       const notif = await notificationService.createNotification({
         tenantId: tenant._id,
         userId: admin._id,
@@ -56,7 +55,7 @@ describe('Notification Service', () => {
       expect(notif.title).toBe('New Employee Added');
     });
 
-    it('should NOT create a duplicate notification within 5 minutes', async () => {
+    it('should NOT create a duplicate notification within 5 minutes', async() => {
       const params = {
         tenantId: tenant._id,
         userId: admin._id,
@@ -80,7 +79,7 @@ describe('Notification Service', () => {
       expect(count).toBe(1);
     });
 
-    it('should allow different titles for the same category', async () => {
+    it('should allow different titles for the same category', async() => {
       const base = {
         tenantId: tenant._id,
         userId: admin._id,
@@ -104,7 +103,7 @@ describe('Notification Service', () => {
       expect(second).not.toBeNull();
     });
 
-    it('should allow same notification for different users', async () => {
+    it('should allow same notification for different users', async() => {
       const params = {
         tenantId: tenant._id,
         title: 'System Update',
@@ -127,7 +126,7 @@ describe('Notification Service', () => {
       expect(second).not.toBeNull();
     });
 
-    it('should deduplicate within createBulkNotifications', async () => {
+    it('should deduplicate within createBulkNotifications', async() => {
       // Pre-create one notification
       await notificationService.createNotification({
         tenantId: tenant._id,
@@ -169,7 +168,7 @@ describe('Notification Service', () => {
   // ========================================================================
 
   describe('createNotification', () => {
-    it('should respect user preferences and skip disabled categories', async () => {
+    it('should respect user preferences and skip disabled categories', async() => {
       // Disable employee notifications for admin
       await NotificationPreference.create({
         tenantId: tenant._id,
@@ -189,7 +188,7 @@ describe('Notification Service', () => {
       expect(notif).toBeNull();
     });
 
-    it('should set channels.inApp.deliveredAt', async () => {
+    it('should set channels.inApp.deliveredAt', async() => {
       const notif = await notificationService.createNotification({
         tenantId: tenant._id,
         userId: admin._id,
@@ -203,7 +202,7 @@ describe('Notification Service', () => {
       expect(notif.channels.inApp.deliveredAt).toBeDefined();
     });
 
-    it('should pass through visibility when provided', async () => {
+    it('should pass through visibility when provided', async() => {
       const notif = await notificationService.createNotification({
         tenantId: tenant._id,
         userId: teacher._id,
@@ -223,7 +222,7 @@ describe('Notification Service', () => {
   // ========================================================================
 
   describe('markAsRead / markAllAsRead', () => {
-    it('should mark a single notification as read', async () => {
+    it('should mark a single notification as read', async() => {
       const notif = await notificationService.createNotification({
         tenantId: tenant._id,
         userId: admin._id,
@@ -238,7 +237,7 @@ describe('Notification Service', () => {
       expect(updated.readAt).toBeDefined();
     });
 
-    it('should not allow marking another user\'s notification as read', async () => {
+    it('should not allow marking another user\'s notification as read', async() => {
       const notif = await notificationService.createNotification({
         tenantId: tenant._id,
         userId: admin._id,
@@ -253,7 +252,7 @@ describe('Notification Service', () => {
       ).rejects.toThrow('Notification not found');
     });
 
-    it('should mark all notifications as read for a user', async () => {
+    it('should mark all notifications as read for a user', async() => {
       // Create 3 unread notifications
       for (let i = 0; i < 3; i++) {
         await Notification.create({
@@ -283,7 +282,7 @@ describe('Notification Service', () => {
   // ========================================================================
 
   describe('getUnreadCount', () => {
-    it('should return correct unread count', async () => {
+    it('should return correct unread count', async() => {
       // Create 2 unread and 1 read
       await Notification.create([
         { tenantId: tenant._id, userId: admin._id, title: 'A', message: 'a', type: 'info', category: 'system', isRead: false },
@@ -295,7 +294,7 @@ describe('Notification Service', () => {
       expect(count).toBe(2);
     });
 
-    it('should not count soft-deleted notifications', async () => {
+    it('should not count soft-deleted notifications', async() => {
       await Notification.create({
         tenantId: tenant._id,
         userId: admin._id,
@@ -311,7 +310,7 @@ describe('Notification Service', () => {
       expect(count).toBe(0);
     });
 
-    it('should clean up stale visibility mismatches for non-admin users', async () => {
+    it('should clean up stale visibility mismatches for non-admin users', async() => {
       // Create an admin-only notification targeted at the teacher user
       await Notification.create({
         tenantId: tenant._id,
@@ -341,7 +340,7 @@ describe('Notification Service', () => {
   // ========================================================================
 
   describe('deleteNotification', () => {
-    it('should soft-delete a notification', async () => {
+    it('should soft-delete a notification', async() => {
       const notif = await notificationService.createNotification({
         tenantId: tenant._id,
         userId: admin._id,
@@ -358,7 +357,7 @@ describe('Notification Service', () => {
       expect(deleted.deletedAt).toBeDefined();
     });
 
-    it('should not allow deleting another user\'s notification', async () => {
+    it('should not allow deleting another user\'s notification', async() => {
       const notif = await notificationService.createNotification({
         tenantId: tenant._id,
         userId: admin._id,
@@ -379,7 +378,7 @@ describe('Notification Service', () => {
   // ========================================================================
 
   describe('notifyNewEmployee', () => {
-    it('should create exactly one notification per recipient', async () => {
+    it('should create exactly one notification per recipient', async() => {
       const employee = await createTestUser(tenant._id, {
         name: 'New Teacher',
         email: 'newteacher@test.com',
@@ -399,7 +398,7 @@ describe('Notification Service', () => {
       expect(adminNotifs[0].title).toBe('New Employee Added');
     });
 
-    it('should not duplicate if called twice rapidly', async () => {
+    it('should not duplicate if called twice rapidly', async() => {
       const employee = await createTestUser(tenant._id, {
         name: 'New Teacher 2',
         email: 'newteacher2@test.com',
@@ -427,7 +426,7 @@ describe('Notification Service', () => {
   // ========================================================================
 
   describe('getNotifications', () => {
-    it('should paginate results correctly', async () => {
+    it('should paginate results correctly', async() => {
       // Create 5 notifications
       for (let i = 0; i < 5; i++) {
         await Notification.create({
@@ -450,7 +449,7 @@ describe('Notification Service', () => {
       expect(page1.pagination.pages).toBe(3);
     });
 
-    it('should filter by isRead', async () => {
+    it('should filter by isRead', async() => {
       await Notification.create([
         { tenantId: tenant._id, userId: admin._id, title: 'Unread', message: 'u', type: 'info', category: 'system', isRead: false },
         { tenantId: tenant._id, userId: admin._id, title: 'Read', message: 'r', type: 'info', category: 'system', isRead: true }
@@ -470,14 +469,14 @@ describe('Notification Service', () => {
   // ========================================================================
 
   describe('isDuplicate', () => {
-    it('should return false when no matching notification exists', async () => {
+    it('should return false when no matching notification exists', async() => {
       const result = await notificationService.isDuplicate(
         tenant._id, admin._id, 'system', 'Nonexistent'
       );
       expect(result).toBe(false);
     });
 
-    it('should return true when a recent matching notification exists', async () => {
+    it('should return true when a recent matching notification exists', async() => {
       await Notification.create({
         tenantId: tenant._id,
         userId: admin._id,
@@ -493,7 +492,7 @@ describe('Notification Service', () => {
       expect(result).toBe(true);
     });
 
-    it('should return false for soft-deleted notifications', async () => {
+    it('should return false for soft-deleted notifications', async() => {
       await Notification.create({
         tenantId: tenant._id,
         userId: admin._id,

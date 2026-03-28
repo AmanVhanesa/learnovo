@@ -45,7 +45,7 @@ function getDriveClient() {
   );
 
   oauth2Client.setCredentials({
-    refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN,
+    refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN
   });
 
   // Automatically update credentials when new tokens are received
@@ -54,7 +54,9 @@ function getDriveClient() {
       oauth2Client.setCredentials(tokens);
     }
   });
-  oauth2Client.on('error', () => { _driveClient = null; });
+  oauth2Client.on('error', () => {
+    _driveClient = null;
+  });
 
   _driveClient = google.drive({ version: 'v3', auth: oauth2Client });
   return _driveClient;
@@ -113,7 +115,7 @@ async function findExistingFile(tenantId) {
     const res = await drive.files.list({
       q: `'${folderId}' in parents and name = '${filename}' and trashed = false`,
       fields: 'files(id, name, size, modifiedTime, webViewLink)',
-      pageSize: 1,
+      pageSize: 1
     });
 
     return res.data.files?.[0] || null;
@@ -148,17 +150,17 @@ async function uploadOrReplace(tenantId, buffer) {
     result = await drive.files.update({
       fileId: existingFile.id,
       media,
-      fields: 'id, name, size, modifiedTime, webViewLink',
+      fields: 'id, name, size, modifiedTime, webViewLink'
     });
   } else {
     result = await drive.files.create({
       requestBody: {
         name: filename,
         mimeType: 'application/gzip',
-        parents: [folderId],
+        parents: [folderId]
       },
       media,
-      fields: 'id, name, size, modifiedTime, webViewLink',
+      fields: 'id, name, size, modifiedTime, webViewLink'
     });
   }
 
@@ -169,7 +171,7 @@ async function uploadOrReplace(tenantId, buffer) {
     filename: result.data.name,
     size: parseInt(result.data.size || '0', 10),
     modifiedTime: result.data.modifiedTime,
-    webViewLink: result.data.webViewLink,
+    webViewLink: result.data.webViewLink
   };
 }
 
@@ -181,7 +183,7 @@ async function downloadFile(tenantId) {
   const existingFile = await findExistingFile(tenantId);
 
   if (!existingFile) {
-    throw new Error(`No backup found in Google Drive for this school.`);
+    throw new Error('No backup found in Google Drive for this school.');
   }
 
   const res = await drive.files.get(
@@ -204,7 +206,7 @@ async function getFileInfo(tenantId) {
     filename: existingFile.name,
     size: parseInt(existingFile.size || '0', 10),
     modifiedTime: existingFile.modifiedTime,
-    webViewLink: existingFile.webViewLink,
+    webViewLink: existingFile.webViewLink
   };
 }
 
@@ -214,5 +216,5 @@ module.exports = {
   resetClient,
   uploadOrReplace,
   downloadFile,
-  getFileInfo,
+  getFileInfo
 };

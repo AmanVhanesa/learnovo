@@ -11,12 +11,10 @@ const Class = require('../models/Class');
 const GeneratedCertificate = require('../models/GeneratedCertificate');
 const ActivityLog = require('../models/ActivityLog');
 
-const planGate = require('../middleware/planGate');
-
 const router = express.Router();
 // @route   GET /api/reports/dashboard
 // @access  Private
-router.get('/dashboard', protect, async (req, res) => {
+router.get('/dashboard', protect, async(req, res) => {
   try {
     const user = req.user;
     const tenantId = user.tenantId;
@@ -121,7 +119,7 @@ router.get('/dashboard', protect, async (req, res) => {
       students: { total: 0, active: 0 },
       teachers: { total: 0, active: 0 },
       admissions: { total: 0, pending: 0, approved: 0, rejected: 0 },
-      fees: { total: 0, paid: 0, pending: 0, overdue: 0 },
+      fees: { total: 0, paid: 0, pending: 0, overdue: 0 }
     };
 
     // ── Admin dashboard: run all counts in parallel ──────────────────────
@@ -140,8 +138,8 @@ router.get('/dashboard', protect, async (req, res) => {
           total: { $sum: '$amount' },
           paid: { $sum: { $cond: [{ $eq: ['$status', 'paid'] }, '$amount', 0] } },
           pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, '$amount', 0] } },
-          overdue: { $sum: { $cond: [{ $eq: ['$status', 'overdue'] }, '$amount', 0] } },
-        }}
+          overdue: { $sum: { $cond: [{ $eq: ['$status', 'overdue'] }, '$amount', 0] } }
+        } }
       ];
 
       // Fee aggregation — FeeInvoice model (capitalized statuses)
@@ -152,8 +150,8 @@ router.get('/dashboard', protect, async (req, res) => {
           total: { $sum: '$totalAmount' },
           paid: { $sum: { $cond: [{ $eq: ['$status', 'Paid'] }, '$totalAmount', 0] } },
           pending: { $sum: { $cond: [{ $in: ['$status', ['Pending', 'Partial']] }, '$balanceAmount', 0] } },
-          overdue: { $sum: { $cond: [{ $eq: ['$status', 'Overdue'] }, '$balanceAmount', 0] } },
-        }}
+          overdue: { $sum: { $cond: [{ $eq: ['$status', 'Overdue'] }, '$balanceAmount', 0] } }
+        } }
       ];
 
       // Today's fee collection — legacy Fee model
@@ -183,7 +181,7 @@ router.get('/dashboard', protect, async (req, res) => {
       }
 
       // Attendance counts — Attendance model uses nested attendanceRecords array
-      const attendancePromises = (async () => {
+      const attendancePromises = (async() => {
         try {
           const Attendance = require('../models/Attendance');
           const todayRecords = await Attendance.find({
@@ -200,7 +198,7 @@ router.get('/dashboard', protect, async (req, res) => {
       })();
 
       // Upcoming exams (class/subject are strings, not ObjectId refs)
-      const upcomingExamsPromise = (async () => {
+      const upcomingExamsPromise = (async() => {
         try {
           const Exam = require('../models/Exam');
           const exams = await Exam.find({
@@ -246,7 +244,7 @@ router.get('/dashboard', protect, async (req, res) => {
         Payment.aggregate(todayPaymentAggPipeline),
         attendancePromises,
         upcomingExamsPromise,
-        ...trendPromises,
+        ...trendPromises
       ]);
 
       // Combine totals from both legacy Fee and FeeInvoice systems
@@ -256,7 +254,7 @@ router.get('/dashboard', protect, async (req, res) => {
         total: legacyFees.total + invoiceFees.total,
         paid: legacyFees.paid + invoiceFees.paid,
         pending: legacyFees.pending + invoiceFees.pending,
-        overdue: legacyFees.overdue + invoiceFees.overdue,
+        overdue: legacyFees.overdue + invoiceFees.overdue
       };
       const collectedToday =
         (todayFeeAgg[0]?.collectedToday || 0) +
@@ -273,13 +271,13 @@ router.get('/dashboard', protect, async (req, res) => {
         fees: { ...feeTotals, collectedToday },
         attendance: attendanceCounts,
         enrollmentTrend: { labels: trendLabels, data: trendCounts },
-        upcomingExams: upcomingExams || [],
+        upcomingExams: upcomingExams || []
       });
     }
 
     // ── Teacher dashboard ──────────────────────────────────────────────
     if (user.role === 'teacher') {
-      const myStudentIds = studentFilter._id?.$in || [];
+      const _myStudentIds = studentFilter._id?.$in || [];
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
 
@@ -290,52 +288,58 @@ router.get('/dashboard', protect, async (req, res) => {
         homeworkStats,
         weeklyAttendance,
         upcomingAssignments,
-        assignedClassesList,
+        assignedClassesList
       ] = await Promise.all([
         // 1. Student count
         User.countDocuments({ role: 'student', tenantId, ...studentFilter }),
 
         // 2. Today's attendance — uses attendanceRecords array, scoped by teacherId
-        (async () => {
+        (async() => {
           try {
             const Attendance = require('../models/Attendance');
             const todayRecords = await Attendance.find({
               tenantId, teacherId: user._id,
-              date: { $gte: today, $lt: tomorrow },
+              date: { $gte: today, $lt: tomorrow }
             }).select('totalPresent totalLate totalAbsent');
             const present = todayRecords.reduce((s, r) => s + (r.totalPresent || 0) + (r.totalLate || 0), 0);
             const total = todayRecords.reduce((s, r) => s + (r.totalPresent || 0) + (r.totalLate || 0) + (r.totalAbsent || 0), 0);
             return { present, total };
-          } catch { return { present: 0, total: 0 }; }
+          } catch {
+            return { present: 0, total: 0 };
+          }
         })(),
 
         // 3. Active assignment count
-        (async () => {
+        (async() => {
           try {
             const Assignment = require('../models/Assignment');
             return Assignment.countDocuments({ teacher: user._id, tenantId, status: 'active' });
-          } catch { return 0; }
+          } catch {
+            return 0;
+          }
         })(),
 
         // 4. Homework submission stats (submitted, pending, late)
-        (async () => {
+        (async() => {
           try {
             const Homework = require('../models/Homework');
             const HomeworkSubmission = require('../models/HomeworkSubmission');
             // Get all active homework IDs for this teacher
             const myHomework = await Homework.find({
-              assignedBy: user._id, tenantId, isActive: true,
+              assignedBy: user._id, tenantId, isActive: true
             }).select('_id dueDate');
             const hwIds = myHomework.map(h => h._id);
             if (hwIds.length === 0) return { submitted: 0, pending: 0, late: 0 };
 
             const submissions = await HomeworkSubmission.find({
-              tenantId, homeworkId: { $in: hwIds },
+              tenantId, homeworkId: { $in: hwIds }
             }).select('status homeworkId submittedAt').lean();
 
             // Build due-date lookup
             const dueDateMap = {};
-            myHomework.forEach(h => { dueDateMap[h._id.toString()] = h.dueDate; });
+            myHomework.forEach(h => {
+              dueDateMap[h._id.toString()] = h.dueDate;
+            });
 
             let submitted = 0, pending = 0, late = 0;
             submissions.forEach(s => {
@@ -351,11 +355,13 @@ router.get('/dashboard', protect, async (req, res) => {
               }
             });
             return { submitted, pending, late };
-          } catch { return { submitted: 0, pending: 0, late: 0 }; }
+          } catch {
+            return { submitted: 0, pending: 0, late: 0 };
+          }
         })(),
 
         // 5. Weekly attendance trend (last 7 days)
-        (async () => {
+        (async() => {
           try {
             const Attendance = require('../models/Attendance');
             const labels = [];
@@ -370,7 +376,7 @@ router.get('/dashboard', protect, async (req, res) => {
 
               const dayRecords = await Attendance.find({
                 tenantId, teacherId: user._id,
-                date: { $gte: dayStart, $lt: dayEnd },
+                date: { $gte: dayStart, $lt: dayEnd }
               }).select('totalPresent totalLate totalAbsent');
 
               const present = dayRecords.reduce((s, r) => s + (r.totalPresent || 0) + (r.totalLate || 0), 0);
@@ -378,26 +384,30 @@ router.get('/dashboard', protect, async (req, res) => {
               data.push(total > 0 ? Math.round((present / total) * 100) : 0);
             }
             return { labels, data };
-          } catch { return { labels: [], data: [] }; }
+          } catch {
+            return { labels: [], data: [] };
+          }
         })(),
 
         // 6. Upcoming assignments (due in future, active)
-        (async () => {
+        (async() => {
           try {
             const Assignment = require('../models/Assignment');
             return Assignment.find({
               teacher: user._id, tenantId,
-              status: 'active', dueDate: { $gte: today },
+              status: 'active', dueDate: { $gte: today }
             })
               .sort({ dueDate: 1 })
               .limit(5)
               .select('title subject class dueDate')
               .lean();
-          } catch { return []; }
+          } catch {
+            return [];
+          }
         })(),
 
         // 7. Assigned classes list (all 4 allocation methods)
-        (async () => {
+        (async() => {
           try {
             const classMap = new Map(); // deduplicate by class _id
 
@@ -406,8 +416,8 @@ router.get('/dashboard', protect, async (req, res) => {
               tenantId,
               $or: [
                 { classTeacher: user._id },
-                { 'subjects.teacher': user._id },
-              ],
+                { 'subjects.teacher': user._id }
+              ]
             }).select('name grade').lean();
             directClasses.forEach(c => {
               classMap.set(c._id.toString(), { id: c._id, name: c.name, grade: c.grade });
@@ -416,12 +426,12 @@ router.get('/dashboard', protect, async (req, res) => {
             // 7b. Section model: sectionTeacher
             const Section = require('../models/Section');
             const teacherSections = await Section.find({
-              tenantId, sectionTeacher: user._id, isActive: true,
+              tenantId, sectionTeacher: user._id, isActive: true
             }).select('classId name').lean();
             if (teacherSections.length > 0) {
               const sectionClassIds = [...new Set(teacherSections.map(s => s.classId?.toString()).filter(Boolean))];
               const sectionClasses = await Class.find({
-                _id: { $in: sectionClassIds }, tenantId,
+                _id: { $in: sectionClassIds }, tenantId
               }).select('name grade').lean();
               sectionClasses.forEach(c => {
                 if (!classMap.has(c._id.toString())) {
@@ -432,14 +442,14 @@ router.get('/dashboard', protect, async (req, res) => {
 
             // 7c. TeacherSubjectAssignment model
             const tsaRecords = await TeacherSubjectAssignment.find({
-              teacherId: user._id, tenantId, isActive: true,
+              teacherId: user._id, tenantId, isActive: true
             }).select('classId').lean();
             if (tsaRecords.length > 0) {
               const tsaClassIds = [...new Set(tsaRecords.map(a => a.classId?.toString()).filter(Boolean))];
               const missingIds = tsaClassIds.filter(id => !classMap.has(id));
               if (missingIds.length > 0) {
                 const tsaClasses = await Class.find({
-                  _id: { $in: missingIds }, tenantId,
+                  _id: { $in: missingIds }, tenantId
                 }).select('name grade').lean();
                 tsaClasses.forEach(c => {
                   classMap.set(c._id.toString(), { id: c._id, name: c.name, grade: c.grade });
@@ -451,7 +461,7 @@ router.get('/dashboard', protect, async (req, res) => {
             const legacyClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
             if (legacyClasses.length > 0) {
               const legacyFound = await Class.find({
-                tenantId, name: { $in: legacyClasses },
+                tenantId, name: { $in: legacyClasses }
               }).select('name grade').lean();
               legacyFound.forEach(c => {
                 if (!classMap.has(c._id.toString())) {
@@ -472,21 +482,25 @@ router.get('/dashboard', protect, async (req, res) => {
                     { classId: { $in: classIds } },
                     { class: { $in: classNames } }
                   ]
-                }},
+                } },
                 { $group: {
                   _id: { $ifNull: ['$classId', '$class'] },
                   count: { $sum: 1 }
-                }}
+                } }
               ]);
               const countMap = {};
-              studentCounts.forEach(sc => { countMap[sc._id?.toString()] = sc.count; });
+              studentCounts.forEach(sc => {
+                countMap[sc._id?.toString()] = sc.count;
+              });
               classList.forEach(c => {
                 c.studentCount = countMap[c.id?.toString()] || countMap[c.name] || 0;
               });
             }
             return classList;
-          } catch { return []; }
-        })(),
+          } catch {
+            return [];
+          }
+        })()
       ]);
 
       const attendancePercent = todayAttResult.total > 0
@@ -495,7 +509,7 @@ router.get('/dashboard', protect, async (req, res) => {
 
       statistics.students = {
         total: studentCount,
-        active: studentCount,
+        active: studentCount
       };
       statistics.teacher = {
         myStudents: studentCount,
@@ -507,7 +521,7 @@ router.get('/dashboard', protect, async (req, res) => {
         lateSubmissions: homeworkStats.late,
         weeklyAttendance: weeklyAttendance,
         upcomingAssignments: upcomingAssignments,
-        assignedClasses: assignedClassesList,
+        assignedClasses: assignedClassesList
       };
     }
 
@@ -521,13 +535,15 @@ router.get('/dashboard', protect, async (req, res) => {
           { $match: { studentId: studentOid, tenantId: tenantOid, status: { $in: ['Pending', 'Partial', 'Overdue'] } } },
           { $group: { _id: null, totalOutstanding: { $sum: '$balanceAmount' }, count: { $sum: 1 } } }
         ]),
-        (async () => {
+        (async() => {
           try {
             const Assignment = require('../models/Assignment');
             return Assignment.countDocuments({ tenantId, assignedTo: user._id });
-          } catch { return 0; }
+          } catch {
+            return 0;
+          }
         })(),
-        Notification.getUnreadCount(user._id, tenantId),
+        Notification.getUnreadCount(user._id, tenantId)
       ]);
       const outstandingData = invoiceAgg[0] || { totalOutstanding: 0, count: 0 };
       statistics.students = { total: 1, active: user.isActive ? 1 : 0 };
@@ -536,7 +552,7 @@ router.get('/dashboard', protect, async (req, res) => {
         pendingFees: outstandingData.count,
         pendingFeesAmount: outstandingData.totalOutstanding,
         assignments: assignmentCount,
-        notifications: unreadNotifications,
+        notifications: unreadNotifications
       };
     }
 
@@ -551,7 +567,7 @@ router.get('/dashboard', protect, async (req, res) => {
           { $match: { studentId: { $in: childrenIds }, tenantId: parentTenantOid, status: { $in: ['Pending', 'Partial', 'Overdue'] } } },
           { $group: { _id: null, totalOutstanding: { $sum: '$balanceAmount' }, count: { $sum: 1 } } }
         ]),
-        Notification.getUnreadCount(user._id, tenantId),
+        Notification.getUnreadCount(user._id, tenantId)
       ]);
       const outstandingData = invoiceAgg[0] || { totalOutstanding: 0, count: 0 };
       statistics.parent = {
@@ -559,7 +575,7 @@ router.get('/dashboard', protect, async (req, res) => {
         pendingFees: outstandingData.count,
         pendingFeesAmount: outstandingData.totalOutstanding,
         notifications: parentUnreadNotifications,
-        performance: 'Good',
+        performance: 'Good'
       };
     }
 
@@ -581,7 +597,7 @@ router.get('/dashboard', protect, async (req, res) => {
 // @desc    Get recent activities
 // @route   GET /api/reports/activities
 // @access  Private
-router.get('/activities', protect, async (req, res) => {
+router.get('/activities', protect, async(req, res) => {
   try {
     // Only admins should see recent activities (contains fee payments, employee data)
     if (req.user.role !== 'admin') {
@@ -712,7 +728,7 @@ router.get('/activities', protect, async (req, res) => {
 // @desc    Log an activity (for client-side events like preview, Word export)
 // @route   POST /api/reports/activities/log
 // @access  Private
-router.post('/activities/log', protect, async (req, res) => {
+router.post('/activities/log', protect, async(req, res) => {
   try {
     const { type, action, message, studentName } = req.body;
     if (!message) return res.status(400).json({ success: false, message: 'Message is required' });

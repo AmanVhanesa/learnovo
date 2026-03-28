@@ -10,7 +10,7 @@ const SubjectAllocation = require('../models/SubjectAllocation');
 const User = require('../models/User');
 
 // ─── GET / — List substitutions ─────────────────────────────────────────────
-router.get('/', async (req, res, next) => {
+router.get('/', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { date, startDate, endDate, status, absentTeacherId, substituteTeacherId, page = 1, limit = 50 } = req.query;
@@ -93,7 +93,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // ─── POST / — Create substitution (admin only) ──────────────────────────────
-router.post('/', authorize('admin'), validateSubstitution, handleValidationErrors, async (req, res, next) => {
+router.post('/', authorize('admin'), validateSubstitution, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { date, originalEntryId, absentTeacherId, substituteTeacherId, reason, reasonNote } = req.body;
@@ -163,7 +163,7 @@ router.post('/', authorize('admin'), validateSubstitution, handleValidationError
 });
 
 // ─── PUT /:id — Update substitution (admin only) ────────────────────────────
-router.put('/:id', authorize('admin'), async (req, res, next) => {
+router.put('/:id', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -221,7 +221,7 @@ router.put('/:id', authorize('admin'), async (req, res, next) => {
 });
 
 // ─── DELETE /:id — Cancel substitution (admin only) ──────────────────────────
-router.delete('/:id', authorize('admin'), async (req, res, next) => {
+router.delete('/:id', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -248,7 +248,7 @@ router.delete('/:id', authorize('admin'), async (req, res, next) => {
 });
 
 // ─── GET /suggestions/:entryId — Suggest substitute teachers ─────────────────
-router.get('/suggestions/:entryId', async (req, res, next) => {
+router.get('/suggestions/:entryId', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { entryId } = req.params;
@@ -383,7 +383,7 @@ router.post('/bulk', authorize('admin'), [
   body('date').isISO8601().withMessage('Valid date is required'),
   body('absentTeacherId').isMongoId().withMessage('Valid absent teacher ID is required'),
   body('reason').optional().isIn(['sick', 'personal', 'official', 'training', 'other']).withMessage('Invalid reason')
-], handleValidationErrors, async (req, res, next) => {
+], handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { date, absentTeacherId, reason, reasonNote } = req.body;

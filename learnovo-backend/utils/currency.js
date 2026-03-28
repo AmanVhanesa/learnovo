@@ -70,7 +70,7 @@ exports.formatCurrency = (amount, currency = 'INR', options = {}) => {
 };
 
 // Format currency with system settings
-exports.formatCurrencyWithSettings = async (amount, currency = null) => {
+exports.formatCurrencyWithSettings = async(amount, currency = null) => {
   try {
     const settings = await Settings.getSettings();
     const systemCurrency = currency || settings.currency.default;
@@ -89,7 +89,7 @@ exports.formatCurrencyWithSettings = async (amount, currency = null) => {
 };
 
 // Convert currency (requires external API)
-exports.convertCurrency = async (amount, fromCurrency, toCurrency) => {
+exports.convertCurrency = async(amount, fromCurrency, toCurrency) => {
   try {
     // For demo purposes, using static conversion rates
     // In production, integrate with a real currency API like exchangerate.host

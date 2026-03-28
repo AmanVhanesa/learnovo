@@ -1,4 +1,4 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 
 /**
  * Attendance Settings Model
@@ -54,6 +54,6 @@ const attendanceSettingsSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
-})
+});
 
-module.exports = mongoose.model('AttendanceSettings', attendanceSettingsSchema)
+module.exports = mongoose.model('AttendanceSettings', attendanceSettingsSchema);

@@ -1,5 +1,4 @@
 const router = require('express').Router();
-const { validationResult } = require('express-validator');
 const Room = require('../models/Room');
 const { authorize } = require('../middleware/auth');
 const { validateRoom } = require('../middleware/timetableValidation');
@@ -7,7 +6,7 @@ const { handleValidationErrors } = require('../middleware/validation');
 
 // ─── GET / — List rooms ─────────────────────────────────────────────────────
 // Filterable by type, isActive
-router.get('/', async (req, res, next) => {
+router.get('/', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const filter = { tenantId };
@@ -27,7 +26,7 @@ router.get('/', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: rooms,
-      message: `Found ${rooms.length} room(s)`,
+      message: `Found ${rooms.length} room(s)`
     });
   } catch (error) {
     next(error);
@@ -35,7 +34,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // ─── POST / — Create room (admin only) ─────────────────────────────────────
-router.post('/', authorize('admin'), validateRoom, handleValidationErrors, async (req, res, next) => {
+router.post('/', authorize('admin'), validateRoom, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { name, code, type, building, floor, capacity, facilities } = req.body;
@@ -45,7 +44,7 @@ router.post('/', authorize('admin'), validateRoom, handleValidationErrors, async
     if (existing) {
       return res.status(409).json({
         success: false,
-        message: `A room with the name "${name}" already exists`,
+        message: `A room with the name "${name}" already exists`
       });
     }
 
@@ -57,13 +56,13 @@ router.post('/', authorize('admin'), validateRoom, handleValidationErrors, async
       building,
       floor,
       capacity,
-      facilities,
+      facilities
     });
 
     return res.status(201).json({
       success: true,
       data: room,
-      message: 'Room created successfully',
+      message: 'Room created successfully'
     });
   } catch (error) {
     next(error);
@@ -71,7 +70,7 @@ router.post('/', authorize('admin'), validateRoom, handleValidationErrors, async
 });
 
 // ─── PUT /:id — Update room (admin only) ───────────────────────────────────
-router.put('/:id', authorize('admin'), validateRoom, handleValidationErrors, async (req, res, next) => {
+router.put('/:id', authorize('admin'), validateRoom, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { name, code, type, building, floor, capacity, facilities } = req.body;
@@ -80,7 +79,7 @@ router.put('/:id', authorize('admin'), validateRoom, handleValidationErrors, asy
     if (!room) {
       return res.status(404).json({
         success: false,
-        message: 'Room not found',
+        message: 'Room not found'
       });
     }
 
@@ -90,7 +89,7 @@ router.put('/:id', authorize('admin'), validateRoom, handleValidationErrors, asy
       if (existing) {
         return res.status(409).json({
           success: false,
-          message: `A room with the name "${name}" already exists`,
+          message: `A room with the name "${name}" already exists`
         });
       }
     }
@@ -108,7 +107,7 @@ router.put('/:id', authorize('admin'), validateRoom, handleValidationErrors, asy
     return res.status(200).json({
       success: true,
       data: room,
-      message: 'Room updated successfully',
+      message: 'Room updated successfully'
     });
   } catch (error) {
     next(error);
@@ -116,7 +115,7 @@ router.put('/:id', authorize('admin'), validateRoom, handleValidationErrors, asy
 });
 
 // ─── DELETE /:id — Soft delete room (admin only) ───────────────────────────
-router.delete('/:id', authorize('admin'), async (req, res, next) => {
+router.delete('/:id', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -124,7 +123,7 @@ router.delete('/:id', authorize('admin'), async (req, res, next) => {
     if (!room) {
       return res.status(404).json({
         success: false,
-        message: 'Room not found',
+        message: 'Room not found'
       });
     }
 
@@ -134,7 +133,7 @@ router.delete('/:id', authorize('admin'), async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: room,
-      message: 'Room deactivated successfully',
+      message: 'Room deactivated successfully'
     });
   } catch (error) {
     next(error);

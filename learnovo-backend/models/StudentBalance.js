@@ -2,68 +2,68 @@ const mongoose = require('mongoose');
 const { roundToRupee } = require('../utils/money');
 
 const studentBalanceSchema = new mongoose.Schema({
-    // Multi-tenant support
-    tenantId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Tenant',
-        required: true,
-        index: true
-    },
+  // Multi-tenant support
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: true,
+    index: true
+  },
 
-    // Student & Session
-    studentId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-        index: true
-    },
+  // Student & Session
+  studentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
 
-    academicSessionId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'AcademicSession',
-        required: true,
-        index: true
-    },
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    required: true,
+    index: true
+  },
 
-    // Financial Summary (All derived from transactions)
-    totalInvoiced: {
-        type: Number,
-        default: 0,
-        min: 0
-    },
+  // Financial Summary (All derived from transactions)
+  totalInvoiced: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
 
-    totalPaid: {
-        type: Number,
-        default: 0,
-        min: 0
-    },
+  totalPaid: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
 
-    totalBalance: {
-        type: Number,
-        default: 0
-        // Can be negative (advance payment)
-    },
+  totalBalance: {
+    type: Number,
+    default: 0
+    // Can be negative (advance payment)
+  },
 
-    // Last Payment Info
-    lastPaymentDate: {
-        type: Date
-    },
+  // Last Payment Info
+  lastPaymentDate: {
+    type: Date
+  },
 
-    lastPaymentAmount: {
-        type: Number
-    },
+  lastPaymentAmount: {
+    type: Number
+  },
 
-    // Carry Forward from Previous Session
-    carryForwardBalance: {
-        type: Number,
-        default: 0
-    },
+  // Carry Forward from Previous Session
+  carryForwardBalance: {
+    type: Number,
+    default: 0
+  },
 
-    carryForwardDate: {
-        type: Date
-    }
+  carryForwardDate: {
+    type: Date
+  }
 }, {
-    timestamps: true
+  timestamps: true
 });
 
 // Indexes
@@ -72,111 +72,111 @@ studentBalanceSchema.index({ tenantId: 1, totalBalance: 1 }); // For defaulters 
 studentBalanceSchema.index({ tenantId: 1, academicSessionId: 1, totalBalance: 1 });
 
 // Static method to update balance for a student
-studentBalanceSchema.statics.updateBalance = async function (tenantId, studentId, academicSessionId) {
-    const FeeInvoice = mongoose.model('FeeInvoice');
-    const Payment = mongoose.model('Payment');
+studentBalanceSchema.statics.updateBalance = async function(tenantId, studentId, academicSessionId) {
+  const FeeInvoice = mongoose.model('FeeInvoice');
+  const Payment = mongoose.model('Payment');
 
-    // Calculate total invoiced
-    const invoiceAgg = await FeeInvoice.aggregate([
-        {
-            $match: {
-                tenantId: new mongoose.Types.ObjectId(tenantId),
-                studentId: new mongoose.Types.ObjectId(studentId),
-                academicSessionId: new mongoose.Types.ObjectId(academicSessionId),
-                status: { $ne: 'Cancelled' }
-            }
-        },
-        {
-            $group: {
-                _id: null,
-                total: { $sum: { $add: ['$totalAmount', '$lateFeeApplied'] } }
-            }
-        }
-    ]);
+  // Calculate total invoiced
+  const invoiceAgg = await FeeInvoice.aggregate([
+    {
+      $match: {
+        tenantId: new mongoose.Types.ObjectId(tenantId),
+        studentId: new mongoose.Types.ObjectId(studentId),
+        academicSessionId: new mongoose.Types.ObjectId(academicSessionId),
+        status: { $ne: 'Cancelled' }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: { $add: ['$totalAmount', '$lateFeeApplied'] } }
+      }
+    }
+  ]);
 
-    const totalInvoiced = roundToRupee(invoiceAgg.length > 0 ? invoiceAgg[0].total : 0);
+  const totalInvoiced = roundToRupee(invoiceAgg.length > 0 ? invoiceAgg[0].total : 0);
 
-    // Calculate total paid
-    const paymentAgg = await Payment.aggregate([
-        {
-            $match: {
-                tenantId: new mongoose.Types.ObjectId(tenantId),
-                studentId: new mongoose.Types.ObjectId(studentId),
-                isConfirmed: true,
-                isReversed: false
-            }
-        },
-        {
-            $lookup: {
-                from: 'feeinvoices',
-                localField: 'invoiceId',
-                foreignField: '_id',
-                as: 'invoice'
-            }
-        },
-        {
-            $unwind: '$invoice'
-        },
-        {
-            $match: {
-                'invoice.academicSessionId': new mongoose.Types.ObjectId(academicSessionId)
-            }
-        },
-        {
-            $group: {
-                _id: null,
-                total: { $sum: '$amount' }
-            }
-        }
-    ]);
-
-    const totalPaid = roundToRupee(paymentAgg.length > 0 ? paymentAgg[0].total : 0);
-
-    // Get last payment
-    const lastPayment = await Payment.findOne({
+  // Calculate total paid
+  const paymentAgg = await Payment.aggregate([
+    {
+      $match: {
         tenantId: new mongoose.Types.ObjectId(tenantId),
         studentId: new mongoose.Types.ObjectId(studentId),
         isConfirmed: true,
         isReversed: false
-    }).sort({ paymentDate: -1 });
+      }
+    },
+    {
+      $lookup: {
+        from: 'feeinvoices',
+        localField: 'invoiceId',
+        foreignField: '_id',
+        as: 'invoice'
+      }
+    },
+    {
+      $unwind: '$invoice'
+    },
+    {
+      $match: {
+        'invoice.academicSessionId': new mongoose.Types.ObjectId(academicSessionId)
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: '$amount' }
+      }
+    }
+  ]);
 
-    // Find or create balance record
-    const balance = await this.findOneAndUpdate(
-        { tenantId, studentId, academicSessionId },
-        {
-            $set: {
-                totalInvoiced,
-                totalPaid,
-                totalBalance: roundToRupee(totalInvoiced - totalPaid),
-                lastPaymentDate: lastPayment?.paymentDate,
-                lastPaymentAmount: lastPayment?.amount
-            }
-        },
-        { upsert: true, new: true }
-    );
+  const totalPaid = roundToRupee(paymentAgg.length > 0 ? paymentAgg[0].total : 0);
 
-    return balance;
+  // Get last payment
+  const lastPayment = await Payment.findOne({
+    tenantId: new mongoose.Types.ObjectId(tenantId),
+    studentId: new mongoose.Types.ObjectId(studentId),
+    isConfirmed: true,
+    isReversed: false
+  }).sort({ paymentDate: -1 });
+
+  // Find or create balance record
+  const balance = await this.findOneAndUpdate(
+    { tenantId, studentId, academicSessionId },
+    {
+      $set: {
+        totalInvoiced,
+        totalPaid,
+        totalBalance: roundToRupee(totalInvoiced - totalPaid),
+        lastPaymentDate: lastPayment?.paymentDate,
+        lastPaymentAmount: lastPayment?.amount
+      }
+    },
+    { upsert: true, new: true }
+  );
+
+  return balance;
 };
 
 // Static method to get defaulters
-studentBalanceSchema.statics.getDefaulters = async function (tenantId, academicSessionId, options = {}) {
-    const query = {
-        tenantId: new mongoose.Types.ObjectId(tenantId),
-        academicSessionId: new mongoose.Types.ObjectId(academicSessionId),
-        totalBalance: { $gt: 0 }
-    };
+studentBalanceSchema.statics.getDefaulters = async function(tenantId, academicSessionId, options = {}) {
+  const query = {
+    tenantId: new mongoose.Types.ObjectId(tenantId),
+    academicSessionId: new mongoose.Types.ObjectId(academicSessionId),
+    totalBalance: { $gt: 0 }
+  };
 
-    if (options.minBalance) {
-        query.totalBalance.$gte = options.minBalance;
-    }
+  if (options.minBalance) {
+    query.totalBalance.$gte = options.minBalance;
+  }
 
-    const defaulters = await this.find(query)
-        .populate('studentId', 'name fullName studentId phone email classId sectionId admissionNumber')
-        .populate('academicSessionId', 'name')
-        .sort({ totalBalance: -1 })
-        .limit(options.limit || 1000);
+  const defaulters = await this.find(query)
+    .populate('studentId', 'name fullName studentId phone email classId sectionId admissionNumber')
+    .populate('academicSessionId', 'name')
+    .sort({ totalBalance: -1 })
+    .limit(options.limit || 1000);
 
-    return defaulters;
+  return defaulters;
 };
 
 module.exports = mongoose.model('StudentBalance', studentBalanceSchema);

@@ -60,7 +60,7 @@ exports.validateStudent = [
   body('phone')
     .optional({ checkFalsy: true })
     .trim()
-    .matches(/^[\+]?([1-9]{1})([\d]{5,15})$/)
+    .matches(/^[+]?([1-9]{1})([\d]{5,15})$/)
     .withMessage('Please provide a valid phone number (e.g., +919876543210 or 9876543210)'),
 
   body('class')

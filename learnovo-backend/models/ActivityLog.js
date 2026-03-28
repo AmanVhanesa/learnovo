@@ -1,32 +1,32 @@
 const mongoose = require('mongoose');
 
 const activityLogSchema = new mongoose.Schema({
-    tenantId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Tenant',
-        required: true,
-        index: true
-    },
-    type: {
-        type: String,
-        enum: ['certificate', 'student', 'fee', 'attendance', 'exam', 'general'],
-        default: 'certificate'
-    },
-    action: {
-        type: String,
-        required: true
-    },
-    message: {
-        type: String,
-        required: true
-    },
-    studentName: String,
-    userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    }
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: true,
+    index: true
+  },
+  type: {
+    type: String,
+    enum: ['certificate', 'student', 'fee', 'attendance', 'exam', 'general'],
+    default: 'certificate'
+  },
+  action: {
+    type: String,
+    required: true
+  },
+  message: {
+    type: String,
+    required: true
+  },
+  studentName: String,
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }
 }, {
-    timestamps: true
+  timestamps: true
 });
 
 // Auto-expire after 90 days

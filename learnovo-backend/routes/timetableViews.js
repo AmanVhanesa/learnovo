@@ -4,7 +4,7 @@ const { getEffectiveSchedule, getWeekSchedule, getTodayForUser } = require('../s
 const { generatePDF, generateExcel } = require('../services/timetableExportService');
 
 // ─── GET /today — Today's effective schedule (role-based) ────────────────────
-router.get('/today', async (req, res, next) => {
+router.get('/today', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { classId, sectionId, teacherId, roomId } = req.query;
@@ -19,7 +19,7 @@ router.get('/today', async (req, res, next) => {
       return res.status(200).json({
         success: true,
         data: schedule,
-        message: "Today's schedule retrieved successfully"
+        message: 'Today\'s schedule retrieved successfully'
       });
     }
 
@@ -32,7 +32,7 @@ router.get('/today', async (req, res, next) => {
       return res.status(200).json({
         success: true,
         data: schedule,
-        message: "Today's schedule retrieved successfully"
+        message: 'Today\'s schedule retrieved successfully'
       });
     }
 
@@ -51,7 +51,7 @@ router.get('/today', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: schedule,
-      message: "Today's schedule retrieved successfully"
+      message: 'Today\'s schedule retrieved successfully'
     });
   } catch (error) {
     next(error);
@@ -59,7 +59,7 @@ router.get('/today', async (req, res, next) => {
 });
 
 // ─── GET /week — Weekly schedule ─────────────────────────────────────────────
-router.get('/week', async (req, res, next) => {
+router.get('/week', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { date, classId, sectionId, teacherId, roomId } = req.query;
@@ -103,7 +103,7 @@ router.get('/week', async (req, res, next) => {
 });
 
 // ─── GET /class/:classId — Weekly class timetable ────────────────────────────
-router.get('/class/:classId', async (req, res, next) => {
+router.get('/class/:classId', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { classId } = req.params;
@@ -129,7 +129,7 @@ router.get('/class/:classId', async (req, res, next) => {
 });
 
 // ─── GET /teacher/:teacherId — Weekly teacher timetable ──────────────────────
-router.get('/teacher/:teacherId', async (req, res, next) => {
+router.get('/teacher/:teacherId', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { teacherId } = req.params;
@@ -160,7 +160,7 @@ router.get('/teacher/:teacherId', async (req, res, next) => {
 });
 
 // ─── GET /room/:roomId — Weekly room occupancy ──────────────────────────────
-router.get('/room/:roomId', authorize('admin', 'teacher'), async (req, res, next) => {
+router.get('/room/:roomId', authorize('admin', 'teacher'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { roomId } = req.params;
@@ -183,7 +183,7 @@ router.get('/room/:roomId', authorize('admin', 'teacher'), async (req, res, next
 });
 
 // ─── GET /export/pdf — Export timetable as PDF ───────────────────────────────
-router.get('/export/pdf', async (req, res, next) => {
+router.get('/export/pdf', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { classId, sectionId, teacherId, templateId } = req.query;
@@ -223,7 +223,7 @@ router.get('/export/pdf', async (req, res, next) => {
 });
 
 // ─── GET /export/excel — Export timetable as Excel ───────────────────────────
-router.get('/export/excel', async (req, res, next) => {
+router.get('/export/excel', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { classId, sectionId, teacherId, templateId } = req.query;

@@ -10,7 +10,7 @@ const IncomeCategory = require('../models/IncomeCategory');
 router.use(protect, authorize('admin'));
 
 // ── GET /api/income/summary/monthly ──────────────────────────────────────────
-router.get('/summary/monthly', async (req, res, next) => {
+router.get('/summary/monthly', async(req, res, next) => {
   try {
     const { academicYear } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -35,7 +35,7 @@ router.get('/summary/monthly', async (req, res, next) => {
 });
 
 // ── GET /api/income/summary/category ─────────────────────────────────────────
-router.get('/summary/category', async (req, res, next) => {
+router.get('/summary/category', async(req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -83,7 +83,7 @@ router.get('/summary/category', async (req, res, next) => {
 });
 
 // ── GET /api/income/summary/dashboard ────────────────────────────────────────
-router.get('/summary/dashboard', async (req, res, next) => {
+router.get('/summary/dashboard', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const now = new Date();
@@ -127,7 +127,7 @@ router.get('/summary/dashboard', async (req, res, next) => {
 });
 
 // ── GET /api/income/export ───────────────────────────────────────────────────
-router.get('/export', async (req, res, next) => {
+router.get('/export', async(req, res, next) => {
   try {
     const { startDate, endDate, category, paymentMethod } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -175,7 +175,7 @@ router.get('/', [
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('paymentMethod').optional().isIn(['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Card']),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const { page = 1, limit = 20, category, paymentMethod, startDate, endDate, search, sortBy = 'incomeDate', sortOrder = 'desc' } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -224,7 +224,7 @@ router.get('/', [
 router.get('/:id', [
   param('id').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const income = await Income.findOne({ _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false })
       .populate('category', 'name color icon')
@@ -251,7 +251,7 @@ router.post('/', [
   body('receivedBy').optional().trim(),
   body('description').optional().trim(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const { category, title, amount, incomeDate, paymentMethod, paymentReference, receivedBy, description, receiptUrl, academicYear } = req.body;
 
@@ -289,7 +289,7 @@ router.put('/:id', [
   body('incomeDate').optional().isISO8601(),
   body('paymentMethod').optional().isIn(['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Card']),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const income = await Income.findOne({ _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false });
     if (!income) {
@@ -324,7 +324,7 @@ router.put('/:id', [
 router.delete('/:id', [
   param('id').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const income = await Income.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false },
@@ -347,7 +347,7 @@ router.delete('/bulk/delete', [
   body('ids').isArray({ min: 1 }),
   body('ids.*').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const result = await Income.updateMany(
       { _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false },
@@ -362,7 +362,7 @@ router.delete('/bulk/delete', [
 
 // ── Categories CRUD ──────────────────────────────────────────────────────────
 
-router.get('/categories/list', async (req, res, next) => {
+router.get('/categories/list', async(req, res, next) => {
   try {
     const filter = { tenantId: req.user.tenantId };
     if (req.query.activeOnly === 'true') filter.isActive = true;
@@ -379,7 +379,7 @@ router.post('/categories', [
   body('icon').optional().trim(),
   body('color').optional().trim(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const { name, icon, color } = req.body;
 
@@ -402,7 +402,7 @@ router.put('/categories/:id', [
   body('color').optional().trim(),
   body('isActive').optional().isBoolean(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const category = await IncomeCategory.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId },
@@ -423,7 +423,7 @@ router.put('/categories/:id', [
 router.delete('/categories/:id', [
   param('id').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const category = await IncomeCategory.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId },
@@ -442,7 +442,7 @@ router.delete('/categories/:id', [
 });
 
 // ── Seed default categories ──────────────────────────────────────────────────
-router.post('/categories/seed', async (req, res, next) => {
+router.post('/categories/seed', async(req, res, next) => {
   try {
     const defaults = [
       { name: 'Fee Collection', icon: 'GraduationCap', color: '#3B82F6' },

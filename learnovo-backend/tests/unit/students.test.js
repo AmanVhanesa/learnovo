@@ -22,7 +22,7 @@ const studentPayload = (tenantId, overrides = {}) => ({
   ...overrides
 });
 
-const createStudentDirectly = async (tenantId, overrides = {}) => {
+const createStudentDirectly = async(tenantId, overrides = {}) => {
   return User.create({
     tenantId,
     name: 'Direct Student',
@@ -38,7 +38,7 @@ const createStudentDirectly = async (tenantId, overrides = {}) => {
   });
 };
 
-const setupAdminContext = async (tenantOverrides = {}) => {
+const setupAdminContext = async(tenantOverrides = {}) => {
   const tenant = await createTestTenant(tenantOverrides);
   const admin = await createTestUser(tenant._id, {
     role: 'admin',
@@ -56,7 +56,7 @@ describe('Student Routes API', () => {
   // 1. GET /api/students — List students
   // ────────────────────────────────────────────────────────────────────────────
   describe('GET /api/students', () => {
-    it('should return paginated list of students for admin', async () => {
+    it('should return paginated list of students for admin', async() => {
       const { tenant, token } = await setupAdminContext();
 
       // Create a few students
@@ -75,7 +75,7 @@ describe('Student Routes API', () => {
       expect(res.body.pagination.total).toBe(3);
     });
 
-    it('should filter students by search (name, email, rollNumber)', async () => {
+    it('should filter students by search (name, email, rollNumber)', async() => {
       const { tenant, token } = await setupAdminContext();
 
       await createStudentDirectly(tenant._id, { name: 'Searchable Student', email: 'searchme@test.com', rollNumber: '100' });
@@ -89,7 +89,7 @@ describe('Student Routes API', () => {
       expect(res.body.data[0].name).toBe('Searchable Student');
     });
 
-    it('should filter students by class', async () => {
+    it('should filter students by class', async() => {
       const { tenant, token } = await setupAdminContext();
 
       await createStudentDirectly(tenant._id, { name: 'Class10 Student', class: '10', rollNumber: '10' });
@@ -105,7 +105,7 @@ describe('Student Routes API', () => {
       });
     });
 
-    it('should filter students by status (active/inactive)', async () => {
+    it('should filter students by status (active/inactive)', async() => {
       const { tenant, token } = await setupAdminContext();
 
       await createStudentDirectly(tenant._id, { name: 'Active Student', isActive: true, rollNumber: '50' });
@@ -120,7 +120,7 @@ describe('Student Routes API', () => {
       inactiveRes.body.data.forEach(s => expect(s.isActive).toBe(false));
     });
 
-    it('should allow teacher to see students in assigned classes', async () => {
+    it('should allow teacher to see students in assigned classes', async() => {
       const tenant = await createTestTenant();
       const teacher = await createTestUser(tenant._id, {
         role: 'teacher',
@@ -144,7 +144,7 @@ describe('Student Routes API', () => {
       }
     });
 
-    it('should return 403 when student role accesses the endpoint', async () => {
+    it('should return 403 when student role accesses the endpoint', async() => {
       const tenant = await createTestTenant({ schoolCode: 'stu403', subdomain: 'stu403', email: 'stu403@test.com' });
       const student = await createStudentDirectly(tenant._id, { email: 'studentuser@test.com' });
       const studentToken = await getAuthToken(student);
@@ -155,7 +155,7 @@ describe('Student Routes API', () => {
       expect(res.body.success).toBe(false);
     });
 
-    it('should return 401 for unauthenticated request', async () => {
+    it('should return 401 for unauthenticated request', async() => {
       const res = await request(app).get('/api/students');
 
       expect(res.status).toBe(401);
@@ -167,7 +167,7 @@ describe('Student Routes API', () => {
   // 2. GET /api/students/:id — Get single student
   // ────────────────────────────────────────────────────────────────────────────
   describe('GET /api/students/:id', () => {
-    it('should return student details with fees for admin', async () => {
+    it('should return student details with fees for admin', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'Detail Student', email: 'detail@test.com' });
 
@@ -182,7 +182,7 @@ describe('Student Routes API', () => {
       expect(res.body.requestId).toBeDefined();
     });
 
-    it('should return 404 for non-existent student', async () => {
+    it('should return 404 for non-existent student', async() => {
       const { token } = await setupAdminContext();
       const fakeId = new mongoose.Types.ObjectId();
 
@@ -193,7 +193,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toBe('Student not found');
     });
 
-    it('should not allow accessing student from another tenant (multi-tenancy)', async () => {
+    it('should not allow accessing student from another tenant (multi-tenancy)', async() => {
       const { token: token1 } = await setupAdminContext({ schoolCode: 'tenant1', subdomain: 'tenant1', email: 'tenant1@test.com' });
       const tenant2 = await createTestTenant({ schoolName: 'School 2', schoolCode: 'tenant2', subdomain: 'tenant2', email: 'tenant2@test.com' });
       const otherStudent = await createStudentDirectly(tenant2._id, { name: 'Other Tenant Student', email: 'other-tenant@test.com' });
@@ -204,7 +204,7 @@ describe('Student Routes API', () => {
       expect(res.body.success).toBe(false);
     });
 
-    it('should allow student to access their own data', async () => {
+    it('should allow student to access their own data', async() => {
       const tenant = await createTestTenant({ schoolCode: 'selfaccess', subdomain: 'selfaccess', email: 'selfaccess@test.com' });
       const student = await createStudentDirectly(tenant._id, { name: 'Self Access', email: 'selfaccess-student@test.com' });
       const studentToken = await getAuthToken(student);
@@ -224,7 +224,7 @@ describe('Student Routes API', () => {
   // 3. POST /api/students — Create student
   // ────────────────────────────────────────────────────────────────────────────
   describe('POST /api/students', () => {
-    it('should create student successfully with all required fields', async () => {
+    it('should create student successfully with all required fields', async() => {
       const { tenant, token } = await setupAdminContext();
       const payload = studentPayload(tenant._id);
 
@@ -239,7 +239,7 @@ describe('Student Routes API', () => {
       expect(res.body.requestId).toBeDefined();
     });
 
-    it('should return 201 with student data and credentials', async () => {
+    it('should return 201 with student data and credentials', async() => {
       const { tenant, token } = await setupAdminContext();
       const payload = studentPayload(tenant._id, { email: 'creds@test.com' });
 
@@ -251,7 +251,7 @@ describe('Student Routes API', () => {
       expect(res.body.data.credentials.password).toBe('student123');
     });
 
-    it('should generate admission number automatically', async () => {
+    it('should generate admission number automatically', async() => {
       const { tenant, token } = await setupAdminContext();
       const payload = studentPayload(tenant._id, { email: 'admno@test.com' });
 
@@ -262,7 +262,7 @@ describe('Student Routes API', () => {
       expect(res.body.data.admissionNumber.length).toBeGreaterThan(0);
     });
 
-    it('should reject duplicate email within same tenant', async () => {
+    it('should reject duplicate email within same tenant', async() => {
       const { tenant, token } = await setupAdminContext();
 
       // Create first student
@@ -277,7 +277,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toMatch(/email already exists/i);
     });
 
-    it('should reject duplicate roll number in same class/section/year', async () => {
+    it('should reject duplicate roll number in same class/section/year', async() => {
       const { tenant, token } = await setupAdminContext();
 
       // Create first student with specific roll number
@@ -304,7 +304,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toMatch(/roll number already exists/i);
     });
 
-    it('should return 403 when teacher tries to create student', async () => {
+    it('should return 403 when teacher tries to create student', async() => {
       const tenant = await createTestTenant({ schoolCode: 'tcreate', subdomain: 'tcreate', email: 'tcreate@test.com' });
       const teacher = await createTestUser(tenant._id, {
         role: 'teacher',
@@ -319,7 +319,7 @@ describe('Student Routes API', () => {
       expect(res.body.success).toBe(false);
     });
 
-    it('should validate required fields (name)', async () => {
+    it('should validate required fields (name)', async() => {
       const { token } = await setupAdminContext();
 
       const payload = { class: '10' }; // Missing name
@@ -334,7 +334,7 @@ describe('Student Routes API', () => {
   // 4. PUT /api/students/:id — Update student
   // ────────────────────────────────────────────────────────────────────────────
   describe('PUT /api/students/:id', () => {
-    it('should update student successfully', async () => {
+    it('should update student successfully', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'Before Update', email: 'before@test.com' });
 
@@ -348,9 +348,9 @@ describe('Student Routes API', () => {
       expect(res.body.data.name).toBe('After Update');
     });
 
-    it('should validate email uniqueness on update', async () => {
+    it('should validate email uniqueness on update', async() => {
       const { tenant, token } = await setupAdminContext();
-      const student1 = await createStudentDirectly(tenant._id, { name: 'Student 1', email: 'taken-email@test.com', rollNumber: '1' });
+      const _student1 = await createStudentDirectly(tenant._id, { name: 'Student 1', email: 'taken-email@test.com', rollNumber: '1' });
       const student2 = await createStudentDirectly(tenant._id, { name: 'Student 2', email: 'student2@test.com', rollNumber: '2' });
 
       // Try to update student2's email to student1's email
@@ -363,7 +363,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toMatch(/email already exists/i);
     });
 
-    it('should validate roll number uniqueness on update', async () => {
+    it('should validate roll number uniqueness on update', async() => {
       const { tenant, token } = await setupAdminContext();
       await createStudentDirectly(tenant._id, {
         name: 'Student A',
@@ -391,7 +391,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toMatch(/roll number already exists/i);
     });
 
-    it('should not allow updating student from another tenant', async () => {
+    it('should not allow updating student from another tenant', async() => {
       const { token: token1 } = await setupAdminContext({ schoolCode: 'upd-t1', subdomain: 'upd-t1', email: 'upd-t1@test.com' });
       const tenant2 = await createTestTenant({ schoolName: 'Update School 2', schoolCode: 'upd-t2', subdomain: 'upd-t2', email: 'upd-t2@test.com' });
       const otherStudent = await createStudentDirectly(tenant2._id, { name: 'Cross Tenant', email: 'cross-upd@test.com' });
@@ -409,7 +409,7 @@ describe('Student Routes API', () => {
   // 5. DELETE /api/students/:id — Delete student (soft delete)
   // ────────────────────────────────────────────────────────────────────────────
   describe('DELETE /api/students/:id', () => {
-    it('should soft-delete student successfully', async () => {
+    it('should soft-delete student successfully', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'To Delete', email: 'delete@test.com' });
 
@@ -425,7 +425,7 @@ describe('Student Routes API', () => {
       expect(deletedStudent.inactiveReason).toBe('Deleted by admin');
     });
 
-    it('should return 404 for non-existent student', async () => {
+    it('should return 404 for non-existent student', async() => {
       const { token } = await setupAdminContext();
       const fakeId = new mongoose.Types.ObjectId();
 
@@ -436,7 +436,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toBe('Student not found');
     });
 
-    it('should not delete student from another tenant', async () => {
+    it('should not delete student from another tenant', async() => {
       const { token: token1 } = await setupAdminContext({ schoolCode: 'del-t1', subdomain: 'del-t1', email: 'del-t1@test.com' });
       const tenant2 = await createTestTenant({ schoolName: 'Del School 2', schoolCode: 'del-t2', subdomain: 'del-t2', email: 'del-t2@test.com' });
       const otherStudent = await createStudentDirectly(tenant2._id, { name: 'Other Tenant Del', email: 'cross-del@test.com' });
@@ -452,7 +452,7 @@ describe('Student Routes API', () => {
   // 6. PUT /api/students/:id/toggle-status
   // ────────────────────────────────────────────────────────────────────────────
   describe('PUT /api/students/:id/toggle-status', () => {
-    it('should toggle active student to inactive', async () => {
+    it('should toggle active student to inactive', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'Toggle Me', email: 'toggle@test.com', isActive: true });
 
@@ -466,7 +466,7 @@ describe('Student Routes API', () => {
       expect(res.body.data.isActive).toBe(false);
     });
 
-    it('should toggle inactive student to active', async () => {
+    it('should toggle inactive student to active', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, {
         name: 'Toggle Back',
@@ -482,7 +482,7 @@ describe('Student Routes API', () => {
       expect(res.body.data.isActive).toBe(true);
     });
 
-    it('should store inactiveReason when deactivating', async () => {
+    it('should store inactiveReason when deactivating', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'Reason Student', email: 'reason@test.com', isActive: true });
 
@@ -496,7 +496,7 @@ describe('Student Routes API', () => {
       expect(updated.inactivatedAt).toBeDefined();
     });
 
-    it('should not toggle student from another tenant', async () => {
+    it('should not toggle student from another tenant', async() => {
       const { token: token1 } = await setupAdminContext({ schoolCode: 'tog-t1', subdomain: 'tog-t1', email: 'tog-t1@test.com' });
       const tenant2 = await createTestTenant({ schoolName: 'Toggle School 2', schoolCode: 'tog-t2', subdomain: 'tog-t2', email: 'tog-t2@test.com' });
       const otherStudent = await createStudentDirectly(tenant2._id, { name: 'Cross Toggle', email: 'cross-tog@test.com' });
@@ -512,7 +512,7 @@ describe('Student Routes API', () => {
   // 7. PUT /api/students/:id/deactivate
   // ────────────────────────────────────────────────────────────────────────────
   describe('PUT /api/students/:id/deactivate', () => {
-    it('should set student inactive with removal details', async () => {
+    it('should set student inactive with removal details', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'Deactivate Me', email: 'deact@test.com', isActive: true });
 
@@ -528,7 +528,7 @@ describe('Student Routes API', () => {
       expect(res.body.data.removalReason).toBe('Graduated');
     });
 
-    it('should return 400 when deactivating already inactive student', async () => {
+    it('should return 400 when deactivating already inactive student', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'Already Inactive', email: 'alreadyinact@test.com', isActive: false });
 
@@ -541,7 +541,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toMatch(/already inactive/i);
     });
 
-    it('should return 404 for student from another tenant', async () => {
+    it('should return 404 for student from another tenant', async() => {
       const { token: token1 } = await setupAdminContext({ schoolCode: 'deact-t1', subdomain: 'deact-t1', email: 'deact-t1@test.com' });
       const tenant2 = await createTestTenant({ schoolName: 'Deact School 2', schoolCode: 'deact-t2', subdomain: 'deact-t2', email: 'deact-t2@test.com' });
       const otherStudent = await createStudentDirectly(tenant2._id, { name: 'Cross Deact', email: 'cross-deact@test.com' });
@@ -559,7 +559,7 @@ describe('Student Routes API', () => {
   // 8. PUT /api/students/:id/reactivate
   // ────────────────────────────────────────────────────────────────────────────
   describe('PUT /api/students/:id/reactivate', () => {
-    it('should reactivate inactive student', async () => {
+    it('should reactivate inactive student', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, {
         name: 'Reactivate Me',
@@ -577,7 +577,7 @@ describe('Student Routes API', () => {
       expect(res.body.data.isActive).toBe(true);
     });
 
-    it('should return 400 when reactivating already active student', async () => {
+    it('should return 400 when reactivating already active student', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'Already Active', email: 'alreadyactive@test.com', isActive: true });
 
@@ -588,7 +588,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toMatch(/already active/i);
     });
 
-    it('should return 404 for student from another tenant', async () => {
+    it('should return 404 for student from another tenant', async() => {
       const { token: token1 } = await setupAdminContext({ schoolCode: 'react-t1', subdomain: 'react-t1', email: 'react-t1@test.com' });
       const tenant2 = await createTestTenant({ schoolName: 'React School 2', schoolCode: 'react-t2', subdomain: 'react-t2', email: 'react-t2@test.com' });
       const otherStudent = await createStudentDirectly(tenant2._id, { name: 'Cross React', email: 'cross-react@test.com', isActive: false });
@@ -604,7 +604,7 @@ describe('Student Routes API', () => {
   // 9. GET /api/students/filters
   // ────────────────────────────────────────────────────────────────────────────
   describe('GET /api/students/filters', () => {
-    it('should return classes, sections, academic years, and drivers', async () => {
+    it('should return classes, sections, academic years, and drivers', async() => {
       const { tenant, token } = await setupAdminContext();
 
       // Create students with different classes/sections/years
@@ -626,7 +626,7 @@ describe('Student Routes API', () => {
       expect(Array.isArray(res.body.data.drivers)).toBe(true);
     });
 
-    it('should return 403 for student role', async () => {
+    it('should return 403 for student role', async() => {
       const tenant = await createTestTenant({ schoolCode: 'filt-stu', subdomain: 'filt-stu', email: 'filt-stu@test.com' });
       const student = await createStudentDirectly(tenant._id, { email: 'filt-student@test.com' });
       const studentToken = await getAuthToken(student);
@@ -642,7 +642,7 @@ describe('Student Routes API', () => {
   // 10. DELETE /api/students/bulk-delete (POST body with studentIds)
   // ────────────────────────────────────────────────────────────────────────────
   describe('DELETE /api/students/bulk-delete', () => {
-    it('should delete multiple students', async () => {
+    it('should delete multiple students', async() => {
       const { tenant, token } = await setupAdminContext();
       const s1 = await createStudentDirectly(tenant._id, { name: 'Bulk 1', email: 'bulk1@test.com', rollNumber: '1' });
       const s2 = await createStudentDirectly(tenant._id, { name: 'Bulk 2', email: 'bulk2@test.com', rollNumber: '2' });
@@ -661,7 +661,7 @@ describe('Student Routes API', () => {
       expect(remaining.length).toBe(0);
     });
 
-    it('should validate tenant ownership for bulk delete', async () => {
+    it('should validate tenant ownership for bulk delete', async() => {
       const { token: token1 } = await setupAdminContext({ schoolCode: 'bulk-t1', subdomain: 'bulk-t1', email: 'bulk-t1@test.com' });
       const tenant2 = await createTestTenant({ schoolName: 'Bulk School 2', schoolCode: 'bulk-t2', subdomain: 'bulk-t2', email: 'bulk-t2@test.com' });
       const otherStudent = await createStudentDirectly(tenant2._id, { name: 'Other Bulk', email: 'other-bulk@test.com' });
@@ -680,7 +680,7 @@ describe('Student Routes API', () => {
       expect(stillExists).toBeTruthy();
     });
 
-    it('should block bulk delete if students have fees', async () => {
+    it('should block bulk delete if students have fees', async() => {
       const { tenant, token } = await setupAdminContext();
       const student = await createStudentDirectly(tenant._id, { name: 'Fee Blocker', email: 'feeblocker@test.com' });
 
@@ -705,7 +705,7 @@ describe('Student Routes API', () => {
       expect(res.body.message).toMatch(/fee records/i);
     });
 
-    it('should return 400 when no student IDs provided', async () => {
+    it('should return 400 when no student IDs provided', async() => {
       const { token } = await setupAdminContext();
 
       const res = await request(app)

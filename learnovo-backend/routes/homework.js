@@ -9,28 +9,28 @@ const notificationService = require('../services/notificationService');
  * @desc    Create new homework (teacher only)
  * @access  Private (Teacher)
  */
-router.post('/', protect, authorize('teacher', 'admin'), async (req, res) => {
-    try {
-        const homework = await homeworkService.createHomework(
-            req.body,
-            req.user._id,
-            req.user.tenantId
-        );
+router.post('/', protect, authorize('teacher', 'admin'), async(req, res) => {
+  try {
+    const homework = await homeworkService.createHomework(
+      req.body,
+      req.user._id,
+      req.user.tenantId
+    );
 
-        // Fire homework assignment notifications (async, non-blocking)
-        notificationService.notifyHomeworkAssigned(homework, req.user._id, req.user.tenantId)
-            .catch(err => console.error('notifyHomeworkAssigned failed:', err));
+    // Fire homework assignment notifications (async, non-blocking)
+    notificationService.notifyHomeworkAssigned(homework, req.user._id, req.user.tenantId)
+      .catch(err => console.error('notifyHomeworkAssigned failed:', err));
 
-        res.status(201).json({
-            success: true,
-            data: homework
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.status(201).json({
+      success: true,
+      data: homework
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -38,34 +38,34 @@ router.post('/', protect, authorize('teacher', 'admin'), async (req, res) => {
  * @desc    Get homework list (filtered by role)
  * @access  Private
  */
-router.get('/', protect, async (req, res) => {
-    try {
-        const filters = {
-            subject: req.query.subject,
-            class: req.query.class,
-            section: req.query.section,
-            startDate: req.query.startDate,
-            endDate: req.query.endDate
-        };
+router.get('/', protect, async(req, res) => {
+  try {
+    const filters = {
+      subject: req.query.subject,
+      class: req.query.class,
+      section: req.query.section,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate
+    };
 
-        const homework = await homeworkService.getHomeworkList(
-            filters,
-            req.user.role,
-            req.user._id,
-            req.user.tenantId
-        );
+    const homework = await homeworkService.getHomeworkList(
+      filters,
+      req.user.role,
+      req.user._id,
+      req.user.tenantId
+    );
 
-        res.json({
-            success: true,
-            count: homework.length,
-            data: homework
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.json({
+      success: true,
+      count: homework.length,
+      data: homework
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -73,24 +73,24 @@ router.get('/', protect, async (req, res) => {
  * @desc    Get homework statistics for dashboard
  * @access  Private
  */
-router.get('/stats', protect, async (req, res) => {
-    try {
-        const stats = await homeworkService.getHomeworkStats(
-            req.user._id,
-            req.user.role,
-            req.user.tenantId
-        );
+router.get('/stats', protect, async(req, res) => {
+  try {
+    const stats = await homeworkService.getHomeworkStats(
+      req.user._id,
+      req.user.role,
+      req.user.tenantId
+    );
 
-        res.json({
-            success: true,
-            data: stats
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -98,29 +98,29 @@ router.get('/stats', protect, async (req, res) => {
  * @desc    Get student's submissions
  * @access  Private (Student)
  */
-router.get('/my-submissions', protect, authorize('student'), async (req, res) => {
-    try {
-        const filters = {
-            status: req.query.status
-        };
+router.get('/my-submissions', protect, authorize('student'), async(req, res) => {
+  try {
+    const filters = {
+      status: req.query.status
+    };
 
-        const submissions = await homeworkService.getStudentSubmissions(
-            req.user._id,
-            req.user.tenantId,
-            filters
-        );
+    const submissions = await homeworkService.getStudentSubmissions(
+      req.user._id,
+      req.user.tenantId,
+      filters
+    );
 
-        res.json({
-            success: true,
-            count: submissions.length,
-            data: submissions
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.json({
+      success: true,
+      count: submissions.length,
+      data: submissions
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -128,25 +128,25 @@ router.get('/my-submissions', protect, authorize('student'), async (req, res) =>
  * @desc    Get homework by ID
  * @access  Private
  */
-router.get('/:id', protect, async (req, res) => {
-    try {
-        const homework = await homeworkService.getHomeworkById(
-            req.params.id,
-            req.user._id,
-            req.user.role,
-            req.user.tenantId
-        );
+router.get('/:id', protect, async(req, res) => {
+  try {
+    const homework = await homeworkService.getHomeworkById(
+      req.params.id,
+      req.user._id,
+      req.user.role,
+      req.user.tenantId
+    );
 
-        res.json({
-            success: true,
-            data: homework
-        });
-    } catch (error) {
-        res.status(404).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.json({
+      success: true,
+      data: homework
+    });
+  } catch (error) {
+    res.status(404).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -154,26 +154,26 @@ router.get('/:id', protect, async (req, res) => {
  * @desc    Update homework (teacher or admin)
  * @access  Private (Teacher, Admin)
  */
-router.put('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
-    try {
-        const homework = await homeworkService.updateHomework(
-            req.params.id,
-            req.body,
-            req.user._id,
-            req.user.tenantId,
-            req.user.role
-        );
+router.put('/:id', protect, authorize('teacher', 'admin'), async(req, res) => {
+  try {
+    const homework = await homeworkService.updateHomework(
+      req.params.id,
+      req.body,
+      req.user._id,
+      req.user.tenantId,
+      req.user.role
+    );
 
-        res.json({
-            success: true,
-            data: homework
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.json({
+      success: true,
+      data: homework
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -181,25 +181,25 @@ router.put('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
  * @desc    Delete homework (teacher or admin)
  * @access  Private (Teacher, Admin)
  */
-router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
-    try {
-        const result = await homeworkService.deleteHomework(
-            req.params.id,
-            req.user._id,
-            req.user.tenantId,
-            req.user.role
-        );
+router.delete('/:id', protect, authorize('teacher', 'admin'), async(req, res) => {
+  try {
+    const result = await homeworkService.deleteHomework(
+      req.params.id,
+      req.user._id,
+      req.user.tenantId,
+      req.user.role
+    );
 
-        res.json({
-            success: true,
-            data: result
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -207,35 +207,35 @@ router.delete('/:id', protect, authorize('teacher', 'admin'), async (req, res) =
  * @desc    Submit homework (student only)
  * @access  Private (Student)
  */
-router.post('/:id/submit', protect, authorize('student'), async (req, res) => {
-    try {
-        const submission = await homeworkService.submitHomework(
-            req.params.id,
-            req.user._id,
-            req.body,
-            req.user.tenantId
-        );
+router.post('/:id/submit', protect, authorize('student'), async(req, res) => {
+  try {
+    const submission = await homeworkService.submitHomework(
+      req.params.id,
+      req.user._id,
+      req.body,
+      req.user.tenantId
+    );
 
-        // Notify the assigning teacher about the submission (async, non-blocking)
-        const Homework = require('../models/Homework');
-        Homework.findById(req.params.id).select('assignedBy title').lean()
-            .then(hw => {
-                if (hw) {
-                    notificationService.notifyHomeworkSubmitted(hw, req.user, req.user.tenantId)
-                        .catch(err => console.error('notifyHomeworkSubmitted failed:', err));
-                }
-            });
+    // Notify the assigning teacher about the submission (async, non-blocking)
+    const Homework = require('../models/Homework');
+    Homework.findById(req.params.id).select('assignedBy title').lean()
+      .then(hw => {
+        if (hw) {
+          notificationService.notifyHomeworkSubmitted(hw, req.user, req.user.tenantId)
+            .catch(err => console.error('notifyHomeworkSubmitted failed:', err));
+        }
+      });
 
-        res.status(201).json({
-            success: true,
-            data: submission
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.status(201).json({
+      success: true,
+      data: submission
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -243,25 +243,25 @@ router.post('/:id/submit', protect, authorize('student'), async (req, res) => {
  * @desc    Get submissions for homework (teacher only)
  * @access  Private (Teacher)
  */
-router.get('/:id/submissions', protect, authorize('teacher', 'admin'), async (req, res) => {
-    try {
-        const submissions = await homeworkService.getSubmissions(
-            req.params.id,
-            req.user._id,
-            req.user.tenantId
-        );
+router.get('/:id/submissions', protect, authorize('teacher', 'admin'), async(req, res) => {
+  try {
+    const submissions = await homeworkService.getSubmissions(
+      req.params.id,
+      req.user._id,
+      req.user.tenantId
+    );
 
-        res.json({
-            success: true,
-            count: submissions.length,
-            data: submissions
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.json({
+      success: true,
+      count: submissions.length,
+      data: submissions
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 /**
@@ -269,25 +269,25 @@ router.get('/:id/submissions', protect, authorize('teacher', 'admin'), async (re
  * @desc    Update submission feedback (teacher only)
  * @access  Private (Teacher)
  */
-router.put('/submissions/:id', protect, authorize('teacher', 'admin'), async (req, res) => {
-    try {
-        const submission = await homeworkService.updateSubmissionFeedback(
-            req.params.id,
-            req.body,
-            req.user._id,
-            req.user.tenantId
-        );
+router.put('/submissions/:id', protect, authorize('teacher', 'admin'), async(req, res) => {
+  try {
+    const submission = await homeworkService.updateSubmissionFeedback(
+      req.params.id,
+      req.body,
+      req.user._id,
+      req.user.tenantId
+    );
 
-        res.json({
-            success: true,
-            data: submission
-        });
-    } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: error.message
-        });
-    }
+    res.json({
+      success: true,
+      data: submission
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message
+    });
+  }
 });
 
 module.exports = router;

@@ -46,7 +46,7 @@ const schoolTimingSchema = new mongoose.Schema({
 });
 
 // Pre-validate: endTime must be after startTime
-schoolTimingSchema.pre('validate', function (next) {
+schoolTimingSchema.pre('validate', function(next) {
   if (this.startTime && this.endTime && this.endTime <= this.startTime) {
     this.invalidate('endTime', 'End time must be after start time');
   }

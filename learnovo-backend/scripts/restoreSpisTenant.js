@@ -37,7 +37,7 @@ async function restore() {
   }
 
   // Check if admin user already exists
-  let admin = await User.findOne({ email: 'spinternationalschool2021@gmail.com', tenantId: tenant._id });
+  const admin = await User.findOne({ email: 'spinternationalschool2021@gmail.com', tenantId: tenant._id });
   if (admin) {
     console.log('Admin user already exists, updating password...');
     // Use raw collection update to bypass the pre-save hook (which would double-hash)

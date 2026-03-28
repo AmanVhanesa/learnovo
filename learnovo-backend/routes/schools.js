@@ -1,6 +1,5 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Tenant = require('../models/Tenant');
@@ -21,11 +20,11 @@ router.post('/register', [
   body('subdomain').optional().isLength({ min: 3, max: 20 }).withMessage('Subdomain must be 3-20 characters').matches(/^[a-z0-9-]+$/).withMessage('Subdomain must contain only lowercase letters, numbers, and hyphens'),
   body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
   body('address').optional().isObject().withMessage('Address must be an object')
-], async (req, res) => {
+], async(req, res) => {
   // For development, skip transactions if MongoDB is not a replica set
   const useTransactions = process.env.NODE_ENV === 'production';
   const session = useTransactions ? await mongoose.startSession() : null;
-  
+
   try {
     // Validation
     const errors = validationResult(req);
@@ -132,11 +131,11 @@ router.post('/register', [
     console.error('School registration error:', error);
     console.error('Error stack:', error.stack);
     logger.error('School registration failed', error);
-    
+
     // Handle specific error types
     let statusCode = 500;
     let message = 'Server error during school registration';
-    
+
     if (error.name === 'ValidationError') {
       statusCode = 400;
       message = 'Validation error';
@@ -147,7 +146,7 @@ router.post('/register', [
     } else if (error.message) {
       message = error.message;
     }
-    
+
     res.status(statusCode).json({
       success: false,
       message: message,

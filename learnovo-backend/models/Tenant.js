@@ -22,7 +22,7 @@ const tenantSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
     validate: {
-      validator: function (v) {
+      validator: function(v) {
         if (!v) return true; // null/undefined is fine (sparse)
         // Must be a valid URL-safe slug: lowercase alphanumeric + hyphens, 3-63 chars
         return /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/.test(v);
@@ -188,7 +188,7 @@ tenantSchema.index({ email: 1 });
 tenantSchema.index({ 'subscription.status': 1 });
 
 // Virtual for full address
-tenantSchema.virtual('fullAddress').get(function () {
+tenantSchema.virtual('fullAddress').get(function() {
   const addr = this.address;
   if (!addr) return '';
   return [addr.street, addr.city, addr.state, addr.country, addr.zipCode]
@@ -197,7 +197,7 @@ tenantSchema.virtual('fullAddress').get(function () {
 });
 
 // Pre-save middleware
-tenantSchema.pre('save', function (next) {
+tenantSchema.pre('save', function(next) {
   this.updatedAt = new Date();
   // Auto-populate subdomain from schoolCode if not explicitly set
   if (!this.subdomain && this.schoolCode) {

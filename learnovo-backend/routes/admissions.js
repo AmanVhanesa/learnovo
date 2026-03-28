@@ -1,7 +1,6 @@
 const express = require('express');
 const { body, query } = require('express-validator');
 const Admission = require('../models/Admission');
-const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors, validateAdmission } = require('../middleware/validation');
 

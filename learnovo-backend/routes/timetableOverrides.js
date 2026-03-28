@@ -18,7 +18,7 @@ async function getPublishedTemplate(tenantId, templateId) {
 }
 
 // ─── GET / — List overrides ─────────────────────────────────────────────────
-router.get('/', async (req, res, next) => {
+router.get('/', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { month, startDate, endDate, type, templateId, page = 1, limit = 50 } = req.query;
@@ -87,7 +87,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // ─── POST / — Create override (admin only) ──────────────────────────────────
-router.post('/', authorize('admin'), validateOverride, handleValidationErrors, async (req, res, next) => {
+router.post('/', authorize('admin'), validateOverride, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const {
@@ -159,7 +159,7 @@ router.post('/', authorize('admin'), validateOverride, handleValidationErrors, a
 });
 
 // ─── PUT /:id — Update override (admin only) ────────────────────────────────
-router.put('/:id', authorize('admin'), async (req, res, next) => {
+router.put('/:id', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -226,7 +226,7 @@ router.put('/:id', authorize('admin'), async (req, res, next) => {
 });
 
 // ─── DELETE /:id — Delete override (admin only) ─────────────────────────────
-router.delete('/:id', authorize('admin'), async (req, res, next) => {
+router.delete('/:id', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { id } = req.params;
@@ -250,7 +250,7 @@ router.delete('/:id', authorize('admin'), async (req, res, next) => {
 });
 
 // ─── GET /calendar — Calendar view for a month ──────────────────────────────
-router.get('/calendar', async (req, res, next) => {
+router.get('/calendar', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { month, templateId } = req.query;

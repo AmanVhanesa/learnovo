@@ -1,5 +1,4 @@
 const router = require('express').Router();
-const { validationResult } = require('express-validator');
 const TimetableTemplate = require('../models/TimetableTemplate');
 const SchoolTiming = require('../models/SchoolTiming');
 const SubjectAllocation = require('../models/SubjectAllocation');
@@ -12,7 +11,7 @@ const {
   validateTiming,
   validateBulkTimings,
   validateAllocation,
-  validateConstraint,
+  validateConstraint
 } = require('../middleware/timetableValidation');
 const timetableService = require('../services/timetableService');
 
@@ -20,14 +19,14 @@ const timetableService = require('../services/timetableService');
 router.use('/:id/entries', require('./timetableEntries'));
 
 // ─── Param middleware: validate template belongs to tenant ───────────────────
-router.param('id', async (req, res, next, id) => {
+router.param('id', async(req, res, next, id) => {
   try {
     const tenantId = req.user.tenantId;
     const template = await TimetableTemplate.findOne({ _id: id, tenantId });
     if (!template) {
       return res.status(404).json({
         success: false,
-        message: 'Template not found',
+        message: 'Template not found'
       });
     }
     req.template = template;
@@ -37,7 +36,7 @@ router.param('id', async (req, res, next, id) => {
     if (error.name === 'CastError') {
       return res.status(400).json({
         success: false,
-        message: 'Invalid template ID format',
+        message: 'Invalid template ID format'
       });
     }
     next(error);
@@ -49,7 +48,7 @@ router.param('id', async (req, res, next, id) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── GET / — List templates ─────────────────────────────────────────────────
-router.get('/', async (req, res, next) => {
+router.get('/', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const filter = { tenantId };
@@ -70,7 +69,7 @@ router.get('/', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: templates,
-      message: `Found ${templates.length} template(s)`,
+      message: `Found ${templates.length} template(s)`
     });
   } catch (error) {
     next(error);
@@ -78,7 +77,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // ─── POST / — Create template (admin only) ─────────────────────────────────
-router.post('/', authorize('admin'), validateTemplate, handleValidationErrors, async (req, res, next) => {
+router.post('/', authorize('admin'), validateTemplate, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { name, description, academicSessionId, workingDays, effectiveFrom, effectiveTo } = req.body;
@@ -92,13 +91,13 @@ router.post('/', authorize('admin'), validateTemplate, handleValidationErrors, a
       effectiveFrom,
       effectiveTo,
       createdBy: req.user._id,
-      status: 'draft',
+      status: 'draft'
     });
 
     return res.status(201).json({
       success: true,
       data: template,
-      message: 'Template created successfully',
+      message: 'Template created successfully'
     });
   } catch (error) {
     next(error);
@@ -106,7 +105,7 @@ router.post('/', authorize('admin'), validateTemplate, handleValidationErrors, a
 });
 
 // ─── GET /:id — Get template with stats ────────────────────────────────────
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const template = await TimetableTemplate.findOne({ _id: req.params.id, tenantId })
@@ -120,7 +119,7 @@ router.get('/:id', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: { ...template, stats },
-      message: 'Template retrieved successfully',
+      message: 'Template retrieved successfully'
     });
   } catch (error) {
     next(error);
@@ -128,14 +127,14 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // ─── PUT /:id — Update template (admin, draft only) ────────────────────────
-router.put('/:id', authorize('admin'), validateTemplate, handleValidationErrors, async (req, res, next) => {
+router.put('/:id', authorize('admin'), validateTemplate, handleValidationErrors, async(req, res, next) => {
   try {
     const template = req.template;
 
     if (template.status !== 'draft') {
       return res.status(400).json({
         success: false,
-        message: `Cannot edit a template that is ${template.status}. Duplicate it first.`,
+        message: `Cannot edit a template that is ${template.status}. Duplicate it first.`
       });
     }
 
@@ -153,7 +152,7 @@ router.put('/:id', authorize('admin'), validateTemplate, handleValidationErrors,
     return res.status(200).json({
       success: true,
       data: template,
-      message: 'Template updated successfully',
+      message: 'Template updated successfully'
     });
   } catch (error) {
     next(error);
@@ -161,14 +160,14 @@ router.put('/:id', authorize('admin'), validateTemplate, handleValidationErrors,
 });
 
 // ─── DELETE /:id — Delete template (admin, draft only) ─────────────────────
-router.delete('/:id', authorize('admin'), async (req, res, next) => {
+router.delete('/:id', authorize('admin'), async(req, res, next) => {
   try {
     const template = req.template;
 
     if (template.status !== 'draft') {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete a template that is ${template.status}`,
+        message: `Cannot delete a template that is ${template.status}`
       });
     }
 
@@ -181,13 +180,13 @@ router.delete('/:id', authorize('admin'), async (req, res, next) => {
       SubjectAllocation.deleteMany({ tenantId, templateId }),
       TeacherConstraint.deleteMany({ tenantId, templateId }),
       TimetableEntry.deleteMany({ tenantId, templateId }),
-      TimetableTemplate.deleteOne({ _id: templateId, tenantId }),
+      TimetableTemplate.deleteOne({ _id: templateId, tenantId })
     ]);
 
     return res.status(200).json({
       success: true,
       data: null,
-      message: 'Template and all related data deleted successfully',
+      message: 'Template and all related data deleted successfully'
     });
   } catch (error) {
     next(error);
@@ -195,7 +194,7 @@ router.delete('/:id', authorize('admin'), async (req, res, next) => {
 });
 
 // ─── POST /:id/publish — Publish template (admin only) ─────────────────────
-router.post('/:id/publish', authorize('admin'), async (req, res, next) => {
+router.post('/:id/publish', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const template = req.template;
@@ -203,7 +202,7 @@ router.post('/:id/publish', authorize('admin'), async (req, res, next) => {
     if (template.status !== 'draft') {
       return res.status(400).json({
         success: false,
-        message: `Cannot publish a template that is ${template.status}`,
+        message: `Cannot publish a template that is ${template.status}`
       });
     }
 
@@ -213,7 +212,7 @@ router.post('/:id/publish', authorize('admin'), async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Template is not ready for publishing',
-        errors: validation.errors,
+        errors: validation.errors
       });
     }
 
@@ -225,7 +224,7 @@ router.post('/:id/publish', authorize('admin'), async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: template,
-      message: 'Template published successfully',
+      message: 'Template published successfully'
     });
   } catch (error) {
     next(error);
@@ -233,14 +232,14 @@ router.post('/:id/publish', authorize('admin'), async (req, res, next) => {
 });
 
 // ─── POST /:id/archive — Archive template (admin only) ─────────────────────
-router.post('/:id/archive', authorize('admin'), async (req, res, next) => {
+router.post('/:id/archive', authorize('admin'), async(req, res, next) => {
   try {
     const template = req.template;
 
     if (template.status === 'archived') {
       return res.status(400).json({
         success: false,
-        message: 'Template is already archived',
+        message: 'Template is already archived'
       });
     }
 
@@ -250,7 +249,7 @@ router.post('/:id/archive', authorize('admin'), async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: template,
-      message: 'Template archived successfully',
+      message: 'Template archived successfully'
     });
   } catch (error) {
     next(error);
@@ -258,7 +257,7 @@ router.post('/:id/archive', authorize('admin'), async (req, res, next) => {
 });
 
 // ─── POST /:id/duplicate — Duplicate template (admin only) ─────────────────
-router.post('/:id/duplicate', authorize('admin'), async (req, res, next) => {
+router.post('/:id/duplicate', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { name } = req.body;
@@ -273,7 +272,7 @@ router.post('/:id/duplicate', authorize('admin'), async (req, res, next) => {
     return res.status(201).json({
       success: true,
       data: newTemplate,
-      message: 'Template duplicated successfully',
+      message: 'Template duplicated successfully'
     });
   } catch (error) {
     next(error);
@@ -285,18 +284,18 @@ router.post('/:id/duplicate', authorize('admin'), async (req, res, next) => {
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── GET /:id/timings — Get timing slots for template ───────────────────────
-router.get('/:id/timings', async (req, res, next) => {
+router.get('/:id/timings', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const timings = await SchoolTiming.find({
       tenantId,
-      templateId: req.params.id,
+      templateId: req.params.id
     }).sort({ slotNumber: 1 }).lean();
 
     return res.status(200).json({
       success: true,
       data: timings,
-      message: `Found ${timings.length} timing slot(s)`,
+      message: `Found ${timings.length} timing slot(s)`
     });
   } catch (error) {
     next(error);
@@ -304,7 +303,7 @@ router.get('/:id/timings', async (req, res, next) => {
 });
 
 // ─── POST /:id/timings — Bulk create/replace timing slots (admin only) ─────
-router.post('/:id/timings', authorize('admin'), validateBulkTimings, handleValidationErrors, async (req, res, next) => {
+router.post('/:id/timings', authorize('admin'), validateBulkTimings, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.id;
@@ -313,7 +312,7 @@ router.post('/:id/timings', authorize('admin'), validateBulkTimings, handleValid
     if (template.status !== 'draft') {
       return res.status(400).json({
         success: false,
-        message: `Cannot modify timings for a ${template.status} template`,
+        message: `Cannot modify timings for a ${template.status} template`
       });
     }
 
@@ -331,14 +330,14 @@ router.post('/:id/timings', authorize('admin'), validateBulkTimings, handleValid
         label: t.label,
         startTime: t.startTime,
         endTime: t.endTime,
-        type: t.type || 'period',
+        type: t.type || 'period'
       }))
     );
 
     return res.status(201).json({
       success: true,
       data: newTimings,
-      message: `${newTimings.length} timing slot(s) created successfully`,
+      message: `${newTimings.length} timing slot(s) created successfully`
     });
   } catch (error) {
     next(error);
@@ -346,7 +345,7 @@ router.post('/:id/timings', authorize('admin'), validateBulkTimings, handleValid
 });
 
 // ─── PUT /:id/timings/:slotId — Update single timing slot (admin only) ─────
-router.put('/:id/timings/:slotId', authorize('admin'), validateTiming, handleValidationErrors, async (req, res, next) => {
+router.put('/:id/timings/:slotId', authorize('admin'), validateTiming, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const template = req.template;
@@ -354,20 +353,20 @@ router.put('/:id/timings/:slotId', authorize('admin'), validateTiming, handleVal
     if (template.status !== 'draft') {
       return res.status(400).json({
         success: false,
-        message: `Cannot modify timings for a ${template.status} template`,
+        message: `Cannot modify timings for a ${template.status} template`
       });
     }
 
     const timing = await SchoolTiming.findOne({
       _id: req.params.slotId,
       tenantId,
-      templateId: req.params.id,
+      templateId: req.params.id
     });
 
     if (!timing) {
       return res.status(404).json({
         success: false,
-        message: 'Timing slot not found',
+        message: 'Timing slot not found'
       });
     }
 
@@ -383,7 +382,7 @@ router.put('/:id/timings/:slotId', authorize('admin'), validateTiming, handleVal
     return res.status(200).json({
       success: true,
       data: timing,
-      message: 'Timing slot updated successfully',
+      message: 'Timing slot updated successfully'
     });
   } catch (error) {
     next(error);
@@ -391,7 +390,7 @@ router.put('/:id/timings/:slotId', authorize('admin'), validateTiming, handleVal
 });
 
 // ─── DELETE /:id/timings/:slotId — Delete timing slot (admin only) ──────────
-router.delete('/:id/timings/:slotId', authorize('admin'), async (req, res, next) => {
+router.delete('/:id/timings/:slotId', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const template = req.template;
@@ -399,20 +398,20 @@ router.delete('/:id/timings/:slotId', authorize('admin'), async (req, res, next)
     if (template.status !== 'draft') {
       return res.status(400).json({
         success: false,
-        message: `Cannot modify timings for a ${template.status} template`,
+        message: `Cannot modify timings for a ${template.status} template`
       });
     }
 
     const timing = await SchoolTiming.findOneAndDelete({
       _id: req.params.slotId,
       tenantId,
-      templateId: req.params.id,
+      templateId: req.params.id
     });
 
     if (!timing) {
       return res.status(404).json({
         success: false,
-        message: 'Timing slot not found',
+        message: 'Timing slot not found'
       });
     }
 
@@ -420,13 +419,13 @@ router.delete('/:id/timings/:slotId', authorize('admin'), async (req, res, next)
     await TimetableEntry.deleteMany({
       tenantId,
       templateId: req.params.id,
-      timingSlotId: req.params.slotId,
+      timingSlotId: req.params.slotId
     });
 
     return res.status(200).json({
       success: true,
       data: null,
-      message: 'Timing slot deleted successfully',
+      message: 'Timing slot deleted successfully'
     });
   } catch (error) {
     next(error);
@@ -438,7 +437,7 @@ router.delete('/:id/timings/:slotId', authorize('admin'), async (req, res, next)
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── GET /:id/allocations — List allocations ────────────────────────────────
-router.get('/:id/allocations', async (req, res, next) => {
+router.get('/:id/allocations', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const filter = { tenantId, templateId: req.params.id, isActive: true };
@@ -458,7 +457,7 @@ router.get('/:id/allocations', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: allocations,
-      message: `Found ${allocations.length} allocation(s)`,
+      message: `Found ${allocations.length} allocation(s)`
     });
   } catch (error) {
     next(error);
@@ -466,7 +465,7 @@ router.get('/:id/allocations', async (req, res, next) => {
 });
 
 // ─── POST /:id/allocations — Create allocation (admin only) ────────────────
-router.post('/:id/allocations', authorize('admin'), validateAllocation, handleValidationErrors, async (req, res, next) => {
+router.post('/:id/allocations', authorize('admin'), validateAllocation, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const templateId = req.params.id;
@@ -479,13 +478,13 @@ router.post('/:id/allocations', authorize('admin'), validateAllocation, handleVa
       classId,
       sectionId: sectionId || null,
       subjectId,
-      isActive: true,
+      isActive: true
     });
 
     if (duplicate) {
       return res.status(409).json({
         success: false,
-        message: 'This subject is already allocated for this class/section in this template',
+        message: 'This subject is already allocated for this class/section in this template'
       });
     }
 
@@ -499,7 +498,7 @@ router.post('/:id/allocations', authorize('admin'), validateAllocation, handleVa
       periodsPerWeek,
       preferConsecutive,
       consecutiveCount,
-      preferredRoomType,
+      preferredRoomType
     });
 
     const populated = await SubjectAllocation.findById(allocation._id)
@@ -512,7 +511,7 @@ router.post('/:id/allocations', authorize('admin'), validateAllocation, handleVa
     return res.status(201).json({
       success: true,
       data: populated,
-      message: 'Allocation created successfully',
+      message: 'Allocation created successfully'
     });
   } catch (error) {
     next(error);
@@ -520,20 +519,20 @@ router.post('/:id/allocations', authorize('admin'), validateAllocation, handleVa
 });
 
 // ─── PUT /:id/allocations/:allocId — Update allocation (admin only) ────────
-router.put('/:id/allocations/:allocId', authorize('admin'), validateAllocation, handleValidationErrors, async (req, res, next) => {
+router.put('/:id/allocations/:allocId', authorize('admin'), validateAllocation, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
 
     const allocation = await SubjectAllocation.findOne({
       _id: req.params.allocId,
       tenantId,
-      templateId: req.params.id,
+      templateId: req.params.id
     });
 
     if (!allocation) {
       return res.status(404).json({
         success: false,
-        message: 'Allocation not found',
+        message: 'Allocation not found'
       });
     }
 
@@ -552,13 +551,13 @@ router.put('/:id/allocations/:allocId', authorize('admin'), validateAllocation, 
         sectionId: sectionId !== undefined ? (sectionId || null) : allocation.sectionId,
         subjectId: subjectId || allocation.subjectId,
         isActive: true,
-        _id: { $ne: allocation._id },
+        _id: { $ne: allocation._id }
       });
 
       if (duplicate) {
         return res.status(409).json({
           success: false,
-          message: 'This subject is already allocated for this class/section in this template',
+          message: 'This subject is already allocated for this class/section in this template'
         });
       }
     }
@@ -584,7 +583,7 @@ router.put('/:id/allocations/:allocId', authorize('admin'), validateAllocation, 
     return res.status(200).json({
       success: true,
       data: populated,
-      message: 'Allocation updated successfully',
+      message: 'Allocation updated successfully'
     });
   } catch (error) {
     next(error);
@@ -592,20 +591,20 @@ router.put('/:id/allocations/:allocId', authorize('admin'), validateAllocation, 
 });
 
 // ─── DELETE /:id/allocations/:allocId — Delete allocation (admin only) ──────
-router.delete('/:id/allocations/:allocId', authorize('admin'), async (req, res, next) => {
+router.delete('/:id/allocations/:allocId', authorize('admin'), async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
 
     const allocation = await SubjectAllocation.findOne({
       _id: req.params.allocId,
       tenantId,
-      templateId: req.params.id,
+      templateId: req.params.id
     });
 
     if (!allocation) {
       return res.status(404).json({
         success: false,
-        message: 'Allocation not found',
+        message: 'Allocation not found'
       });
     }
 
@@ -615,7 +614,7 @@ router.delete('/:id/allocations/:allocId', authorize('admin'), async (req, res, 
     return res.status(200).json({
       success: true,
       data: null,
-      message: 'Allocation deleted successfully',
+      message: 'Allocation deleted successfully'
     });
   } catch (error) {
     next(error);
@@ -627,7 +626,7 @@ router.delete('/:id/allocations/:allocId', authorize('admin'), async (req, res, 
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── GET /:id/constraints — List constraints ────────────────────────────────
-router.get('/:id/constraints', async (req, res, next) => {
+router.get('/:id/constraints', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const filter = { tenantId, templateId: req.params.id };
@@ -649,7 +648,7 @@ router.get('/:id/constraints', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: constraints,
-      message: `Found ${constraints.length} constraint(s)`,
+      message: `Found ${constraints.length} constraint(s)`
     });
   } catch (error) {
     next(error);
@@ -657,7 +656,7 @@ router.get('/:id/constraints', async (req, res, next) => {
 });
 
 // ─── POST /:id/constraints — Create constraint (admin or teacher for own) ──
-router.post('/:id/constraints', validateConstraint, handleValidationErrors, async (req, res, next) => {
+router.post('/:id/constraints', validateConstraint, handleValidationErrors, async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const { teacherId, type, dayOfWeek, timingSlotId, value, reason, priority } = req.body;
@@ -666,7 +665,7 @@ router.post('/:id/constraints', validateConstraint, handleValidationErrors, asyn
     if (req.user.role === 'teacher' && teacherId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Teachers can only create constraints for themselves',
+        message: 'Teachers can only create constraints for themselves'
       });
     }
 
@@ -674,7 +673,7 @@ router.post('/:id/constraints', validateConstraint, handleValidationErrors, asyn
     if (!['admin', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Only admins and teachers can create constraints',
+        message: 'Only admins and teachers can create constraints'
       });
     }
 
@@ -688,7 +687,7 @@ router.post('/:id/constraints', validateConstraint, handleValidationErrors, asyn
       value,
       reason,
       priority,
-      createdBy: req.user._id,
+      createdBy: req.user._id
     });
 
     const populated = await TeacherConstraint.findById(constraint._id)
@@ -699,7 +698,7 @@ router.post('/:id/constraints', validateConstraint, handleValidationErrors, asyn
     return res.status(201).json({
       success: true,
       data: populated,
-      message: 'Constraint created successfully',
+      message: 'Constraint created successfully'
     });
   } catch (error) {
     next(error);
@@ -707,20 +706,20 @@ router.post('/:id/constraints', validateConstraint, handleValidationErrors, asyn
 });
 
 // ─── DELETE /:id/constraints/:cId — Delete constraint (admin or teacher for own) ─
-router.delete('/:id/constraints/:cId', async (req, res, next) => {
+router.delete('/:id/constraints/:cId', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
 
     const constraint = await TeacherConstraint.findOne({
       _id: req.params.cId,
       tenantId,
-      templateId: req.params.id,
+      templateId: req.params.id
     });
 
     if (!constraint) {
       return res.status(404).json({
         success: false,
-        message: 'Constraint not found',
+        message: 'Constraint not found'
       });
     }
 
@@ -728,7 +727,7 @@ router.delete('/:id/constraints/:cId', async (req, res, next) => {
     if (req.user.role === 'teacher' && constraint.teacherId.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Teachers can only delete their own constraints',
+        message: 'Teachers can only delete their own constraints'
       });
     }
 
@@ -736,7 +735,7 @@ router.delete('/:id/constraints/:cId', async (req, res, next) => {
     if (!['admin', 'teacher'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Only admins and teachers can delete constraints',
+        message: 'Only admins and teachers can delete constraints'
       });
     }
 
@@ -745,7 +744,7 @@ router.delete('/:id/constraints/:cId', async (req, res, next) => {
     return res.status(200).json({
       success: true,
       data: null,
-      message: 'Constraint deleted successfully',
+      message: 'Constraint deleted successfully'
     });
   } catch (error) {
     next(error);

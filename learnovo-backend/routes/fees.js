@@ -44,7 +44,7 @@ router.get('/', protect, feePlanGates, [
         filter.tenantId = req.user.tenantId;
       } else {
         // Legacy: filter through students
-        const studentsInTenant = await User.find({ 
+        const studentsInTenant = await User.find({
           tenantId: req.user.tenantId,
           role: 'student'
         }).select('_id');
@@ -316,19 +316,19 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
       // Use defaults if settings fail
       settings = {
         currency: { default: 'INR' },
-        academic: { currentYear: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1) }
+        academic: { currentYear: `${new Date().getFullYear()  }-${  new Date().getFullYear() + 1}` }
       };
     }
-    
+
     // Handle case where settings might not have all required fields
     const feeCurrency = currency || (settings?.currency?.default || settings?.currency || 'INR');
     const currentYear = new Date().getFullYear();
     const nextYear = currentYear + 1;
-    const defaultAcademicYearStr = academicYear || 
-      settings?.academic?.currentYear || 
+    const defaultAcademicYearStr = academicYear ||
+      settings?.academic?.currentYear ||
       settings?.settings?.academicYear ||
       `${currentYear}-${nextYear}`;
-    
+
     const feeCurrencyFinal = typeof feeCurrency === 'string' ? feeCurrency : (feeCurrency?.default || 'INR');
     const defaultAcademicYear = defaultAcademicYearStr.toString();
 
@@ -339,31 +339,31 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
         message: 'Invalid student ID format'
       });
     }
-    
+
     // Validate feeType enum
     const validFeeTypes = ['tuition', 'transport', 'library', 'sports', 'exam', 'other'];
-    const finalFeeType = feeType && validFeeTypes.includes(feeType.toLowerCase()) 
-      ? feeType.toLowerCase() 
+    const finalFeeType = feeType && validFeeTypes.includes(feeType.toLowerCase())
+      ? feeType.toLowerCase()
       : 'tuition';
-    
+
     // Validate term enum
     const validTerms = ['1st_term', '2nd_term', '3rd_term', 'annual'];
     const finalTerm = term && validTerms.includes(term.toLowerCase())
       ? term.toLowerCase()
       : 'annual';
-    
+
     // Validate academic year format
     const academicYearPattern = /^\d{4}-\d{4}$/;
     const finalAcademicYear = academicYear && academicYearPattern.test(academicYear)
       ? academicYear
       : defaultAcademicYear.toString().trim();
-    
+
     // Validate status
     const validStatuses = ['pending', 'paid', 'overdue', 'cancelled'];
     const finalStatus = status && validStatuses.includes(status.toLowerCase())
       ? status.toLowerCase()
       : 'pending';
-    
+
     // If status is paid, set payment info
     const paymentInfo = {};
     if (finalStatus === 'paid') {
@@ -373,7 +373,7 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
         : 'cash';
       paymentInfo.paidDate = paidDate ? new Date(paidDate) : new Date();
     }
-    
+
     // Prepare fee data - mongoose will handle ObjectId conversion
     const feeDataToCreate = {
       tenantId: req.user.tenantId, // Ensure tenantId is included
@@ -389,7 +389,7 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
       ...paymentInfo,
       notes: (notes || '').trim()
     };
-    
+
     console.log('✅ Fee data validated and prepared:', {
       ...feeDataToCreate,
       dueDateType: typeof feeDataToCreate.dueDate,
@@ -437,7 +437,7 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
       console.error('❌ Error message:', createError.message);
       console.error('❌ Error code:', createError.code);
       console.error('❌ Full error object:', createError);
-      
+
       if (createError.errors) {
         console.error('❌ Validation errors object:', createError.errors);
         Object.keys(createError.errors).forEach(key => {
@@ -445,14 +445,14 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
           console.error(`  - ${key}: ${err.message} (kind: ${err.kind}, value: ${err.value})`);
         });
       }
-      
+
       if (createError.keyPattern) {
         console.error('❌ Duplicate key pattern:', createError.keyPattern);
         console.error('❌ Duplicate key value:', createError.keyValue);
       }
-      
+
       console.error('❌ Stack trace:', createError.stack);
-      
+
       // Re-throw to outer catch
       throw createError;
     }
@@ -513,13 +513,13 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
     console.error('🚨 Full error object:', error);
     console.error('🚨 Error constructor:', error?.constructor?.name);
     console.error('🚨 Is Error instance?', error instanceof Error);
-    
+
     // Check if response was already sent
     if (res.headersSent) {
       console.error('🚨⚠️ Response already sent! Cannot send error response.');
       return;
     }
-    
+
     if (error?.errors) {
       console.error('🚨 Error.errors exists! Keys:', Object.keys(error.errors));
       Object.keys(error.errors).forEach(key => {
@@ -528,22 +528,22 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
     } else {
       console.error('🚨 No error.errors property');
     }
-    
+
     if (error?.keyPattern) {
       console.error('🚨 Duplicate key error detected!');
       console.error('🚨 Key pattern:', error.keyPattern);
       console.error('🚨 Key value:', error.keyValue);
     }
-    
+
     if (error?.stack) {
       console.error('🚨 Stack trace (first 15 lines):');
       console.error(error.stack.split('\n').slice(0, 15).join('\n'));
     }
-    
+
     // Handle specific error types
     let statusCode = 500;
     let errorMessage = 'Server error while creating fee';
-    
+
     if (error?.name === 'ValidationError') {
       statusCode = 400;
       errorMessage = 'Validation error';
@@ -574,7 +574,7 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
     } else if (error?.message) {
       errorMessage = error.message;
     }
-    
+
     // Build comprehensive error response - FORCE include details
     const errorResponse = {
       success: false,
@@ -586,7 +586,7 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
       // Include request info for debugging
       timestamp: new Date().toISOString()
     };
-    
+
     // Log what we're including
     console.error('🚨 Error object analysis:', {
       hasMessage: !!error?.message,
@@ -598,7 +598,7 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
       errorType: typeof error,
       errorString: String(error)
     });
-    
+
     // Include detailed validation errors if present
     if (error?.errors && typeof error.errors === 'object' && Object.keys(error.errors).length > 0) {
       errorResponse.validationErrors = Object.keys(error.errors).map(key => ({
@@ -609,7 +609,7 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
       }));
       console.error('🚨 Added', errorResponse.validationErrors.length, 'validation errors to response');
     }
-    
+
     // Include duplicate key info if present
     if (error?.keyPattern || error?.keyValue) {
       errorResponse.duplicateKey = {
@@ -618,17 +618,17 @@ router.post('/', protect, feePlanGates, authorize('admin', 'teacher'), validateF
       };
       console.error('🚨 Added duplicate key info to response');
     }
-    
+
     // Always include stack in development
     if (error?.stack) {
       errorResponse.stack = error.stack.split('\n').slice(0, 15).join('\n');
     }
-    
+
     console.error('🚨🚨🚨 FINAL ERROR RESPONSE BEING SENT:');
     console.error(JSON.stringify(errorResponse, null, 2));
     console.error('🚨 Response status code:', statusCode);
     console.error('🚨 Response headers sent?', res.headersSent);
-    
+
     try {
       res.status(statusCode).json(errorResponse);
       console.error('🚨✅ Error response sent successfully');

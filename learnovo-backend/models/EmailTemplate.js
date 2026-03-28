@@ -9,7 +9,7 @@ const emailTemplateSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['welcome', 'trial_expiry', 'payment_receipt', 'payment_overdue', 'password_reset',
-           'account_suspended', 'account_activated', 'maintenance', 'feature_update', 'newsletter', 'custom'],
+      'account_suspended', 'account_activated', 'maintenance', 'feature_update', 'newsletter', 'custom'],
     default: 'custom'
   },
 

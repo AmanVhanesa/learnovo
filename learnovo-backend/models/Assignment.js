@@ -20,7 +20,7 @@ const assignmentSchema = new mongoose.Schema({
     required: [true, 'Description is required'],
     trim: true
   },
-  
+
   // Assignment metadata
   subject: {
     type: String,

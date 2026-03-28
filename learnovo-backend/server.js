@@ -3,8 +3,6 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-const { v4: uuidv4 } = require('uuid');
 const { requestIdMiddleware, errorHandler, notFoundHandler, logger } = require('./middleware/errorHandler');
 require('dotenv').config({ path: './config.env' });
 
@@ -46,7 +44,7 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: function (origin, callback) {
+  origin: function(origin, callback) {
     // Allow requests with no origin (mobile apps, curl, same-origin)
     if (!origin) return callback(null, true);
     // Allow if origin is in the allowed list
@@ -84,7 +82,7 @@ app.use((req, res, next) => {
   if (req.path === '/test-payment' || req.path.startsWith('/public/')) {
     return next();
   }
-  helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } })(req, res, next);
+  helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } })(req, res, next);
 });
 app.use(compression());
 
@@ -121,9 +119,9 @@ mongoose.connect(mongoUri, {
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
-  autoIndex: !isProduction, // indexes managed via utils/indexes.js in prod
+  autoIndex: !isProduction // indexes managed via utils/indexes.js in prod
 })
-  .then(async () => {
+  .then(async() => {
     console.log('MongoDB connected');
     // Create indexes in the background (non-blocking)
     const { ensureIndexes } = require('./utils/indexes');
@@ -144,7 +142,7 @@ app.get('/', (req, res) => {
 });
 
 // Enhanced health check endpoint
-app.get('/health', async (req, res) => {
+app.get('/health', async(req, res) => {
   try {
     const healthCheck = {
       success: true,
@@ -289,7 +287,7 @@ if (process.env.NODE_ENV !== 'production') {
   app.use('/public', express.static(require('path').join(__dirname, 'public')));
   app.get('/test-payment', (req, res) => {
     // Relax CSP for test page so Razorpay checkout script can load
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* https://*.razorpay.com; frame-src https://*.razorpay.com;");
+    res.setHeader('Content-Security-Policy', 'default-src \'self\'; script-src \'self\' https://checkout.razorpay.com; style-src \'self\' \'unsafe-inline\'; connect-src \'self\' http://localhost:* https://*.razorpay.com; frame-src https://*.razorpay.com;');
     res.sendFile(require('path').join(__dirname, 'test-payment.html'));
   });
 }
@@ -305,14 +303,14 @@ try {
   const reconciliationJob = require('./jobs/reconciliationJob');
   reconciliationJob.startJob();
 } catch (e) {
-  console.error("Failed to start reconciliation job:", e);
+  console.error('Failed to start reconciliation job:', e);
 }
 
 try {
   const backupJob = require('./jobs/backupJob');
   backupJob.startJob();
 } catch (e) {
-  console.error("Failed to start backup job:", e);
+  console.error('Failed to start backup job:', e);
 }
 
 // ── Memory monitoring ───────────────────────────────────────────────
@@ -341,7 +339,7 @@ app.listen(PORT, () => {
 
 // Graceful shutdown — close Puppeteer browser on exit
 const { closeBrowser } = require('./services/pdfService');
-const shutdownHandler = async (signal) => {
+const shutdownHandler = async(signal) => {
   console.log(`\n${signal} received — closing Puppeteer browser...`);
   await closeBrowser();
   process.exit(0);

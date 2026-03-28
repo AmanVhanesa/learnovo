@@ -1,5 +1,5 @@
 const express = require('express');
-const { body, query } = require('express-validator');
+const { query } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const Notification = require('../models/Notification'); // Import Notification model
@@ -9,7 +9,7 @@ const router = express.Router();
 // @desc    Get unread notification count
 // @route   GET /api/notifications/unread-count
 // @access  Private
-router.get('/unread-count', protect, async (req, res) => {
+router.get('/unread-count', protect, async(req, res) => {
   try {
     const count = await Notification.getUnreadCount(req.user._id, req.user.tenantId);
     res.json({
@@ -32,7 +32,7 @@ router.get('/', protect, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -90,7 +90,7 @@ router.get('/', protect, [
 // @desc    Mark all notifications as read
 // @route   PATCH /api/notifications/mark-all-read
 // @access  Private
-router.patch('/mark-all-read', protect, async (req, res) => {
+router.patch('/mark-all-read', protect, async(req, res) => {
   try {
     await Notification.updateMany(
       { tenantId: req.user.tenantId, userId: req.user._id, isRead: false },
@@ -106,7 +106,7 @@ router.patch('/mark-all-read', protect, async (req, res) => {
 // @desc    Mark notification as read
 // @route   PATCH /api/notifications/:id/read
 // @access  Private
-router.patch('/:id/read', protect, async (req, res) => {
+router.patch('/:id/read', protect, async(req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, userId: req.user._id },
@@ -126,7 +126,7 @@ router.patch('/:id/read', protect, async (req, res) => {
 // @desc    Mark notification as unread
 // @route   PATCH /api/notifications/:id/unread
 // @access  Private
-router.patch('/:id/unread', protect, async (req, res) => {
+router.patch('/:id/unread', protect, async(req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, userId: req.user._id },
@@ -146,7 +146,7 @@ router.patch('/:id/unread', protect, async (req, res) => {
 // @desc    Soft-delete a notification
 // @route   DELETE /api/notifications/:id
 // @access  Private
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', protect, async(req, res) => {
   try {
     const notification = await Notification.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, userId: req.user._id, isDeleted: false },

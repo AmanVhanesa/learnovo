@@ -24,7 +24,7 @@ router.get('/', protect, authorize('admin'), [
 
     // Build filter
     const filter = { role: 'teacher' };
-    
+
     // Add tenant filtering
     if (req.user && req.user.tenantId) {
       filter.tenantId = req.user.tenantId;

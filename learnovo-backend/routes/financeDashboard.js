@@ -1,8 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { query } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
-const { handleValidationErrors } = require('../middleware/validation');
 const Income = require('../models/Income');
 const Expense = require('../models/Expense');
 
@@ -11,7 +9,7 @@ router.use(protect, authorize('admin'));
 
 // ── GET /api/finance/dashboard ───────────────────────────────────────────────
 // Combined finance dashboard: income vs expense overview
-router.get('/dashboard', async (req, res, next) => {
+router.get('/dashboard', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const now = new Date();
@@ -118,7 +116,7 @@ router.get('/dashboard', async (req, res, next) => {
 
 // ── GET /api/finance/monthly-comparison ──────────────────────────────────────
 // Income vs Expense comparison by month (last 6 months)
-router.get('/monthly-comparison', async (req, res, next) => {
+router.get('/monthly-comparison', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const months = parseInt(req.query.months) || 6;
@@ -177,7 +175,7 @@ router.get('/monthly-comparison', async (req, res, next) => {
 
 // ── GET /api/finance/expense-breakdown ────────────────────────────────────────
 // Expense breakdown by category for pie/donut chart
-router.get('/expense-breakdown', async (req, res, next) => {
+router.get('/expense-breakdown', async(req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -226,7 +224,7 @@ router.get('/expense-breakdown', async (req, res, next) => {
 
 // ── GET /api/finance/report ──────────────────────────────────────────────────
 // Combined finance report for export (PDF/CSV)
-router.get('/report', async (req, res, next) => {
+router.get('/report', async(req, res, next) => {
   try {
     const { startDate, endDate, format = 'json' } = req.query;
     const tenantId = req.user.tenantId;

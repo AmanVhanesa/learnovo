@@ -4,7 +4,7 @@ const Tenant = require('../models/Tenant');
 const { protect } = require('../middleware/auth');
 const { getTenantFromRequest, validateTenantAccess } = require('../middleware/tenant');
 
-const { PLANS, getPlanConfig } = require('../utils/planConfig');
+const { PLANS } = require('../utils/planConfig');
 
 const router = express.Router();
 
@@ -62,7 +62,7 @@ router.get('/plans', (req, res) => {
 // @desc    Create payment order
 // @route   POST /api/payments/create-order
 // @access  Private (Admin)
-router.post('/create-order', protect, getTenantFromRequest, validateTenantAccess, async (req, res) => {
+router.post('/create-order', protect, getTenantFromRequest, validateTenantAccess, async(req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== 'admin') {
@@ -89,7 +89,7 @@ router.post('/create-order', protect, getTenantFromRequest, validateTenantAccess
         success: true,
         message: 'Payment gateway not configured. Using mock order.',
         data: {
-          orderId: 'mock_order_' + Date.now(),
+          orderId: `mock_order_${  Date.now()}`,
           amount: selectedPlan.price * 100, // in paise
           currency: 'INR',
           plan: plan,
@@ -136,7 +136,7 @@ router.post('/create-order', protect, getTenantFromRequest, validateTenantAccess
 // @desc    Verify payment and update subscription
 // @route   POST /api/payments/verify
 // @access  Private (Admin)
-router.post('/verify', protect, getTenantFromRequest, validateTenantAccess, async (req, res) => {
+router.post('/verify', protect, getTenantFromRequest, validateTenantAccess, async(req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== 'admin') {
@@ -203,7 +203,7 @@ router.post('/verify', protect, getTenantFromRequest, validateTenantAccess, asyn
       });
     }
 
-    const text = orderId + '|' + paymentId;
+    const text = `${orderId  }|${  paymentId}`;
     const generatedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
       .update(text)
@@ -265,7 +265,7 @@ router.post('/verify', protect, getTenantFromRequest, validateTenantAccess, asyn
 // @desc    Get current subscription details
 // @route   GET /api/payments/subscription
 // @access  Private (Admin)
-router.get('/subscription', protect, getTenantFromRequest, validateTenantAccess, async (req, res) => {
+router.get('/subscription', protect, getTenantFromRequest, validateTenantAccess, async(req, res) => {
   try {
     const tenant = await Tenant.findById(req.tenant._id)
       .select('subscription schoolName schoolCode');
@@ -299,11 +299,11 @@ const { logger } = require('../middleware/errorHandler');
 // @desc    Payment notification webhook from HDFC/CCAvenue gateway
 // @route   POST /api/payments/notify
 // @access  Public (from payment gateway)
-router.post('/notify', async (req, res) => {
+router.post('/notify', async(req, res) => {
   try {
     const {
       order_id, tracking_id, bank_ref_no, order_status,
-      payment_mode, amount, currency, enc_val, merchant_id
+      payment_mode, amount, currency, enc_val
     } = req.body;
 
     // Log all payment notifications
@@ -402,7 +402,7 @@ router.post('/notify', async (req, res) => {
 // @desc    Payment success redirect
 // @route   POST /api/payments/return
 // @access  Public (redirect from payment gateway)
-router.post('/return', async (req, res) => {
+router.post('/return', async(req, res) => {
   try {
     const { order_id } = req.body;
     logger.info('Payment return (success)', null, { orderId: order_id });
@@ -419,7 +419,7 @@ router.post('/return', async (req, res) => {
 // @desc    Payment cancel redirect
 // @route   POST /api/payments/cancel
 // @access  Public (redirect from payment gateway)
-router.post('/cancel', async (req, res) => {
+router.post('/cancel', async(req, res) => {
   try {
     const { order_id } = req.body;
     logger.info('Payment cancelled', null, { orderId: order_id });
@@ -435,7 +435,7 @@ router.post('/cancel', async (req, res) => {
 // @desc    Payment failure redirect
 // @route   POST /api/payments/failure
 // @access  Public (redirect from payment gateway)
-router.post('/failure', async (req, res) => {
+router.post('/failure', async(req, res) => {
   try {
     const { order_id } = req.body;
     logger.info('Payment failed', null, { orderId: order_id });

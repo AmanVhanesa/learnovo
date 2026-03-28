@@ -1,28 +1,28 @@
 const mongoose = require('mongoose');
 
 const subDepartmentSchema = new mongoose.Schema({
-    tenantId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Tenant',
-        required: true,
-        index: true
-    },
-    name: {
-        type: String,
-        required: [true, 'Sub Department name is required'],
-        trim: true,
-        uppercase: true
-    },
-    description: {
-        type: String,
-        trim: true
-    },
-    isActive: {
-        type: Boolean,
-        default: true
-    }
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: true,
+    index: true
+  },
+  name: {
+    type: String,
+    required: [true, 'Sub Department name is required'],
+    trim: true,
+    uppercase: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  }
 }, {
-    timestamps: true
+  timestamps: true
 });
 
 // Unique name per tenant

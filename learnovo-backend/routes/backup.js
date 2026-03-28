@@ -15,7 +15,7 @@ router.use(protect, authorize('admin'));
  * POST /api/admin/backup
  * Download backup as file + upload to Google Drive (fire-and-forget)
  */
-router.post('/backup', async (req, res) => {
+router.post('/backup', async(req, res) => {
   req.setTimeout(120000);
   if (res.setTimeout) res.setTimeout(120000);
 
@@ -35,7 +35,7 @@ router.post('/backup', async (req, res) => {
     res.send(buffer);
 
     // Fire-and-forget: upload to Google Drive + log
-    (async () => {
+    (async() => {
       try {
         let driveFileId;
         let storageLocation = 'local';
@@ -56,7 +56,7 @@ router.post('/backup', async (req, res) => {
           status: 'success',
           type: 'manual',
           driveFileId,
-          storageLocation,
+          storageLocation
         });
       } catch (err) {
         logger.error('Post-download backup logging/upload failed', err, { tenantId });
@@ -70,13 +70,13 @@ router.post('/backup', async (req, res) => {
         filename: 'failed-backup',
         status: 'failed',
         errorMessage: error.message,
-        type: 'manual',
+        type: 'manual'
       }).catch(() => {});
 
       res.status(500).json({
         success: false,
         message: 'Backup failed',
-        error: error.message,
+        error: error.message
       });
     }
   }
@@ -86,7 +86,7 @@ router.post('/backup', async (req, res) => {
  * POST /api/admin/backup/cloud
  * Backup directly to Google Drive (no file download)
  */
-router.post('/backup/cloud', async (req, res) => {
+router.post('/backup/cloud', async(req, res) => {
   req.setTimeout(120000);
 
   const tenantId = req.user.tenantId;
@@ -97,7 +97,7 @@ router.post('/backup/cloud', async (req, res) => {
   if (!googleDriveService.isConfigured()) {
     return res.status(400).json({
       success: false,
-      message: 'Google Drive is not configured. Run: node scripts/gdrive-setup.js to set up OAuth credentials.',
+      message: 'Google Drive is not configured. Run: node scripts/gdrive-setup.js to set up OAuth credentials.'
     });
   }
 
@@ -114,13 +114,13 @@ router.post('/backup/cloud', async (req, res) => {
         sizeBytes: metadata.sizeBytes,
         collectionsCount: metadata.collectionsCount,
         documentsCount: metadata.documentsCount,
-        backupId: log._id,
-      },
+        backupId: log._id
+      }
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message || 'Cloud backup failed',
+      message: error.message || 'Cloud backup failed'
     });
   }
 });
@@ -129,13 +129,13 @@ router.post('/backup/cloud', async (req, res) => {
  * GET /api/admin/backup/cloud/status
  * Get Google Drive backup file info for this tenant
  */
-router.get('/backup/cloud/status', async (req, res) => {
+router.get('/backup/cloud/status', async(req, res) => {
   const tenantId = req.user.tenantId;
 
   if (!googleDriveService.isConfigured()) {
     return res.json({
       success: true,
-      data: { configured: false },
+      data: { configured: false }
     });
   }
 
@@ -147,8 +147,8 @@ router.get('/backup/cloud/status', async (req, res) => {
       data: {
         configured: true,
         active: false,
-        error: connection.error,
-      },
+        error: connection.error
+      }
     });
   }
 
@@ -160,8 +160,8 @@ router.get('/backup/cloud/status', async (req, res) => {
       data: {
         configured: true,
         active: true,
-        file: fileInfo,
-      },
+        file: fileInfo
+      }
     });
   } catch (error) {
     logger.error('Cloud status check failed', error, { tenantId });
@@ -170,8 +170,8 @@ router.get('/backup/cloud/status', async (req, res) => {
       data: {
         configured: true,
         active: false,
-        error: error.message || 'Failed to reach Google Drive',
-      },
+        error: error.message || 'Failed to reach Google Drive'
+      }
     });
   }
 });
@@ -180,7 +180,7 @@ router.get('/backup/cloud/status', async (req, res) => {
  * POST /api/admin/backup/cloud/restore
  * Restore data from Google Drive backup
  */
-router.post('/backup/cloud/restore', async (req, res) => {
+router.post('/backup/cloud/restore', async(req, res) => {
   req.setTimeout(120000);
 
   const tenantId = req.user.tenantId;
@@ -189,14 +189,14 @@ router.post('/backup/cloud/restore', async (req, res) => {
   if (confirmation !== 'RESTORE') {
     return res.status(400).json({
       success: false,
-      message: 'You must type "RESTORE" to confirm this action.',
+      message: 'You must type "RESTORE" to confirm this action.'
     });
   }
 
   if (!googleDriveService.isConfigured()) {
     return res.status(400).json({
       success: false,
-      message: 'Google Drive is not configured.',
+      message: 'Google Drive is not configured.'
     });
   }
 
@@ -213,7 +213,7 @@ router.post('/backup/cloud/restore', async (req, res) => {
     let restoredDocs = 0;
 
     try {
-      await session.withTransaction(async () => {
+      await session.withTransaction(async() => {
         for (const [colName, docs] of Object.entries(backupData)) {
           if (!Array.isArray(docs) || docs.length === 0) continue;
           if (colName.startsWith('system.')) continue;
@@ -232,7 +232,7 @@ router.post('/backup/cloud/restore', async (req, res) => {
       res.json({
         success: true,
         message: `Restore completed. ${restoredCollections} collections, ${restoredDocs} documents restored from Google Drive.`,
-        data: { collections: restoredCollections, documents: restoredDocs },
+        data: { collections: restoredCollections, documents: restoredDocs }
       });
     } finally {
       await session.endSession();
@@ -241,7 +241,7 @@ router.post('/backup/cloud/restore', async (req, res) => {
     logger.error('Cloud restore failed', error, { tenantId });
     res.status(500).json({
       success: false,
-      message: error.message || 'Restore from Google Drive failed',
+      message: error.message || 'Restore from Google Drive failed'
     });
   }
 });
@@ -250,7 +250,7 @@ router.post('/backup/cloud/restore', async (req, res) => {
  * POST /api/admin/restore
  * Restore from uploaded backup file (existing endpoint)
  */
-router.post('/restore', async (req, res) => {
+router.post('/restore', async(req, res) => {
   req.setTimeout(120000);
 
   const tenantId = req.user.tenantId;
@@ -279,7 +279,7 @@ router.post('/restore', async (req, res) => {
   let restoredDocs = 0;
 
   try {
-    await session.withTransaction(async () => {
+    await session.withTransaction(async() => {
       for (const [colName, docs] of Object.entries(backupData)) {
         if (!Array.isArray(docs) || docs.length === 0) continue;
         if (colName.startsWith('system.')) continue;
@@ -298,7 +298,7 @@ router.post('/restore', async (req, res) => {
     res.json({
       success: true,
       message: `Restore completed. ${restoredCollections} collections, ${restoredDocs} documents restored.`,
-      data: { collections: restoredCollections, documents: restoredDocs },
+      data: { collections: restoredCollections, documents: restoredDocs }
     });
   } catch (error) {
     logger.error('Restore failed', error, { tenantId });
@@ -311,7 +311,7 @@ router.post('/restore', async (req, res) => {
 /**
  * GET /api/admin/backup/history
  */
-router.get('/backup/history', async (req, res) => {
+router.get('/backup/history', async(req, res) => {
   try {
     const logs = await BackupLog.find({ tenantId: req.user.tenantId })
       .sort({ createdAt: -1 })
@@ -328,11 +328,11 @@ router.get('/backup/history', async (req, res) => {
 /**
  * GET /api/admin/backup/last
  */
-router.get('/backup/last', async (req, res) => {
+router.get('/backup/last', async(req, res) => {
   try {
     const lastBackup = await BackupLog.findOne({
       tenantId: req.user.tenantId,
-      status: 'success',
+      status: 'success'
     }).sort({ createdAt: -1 }).lean();
 
     res.json({ success: true, data: lastBackup || null });

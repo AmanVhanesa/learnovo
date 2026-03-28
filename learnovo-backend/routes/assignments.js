@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
+const { body } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const Assignment = require('../models/Assignment');
@@ -20,20 +20,20 @@ async function resolveTeacherClassNames(teacherId, tenantId) {
       tenantId,
       $or: [
         { classTeacher: teacherId },
-        { 'subjects.teacher': teacherId },
-      ],
+        { 'subjects.teacher': teacherId }
+      ]
     }).select('name').lean();
     directClasses.forEach(c => classNames.add(c.name));
 
     // 2. Section model: sectionTeacher
     const Section = require('../models/Section');
     const sectionDocs = await Section.find({
-      tenantId, sectionTeacher: teacherId, isActive: true,
+      tenantId, sectionTeacher: teacherId, isActive: true
     }).select('classId').lean();
     if (sectionDocs.length > 0) {
       const sectionClassIds = [...new Set(sectionDocs.map(s => s.classId?.toString()).filter(Boolean))];
       const sectionClasses = await Class.find({
-        _id: { $in: sectionClassIds }, tenantId,
+        _id: { $in: sectionClassIds }, tenantId
       }).select('name').lean();
       sectionClasses.forEach(c => classNames.add(c.name));
     }
@@ -41,12 +41,12 @@ async function resolveTeacherClassNames(teacherId, tenantId) {
     // 3. TeacherSubjectAssignment model
     const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
     const tsaDocs = await TeacherSubjectAssignment.find({
-      teacherId, tenantId, isActive: true,
+      teacherId, tenantId, isActive: true
     }).select('classId').lean();
     if (tsaDocs.length > 0) {
       const tsaClassIds = [...new Set(tsaDocs.map(a => a.classId?.toString()).filter(Boolean))];
       const tsaClasses = await Class.find({
-        _id: { $in: tsaClassIds }, tenantId,
+        _id: { $in: tsaClassIds }, tenantId
       }).select('name').lean();
       tsaClasses.forEach(c => classNames.add(c.name));
     }
@@ -80,7 +80,7 @@ router.get('/stats/overview', protect, async(req, res) => {
       if (teacherClassNames.length > 0) {
         filter.$or = [
           { teacher: user._id },
-          { class: { $in: teacherClassNames } },
+          { class: { $in: teacherClassNames } }
         ];
       } else {
         filter.teacher = user._id;
@@ -137,7 +137,7 @@ router.get('/upcoming/list', protect, async(req, res) => {
       if (teacherClassNames.length > 0) {
         filter.$or = [
           { teacher: user._id },
-          { class: { $in: teacherClassNames } },
+          { class: { $in: teacherClassNames } }
         ];
       } else {
         filter.teacher = user._id;
@@ -188,7 +188,7 @@ router.get('/', protect, async(req, res) => {
       if (teacherClassNames.length > 0) {
         filter.$or = [
           { teacher: user._id },
-          { class: { $in: teacherClassNames } },
+          { class: { $in: teacherClassNames } }
         ];
       } else {
         filter.teacher = user._id;
@@ -313,7 +313,7 @@ router.post('/', protect, authorize('admin', 'teacher'), [
       if (classId) {
         studentQuery.$or = [
           { classId: classId },
-          { class: className },
+          { class: className }
         ];
       } else {
         studentQuery.class = className;

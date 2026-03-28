@@ -15,7 +15,7 @@ async function checkConflicts(tenantId, templateId, { dayOfWeek, timingSlotId, c
     tenantId,
     templateId,
     dayOfWeek,
-    timingSlotId,
+    timingSlotId
   };
 
   // Exclude an existing entry (for update operations)
@@ -27,14 +27,14 @@ async function checkConflicts(tenantId, templateId, { dayOfWeek, timingSlotId, c
   if (teacherId) {
     const teacherConflict = await TimetableEntry.findOne({
       ...baseFilter,
-      teacherId,
+      teacherId
     }).populate('classId', 'grade').populate('subjectId', 'name').lean();
 
     if (teacherConflict) {
       conflicts.push({
         type: 'teacher',
         message: `Teacher is already assigned to ${teacherConflict.subjectId?.name || 'a subject'} for class ${teacherConflict.classId?.grade || 'unknown'} at this slot`,
-        conflictingEntry: teacherConflict,
+        conflictingEntry: teacherConflict
       });
     }
   }
@@ -53,7 +53,7 @@ async function checkConflicts(tenantId, templateId, { dayOfWeek, timingSlotId, c
       conflicts.push({
         type: 'class',
         message: `This class/section already has ${classConflict.subjectId?.name || 'a subject'} with ${classConflict.teacherId?.name || 'a teacher'} at this slot`,
-        conflictingEntry: classConflict,
+        conflictingEntry: classConflict
       });
     }
   }
@@ -62,14 +62,14 @@ async function checkConflicts(tenantId, templateId, { dayOfWeek, timingSlotId, c
   if (roomId) {
     const roomConflict = await TimetableEntry.findOne({
       ...baseFilter,
-      roomId,
+      roomId
     }).populate('classId', 'grade').populate('subjectId', 'name').lean();
 
     if (roomConflict) {
       conflicts.push({
         type: 'room',
         message: `Room is already booked for ${roomConflict.subjectId?.name || 'a subject'} (class ${roomConflict.classId?.grade || 'unknown'}) at this slot`,
-        conflictingEntry: roomConflict,
+        conflictingEntry: roomConflict
       });
     }
   }
@@ -87,14 +87,14 @@ async function getTemplateStats(tenantId, templateId) {
     allocationCount,
     entryCount,
     constraintCount,
-    teacherIds,
+    teacherIds
   ] = await Promise.all([
     SchoolTiming.countDocuments({ tenantId, templateId }),
     SchoolTiming.countDocuments({ tenantId, templateId, type: 'period' }),
     SubjectAllocation.countDocuments({ tenantId, templateId, isActive: true }),
     TimetableEntry.countDocuments({ tenantId, templateId }),
     TeacherConstraint.countDocuments({ tenantId, templateId }),
-    TimetableEntry.distinct('teacherId', { tenantId, templateId }),
+    TimetableEntry.distinct('teacherId', { tenantId, templateId })
   ]);
 
   // Calculate total available slots from template working days
@@ -133,7 +133,7 @@ async function getTemplateStats(tenantId, templateId) {
     teacherCount: teacherIds.length,
     totalSlots,
     conflictCount,
-    fillPercentage: totalSlots > 0 ? Math.round((entryCount / totalSlots) * 100) : 0,
+    fillPercentage: totalSlots > 0 ? Math.round((entryCount / totalSlots) * 100) : 0
   };
 }
 
@@ -207,7 +207,7 @@ async function validateForPublish(tenantId, templateId) {
 
   return {
     valid: errors.length === 0,
-    errors,
+    errors
   };
 }
 
@@ -232,7 +232,7 @@ async function duplicateTemplate(tenantId, sourceTemplateId, newName, userId) {
     workingDays: source.workingDays,
     createdBy: userId,
     duplicatedFrom: sourceTemplateId,
-    version: 1,
+    version: 1
   });
 
   // 3. Copy timing slots
@@ -248,7 +248,7 @@ async function duplicateTemplate(tenantId, sourceTemplateId, newName, userId) {
         startTime: t.startTime,
         endTime: t.endTime,
         type: t.type,
-        isActive: t.isActive,
+        isActive: t.isActive
       }))
     );
     // Build mapping for constraints that reference timing slots
@@ -272,7 +272,7 @@ async function duplicateTemplate(tenantId, sourceTemplateId, newName, userId) {
         preferConsecutive: a.preferConsecutive,
         consecutiveCount: a.consecutiveCount,
         preferredRoomType: a.preferredRoomType,
-        isActive: a.isActive,
+        isActive: a.isActive
       }))
     );
   }
@@ -291,7 +291,7 @@ async function duplicateTemplate(tenantId, sourceTemplateId, newName, userId) {
         value: c.value,
         reason: c.reason,
         priority: c.priority,
-        createdBy: userId,
+        createdBy: userId
       }))
     );
   }
@@ -303,5 +303,5 @@ module.exports = {
   checkConflicts,
   getTemplateStats,
   validateForPublish,
-  duplicateTemplate,
+  duplicateTemplate
 };

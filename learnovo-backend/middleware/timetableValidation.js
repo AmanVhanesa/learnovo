@@ -21,7 +21,7 @@ exports.validateTemplate = [
   body('effectiveTo')
     .optional()
     .isISO8601()
-    .withMessage('effectiveTo must be a valid date'),
+    .withMessage('effectiveTo must be a valid date')
 ];
 
 // ─── Timing slot validation ─────────────────────────────────────────────────
@@ -41,7 +41,7 @@ exports.validateTiming = [
     .withMessage('endTime must be HH:mm'),
   body('type')
     .isIn(['period', 'break', 'lunch', 'assembly', 'activity'])
-    .withMessage('Type must be one of: period, break, lunch, assembly, activity'),
+    .withMessage('Type must be one of: period, break, lunch, assembly, activity')
 ];
 
 // ─── Bulk timings validation ────────────────────────────────────────────────
@@ -64,7 +64,7 @@ exports.validateBulkTimings = [
     .withMessage('endTime must be HH:mm'),
   body('timings.*.type')
     .isIn(['period', 'break', 'lunch', 'assembly', 'activity'])
-    .withMessage('Type must be one of: period, break, lunch, assembly, activity'),
+    .withMessage('Type must be one of: period, break, lunch, assembly, activity')
 ];
 
 // ─── Subject allocation validation ──────────────────────────────────────────
@@ -96,7 +96,7 @@ exports.validateAllocation = [
   body('preferredRoomType')
     .optional()
     .isIn(['classroom', 'lab', 'auditorium', 'library', 'sports', 'other'])
-    .withMessage('Invalid room type'),
+    .withMessage('Invalid room type')
 ];
 
 // ─── Timetable entry validation ─────────────────────────────────────────────
@@ -123,7 +123,7 @@ exports.validateEntry = [
   body('roomId')
     .optional()
     .isMongoId()
-    .withMessage('Room ID must be a valid Mongo ID'),
+    .withMessage('Room ID must be a valid Mongo ID')
 ];
 
 // ─── Room validation ────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ exports.validateRoom = [
     .withMessage('Floor must be an integer'),
   body('code')
     .optional()
-    .trim(),
+    .trim()
 ];
 
 // ─── Substitution validation ────────────────────────────────────────────────
@@ -173,7 +173,7 @@ exports.validateSubstitution = [
     .withMessage('Reason must be one of: sick, personal, official, training, other'),
   body('notes')
     .optional()
-    .trim(),
+    .trim()
 ];
 
 // ─── Override validation ────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ exports.validateOverride = [
   body('affectedClasses.*')
     .optional()
     .isMongoId()
-    .withMessage('Each affected class must be a valid Mongo ID'),
+    .withMessage('Each affected class must be a valid Mongo ID')
 ];
 
 // ─── Constraint validation ──────────────────────────────────────────────────
@@ -227,5 +227,5 @@ exports.validateConstraint = [
   body('priority')
     .optional()
     .isInt({ min: 1, max: 10 })
-    .withMessage('Priority must be between 1 and 10'),
+    .withMessage('Priority must be between 1 and 10')
 ];

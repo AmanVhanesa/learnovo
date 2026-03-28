@@ -51,7 +51,7 @@ supportTicketSchema.index({ tenantId: 1, status: 1 });
 supportTicketSchema.index({ createdAt: -1 });
 
 // Auto-generate ticket number
-supportTicketSchema.pre('save', async function (next) {
+supportTicketSchema.pre('save', async function(next) {
   if (this.isNew && !this.ticketNumber) {
     const count = await this.constructor.countDocuments();
     this.ticketNumber = `TKT-${String(count + 1).padStart(5, '0')}`;

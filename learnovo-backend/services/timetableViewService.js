@@ -5,11 +5,6 @@ const Substitution = require('../models/Substitution');
 const TimetableOverride = require('../models/TimetableOverride');
 const User = require('../models/User');
 
-const DAY_ORDER = {
-  monday: 0, tuesday: 1, wednesday: 2, thursday: 3,
-  friday: 4, saturday: 5, sunday: 6
-};
-
 /**
  * Find the published template for a tenant.
  */
@@ -102,7 +97,9 @@ async function handleOverride(override, tenantId, template, targetDate, filters)
     }).sort({ slotNumber: 1 }).lean();
 
     const timingMap = {};
-    timings.forEach(t => { timingMap[t._id.toString()] = t; });
+    timings.forEach(t => {
+      timingMap[t._id.toString()] = t;
+    });
 
     const entries = override.overrideEntries.map(oe => ({
       ...oe,
@@ -302,46 +299,46 @@ async function getTodayForUser(tenantId, user) {
   today.setHours(0, 0, 0, 0);
 
   switch (user.role) {
-    case 'student': {
-      if (!user.classId) {
-        return { error: 'Student has no class assigned' };
-      }
-      const filters = { classId: user.classId };
-      if (user.sectionId) filters.sectionId = user.sectionId;
-      return getEffectiveSchedule(tenantId, today, filters);
+  case 'student': {
+    if (!user.classId) {
+      return { error: 'Student has no class assigned' };
     }
+    const filters = { classId: user.classId };
+    if (user.sectionId) filters.sectionId = user.sectionId;
+    return getEffectiveSchedule(tenantId, today, filters);
+  }
 
-    case 'teacher': {
-      return getEffectiveSchedule(tenantId, today, { teacherId: user._id });
+  case 'teacher': {
+    return getEffectiveSchedule(tenantId, today, { teacherId: user._id });
+  }
+
+  case 'parent': {
+    if (!user.children || user.children.length === 0) {
+      return { error: 'No children linked to this parent' };
     }
+    // Fetch children to get their class/section info
+    const children = await User.find({
+      _id: { $in: user.children },
+      tenantId
+    }).select('name fullName classId sectionId').lean();
 
-    case 'parent': {
-      if (!user.children || user.children.length === 0) {
-        return { error: 'No children linked to this parent' };
-      }
-      // Fetch children to get their class/section info
-      const children = await User.find({
-        _id: { $in: user.children },
-        tenantId
-      }).select('name fullName classId sectionId').lean();
-
-      const schedules = [];
-      for (const child of children) {
-        if (!child.classId) continue;
-        const filters = { classId: child.classId };
-        if (child.sectionId) filters.sectionId = child.sectionId;
-        const schedule = await getEffectiveSchedule(tenantId, today, filters);
-        schedules.push({
-          child: { _id: child._id, name: child.name || child.fullName },
-          schedule
-        });
-      }
-      return { children: schedules };
+    const schedules = [];
+    for (const child of children) {
+      if (!child.classId) continue;
+      const filters = { classId: child.classId };
+      if (child.sectionId) filters.sectionId = child.sectionId;
+      const schedule = await getEffectiveSchedule(tenantId, today, filters);
+      schedules.push({
+        child: { _id: child._id, name: child.name || child.fullName },
+        schedule
+      });
     }
+    return { children: schedules };
+  }
 
-    case 'admin':
-    default:
-      return getEffectiveSchedule(tenantId, today, {});
+  case 'admin':
+  default:
+    return getEffectiveSchedule(tenantId, today, {});
   }
 }
 

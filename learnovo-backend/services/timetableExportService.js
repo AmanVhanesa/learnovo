@@ -1,14 +1,11 @@
 const ExcelJS = require('exceljs');
-const { getWeekSchedule } = require('./timetableViewService');
+const { getWeekSchedule: _getWeekSchedule } = require('./timetableViewService');
 const TimetableTemplate = require('../models/TimetableTemplate');
 const TimetableEntry = require('../models/TimetableEntry');
 const SchoolTiming = require('../models/SchoolTiming');
 const User = require('../models/User');
 const Class = require('../models/Class');
 const Section = require('../models/Section');
-const pdfService = require('./pdfService');
-
-const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABELS = {
   monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
   thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday'
@@ -144,7 +141,9 @@ async function generatePDF(tenantId, options = {}) {
     return { buffer: Buffer.from(pdfUint8), filename };
   } finally {
     if (browser) {
-      try { await browser.close(); } catch (e) { /* ignore */ }
+      try {
+        await browser.close();
+      } catch (e) { /* ignore */ }
     }
   }
 }
@@ -153,8 +152,8 @@ async function generatePDF(tenantId, options = {}) {
  * Build an HTML table for the timetable.
  */
 function buildTimetableHTML(title, timings, grid, workingDays, viewType) {
-  const periodTimings = timings.filter(t => t.type === 'period' || t.type === 'activity');
-  const breakTimings = timings.filter(t => t.type === 'break' || t.type === 'lunch' || t.type === 'assembly');
+  const _periodTimings = timings.filter(t => t.type === 'period' || t.type === 'activity');
+  const _breakTimings = timings.filter(t => t.type === 'break' || t.type === 'lunch' || t.type === 'assembly');
 
   // Build header row
   let headerCells = '<th class="time-col">Period</th>';
@@ -183,15 +182,15 @@ function buildTimetableHTML(title, timings, grid, workingDays, viewType) {
 
     for (const day of workingDays) {
       const entry = grid[day]?.[timing._id.toString()];
-      const cellText = getCellText(entry, viewType);
+      const _cellText = getCellText(entry, viewType);
       const bgColor = entry?.subjectId?.color || '#f8f9fa';
 
       if (entry) {
         cells += `<td class="entry-cell" style="background-color: ${bgColor}15;">
           <div class="subject-name">${escapeHtml(entry.subjectId?.name || '')}</div>
           <div class="teacher-name">${escapeHtml(viewType === 'teacher'
-            ? ((entry.classId?.grade || entry.classId?.name || '') + (entry.sectionId?.name ? '-' + entry.sectionId.name : ''))
-            : (entry.teacherId?.name || entry.teacherId?.fullName || ''))}</div>
+    ? ((entry.classId?.grade || entry.classId?.name || '') + (entry.sectionId?.name ? `-${  entry.sectionId.name}` : ''))
+    : (entry.teacherId?.name || entry.teacherId?.fullName || ''))}</div>
           ${entry.roomId ? `<div class="room-name">${escapeHtml(entry.roomId.code || entry.roomId.name)}</div>` : ''}
         </td>`;
       } else {

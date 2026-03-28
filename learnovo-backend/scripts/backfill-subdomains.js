@@ -43,7 +43,7 @@ async function run() {
 
   // Collect existing subdomains to avoid conflicts
   const existing = new Set(
-    (await Tenant.find({ subdomain: { $ne: null, $ne: '' } }).select('subdomain').lean())
+    (await Tenant.find({ subdomain: { $nin: [null, ''] } }).select('subdomain').lean())
       .map(t => t.subdomain)
   );
 
@@ -52,7 +52,7 @@ async function run() {
     let slug = toSlug(tenant.schoolCode || tenant.schoolName || 'school');
 
     // Ensure minimum length
-    if (slug.length < 3) slug = slug + '-school';
+    if (slug.length < 3) slug = `${slug  }-school`;
 
     // Handle duplicates
     let candidate = slug;

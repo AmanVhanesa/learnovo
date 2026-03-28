@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { body } = require('express-validator');
 const User = require('../models/User');
 const Tenant = require('../models/Tenant');
-const { protect, generateToken, sendTokenResponse } = require('../middleware/auth');
+const { protect, generateToken } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { getTenantFromRequest } = require('../middleware/tenant');
 const upload = require('../middleware/upload');
@@ -32,7 +32,7 @@ router.post('/register', protect, getTenantFromRequest, [
   body('role').isIn(['admin', 'teacher', 'student', 'parent']).withMessage('Invalid role'),
   body('phone').optional().isMobilePhone().withMessage('Please provide a valid phone number'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     // Only admins can register new users
     if (req.user.role !== 'admin') {
@@ -192,7 +192,7 @@ router.post('/login', [
   body('password').notEmpty().withMessage('Password is required'),
   body('schoolCode').optional().trim(),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { email, password, schoolCode } = req.body;
     // 'email' field in request can be either an actual email or an admission number
@@ -232,7 +232,7 @@ router.post('/login', [
       ]
     };
 
-    let userQuery = { ...identifierQuery };
+    const userQuery = { ...identifierQuery };
     if (tenant) {
       userQuery.tenantId = tenant._id;
     }
@@ -382,7 +382,7 @@ router.post('/login', [
 // @desc    Get current user
 // @route   GET /api/auth/me
 // @access  Private
-router.get('/me', protect, async (req, res) => {
+router.get('/me', protect, async(req, res) => {
   try {
     const user = await User.findById(req.user.id);
 
@@ -448,7 +448,7 @@ router.put('/profile', protect, [
   body('gender').optional().isIn(['Male', 'Female', 'Other']).withMessage('Gender must be Male, Female or Other'),
   body('bloodGroup').optional().isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', '']).withMessage('Invalid blood group'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { name, phone, address, dateOfBirth, gender, bloodGroup, religion, fatherOrHusbandName, homeAddress, nationalId, education, experience, category } = req.body;
     const userId = req.user.id;
@@ -541,7 +541,7 @@ router.put('/password', protect, [
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters long'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
@@ -584,7 +584,7 @@ router.put('/password', protect, [
 // @desc    Upload profile photo
 // @route   POST /api/auth/upload-photo
 // @access  Private
-router.post('/upload-photo', protect, upload.single('photo'), async (req, res) => {
+router.post('/upload-photo', protect, upload.single('photo'), async(req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No photo file provided' });
@@ -654,7 +654,7 @@ router.post('/logout', protect, (req, res) => {
 router.post('/forgot-password', forgotPasswordLimiter, [
   body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { email } = req.body;
 
@@ -710,7 +710,7 @@ router.put('/reset-password', [
   body('token').notEmpty().withMessage('Reset token is required'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { token, password } = req.body;
 

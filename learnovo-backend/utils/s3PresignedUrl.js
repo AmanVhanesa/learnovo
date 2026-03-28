@@ -12,26 +12,26 @@ const cache = require('./cache');
  * @returns {Promise<string>} - Temporary download URL
  */
 async function getPresignedUrl(s3Key, expiresInSeconds = 3600) {
-    if (!s3Key) throw new Error('s3Key is required');
+  if (!s3Key) throw new Error('s3Key is required');
 
-    // Check cache first (key scoped by bucket + key)
-    const cacheKey = `s3url:${BUCKET_NAME}:${s3Key}`;
-    const cached = cache.get(cacheKey);
-    if (cached) return cached;
+  // Check cache first (key scoped by bucket + key)
+  const cacheKey = `s3url:${BUCKET_NAME}:${s3Key}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
 
-    const command = new GetObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: s3Key,
-    });
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: s3Key
+  });
 
-    const url = await getSignedUrl(s3Client, command, {
-        expiresIn: expiresInSeconds,
-    });
+  const url = await getSignedUrl(s3Client, command, {
+    expiresIn: expiresInSeconds
+  });
 
-    // Cache for 50 min (just under the 60-min expiry)
-    cache.set(cacheKey, url, 3000);
+  // Cache for 50 min (just under the 60-min expiry)
+  cache.set(cacheKey, url, 3000);
 
-    return url;
+  return url;
 }
 
 module.exports = { getPresignedUrl };

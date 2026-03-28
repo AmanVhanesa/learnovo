@@ -29,7 +29,7 @@ const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI
 const authUrl = oauth2Client.generateAuthUrl({
   access_type: 'offline',
   scope: ['https://www.googleapis.com/auth/drive.file'],
-  prompt: 'consent',
+  prompt: 'consent'
 });
 
 console.log('');
@@ -44,7 +44,7 @@ const { exec } = require('child_process');
 exec(`open "${authUrl}"`);
 
 // Start a temporary local server to catch the redirect
-const server = http.createServer(async (req, res) => {
+const server = http.createServer(async(req, res) => {
   const query = url.parse(req.url, true).query;
 
   if (query.code) {

@@ -8,7 +8,7 @@ const settingsSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  
+
   // Institution Information
   institution: {
     name: {
@@ -293,13 +293,13 @@ settingsSchema.statics.getSettings = async function(tenantId) {
   if (!tenantId) {
     throw new Error('Tenant ID is required');
   }
-  
+
   let settings = await this.findOne({ tenantId });
   if (!settings) {
     // Get tenant data to populate settings
     const Tenant = mongoose.model('Tenant');
     const tenant = await Tenant.findById(tenantId);
-    
+
     // Create default settings with required fields, populated from tenant if available
     settings = new this({
       tenantId,
@@ -326,13 +326,13 @@ settingsSchema.statics.getSettings = async function(tenantId) {
       },
       currency: {
         default: tenant?.settings?.currency || 'INR',
-        symbol: tenant?.settings?.currency === 'INR' ? '₹' : 
-                tenant?.settings?.currency === 'USD' ? '$' : 
-                tenant?.settings?.currency === 'EUR' ? '€' : 
-                tenant?.settings?.currency === 'GBP' ? '£' : '₹'
+        symbol: tenant?.settings?.currency === 'INR' ? '₹' :
+          tenant?.settings?.currency === 'USD' ? '$' :
+            tenant?.settings?.currency === 'EUR' ? '€' :
+              tenant?.settings?.currency === 'GBP' ? '£' : '₹'
       },
       academic: {
-        currentYear: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1)
+        currentYear: `${new Date().getFullYear()  }-${  new Date().getFullYear() + 1}`
       }
     });
     try {

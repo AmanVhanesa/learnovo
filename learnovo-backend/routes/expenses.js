@@ -11,7 +11,7 @@ const ExpenseBudget = require('../models/ExpenseBudget');
 router.use(protect, authorize('admin'));
 
 // ── GET /api/expenses/summary/monthly ────────────────────────────────────────
-router.get('/summary/monthly', async (req, res, next) => {
+router.get('/summary/monthly', async(req, res, next) => {
   try {
     const { academicYear } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -36,7 +36,7 @@ router.get('/summary/monthly', async (req, res, next) => {
 });
 
 // ── GET /api/expenses/summary/category ───────────────────────────────────────
-router.get('/summary/category', async (req, res, next) => {
+router.get('/summary/category', async(req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -84,7 +84,7 @@ router.get('/summary/category', async (req, res, next) => {
 });
 
 // ── GET /api/expenses/summary/dashboard ──────────────────────────────────────
-router.get('/summary/dashboard', async (req, res, next) => {
+router.get('/summary/dashboard', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const now = new Date();
@@ -143,7 +143,7 @@ router.get('/summary/dashboard', async (req, res, next) => {
 });
 
 // ── GET /api/expenses/export ─────────────────────────────────────────────────
-router.get('/export', async (req, res, next) => {
+router.get('/export', async(req, res, next) => {
   try {
     const { startDate, endDate, category, status, paymentMethod } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -196,7 +196,7 @@ router.get('/', [
   query('status').optional().isIn(['Pending', 'Approved', 'Rejected']),
   query('paymentMethod').optional().isIn(['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Card']),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const { page = 1, limit = 20, status, category, paymentMethod, startDate, endDate, search, sortBy = 'expenseDate', sortOrder = 'desc' } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
@@ -246,7 +246,7 @@ router.get('/', [
 router.get('/:id', [
   param('id').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const expense = await Expense.findOne({ _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false })
       .populate('category', 'name color icon')
@@ -273,7 +273,7 @@ router.post('/', [
   body('paymentReference').optional().trim(),
   body('description').optional().trim(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const { category, title, amount, expenseDate, paymentMethod, paymentReference, description, receiptUrl, academicYear } = req.body;
 
@@ -310,7 +310,7 @@ router.put('/:id', [
   body('expenseDate').optional().isISO8601(),
   body('paymentMethod').optional().isIn(['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Card']),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const expense = await Expense.findOne({ _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false });
     if (!expense) {
@@ -345,7 +345,7 @@ router.put('/:id', [
 router.delete('/:id', [
   param('id').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const expense = await Expense.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false },
@@ -367,7 +367,7 @@ router.delete('/:id', [
 router.patch('/:id/approve', [
   param('id').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const expense = await Expense.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false, status: 'Pending' },
@@ -392,7 +392,7 @@ router.patch('/:id/reject', [
   param('id').isMongoId(),
   body('reason').optional().trim(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const expense = await Expense.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false, status: 'Pending' },
@@ -417,7 +417,7 @@ router.patch('/bulk/approve', [
   body('ids').isArray({ min: 1 }).withMessage('At least one expense ID required'),
   body('ids.*').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const result = await Expense.updateMany(
       { _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false, status: 'Pending' },
@@ -435,7 +435,7 @@ router.delete('/bulk/delete', [
   body('ids').isArray({ min: 1 }),
   body('ids.*').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const result = await Expense.updateMany(
       { _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false },
@@ -450,7 +450,7 @@ router.delete('/bulk/delete', [
 
 // ── Categories CRUD ──────────────────────────────────────────────────────────
 
-router.get('/categories/list', async (req, res, next) => {
+router.get('/categories/list', async(req, res, next) => {
   try {
     const filter = { tenantId: req.user.tenantId };
     if (req.query.activeOnly === 'true') filter.isActive = true;
@@ -467,7 +467,7 @@ router.post('/categories', [
   body('icon').optional().trim(),
   body('color').optional().trim(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const { name, icon, color } = req.body;
 
@@ -490,7 +490,7 @@ router.put('/categories/:id', [
   body('color').optional().trim(),
   body('isActive').optional().isBoolean(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const category = await ExpenseCategory.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId },
@@ -511,7 +511,7 @@ router.put('/categories/:id', [
 router.delete('/categories/:id', [
   param('id').isMongoId(),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const category = await ExpenseCategory.findOneAndUpdate(
       { _id: req.params.id, tenantId: req.user.tenantId },
@@ -531,7 +531,7 @@ router.delete('/categories/:id', [
 
 // ── Budget CRUD ──────────────────────────────────────────────────────────────
 
-router.get('/budget', async (req, res, next) => {
+router.get('/budget', async(req, res, next) => {
   try {
     const { month, year } = req.query;
     const filter = { tenantId: req.user.tenantId };
@@ -560,7 +560,9 @@ router.get('/budget', async (req, res, next) => {
       ]);
 
       const spentMap = {};
-      spent.forEach(s => { spentMap[s._id.toString()] = s.spent; });
+      spent.forEach(s => {
+        spentMap[s._id.toString()] = s.spent;
+      });
 
       budgets.forEach(b => {
         b.spent = spentMap[b.category?._id?.toString()] || 0;
@@ -581,7 +583,7 @@ router.post('/budget', [
   body('year').isInt({ min: 2020 }).withMessage('Valid year is required'),
   body('budgetAmount').isFloat({ min: 0 }).withMessage('Budget amount must be >= 0'),
   handleValidationErrors
-], async (req, res, next) => {
+], async(req, res, next) => {
   try {
     const { category, month, year, budgetAmount } = req.body;
 
@@ -598,7 +600,7 @@ router.post('/budget', [
 });
 
 // ── Seed default categories ──────────────────────────────────────────────────
-router.post('/categories/seed', async (req, res, next) => {
+router.post('/categories/seed', async(req, res, next) => {
   try {
     const defaults = [
       { name: 'Salaries', icon: 'Users', color: '#3B82F6' },

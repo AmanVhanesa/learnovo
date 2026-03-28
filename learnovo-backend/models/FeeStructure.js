@@ -1,4 +1,4 @@
-const mongoose = require('mongoose')
+const mongoose = require('mongoose');
 
 /**
  * Fee Structure Model
@@ -104,16 +104,16 @@ const feeStructureSchema = new mongoose.Schema({
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
-})
+});
 
 // Virtual: total amount across all fee heads
-feeStructureSchema.virtual('totalAmount').get(function () {
-  if (!this.feeHeads || this.feeHeads.length === 0) return 0
-  return this.feeHeads.reduce((sum, head) => sum + (head.amount || 0), 0)
-})
+feeStructureSchema.virtual('totalAmount').get(function() {
+  if (!this.feeHeads || this.feeHeads.length === 0) return 0;
+  return this.feeHeads.reduce((sum, head) => sum + (head.amount || 0), 0);
+});
 
 // Indexes for efficient queries
-feeStructureSchema.index({ tenantId: 1, classId: 1, academicSessionId: 1 })
-feeStructureSchema.index({ tenantId: 1, isActive: 1 })
+feeStructureSchema.index({ tenantId: 1, classId: 1, academicSessionId: 1 });
+feeStructureSchema.index({ tenantId: 1, isActive: 1 });
 
-module.exports = mongoose.model('FeeStructure', feeStructureSchema)
+module.exports = mongoose.model('FeeStructure', feeStructureSchema);

@@ -1,6 +1,5 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Tenant = require('../models/Tenant');
@@ -24,11 +23,11 @@ router.post('/register', [
   body('subdomain').isLength({ min: 3, max: 20 }).withMessage('Subdomain must be 3-20 characters').matches(/^[a-z0-9-]+$/).withMessage('Subdomain must contain only lowercase letters, numbers, and hyphens'),
   body('phone').optional().isMobilePhone().withMessage('Valid phone number required'),
   body('address').optional().isObject().withMessage('Address must be an object')
-], async (req, res) => {
+], async(req, res) => {
   // For development, skip transactions if MongoDB is not a replica set
   const useTransactions = process.env.NODE_ENV === 'production';
   const session = useTransactions ? await mongoose.startSession() : null;
-  
+
   try {
     // Validation
     const errors = validationResult(req);
@@ -78,7 +77,7 @@ router.post('/register', [
       if (session) {
         await session.abortTransaction();
       }
-      
+
       logger.warn('Tenant registration failed - duplicate data', null, {
         requestId: req.requestId,
         route: req.route?.path,
@@ -111,7 +110,7 @@ router.post('/register', [
       }
     };
 
-    const tenant = session 
+    const tenant = session
       ? await Tenant.create([tenantData], { session })
       : await Tenant.create(tenantData);
 
@@ -198,7 +197,7 @@ router.post('/register', [
     if (session) {
       await session.abortTransaction();
     }
-    
+
     logger.error('Tenant registration failed', error, {
       requestId: req.requestId,
       route: req.route?.path
@@ -374,7 +373,7 @@ router.put('/subscription', protect, getTenantFromRequest, validateTenantAccess,
 // @desc    Get public tenant info by subdomain (no auth required)
 // @route   GET /api/tenants/public/:subdomain
 // @access  Public
-router.get('/public/:subdomain', async (req, res) => {
+router.get('/public/:subdomain', async(req, res) => {
   try {
     const { subdomain } = req.params;
     const tenant = await Tenant.findOne({

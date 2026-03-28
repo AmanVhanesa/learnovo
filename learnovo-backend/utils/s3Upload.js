@@ -9,17 +9,17 @@ const { s3Client, BUCKET_NAME, REGION } = require('./s3');
  * @returns {Promise<{ url: string, key: string }>} - Full S3 URL and key
  */
 async function uploadBufferToS3(buffer, key, mimeType) {
-    const command = new PutObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: key,
-        Body: buffer,
-        ContentType: mimeType,
-    });
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: mimeType
+  });
 
-    await s3Client.send(command);
+  await s3Client.send(command);
 
-    const url = `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/${key}`;
-    return { url, key };
+  const url = `https://${BUCKET_NAME}.s3.${REGION}.amazonaws.com/${key}`;
+  return { url, key };
 }
 
 /**
@@ -30,11 +30,11 @@ async function uploadBufferToS3(buffer, key, mimeType) {
  * @returns {string} - S3 key like "documents/reportcards/{schoolId}/filename_1234567890.pdf"
  */
 function buildS3Key(docType, schoolId, filename) {
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    // Sanitize filename
-    const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    return `documents/${docType}/${schoolId}/${sanitized}_${timestamp}_${randomSuffix}`;
+  const timestamp = Date.now();
+  const randomSuffix = Math.random().toString(36).substring(2, 8);
+  // Sanitize filename
+  const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  return `documents/${docType}/${schoolId}/${sanitized}_${timestamp}_${randomSuffix}`;
 }
 
 module.exports = { uploadBufferToS3, buildS3Key };

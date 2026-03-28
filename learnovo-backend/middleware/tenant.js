@@ -9,14 +9,14 @@ const cache = require('../utils/cache');
 const BASE_DOMAINS = [
   'learnovoportal.com',
   'learnovo.app',
-  'localhost',
+  'localhost'
 ];
 
 /**
  * Segments that are never treated as a tenant subdomain.
  */
 const RESERVED_SUBDOMAINS = new Set([
-  'www', 'api', 'admin', 'app', 'mail', 'ftp', 'staging', 'dev',
+  'www', 'api', 'admin', 'app', 'mail', 'ftp', 'staging', 'dev'
 ]);
 
 /**
@@ -65,7 +65,7 @@ function extractSubdomain(hostname) {
  * school code, or JWT.
  * Tenant documents are cached for 10 minutes to avoid repeated DB lookups.
  */
-const getTenantFromRequest = async (req, res, next) => {
+const getTenantFromRequest = async(req, res, next) => {
   try {
     let tenant = null;
 
@@ -115,7 +115,7 @@ const getTenantFromRequest = async (req, res, next) => {
           success: false,
           code: 'SUBSCRIPTION_SUSPENDED',
           message: 'School subscription is suspended. Please contact support.',
-          upgradeUrl: '/pricing',
+          upgradeUrl: '/pricing'
         });
       }
     }
@@ -145,7 +145,7 @@ const getTenantFromRequest = async (req, res, next) => {
             message: 'Your 14-day free trial has expired. Please upgrade to continue.',
             trialEndedAt: trialEnd,
             daysExpired,
-            upgradeUrl: '/pricing',
+            upgradeUrl: '/pricing'
           });
         }
       }
@@ -217,5 +217,5 @@ module.exports = {
   getTenantFromRequest,
   validateTenantAccess,
   addTenantFilter,
-  extractSubdomain, // exported for testing and reuse
+  extractSubdomain // exported for testing and reuse
 };

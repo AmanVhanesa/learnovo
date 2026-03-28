@@ -15,7 +15,7 @@ const cache = new NodeCache({
   checkperiod: 120,      // purge expired keys every 2 min
   useClones: false,      // return references (faster, saves memory)
   maxKeys: 500,          // prevent unbounded memory growth
-  deleteOnExpire: true,  // remove keys immediately on expiry
+  deleteOnExpire: true  // remove keys immediately on expiry
 });
 
 /** Get a value by key (returns undefined on miss). */
@@ -42,7 +42,7 @@ const delByPrefix = (prefix) => {
 const flush = () => cache.flushAll();
 
 /** Wrap an async fn with cache (get-or-set pattern). */
-const getOrSet = async (key, fn, ttlSeconds) => {
+const getOrSet = async(key, fn, ttlSeconds) => {
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
   const value = await fn();
@@ -54,7 +54,7 @@ const getOrSet = async (key, fn, ttlSeconds) => {
 const getStats = () => ({
   keys: cache.keys().length,
   hits: cache.getStats().hits,
-  misses: cache.getStats().misses,
+  misses: cache.getStats().misses
 });
 
 module.exports = { get, set, del, delByPrefix, flush, getOrSet, getStats };

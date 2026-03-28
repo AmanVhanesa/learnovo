@@ -6,7 +6,6 @@ const SubjectAllocation = require('../models/SubjectAllocation');
 const TeacherConstraint = require('../models/TeacherConstraint');
 const Room = require('../models/Room');
 
-const DAY_ORDER = { monday: 0, tuesday: 1, wednesday: 2, thursday: 3, friday: 4, saturday: 5, sunday: 6 };
 const TIMEOUT_MS = 30000;
 const MAX_BACKTRACKS = 50000;
 
@@ -22,18 +21,18 @@ async function generateTimetable(tenantId, templateId, options = {}) {
 
   // ── 1. Load all required data ──────────────────────────────────────────────
 
-  const [template, timings, allAllocations, constraints, rooms, existingEntries] = await Promise.all([
+  const [template, timings, allAllocations, constraints, rooms, _existingEntries] = await Promise.all([
     TimetableTemplate.findOne({ _id: templateId, tenantId }).lean(),
     SchoolTiming.find({ tenantId, templateId, type: 'period', isActive: true }).sort({ slotNumber: 1 }).lean(),
     SubjectAllocation.find({
       tenantId,
       templateId,
       isActive: true,
-      ...(classId ? { classId } : {}),
+      ...(classId ? { classId } : {})
     }).lean(),
     TeacherConstraint.find({ tenantId, templateId }).lean(),
     Room.find({ tenantId, isActive: true }).lean(),
-    TimetableEntry.find({ tenantId, templateId }).lean(),
+    TimetableEntry.find({ tenantId, templateId }).lean()
   ]);
 
   if (!template) {
@@ -46,7 +45,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
       entriesCreated: 0,
       unassigned: [],
       softViolations: [],
-      generationTimeMs: Math.round(performance.now() - startTime),
+      generationTimeMs: Math.round(performance.now() - startTime)
     };
   }
 
@@ -122,7 +121,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
         tasks.push({
           allocId, teacherId, classId: classIdStr, sectionId: sectionIdStr,
           subjectId, preferredRoomType: alloc.preferredRoomType || null,
-          consecutiveCount: blockSize, isConsecutive: true,
+          consecutiveCount: blockSize, isConsecutive: true
         });
       }
       // Leftover singles
@@ -130,7 +129,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
         tasks.push({
           allocId, teacherId, classId: classIdStr, sectionId: sectionIdStr,
           subjectId, preferredRoomType: alloc.preferredRoomType || null,
-          consecutiveCount: 1, isConsecutive: false,
+          consecutiveCount: 1, isConsecutive: false
         });
       }
     } else {
@@ -139,7 +138,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
         tasks.push({
           allocId, teacherId, classId: classIdStr, sectionId: sectionIdStr,
           subjectId, preferredRoomType: alloc.preferredRoomType || null,
-          consecutiveCount: 1, isConsecutive: false,
+          consecutiveCount: 1, isConsecutive: false
         });
       }
     }
@@ -158,10 +157,18 @@ async function generateTimetable(tenantId, templateId, options = {}) {
   // classDaySubjects: `${classId}-${sectionId}-${day}` -> [subjectIds]
   const classDaySubjects = new Map();
 
-  function tsKey(day, slotId) { return `${day}-${slotId}`; }
-  function csKey(day, slotId, cid, sid) { return `${day}-${slotId}-${cid}-${sid || 'none'}`; }
-  function tdKey(tid, day) { return `${tid}-${day}`; }
-  function cdKey(cid, sid, day) { return `${cid}-${sid || 'none'}-${day}`; }
+  function tsKey(day, slotId) {
+    return `${day}-${slotId}`;
+  }
+  function csKey(day, slotId, cid, sid) {
+    return `${day}-${slotId}-${cid}-${sid || 'none'}`;
+  }
+  function tdKey(tid, day) {
+    return `${tid}-${day}`;
+  }
+  function cdKey(cid, sid, day) {
+    return `${cid}-${sid || 'none'}-${day}`;
+  }
 
   function addToSetMap(map, key, value) {
     if (!map.has(key)) map.set(key, new Set());
@@ -170,7 +177,9 @@ async function generateTimetable(tenantId, templateId, options = {}) {
 
   function removeFromSetMap(map, key, value) {
     const s = map.get(key);
-    if (s) { s.delete(value); if (s.size === 0) map.delete(key); }
+    if (s) {
+      s.delete(value); if (s.size === 0) map.delete(key);
+    }
   }
 
   // Seed state from locked entries
@@ -193,7 +202,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
 
   // ── 5. Sort tasks by MRV (most constrained first) ─────────────────────────
 
-  function countValidSlots(task) {
+  function _countValidSlots(task) {
     let count = 0;
     for (const slot of slots) {
       if (isValidPlacement(task, slot)) count++;
@@ -236,7 +245,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
     return false;
   }
 
-  function getMaxPeriodsPerDay(teacherId) {
+  function _getMaxPeriodsPerDay(teacherId) {
     const tc = constraintsByTeacher.get(teacherId);
     if (!tc) return Infinity;
     for (const c of tc) {
@@ -256,7 +265,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
     }
   }
 
-  function getSlotBySlotNumber(slotNum) {
+  function _getSlotBySlotNumber(slotNum) {
     return timings.find(t => t.slotNumber === slotNum);
   }
 
@@ -302,7 +311,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
   }
 
   // Check validity for consecutive block: task needs `consecutiveCount` adjacent slots on the same day
-  function isValidConsecutivePlacement(task, day, startSlotIdx) {
+  function _isValidConsecutivePlacement(task, day, startSlotIdx) {
     const count = task.consecutiveCount;
     // All consecutive slots on the same day must be available
     const daySlots = slots.filter(s => s.day === day);
@@ -337,7 +346,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
     // Avoid same subject on consecutive periods for this class
     const prevSlotNum = slotNumber - 1;
     const nextSlotNum = slotNumber + 1;
-    for (const s of daySubjects) {
+    for (const _s of daySubjects) {
       // Check if the subject is in an adjacent slot (approximate check via count)
     }
     // More precise: check if this subject is placed in adjacent slot
@@ -428,8 +437,12 @@ async function generateTimetable(tenantId, templateId, options = {}) {
 
   function solve(taskIndex) {
     // Check timeout and backtrack limit
-    if (performance.now() - startTime > TIMEOUT_MS) { timedOut = true; return false; }
-    if (backtracks > MAX_BACKTRACKS) { timedOut = true; return false; }
+    if (performance.now() - startTime > TIMEOUT_MS) {
+      timedOut = true; return false;
+    }
+    if (backtracks > MAX_BACKTRACKS) {
+      timedOut = true; return false;
+    }
 
     if (taskIndex >= tasks.length) return true; // All placed
 
@@ -530,7 +543,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
 
   // ── 10. Run the solver ─────────────────────────────────────────────────────
 
-  const solved = solve(0);
+  const _solved = solve(0);
 
   // ── 11. Post-processing: assign rooms ──────────────────────────────────────
 
@@ -587,7 +600,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
         section: task.sectionId,
         teacher: task.teacherId,
         consecutiveCount: task.consecutiveCount,
-        reason: timedOut ? 'Generation timed out before placement' : 'No valid slot found (hard constraint violation)',
+        reason: timedOut ? 'Generation timed out before placement' : 'No valid slot found (hard constraint violation)'
       });
       continue;
     }
@@ -606,7 +619,7 @@ async function generateTimetable(tenantId, templateId, options = {}) {
         teacherId: task.teacherId,
         roomId: roomId || null,
         isManual: false,
-        lockedByUser: false,
+        lockedByUser: false
       });
     }
   }
@@ -631,14 +644,14 @@ async function generateTimetable(tenantId, templateId, options = {}) {
     backtracks,
     timedOut,
     totalTasks: tasks.length,
-    lockedEntries: lockedEntries.length,
+    lockedEntries: lockedEntries.length
   };
 }
 
 /**
  * Analyze the final schedule for soft constraint violations.
  */
-function checkSoftViolations(tasks, assignments, violations, workingDays) {
+function checkSoftViolations(tasks, assignments, violations, _workingDays) {
   // Track subject distribution per class per day
   const classDayMap = new Map(); // `${classId}-${sectionId}-${day}` -> { subjectId: count }
 
@@ -666,7 +679,7 @@ function checkSoftViolations(tasks, assignments, violations, workingDays) {
         if (!task) {
           violations.push({
             type: 'subject_clustering',
-            description: `Subject ${subjectId} appears ${count} times on ${key.split('-').pop()} for class ${key.split('-')[0]}`,
+            description: `Subject ${subjectId} appears ${count} times on ${key.split('-').pop()} for class ${key.split('-')[0]}`
           });
         }
       }
@@ -696,7 +709,7 @@ function checkSoftViolations(tasks, assignments, violations, workingDays) {
     if (max - min > 3) {
       violations.push({
         type: 'teacher_imbalance',
-        description: `Teacher ${teacherId} has unbalanced workload: max ${max} periods/day, min ${min} periods/day`,
+        description: `Teacher ${teacherId} has unbalanced workload: max ${max} periods/day, min ${min} periods/day`
       });
     }
   }

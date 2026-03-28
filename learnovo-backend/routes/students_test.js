@@ -27,7 +27,7 @@ router.get('/',  [
   query('class').optional().trim().notEmpty().withMessage('Class filter cannot be empty'),
   query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   console.log('--- GET /api/students ---');
   console.log('req.query:', req.query);
   console.log('req.originalUrl:', req.originalUrl);
@@ -132,7 +132,7 @@ router.get('/',  [
         const Section = require('../models/Section');
 
         // Use a case-insensitive exact regex for section name safely
-        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
+        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
 
         const sectionQuery = {
           name: sectionNameRegex,
@@ -144,8 +144,8 @@ router.get('/',  [
           const Class = require('../models/Class');
           const classDoc = await Class.findOne({
             $or: [
-              { grade: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              { name: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+              { grade: new RegExp(`^${req.query.class.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
+              { name: new RegExp(`^${req.query.class.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
             ],
             tenantId: req.user.tenantId
           });
@@ -179,7 +179,7 @@ router.get('/',  [
       } catch (err) {
         console.error('Section filter error:', err);
         if (!filter.$and) filter.$and = [];
-        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
+        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
       }
     }
 
@@ -224,7 +224,7 @@ router.get('/',  [
 
     // Get fee summary for each student
     const studentsWithFees = await Promise.all(
-      students.map(async (student) => {
+      students.map(async(student) => {
         const fees = await Fee.find({ student: student._id });
         const totalFees = fees.reduce((sum, fee) => sum + fee.amount, 0);
         const paidFees = fees.filter(fee => fee.status === 'paid').reduce((sum, fee) => sum + fee.amount, 0);
@@ -280,11 +280,9 @@ router.get('/import/template',  (req, res) => {
     ];
 
     // Create header row
-    const csvContent = fields.join(',') + '\n' +
+    const csvContent = `${fields.join(',')  }\n` +
       // Add a sample row
       'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,,,';
-
-
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.csv');
@@ -374,7 +372,7 @@ router.get('/import/template/excel',  (req, res) => {
 // @desc    Preview student import from CSV
 // @route   POST /api/students/import/preview
 // @access  Private (Admin)
-router.post('/import/preview',  upload.single('file'), async (req, res) => {
+router.post('/import/preview',  upload.single('file'), async(req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'Please upload a CSV file' });
@@ -479,7 +477,7 @@ router.post('/import/preview',  upload.single('file'), async (req, res) => {
         'udisecode': 'udiseCode',
         'udise_code': 'udiseCode',
         'dateofjoining': 'dateOfJoining',
-        'date_of_joining': 'dateOfJoining',
+        'date_of_joining': 'dateOfJoining'
       };
 
       // Normalize each field
@@ -561,7 +559,7 @@ router.post('/import/preview',  upload.single('file'), async (req, res) => {
         cleanRow.email = email;
 
         // Validate email format
-        const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+        const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
         if (!emailRegex.test(email)) {
           rowErrors.push('Invalid email format');
         } else {
@@ -635,7 +633,7 @@ router.post('/import/preview',  upload.single('file'), async (req, res) => {
 // @desc    Execute student import
 // @route   POST /api/students/import/execute
 // @access  Private (Admin)
-router.post('/import/execute',  async (req, res) => {
+router.post('/import/execute',  async(req, res) => {
   try {
     const { validData, options } = req.body;
 
@@ -704,7 +702,7 @@ router.post('/import/execute',  async (req, res) => {
 
         if (!admissionNumber) {
           const settings = await Settings.getSettings(tenantId);
-          const { mode, prefix, yearFormat, counterPadding, startFrom } = settings.admission;
+          const { mode, prefix, yearFormat, counterPadding, startFrom: _startFrom } = settings.admission;
 
           const currentYear = new Date().getFullYear().toString();
           const yearStr = yearFormat === 'YY' ? currentYear.substring(2) : currentYear;
@@ -1006,7 +1004,7 @@ router.post('/import/execute',  async (req, res) => {
         if (existingId && replaceDuplicates) {
           // REPLACE: update fields on the existing student record
           // Exclude: role, tenantId (immutable), createdAt (preserve original), updatedAt (set below), password (preserve unless explicitly in CSV)
-          const { role, tenantId: _t, createdAt, updatedAt, password, ...updateFields } = studentData;
+          const { role: _role, tenantId: _t, createdAt: _createdAt, updatedAt: _updatedAt, password, ...updateFields } = studentData;
           // Only overwrite password if the CSV row provided one explicitly
           if (row.password && row.password.trim()) {
             updateFields.password = password; // already hashed above
@@ -1030,7 +1028,9 @@ router.post('/import/execute',  async (req, res) => {
         // Safely log data (prevent circular dependency/undefined errors)
         try {
           if (studentData) console.error('Student data payload:', JSON.stringify(studentData, null, 2));
-        } catch (logErr) { console.error('Failed to log payload:', logErr.message); }
+        } catch (logErr) {
+          console.error('Failed to log payload:', logErr.message);
+        }
 
         // Capture validation errors if present
         if (error.errors) {
@@ -1059,7 +1059,7 @@ router.post('/import/execute',  async (req, res) => {
 // @desc    Get student filters
 // @route   GET /api/students/filters
 // @access  Private
-router.get('/filters',  async (req, res) => {
+router.get('/filters',  async(req, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -1095,7 +1095,7 @@ router.get('/filters',  async (req, res) => {
 // @desc    Export students to CSV
 // @route   GET /api/students/export
 // @access  Private
-router.get('/export',  async (req, res) => {
+router.get('/export',  async(req, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -1180,14 +1180,14 @@ router.get('/export',  async (req, res) => {
     if (req.query.section) {
       try {
         const Section = require('../models/Section');
-        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
+        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
         const sectionQuery = { name: sectionNameRegex, tenantId: req.user.tenantId };
         if (req.query.class) {
           const Class = require('../models/Class');
           const classDoc = await Class.findOne({
             $or: [
-              { grade: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              { name: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+              { grade: new RegExp(`^${req.query.class.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
+              { name: new RegExp(`^${req.query.class.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
             ],
             tenantId: req.user.tenantId
           });
@@ -1203,7 +1203,7 @@ router.get('/export',  async (req, res) => {
         }
       } catch (err) {
         if (!filter.$and) filter.$and = [];
-        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
+        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
       }
     }
     if (req.query.academicYear) filter.academicYear = req.query.academicYear;
@@ -1382,7 +1382,9 @@ router.get('/export',  async (req, res) => {
     if (format === 'json') {
       const result = rawRows.map(row => {
         const obj = {};
-        headerLabels.forEach((h, i) => { obj[h] = row[i]; });
+        headerLabels.forEach((h, i) => {
+          obj[h] = row[i];
+        });
         return obj;
       });
       return res.status(200).json({ success: true, headers: headerLabels, rows: rawRows, data: result });
@@ -1399,7 +1401,7 @@ router.get('/export',  async (req, res) => {
 // @desc    Get single student
 // @route   GET /api/students/:id
 // @access  Private
-router.get('/:id',  canAccessStudent, async (req, res) => {
+router.get('/:id',  canAccessStudent, async(req, res) => {
   try {
     const student = await User.findById(req.params.id)
       .select('-password')
@@ -1423,7 +1425,7 @@ router.get('/:id',  canAccessStudent, async (req, res) => {
 
     // Format fees with currency
     const formattedFees = await Promise.all(
-      fees.map(async (fee) => ({
+      fees.map(async(fee) => ({
         ...fee.toJSON(),
         formattedAmount: await formatCurrencyWithSettings(fee.amount, fee.currency)
       }))
@@ -1454,14 +1456,14 @@ router.get('/:id',  canAccessStudent, async (req, res) => {
 // @desc    Create new student
 // @route   POST /api/students
 // @access  Private (Admin)
-router.post('/',  validateStudent, async (req, res) => {
+router.post('/',  validateStudent, async(req, res) => {
   try {
     if (!req.user || !req.user.tenantId) {
       return res.status(400).json({ success: false, message: 'User tenant not found.' });
     }
 
     const {
-      fullName, firstName, middleName, lastName, email, phone, password,
+      fullName, firstName, middleName, lastName, email, phone: _phone, password,
       class: studentClass, section, academicYear, rollNumber, admissionDate,
       guardians, address, avatar,
       penNumber, subDepartment, udiseCode, // Legacy fields
@@ -1617,7 +1619,7 @@ router.put('/:id',  canAccessStudent, [
     // Allow empty string or null
     if (!value || value.trim() === '') return true;
     // Basic phone validation - just check if it's numeric and reasonable length
-    const cleaned = value.replace(/[\s\-\(\)]/g, '');
+    const cleaned = value.replace(/[\s\-()]/g, '');
     if (!/^\+?[0-9]{10,15}$/.test(cleaned)) {
       throw new Error('Please provide a valid phone number (10-15 digits)');
     }
@@ -1634,7 +1636,7 @@ router.put('/:id',  canAccessStudent, [
     return true;
   }),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const student = await User.findById(req.params.id);
 
@@ -1787,7 +1789,7 @@ router.put('/:id/deactivate',  [
   body('removalReason').optional().isIn(['Graduated', 'Transferred', 'Withdrawn', 'Expelled', 'Other', '']).withMessage('Invalid removal reason'),
   body('removalNotes').optional().trim(),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const student = await User.findById(req.params.id);
 
@@ -1839,7 +1841,7 @@ router.put('/:id/deactivate',  [
 // @desc    Reactivate student (mark as active, clear removal details)
 // @route   PUT /api/students/:id/reactivate
 // @access  Private (Admin)
-router.put('/:id/reactivate',  async (req, res) => {
+router.put('/:id/reactivate',  async(req, res) => {
   try {
     const student = await User.findById(req.params.id);
 
@@ -1891,7 +1893,7 @@ router.put('/:id/reactivate',  async (req, res) => {
 // @desc    Bulk delete students permanently
 // @route   DELETE /api/students/bulk-delete
 // @access  Private (Admin)
-router.delete('/bulk-delete',  async (req, res) => {
+router.delete('/bulk-delete',  async(req, res) => {
   try {
     const { studentIds } = req.body;
 
@@ -1954,7 +1956,7 @@ router.delete('/bulk-delete',  async (req, res) => {
 // @desc    Delete student
 // @route   DELETE /api/students/:id
 // @access  Private (Admin)
-router.delete('/:id',  async (req, res) => {
+router.delete('/:id',  async(req, res) => {
   try {
     const student = await User.findById(req.params.id);
 
@@ -1993,7 +1995,7 @@ router.delete('/:id',  async (req, res) => {
 // @desc    Get student fees
 // @route   GET /api/students/:id/fees
 // @access  Private
-router.get('/:id/fees',  canAccessStudent, async (req, res) => {
+router.get('/:id/fees',  canAccessStudent, async(req, res) => {
   try {
     const student = await User.findById(req.params.id);
 
@@ -2009,7 +2011,7 @@ router.get('/:id/fees',  canAccessStudent, async (req, res) => {
 
     // Format fees with currency
     const formattedFees = await Promise.all(
-      fees.map(async (fee) => ({
+      fees.map(async(fee) => ({
         ...fee.toJSON(),
         formattedAmount: await formatCurrencyWithSettings(fee.amount, fee.currency)
       }))
@@ -2031,7 +2033,7 @@ router.get('/:id/fees',  canAccessStudent, async (req, res) => {
 // @desc    Get student statistics
 // @route   GET /api/students/:id/statistics
 // @access  Private
-router.get('/:id/statistics',  canAccessStudent, async (req, res) => {
+router.get('/:id/statistics',  canAccessStudent, async(req, res) => {
   try {
     const student = await User.findById(req.params.id);
 
@@ -2077,7 +2079,7 @@ router.get('/:id/statistics',  canAccessStudent, async (req, res) => {
 // @desc    Get filter options (classes, sections, academic years)
 // @route   GET /api/students/filters
 // @access  Private (Admin, Teacher)
-router.get('/filters',  async (req, res) => {
+router.get('/filters',  async(req, res) => {
   try {
     const tenantId = req.user.tenantId;
 
@@ -2085,21 +2087,21 @@ router.get('/filters',  async (req, res) => {
     const classes = await User.distinct('class', {
       role: 'student',
       tenantId,
-      class: { $exists: true, $ne: null, $ne: '' }
+      class: { $exists: true, $nin: [null, ''] }
     });
 
     // Get unique sections - filter out null, undefined, and empty strings
     const sections = await User.distinct('section', {
       role: 'student',
       tenantId,
-      section: { $exists: true, $ne: null, $ne: '' }
+      section: { $exists: true, $nin: [null, ''] }
     });
 
     // Get unique academic years - filter out null, undefined, and empty strings
     const academicYears = await User.distinct('academicYear', {
       role: 'student',
       tenantId,
-      academicYear: { $exists: true, $ne: null, $ne: '' }
+      academicYear: { $exists: true, $nin: [null, ''] }
     });
 
     // Get active drivers for this tenant
@@ -2126,11 +2128,10 @@ router.get('/filters',  async (req, res) => {
   }
 });
 
-
 // @desc    Toggle student active/inactive status
 // @route   PUT /api/students/:id/toggle-status
 // @access  Private (Admin)
-router.put('/:id/toggle-status',  async (req, res) => {
+router.put('/:id/toggle-status',  async(req, res) => {
   try {
     const { reason } = req.body;
     const student = await User.findById(req.params.id);
@@ -2176,7 +2177,7 @@ router.put('/:id/toggle-status',  async (req, res) => {
 // @desc    Reset student password
 // @route   PUT /api/students/:id/reset-password
 // @access  Private (Admin)
-router.put('/:id/reset-password',  async (req, res) => {
+router.put('/:id/reset-password',  async(req, res) => {
   try {
     const { newPassword, forceChange } = req.body;
     const student = await User.findById(req.params.id);
@@ -2214,7 +2215,7 @@ router.put('/:id/reset-password',  async (req, res) => {
 // @desc    Bulk activate students
 // @route   POST /api/students/bulk-activate
 // @access  Private (Admin)
-router.post('/bulk-activate',  async (req, res) => {
+router.post('/bulk-activate',  async(req, res) => {
   try {
     const { studentIds } = req.body;
 
@@ -2255,7 +2256,7 @@ router.post('/bulk-activate',  async (req, res) => {
 // @desc    Bulk deactivate students
 // @route   POST /api/students/bulk-deactivate
 // @access  Private (Admin)
-router.post('/bulk-deactivate',  async (req, res) => {
+router.post('/bulk-deactivate',  async(req, res) => {
   try {
     const { studentIds, reason } = req.body;
 
@@ -2293,11 +2294,10 @@ router.post('/bulk-deactivate',  async (req, res) => {
   }
 });
 
-
 // @desc    Promote students to next class
 // @route   POST /api/students/promote
 // @access  Private (Admin)
-router.post('/promote',  async (req, res) => {
+router.post('/promote',  async(req, res) => {
   try {
     const { studentIds, toClass, toSection, academicYear, resetRollNumbers } = req.body;
 
@@ -2361,7 +2361,7 @@ const ImportExportService = require('../services/importExportService');
 // @desc    Download CSV template for student import
 // @route   GET /api/students/import/template
 // @access  Private (Admin)
-router.get('/import/template',  async (req, res) => {
+router.get('/import/template',  async(req, res) => {
   try {
     const template = await StudentImportService.generateTemplate();
 
@@ -2381,7 +2381,7 @@ router.get('/import/template',  async (req, res) => {
 // @route   POST /api/students/import/preview
 // @access  Private (Admin)
 router.post('/import/preview',  (req, res) => {
-  uploadSingleFile(req, res, async (err) => {
+  uploadSingleFile(req, res, async(err) => {
     try {
       if (err) {
         return res.status(400).json({
@@ -2426,7 +2426,7 @@ router.post('/import/preview',  (req, res) => {
 // @desc    Execute student import
 // @route   POST /api/students/import/execute
 // @access  Private (Admin)
-router.post('/import/execute',  async (req, res) => {
+router.post('/import/execute',  async(req, res) => {
   try {
     const { validData, options } = req.body;
 
@@ -2460,7 +2460,7 @@ router.post('/import/execute',  async (req, res) => {
 // @desc    Export students to CSV
 // @route   GET /api/students/export
 // @access  Private (Admin, Teacher)
-router.get('/export',  async (req, res) => {
+router.get('/export',  async(req, res) => {
   try {
     // Build filter (same as GET /api/students)
     const filter = { role: 'student' };
@@ -2480,14 +2480,14 @@ router.get('/export',  async (req, res) => {
     if (req.query.section) {
       try {
         const Section = require('../models/Section');
-        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
+        const sectionNameRegex = new RegExp(`^${req.query.section.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i');
         const sectionQuery = { name: sectionNameRegex, tenantId: req.user.tenantId };
         if (req.query.class) {
           const Class = require('../models/Class');
           const classDoc = await Class.findOne({
             $or: [
-              { grade: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
-              { name: new RegExp(`^${req.query.class.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
+              { grade: new RegExp(`^${req.query.class.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') },
+              { name: new RegExp(`^${req.query.class.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') }
             ],
             tenantId: req.user.tenantId
           });
@@ -2503,7 +2503,7 @@ router.get('/export',  async (req, res) => {
         }
       } catch (err) {
         if (!filter.$and) filter.$and = [];
-        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
+        filter.$and.push({ section: new RegExp(`^${req.query.section.trim().replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}$`, 'i') });
       }
     }
 
@@ -2577,14 +2577,14 @@ router.get('/export',  async (req, res) => {
 const StudentClassHistory = require('../models/StudentClassHistory');
 const classSequence = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
-const getNextClass = (currentClass) => {
+const _getNextClass = (currentClass) => {
   const index = classSequence.indexOf(currentClass);
   if (index === -1) return null; // Unknown class
   if (index === classSequence.length - 1) return 'GRADUATED';
   return classSequence[index + 1];
 };
 
-const getPrevClass = (currentClass) => {
+const _getPrevClass = (currentClass) => {
   const index = classSequence.indexOf(currentClass);
   if (index === -1) return null;
   if (index === 0) return 'LOWEST';
@@ -2594,7 +2594,7 @@ const getPrevClass = (currentClass) => {
 // @desc    Get bulk promotion/demotion history for reports
 // @route   GET /api/students/promotions/report
 // @access  Private (Admin)
-router.get('/promotions/report',  authorize('admin', 'principal'), async (req, res) => {
+router.get('/promotions/report',  authorize('admin', 'principal'), async(req, res) => {
   try {
     const { startDate, endDate, academicYear, actionType } = req.query;
     const filter = { tenantId: req.user.tenantId };
@@ -2630,7 +2630,7 @@ router.get('/promotions/report',  authorize('admin', 'principal'), async (req, r
 // @desc    Get student class history
 // @route   GET /api/students/:id/class-history
 // @access  Private
-router.get('/:id/class-history',  async (req, res) => {
+router.get('/:id/class-history',  async(req, res) => {
   try {
     const history = await StudentClassHistory.find({
       studentId: req.params.id,
@@ -2656,7 +2656,7 @@ router.get('/:id/class-history',  async (req, res) => {
 // @desc    Promote individual student
 // @route   POST /api/students/:id/promote
 // @access  Private (Admin)
-router.post('/:id/promote',  authorize('admin', 'principal'), async (req, res) => {
+router.post('/:id/promote',  authorize('admin', 'principal'), async(req, res) => {
   try {
     const { toClass, toSection, academicYear, remarks, forceOverride } = req.body;
     const student = await User.findOne({ _id: req.params.id, tenantId: req.user.tenantId, role: 'student' });
@@ -2695,7 +2695,7 @@ router.post('/:id/promote',  authorize('admin', 'principal'), async (req, res) =
 
     await student.save();
 
-    const history = await StudentClassHistory.create({
+    await StudentClassHistory.create({
       tenantId: req.user.tenantId,
       studentId: student._id,
       fromClass,
@@ -2718,7 +2718,7 @@ router.post('/:id/promote',  authorize('admin', 'principal'), async (req, res) =
 // @desc    Demote individual student
 // @route   POST /api/students/:id/demote
 // @access  Private (Admin)
-router.post('/:id/demote',  authorize('admin', 'principal'), async (req, res) => {
+router.post('/:id/demote',  authorize('admin', 'principal'), async(req, res) => {
   try {
     const { toClass, toSection, academicYear, remarks, forceOverride } = req.body;
     const student = await User.findOne({ _id: req.params.id, tenantId: req.user.tenantId, role: 'student' });
@@ -2777,7 +2777,7 @@ router.post('/:id/demote',  authorize('admin', 'principal'), async (req, res) =>
 // @desc    Bulk Promote/Demote Operations
 // @route   POST /api/students/bulk-class-action
 // @access  Private (Admin)
-router.post('/bulk-class-action',  authorize('admin', 'principal'), async (req, res) => {
+router.post('/bulk-class-action',  authorize('admin', 'principal'), async(req, res) => {
   try {
     const { studentIds, actionType, toClass, toSection, academicYear, remarks, forceOverride } = req.body;
 
@@ -2794,7 +2794,7 @@ router.post('/bulk-class-action',  authorize('admin', 'principal'), async (req, 
     const classDoc = await Class.findOne({ grade: toClass, tenantId: req.user.tenantId });
 
     let successCount = 0;
-    let errors = [];
+    const errors = [];
 
     for (const student of students) {
       try {

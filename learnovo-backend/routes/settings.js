@@ -2,7 +2,7 @@ const express = require('express');
 const { body } = require('express-validator');
 const Settings = require('../models/Settings');
 const { protect, authorize } = require('../middleware/auth');
-const { handleValidationErrors, validateSettings } = require('../middleware/validation');
+const { handleValidationErrors } = require('../middleware/validation');
 const { getSupportedCurrencies } = require('../utils/currency');
 
 const router = express.Router();
@@ -28,7 +28,7 @@ router.get('/', protect, async(req, res) => {
         message: 'User tenant not found. Please login again.'
       });
     }
-    
+
     const settings = await Settings.getSettings(tenantId);
 
     res.json({
@@ -53,7 +53,7 @@ router.put('/', protect, authorize('admin'), async(req, res) => {
         message: 'User tenant not found. Please login again.'
       });
     }
-    
+
     // Ensure settings document exists
     await Settings.getSettings(tenantId);
 
@@ -123,7 +123,7 @@ router.put('/currency', protect, authorize('admin'), [
         message: 'User tenant not found. Please login again.'
       });
     }
-    
+
     const { currency, symbol, position } = req.body;
 
     const settings = await Settings.getSettings(tenantId);
@@ -489,7 +489,7 @@ const { clearCache } = require('../services/payment/GatewayFactory');
  * @route   GET /api/settings/payment-gateway
  * @access  Private (Admin only)
  */
-router.get('/payment-gateway', protect, authorize('admin'), async (req, res) => {
+router.get('/payment-gateway', protect, authorize('admin'), async(req, res) => {
   try {
     const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway');
     if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });
@@ -498,7 +498,7 @@ router.get('/payment-gateway', protect, authorize('admin'), async (req, res) => 
     const config = tenant.paymentGateway?.toObject?.() || tenant.paymentGateway || {};
     if (config.icici?.encryptionKey) {
       const key = config.icici.encryptionKey;
-      config.icici.encryptionKey = key.length > 4 ? '****' + key.slice(-4) : '****';
+      config.icici.encryptionKey = key.length > 4 ? `****${  key.slice(-4)}` : '****';
     }
 
     res.json({ success: true, data: config });
@@ -521,7 +521,7 @@ router.get('/payment-gateway', protect, authorize('admin'), async (req, res) => 
 router.put('/payment-gateway', protect, authorize('admin'), [
   body('provider').isIn(['none', 'mock', 'icici_eazypay']).withMessage('Invalid provider'),
   body('isActive').optional().isBoolean()
-], handleValidationErrors, async (req, res) => {
+], handleValidationErrors, async(req, res) => {
   try {
     const { provider, icici, isActive } = req.body;
     const update = { 'paymentGateway.provider': provider };

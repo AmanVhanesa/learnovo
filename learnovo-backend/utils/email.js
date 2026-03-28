@@ -40,7 +40,7 @@ exports.sendEmail = async(to, subject, html, attachments = []) => {
 exports.sendFeeReminder = async(student, fee) => {
   try {
     const settings = await Settings.getSettings();
-    const template = settings.notifications.email.templates.feeReminder;
+    const _template = settings.notifications.email.templates.feeReminder;
 
     const subject = 'Fee Payment Reminder - Learnovo';
     const html = `
@@ -106,7 +106,7 @@ exports.sendFeeReminder = async(student, fee) => {
 exports.sendOverdueFeeReminder = async(student, fee) => {
   try {
     const settings = await Settings.getSettings();
-    const template = settings.notifications.email.templates.feeOverdue;
+    const _template = settings.notifications.email.templates.feeOverdue;
 
     const subject = 'URGENT: Overdue Fee Payment - Learnovo';
     const html = `
@@ -171,7 +171,7 @@ exports.sendOverdueFeeReminder = async(student, fee) => {
 exports.sendAdmissionApproval = async(student, admission) => {
   try {
     const settings = await Settings.getSettings();
-    const template = settings.notifications.email.templates.admissionApproved;
+    const _template = settings.notifications.email.templates.admissionApproved;
 
     const subject = 'Congratulations! Admission Approved - Learnovo';
     const html = `
@@ -234,7 +234,7 @@ exports.sendAdmissionApproval = async(student, admission) => {
 exports.sendAdmissionRejection = async(student, admission) => {
   try {
     const settings = await Settings.getSettings();
-    const template = settings.notifications.email.templates.admissionRejected;
+    const _template = settings.notifications.email.templates.admissionRejected;
 
     const subject = 'Admission Status Update - Learnovo';
     const html = `
