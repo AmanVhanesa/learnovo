@@ -2,16 +2,139 @@ const express = require('express');
 const { query } = require('express-validator');
 const { protect } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
-const Notification = require('../models/Notification'); // Import Notification model
+const Notification = require('../models/Notification');
+const NotificationPreference = require('../models/NotificationPreference');
+const Announcement = require('../models/Announcement');
+
+/**
+ * Get IDs of expired announcements for a tenant.
+ * Used to filter out notifications linked to expired announcements.
+ */
+async function getExpiredAnnouncementIds(tenantId) {
+  const expired = await Announcement.find({
+    tenantId,
+    expiresAt: { $ne: null, $lte: new Date() }
+  }).select('_id').lean();
+  return expired.map(a => a._id);
+}
+
+/**
+ * Add a filter to a Mongo query that excludes notifications
+ * whose parent announcement has expired.
+ */
+function addExpiredAnnouncementFilter(query, expiredIds) {
+  if (expiredIds.length === 0) return;
+  // Exclude announcement notifications whose parent has expired
+  if (!query.$and) query.$and = [];
+  query.$and.push({
+    $or: [
+      { category: { $ne: 'announcement' } },
+      { 'metadata.announcementId': { $nin: expiredIds } }
+    ]
+  });
+}
 
 const router = express.Router();
+
+// @desc    Get user notification preferences
+// @route   GET /api/notifications/preferences
+// @access  Private
+router.get('/preferences', protect, async(req, res) => {
+  try {
+    const preferences = await NotificationPreference.getOrCreate(req.user._id, req.user.tenantId);
+    res.json({
+      success: true,
+      data: preferences
+    });
+  } catch (error) {
+    console.error('Get notification preferences error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching notification preferences'
+    });
+  }
+});
+
+// @desc    Update user notification preferences
+// @route   PUT /api/notifications/preferences
+// @access  Private
+router.put('/preferences', protect, async(req, res) => {
+  try {
+    const { preferences } = req.body;
+
+    if (!preferences || typeof preferences !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'Preferences object is required'
+      });
+    }
+
+    // Validate category keys
+    const validCategories = ['admission', 'fee', 'academic', 'attendance', 'employee', 'exam', 'announcement', 'system'];
+    const updateData = {};
+
+    for (const [category, channels] of Object.entries(preferences)) {
+      if (!validCategories.includes(category)) {
+        continue;
+      }
+      if (typeof channels !== 'object') {
+        continue;
+      }
+      updateData[`preferences.${category}`] = {};
+      for (const [channel, value] of Object.entries(channels)) {
+        if (['inApp', 'email', 'whatsapp'].includes(channel) && typeof value === 'boolean') {
+          updateData[`preferences.${category}`][channel] = value;
+        }
+      }
+    }
+
+    const updated = await NotificationPreference.findOneAndUpdate(
+      { userId: req.user._id, tenantId: req.user.tenantId },
+      { $set: updateData },
+      { new: true, upsert: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Notification preferences updated successfully',
+      data: updated
+    });
+  } catch (error) {
+    console.error('Update notification preferences error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating notification preferences'
+    });
+  }
+});
 
 // @desc    Get unread notification count
 // @route   GET /api/notifications/unread-count
 // @access  Private
 router.get('/unread-count', protect, async(req, res) => {
   try {
-    const count = await Notification.getUnreadCount(req.user._id, req.user.tenantId);
+    // Get expired announcement IDs to exclude from count
+    const expiredIds = await getExpiredAnnouncementIds(req.user.tenantId);
+
+    const User = require('../models/User');
+    const user = await User.findById(req.user._id).select('role').lean();
+
+    const countQuery = {
+      userId: req.user._id,
+      tenantId: req.user.tenantId,
+      isRead: false,
+      isDeleted: false
+    };
+
+    // Apply role-based visibility filter (same as model static)
+    if (user && user.role !== 'admin') {
+      countQuery.visibility = user.role;
+    }
+
+    // Exclude notifications for expired announcements
+    addExpiredAnnouncementFilter(countQuery, expiredIds);
+
+    const count = await Notification.countDocuments(countQuery);
     res.json({
       success: true,
       data: { count }
@@ -38,6 +161,9 @@ router.get('/', protect, [
     const limit = parseInt(req.query.limit) || 20;
     const skip = (page - 1) * limit;
 
+    // Get expired announcement IDs to exclude
+    const expiredIds = await getExpiredAnnouncementIds(req.user.tenantId);
+
     // Build query
     const query = {
       tenantId: req.user.tenantId,
@@ -59,6 +185,9 @@ router.get('/', protect, [
         $lte: new Date(req.query.endDate)
       };
     }
+
+    // Exclude notifications for expired announcements
+    addExpiredAnnouncementFilter(query, expiredIds);
 
     // Execute query
     const notifications = await Notification.find(query)

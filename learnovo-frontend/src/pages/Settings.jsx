@@ -15,6 +15,7 @@ import ThemeLanguageSection from '../components/settings/ThemeLanguageSection'
 import AccountSettingsSection from '../components/settings/AccountSettingsSection'
 import SubDepartmentsSection from '../components/settings/SubDepartmentsSection'
 import BackupRestoreSection from '../components/settings/BackupRestoreSection'
+import NotificationSettingsSection from '../components/settings/NotificationSettingsSection'
 
 const DEFAULT_FORM = {
   institution: {
@@ -46,6 +47,7 @@ const Settings = () => {
     { id: 'rules', label: 'Rules & Regulations', icon: '\uD83D\uDCDC' },
     { id: 'theme', label: 'Theme & Language', icon: '\uD83C\uDFA8' },
     { id: 'account', label: 'Account Settings', icon: '\u2699\uFE0F' },
+    { id: 'notifications', label: 'Notifications', icon: '\uD83D\uDD14' },
     { id: 'backup', label: 'Backup & Restore', icon: '\uD83D\uDCBE' }
   ]
 
@@ -292,6 +294,9 @@ const Settings = () => {
               form={form}
               updateField={updateField}
             />
+          )}
+          {activeTab === 'notifications' && (
+            <NotificationSettingsSection />
           )}
           {activeTab === 'backup' && (
             <BackupRestoreSection />

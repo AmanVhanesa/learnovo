@@ -158,7 +158,7 @@ export function AuthProvider({ children }) {
       } else if (error.response?.status >= 500) {
         message = 'Server error. Please try again later.'
       } else if (error.message === 'Network Error' || error.code === 'ECONNREFUSED') {
-        message = 'Cannot connect to server. Please check if the backend is running on port 5001.'
+        message = 'Cannot connect to server. Please try again later or contact support.'
       } else if (error.message) {
         message = error.message
       }
