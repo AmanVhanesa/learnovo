@@ -36,10 +36,25 @@ router.get('/', protect, async(req, res) => {
             .populate('sectionTeacher', 'name fullName email')
             .sort({ name: 1 })
         ]);
+
+        // Get student count for each section
+        const sectionsWithCounts = await Promise.all(
+          sections.map(async(section) => {
+            const sectionStudentCount = await User.countDocuments({
+              sectionId: section._id,
+              role: 'student'
+            });
+            return {
+              ...section.toObject(),
+              studentCount: sectionStudentCount
+            };
+          })
+        );
+
         return {
           ...classItem.toObject(),
           studentCount,
-          sections
+          sections: sectionsWithCounts
         };
       })
     );
@@ -378,9 +393,23 @@ router.get('/:id/sections', protect, async(req, res) => {
       .populate('sectionTeacher', 'name fullName email')
       .sort({ name: 1 });
 
+    // Add student count to each section
+    const sectionsWithCounts = await Promise.all(
+      sections.map(async(section) => {
+        const studentCount = await User.countDocuments({
+          sectionId: section._id,
+          role: 'student'
+        });
+        return {
+          ...section.toObject(),
+          studentCount
+        };
+      })
+    );
+
     res.json({
       success: true,
-      data: sections
+      data: sectionsWithCounts
     });
   } catch (error) {
     console.error('Error fetching sections for class:', error);
