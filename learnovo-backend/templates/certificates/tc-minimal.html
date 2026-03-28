@@ -92,16 +92,17 @@
 
   /* ═══ HEADER ═══ */
   .header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+    position: relative;
     padding: 22px 26px 10px;
     flex-shrink: 0;
+    text-align: center;
   }
 
   .logo-wrap {
+    position: absolute;
+    left: 26px;
+    top: 22px;
     width: 105px; height: 105px;
-    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -121,7 +122,7 @@
     border: 1.5px dashed #d1d5db;
   }
 
-  .school-info { flex: 1; min-width: 0; text-align: center; }
+  .school-info { text-align: center; }
 
   .school-name {
     font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
