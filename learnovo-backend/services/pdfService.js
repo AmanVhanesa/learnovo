@@ -77,7 +77,7 @@ function getTemplatePath(type) {
     if (type === 'REPORT_CARD') {
         return path.join(__dirname, '..', 'templates', 'report-cards', 'report-card.html');
     }
-    const filename = type === 'TC' ? 'leaving-certificate.html' : 'bonafide-certificate.html';
+    const filename = type === 'TC' ? 'tc-minimal.html' : 'bonafide-minimal.html';
     return path.join(__dirname, '..', 'templates', 'certificates', filename);
 }
 

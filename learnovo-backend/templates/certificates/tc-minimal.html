@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>School Leaving Certificate - {{student_name}}</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 794px;
+    height: 1123px;
+    font-family: 'Helvetica Neue', 'Arial', 'Noto Sans', sans-serif;
+    color: #111827;
+    background: #f9fafb;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    width: 794px;
+    height: 1123px;
+    position: relative;
+    overflow: hidden;
+    background: #f9fafb;
+  }
+
+  .card {
+    position: absolute;
+    top: 14px; left: 14px; right: 14px; bottom: 14px;
+    background: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.07);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ═══ DECORATIVE SHAPES ═══ */
+  .deco-shapes {
+    position: absolute;
+    top: 0; right: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+    border-radius: 14px;
+  }
+
+  .deco-shapes .shape-1 {
+    position: absolute;
+    top: -60px; right: -40px;
+    width: 320px; height: 320px;
+    background: rgba(62, 196, 177, 0.06);
+    border-radius: 50%;
+  }
+
+  .deco-shapes .shape-2 {
+    position: absolute;
+    top: 80px; right: -80px;
+    width: 240px; height: 450px;
+    background: rgba(62, 196, 177, 0.04);
+    transform: rotate(-25deg);
+    border-radius: 80px;
+  }
+
+  .deco-shapes .shape-3 {
+    position: absolute;
+    bottom: -50px; left: -60px;
+    width: 260px; height: 260px;
+    background: rgba(62, 196, 177, 0.05);
+    border-radius: 50%;
+  }
+
+  .deco-shapes .shape-4 {
+    position: absolute;
+    bottom: 120px; left: 40px;
+    width: 160px; height: 300px;
+    background: rgba(62, 196, 177, 0.03);
+    transform: rotate(20deg);
+    border-radius: 60px;
+  }
+
+  .card > *:not(.deco-shapes) {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ═══ HEADER ═══ */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px 26px 16px;
+    flex-shrink: 0;
+  }
+
+  .logo-wrap {
+    width: 68px; height: 68px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .logo-wrap img,
+  .logo-wrap svg {
+    width: 68px; height: 68px;
+    object-fit: contain;
+  }
+
+  /* Fallback when no logo is injected */
+  .logo-wrap:empty {
+    background: #f3f4f6;
+    border: 1.5px dashed #d1d5db;
+  }
+
+  .school-info { flex: 1; }
+
+  .school-name {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.15;
+    letter-spacing: 0.5px;
+  }
+
+  .school-addr,
+  .school-contact {
+    font-size: 11.5px;
+    color: #4b5563;
+    font-weight: 500;
+    margin-top: 3px;
+  }
+
+  .aff-block {
+    margin-left: auto;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .aff-line {
+    font-size: 10px;
+    color: #4b5563;
+    font-weight: 500;
+    line-height: 1.7;
+  }
+
+  .aff-line b {
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .header-divider {
+    height: 1px;
+    background: #e5e7eb;
+    margin: 0 26px;
+    flex-shrink: 0;
+  }
+
+  /* ═══ TITLE ═══ */
+  .title-section {
+    padding: 14px 26px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .title-badge {
+    background: #edf9f7;
+    border-radius: 10px;
+    padding: 10px 28px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .title-section h1 {
+    font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #0a5c56;
+    letter-spacing: 4.5px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .title-line {
+    width: 60px;
+    height: 2.5px;
+    background: linear-gradient(90deg, transparent, #3EC4B1, transparent);
+    border-radius: 2px;
+    margin: 8px auto 0;
+  }
+
+  /* ═══ META ═══ */
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 26px;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
+  }
+
+  .tc-num {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .tc-num .hash { color: #3EC4B1; }
+
+  .meta-right {
+    font-size: 13px;
+    color: #374151;
+    font-weight: 500;
+  }
+
+  .meta-right b {
+    font-weight: 700;
+    color: #111827;
+  }
+
+  /* ═══ TABLE ═══ */
+  .fields-wrap {
+    margin: 8px 18px 0;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    flex-shrink: 0;
+  }
+
+  .fields {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+  }
+
+  .fields tr:nth-child(even) { background: #ffffff; }
+  .fields tr:nth-child(odd) { background: #f0fdfa; }
+
+  .fields td {
+    padding: 5px 12px;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: middle;
+    line-height: 1.3;
+  }
+
+  .fields tr:last-child td { border-bottom: none; }
+
+  .fields .num {
+    width: 28px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #4b5563;
+    border-right: 1px solid #e5e7eb;
+    padding-right: 4px;
+  }
+
+  .fields .label {
+    width: 42%;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #1f2937;
+    border-right: 1px solid #e5e7eb;
+  }
+
+  .fields .val {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .fields tr.bold .val {
+    font-weight: 700;
+    color: #111827;
+  }
+
+  /* ═══ NOTE ═══ */
+  .note-box {
+    margin: 6px 18px 0;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 6px 12px;
+    flex-shrink: 0;
+  }
+
+  .note-box .note-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .note-box p {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: #4b5563;
+    line-height: 1.5;
+    margin-top: 2px;
+  }
+
+  /* ═══ CERTIFICATION ═══ */
+  .cert-block {
+    padding: 8px 26px 0;
+    flex-shrink: 0;
+  }
+
+  /* ═══ SPACER ═══ */
+  .spacer { flex: 1; min-height: 6px; }
+
+  /* ═══ SIGNATURES ═══ */
+  .sig-section {
+    padding: 0 26px 14px;
+    flex-shrink: 0;
+  }
+
+  .cert-text {
+    font-size: 10px;
+    color: #4b5563;
+    font-weight: 500;
+    font-style: italic;
+    line-height: 1.45;
+    margin-bottom: 3px;
+    max-width: 100%;
+  }
+
+  .place {
+    font-size: 11px;
+    color: #111827;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .sig-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 8px;
+    height: 100px;
+  }
+
+  .sig-col { text-align: center; width: 170px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+
+  .sig-img {
+    max-height: 70px;
+    max-width: 160px;
+    margin: 0 auto 4px;
+    object-fit: contain;
+    display: block;
+  }
+
+  .sig-col .sig-line {
+    width: 110px;
+    height: 1px;
+    background: #9ca3af;
+    margin: 0 auto 4px;
+  }
+
+  .sig-col .sig-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  .sig-col.stamp-col {
+    width: 100px;
+  }
+
+  .seal-circle {
+    width: 110px; height: 110px;
+    border: 2px dashed #d1d5db;
+    border-radius: 50%;
+    margin: 0 auto;
+  }
+
+  /* ═══ FOOTER ═══ */
+  .footer {
+    padding: 8px 26px;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .footer span {
+    font-size: 9px;
+    color: #4b5563;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+  }
+
+  .footer .brand {
+    font-weight: 600;
+    color: #0f766e;
+  }
+
+  @media print {
+    html, body { width: 210mm; height: 297mm; }
+    .page { width: 210mm; height: 297mm; page-break-after: avoid; }
+    body { background: #fff; }
+    .card { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+<div class="card">
+
+  <!-- Decorative background shapes -->
+  <div class="deco-shapes">
+    <div class="shape-1"></div>
+    <div class="shape-2"></div>
+    <div class="shape-3"></div>
+    <div class="shape-4"></div>
+  </div>
+
+  <!-- ═══ HEADER ═══ -->
+  <div class="header">
+    <div class="logo-wrap"><!-- LOGO_PLACEHOLDER --></div>
+
+    <div class="school-info">
+      <div class="school-name">{{school_name}}</div>
+      <div class="school-addr">{{school_address}}</div>
+      <div class="school-contact">Phone: {{school_phone}} &nbsp;|&nbsp; Email: {{school_email}}</div>
+    </div>
+
+    <div class="aff-block">
+      <div class="aff-line">Affiliation No: <b>{{affiliation_no}}</b></div>
+      <div class="aff-line">School Code: <b>{{school_code}}</b></div>
+      <div class="aff-line">UDISE: <b>{{udise_no}}</b></div>
+    </div>
+  </div>
+
+  <div class="header-divider"></div>
+
+  <!-- ═══ TITLE ═══ -->
+  <div class="title-section">
+    <div class="title-badge">
+      <h1>School Leaving Certificate</h1>
+      <div class="title-line"></div>
+    </div>
+  </div>
+
+  <!-- ═══ META ═══ -->
+  <div class="meta-row">
+    <div class="tc-num"><span class="hash">#</span> {{certificate_number}}</div>
+    <div class="meta-right">Admission No: <b>{{admission_no}}</b></div>
+  </div>
+
+  <!-- ═══ TABLE ═══ -->
+  <div class="fields-wrap">
+    <table class="fields">
+      <tr class="bold">
+        <td class="num">01</td>
+        <td class="label">Name of the Student</td>
+        <td class="val">{{student_name}}</td>
+      </tr>
+      <tr>
+        <td class="num">02</td>
+        <td class="label">Father's / Guardian's Name</td>
+        <td class="val">{{father_name}}</td>
+      </tr>
+      <tr>
+        <td class="num">03</td>
+        <td class="label">Mother's Name</td>
+        <td class="val">{{mother_name}}</td>
+      </tr>
+      <tr>
+        <td class="num">04</td>
+        <td class="label">Nationality</td>
+        <td class="val">{{nationality}}</td>
+      </tr>
+      <tr>
+        <td class="num">05</td>
+        <td class="label">Category (Gen / SC / ST / OBC)</td>
+        <td class="val">{{category}}</td>
+      </tr>
+      <tr class="bold">
+        <td class="num">06</td>
+        <td class="label">Date of Birth</td>
+        <td class="val">{{dob}}</td>
+      </tr>
+      <tr>
+        <td class="num">07</td>
+        <td class="label">PEN Number</td>
+        <td class="val">{{pen_number}}</td>
+      </tr>
+      <tr>
+        <td class="num">08</td>
+        <td class="label">Date of First Admission in School</td>
+        <td class="val">{{admission_date}}</td>
+      </tr>
+      <tr class="bold">
+        <td class="num">09</td>
+        <td class="label">Class in which Last Studied</td>
+        <td class="val">{{class_last_studied}}</td>
+      </tr>
+      <tr>
+        <td class="num">10</td>
+        <td class="label">Board Examination Last Taken</td>
+        <td class="val">{{board_exam_result}}</td>
+      </tr>
+      <tr>
+        <td class="num">11</td>
+        <td class="label">Whether Qualified for Promotion</td>
+        <td class="val">{{promotion_status}}</td>
+      </tr>
+      <tr>
+        <td class="num">12</td>
+        <td class="label">Subjects Studied</td>
+        <td class="val">{{subjects}}</td>
+      </tr>
+      <tr>
+        <td class="num">13</td>
+        <td class="label">Month up to which Fees Paid</td>
+        <td class="val">{{fee_status}}</td>
+      </tr>
+      <tr>
+        <td class="num">14</td>
+        <td class="label">General Conduct</td>
+        <td class="val">{{conduct}}</td>
+      </tr>
+      <tr>
+        <td class="num">15</td>
+        <td class="label">Date of Application for Certificate</td>
+        <td class="val">{{application_date}}</td>
+      </tr>
+      <tr>
+        <td class="num">16</td>
+        <td class="label">Date of Issue of Certificate</td>
+        <td class="val">{{issue_date}}</td>
+      </tr>
+      <tr class="bold">
+        <td class="num">17</td>
+        <td class="label">Reason for Leaving the School</td>
+        <td class="val">{{reason_for_leaving}}</td>
+      </tr>
+      <tr>
+        <td class="num">18</td>
+        <td class="label">Any Other Remarks</td>
+        <td class="val">{{remarks}}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ═══ NOTE ═══ -->
+  <div class="note-box">
+    <div class="note-label">Important Note</div>
+    <p>This certificate is issued based on school records. No alteration shall be made on this certificate. Erasing or overwriting renders it invalid.</p>
+  </div>
+
+  <!-- ═══ CERTIFICATION ═══ -->
+  <div class="cert-block">
+    <div class="cert-text">Certified that the above information is in accordance with school records. This certificate does not entitle the holder to any benefits unless countersigned by competent authority.</div>
+    <div class="place">Place: {{place}}</div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- ═══ SIGNATURES ═══ -->
+  <div class="sig-section">
+    <div class="sig-row">
+      <div class="sig-col">
+        <div class="sig-line"></div>
+        <div class="sig-label">Class Teacher</div>
+      </div>
+      <div class="sig-col stamp-col">
+        <div class="seal-circle"></div>
+      </div>
+      <div class="sig-col">
+        <!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->
+        <div class="sig-line"></div>
+        <div class="sig-label">Principal</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="footer">
+    <span>Powered by <span class="brand">Learnovo</span> &mdash; School Management System</span>
+  </div>
+
+</div>
+</div>
+</body>
+</html>

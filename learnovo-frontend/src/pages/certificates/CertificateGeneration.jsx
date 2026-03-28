@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Search, Check, FileText, Printer, AlertCircle, AlertTriangle, Edit3, Eye, Download, X } from 'lucide-react';
 import certificateService from '../../services/certificateService';
 import studentsService from '../../services/studentsService';
-import { generateCertificateDocx } from '../../utils/certificateDocxExport';
 import { reportsService } from '../../services/reportsService';
 import { toast } from 'react-hot-toast';
 
@@ -173,21 +172,6 @@ const CertificateGeneration = () => {
         };
     };
 
-    const handleExportWord = async () => {
-        try {
-            const data = getMergedData();
-            await generateCertificateDocx(certType, data);
-            const certLabel = certType === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
-            reportsService.logActivity({
-                type: 'certificate', action: 'word_export',
-                message: `${certLabel} exported as Word document for ${selectedStudent.fullName || selectedStudent.name}`,
-                studentName: selectedStudent.fullName || selectedStudent.name
-            });
-            toast.success('Word document exported!');
-        } catch {
-            toast.error('Failed to export Word document');
-        }
-    };
 
     const handleOpenPreview = () => {
         setShowPreviewModal(true);
@@ -623,13 +607,6 @@ const CertificateGeneration = () => {
                             >
                                 <Download className="h-4 w-4" />
                                 Export as PDF
-                            </button>
-                            <button
-                                onClick={handleExportWord}
-                                className="btn gap-2 w-full sm:w-auto text-sm bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                                <FileText className="h-4 w-4" />
-                                Export as Word
                             </button>
                             <button
                                 onClick={() => setShowPreviewModal(false)}
