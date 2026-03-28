@@ -89,6 +89,10 @@ router.post('/', [
 
     const { type, maxMarks, passingMarks, isOptional } = req.body;
 
+    if (maxMarks !== undefined && Number(maxMarks) > 100) {
+      return res.status(400).json({ success: false, message: 'Max marks cannot exceed 100' });
+    }
+
     const newSubject = new Subject({
       tenantId: req.user.tenantId,
       name,
@@ -141,6 +145,11 @@ router.put('/:id', [
     }
 
     const { name, subjectCode, description, type, maxMarks, passingMarks, isOptional } = req.body;
+
+    if (maxMarks !== undefined && Number(maxMarks) > 100) {
+      return res.status(400).json({ success: false, message: 'Max marks cannot exceed 100' });
+    }
+
     const updates = {};
 
     if (name) updates.name = name;

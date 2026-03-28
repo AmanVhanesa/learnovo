@@ -100,11 +100,11 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
     return createPortal(
         <div className="modal-overlay" onClick={() => { onClose(); resetForm(); }}>
             <div
-                className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-lg w-full sm:mx-4 md:mx-auto h-full sm:h-auto sm:max-h-[90vh] overflow-y-auto animate-scale-in"
+                className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-lg w-full sm:mx-4 md:mx-auto h-full sm:h-auto sm:max-h-[90vh] overflow-hidden flex flex-col animate-scale-in"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#2C2C2E] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
+                <div className="flex items-center justify-between border-b border-gray-100 dark:border-[#2C2C2E] px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-lg bg-primary-100 dark:bg-primary-500/10 flex items-center justify-center">
                             <DollarSign className="w-5 h-5 text-primary-600 dark:text-primary-400" />
@@ -121,7 +121,7 @@ const AdvanceSalaryModal = ({ isOpen, onClose, onSuccess, mode = 'create', advan
                     </button>
                 </div>
 
-                <div className="p-4 sm:p-6">
+                <div className="p-4 sm:p-6 flex-1 min-h-0 overflow-y-auto">
                     {error && (
                         <div className="mb-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 rounded-lg text-sm">
                             {error}

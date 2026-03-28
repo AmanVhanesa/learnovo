@@ -505,8 +505,8 @@ const Assignments = () => {
       {/* Create/Edit Modal */}
       {showModal && !isStudent && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {editing ? 'Edit Assignment' : 'Create Assignment'}
               </h3>
@@ -518,7 +518,7 @@ const Assignments = () => {
               </button>
             </div>
 
-            <form className="p-6 space-y-4" onSubmit={saveAssignment}>
+            <form className="p-6 space-y-4 flex-1 min-h-0 overflow-y-auto" onSubmit={saveAssignment}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                   Title <span className="text-red-500">*</span>
@@ -606,6 +606,7 @@ const Assignments = () => {
                     onChange={(e) => setForm({ ...form, totalMarks: e.target.value })}
                     className="w-full px-3 py-2 input"
                     min="1"
+                    max="100"
                   />
                 </div>
               </div>
@@ -647,8 +648,8 @@ const Assignments = () => {
       {/* Details Modal */}
       {showDetailsModal && selectedAssignment && (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-[#38383A] flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Assignment Details</h3>
               <button
                 className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-[#2C2C2E] text-gray-400 dark:text-[#636366]"
@@ -658,7 +659,7 @@ const Assignments = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-5 flex-1 min-h-0 overflow-y-auto">
               <div>
                 <h4 className="text-xl font-semibold text-gray-900 dark:text-white">{selectedAssignment.title}</h4>
                 <p className="text-gray-600 dark:text-[#8E8E93] mt-2">{selectedAssignment.description}</p>
@@ -733,7 +734,7 @@ const Assignments = () => {
               )}
             </div>
 
-            <div className="flex justify-end p-6 border-t border-gray-200 dark:border-[#38383A]">
+            <div className="flex justify-end p-6 border-t border-gray-200 dark:border-[#38383A] flex-shrink-0">
               <button
                 className="btn btn-outline"
                 onClick={() => { setShowDetailsModal(false); setSelectedAssignment(null) }}

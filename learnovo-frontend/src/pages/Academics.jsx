@@ -1049,6 +1049,10 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
     const handleSubmit = async (e) => {
         e.preventDefault()
 
+        if (form.maxMarks > 100) {
+            toast.error('Max marks cannot exceed 100')
+            return
+        }
         if (form.passingMarks > form.maxMarks) {
             toast.error('Passing marks cannot exceed max marks')
             return
@@ -1131,6 +1135,7 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
                                     value={form.maxMarks}
                                     onChange={(e) => setForm({ ...form, maxMarks: parseInt(e.target.value) })}
                                     min="0"
+                                    max="100"
                                     required
                                 />
                             </div>
@@ -1148,6 +1153,9 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
                                 />
                             </div>
                         </div>
+                        {form.maxMarks > 100 && (
+                            <p className="text-xs text-red-500">Max marks cannot exceed 100</p>
+                        )}
                         {form.passingMarks > form.maxMarks && (
                             <p className="text-xs text-red-500">Passing marks cannot exceed max marks ({form.maxMarks})</p>
                         )}
@@ -1182,7 +1190,7 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
                         <button type="button" onClick={onClose} className="btn btn-ghost">
                             Cancel
                         </button>
-                        <button type="submit" className="btn btn-primary" disabled={isSaving || form.passingMarks > form.maxMarks}>
+                        <button type="submit" className="btn btn-primary" disabled={isSaving || form.maxMarks > 100 || form.passingMarks > form.maxMarks}>
                             {isSaving ? 'Saving...' : subject ? 'Update' : 'Create'}
                         </button>
                     </div>
@@ -1320,6 +1328,7 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
                                     value={form.maxMarks}
                                     onChange={(e) => setForm({ ...form, maxMarks: parseInt(e.target.value) })}
                                     min="0"
+                                    max="100"
                                     required
                                 />
                             </div>
@@ -1332,6 +1341,7 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
                                     value={form.passingMarks}
                                     onChange={(e) => setForm({ ...form, passingMarks: parseInt(e.target.value) })}
                                     min="0"
+                                    max={form.maxMarks}
                                     required
                                 />
                             </div>

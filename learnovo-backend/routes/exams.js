@@ -193,7 +193,8 @@ router.post('/', protect, examPlanGates, authorize('admin', 'teacher'), [
   body('class').notEmpty().withMessage('Class is required'),
   body('subject').notEmpty().withMessage('Subject is required'),
   body('date').isISO8601().withMessage('Valid date is required'),
-  body('totalMarks').isNumeric().withMessage('Total marks must be a number'),
+  body('totalMarks').isNumeric().withMessage('Total marks must be a number')
+    .custom(v => Number(v) >= 0 && Number(v) <= 100).withMessage('Total marks must be between 0 and 100'),
   body('passingMarks').optional().isNumeric().withMessage('Passing marks must be a number'),
   handleValidationErrors
 ], async(req, res) => {
@@ -563,8 +564,16 @@ router.patch('/:id', protect, examPlanGates, authorize('admin', 'teacher'), asyn
       return res.status(404).json({ success: false, message: 'Exam not found' });
     }
 
-    // Validate passing marks if being updated
+    // Validate total marks don't exceed 100
     const totalMarks = req.body.totalMarks !== undefined ? req.body.totalMarks : exam.totalMarks;
+    if (Number(totalMarks) > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Total marks cannot exceed 100'
+      });
+    }
+
+    // Validate passing marks if being updated
     const passingMarks = req.body.passingMarks !== undefined ? req.body.passingMarks : exam.passingMarks;
 
     if (passingMarks !== undefined && passingMarks !== null && Number(passingMarks) >= Number(totalMarks)) {
@@ -656,9 +665,9 @@ router.post('/:id/results', protect, examPlanGates, authorize('admin', 'teacher'
 
         const marksObtained = Number(item.marks);
 
-        // Validate marks don't exceed total
-        if (marksObtained < 0 || marksObtained > exam.totalMarks) {
-          errors.push({ studentId: item.studentId, error: `Marks must be between 0 and ${exam.totalMarks}` });
+        // Validate marks don't exceed total or 100
+        if (marksObtained < 0 || marksObtained > 100 || marksObtained > exam.totalMarks) {
+          errors.push({ studentId: item.studentId, error: `Marks must be between 0 and ${Math.min(exam.totalMarks, 100)}` });
           continue;
         }
 

@@ -50,7 +50,8 @@ const examSchema = new mongoose.Schema({
   totalMarks: {
     type: Number,
     required: [true, 'Total marks are required'],
-    min: 0
+    min: 0,
+    max: [100, 'Total marks cannot exceed 100']
   },
   passingMarks: {
     type: Number,

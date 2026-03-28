@@ -215,9 +215,9 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
 
     return (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10 rounded-t-2xl">
+                <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] flex-shrink-0">
                     <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                         {isEditing ? 'Edit Homework' : 'Create Homework'}
                     </h2>
@@ -227,7 +227,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 flex-1 min-h-0 overflow-y-auto">
                     {/* Title */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">

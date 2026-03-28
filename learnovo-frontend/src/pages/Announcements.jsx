@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Megaphone, Users, Calendar, AlertCircle, Trash2, X, Clock, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Megaphone, Users, Calendar, AlertCircle, Trash2, X, Clock, Search, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import announcementsService from '../services/announcementsService';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 
 const Announcements = () => {
+    const navigate = useNavigate();
     const { user } = useAuth();
     const { refresh: refreshNotifications } = useNotifications();
     const queryClient = useQueryClient();
@@ -173,7 +175,14 @@ const Announcements = () => {
         <div className="space-y-4 sm:space-y-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/app/communication')}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-lg flex-shrink-0"
+                    >
+                        <ArrowLeft className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
+                    </button>
+                    <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Announcements</h1>
                     <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
                         {isAdmin ? 'Create and manage school-wide announcements' : 'Stay updated with school announcements'}

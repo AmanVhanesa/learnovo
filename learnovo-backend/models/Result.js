@@ -20,7 +20,8 @@ const resultSchema = new mongoose.Schema({
   marksObtained: {
     type: Number,
     required: true,
-    min: 0
+    min: 0,
+    max: [100, 'Marks cannot exceed 100']
   },
   percentage: {
     type: Number,

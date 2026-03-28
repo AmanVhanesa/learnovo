@@ -34,7 +34,8 @@ const classSubjectSchema = new mongoose.Schema({
   // Marks Configuration (can override subject defaults)
   maxMarks: {
     type: Number,
-    min: 0
+    min: 0,
+    max: [100, 'Max marks cannot exceed 100']
   },
 
   passingMarks: {

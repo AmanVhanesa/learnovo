@@ -52,6 +52,10 @@ router.post('/', protect, authorize('admin'), [
   try {
     const { classId, subjectId, academicSessionId, maxMarks, passingMarks, isCompulsory } = req.body;
 
+    if (maxMarks !== undefined && Number(maxMarks) > 100) {
+      return res.status(400).json({ success: false, message: 'Max marks cannot exceed 100' });
+    }
+
     // Verify class exists
     const classExists = await Class.findOne({ _id: classId, tenantId: req.user.tenantId });
     if (!classExists) {

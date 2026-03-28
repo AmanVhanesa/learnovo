@@ -233,6 +233,7 @@ const Exams = () => {
         if (!form.subject.trim()) errors.subject = 'Subject is required';
         if (!form.date) errors.date = 'Exam date is required';
         if (!form.totalMarks) errors.totalMarks = 'Total marks is required';
+        else if (Number(form.totalMarks) > 100) errors.totalMarks = 'Total marks cannot exceed 100';
         if (form.passingMarks !== '' && Number(form.passingMarks) >= Number(form.totalMarks)) {
             errors.passingMarks = 'Passing marks must be less than total marks';
         }
@@ -921,6 +922,7 @@ const Exams = () => {
                                         <input
                                             type="number"
                                             min="1"
+                                            max="100"
                                             className={`input ${formErrors.totalMarks ? 'border-red-400' : ''}`}
                                             value={form.totalMarks}
                                             onChange={e => handleField('totalMarks', e.target.value)}

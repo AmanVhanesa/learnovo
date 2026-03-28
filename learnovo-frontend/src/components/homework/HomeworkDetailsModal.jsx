@@ -51,16 +51,16 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
 
     return (
         <div className="fixed inset-0 bg-black/40 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col mx-2 sm:mx-auto">
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
+                <div className="flex justify-between items-center p-4 sm:p-6 border-b border-gray-200 dark:border-[#38383A] flex-shrink-0">
                     <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Homework Details</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
                         <X className="h-6 w-6" />
                     </button>
                 </div>
 
-                <div className="p-4 sm:p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-6 flex-1 min-h-0 overflow-y-auto">
                     {/* Homework Info */}
                     <div>
                         <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">{homework.title}</h3>
@@ -260,7 +260,7 @@ const HomeworkDetailsModal = ({ homework, onClose, onRefresh }) => {
                 </div>
 
                 {/* Footer */}
-                <div className="flex justify-end p-4 sm:p-6 border-t border-gray-200 dark:border-[#38383A]">
+                <div className="flex justify-end p-4 sm:p-6 border-t border-gray-200 dark:border-[#38383A] flex-shrink-0">
                     <button onClick={onClose} className="btn btn-outline">
                         Close
                     </button>

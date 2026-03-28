@@ -256,11 +256,15 @@ const ExamResultsModal = ({ exam, onClose }) => {
                                                         <input
                                                             type="number"
                                                             className="input w-24"
-                                                            max={exam.totalMarks}
+                                                            max={Math.min(exam.totalMarks, 100)}
                                                             min="0"
                                                             placeholder="0"
                                                             value={marks[id] !== undefined ? marks[id] : ''}
-                                                            onChange={e => setMarks(prev => ({ ...prev, [id]: e.target.value }))}
+                                                            onChange={e => {
+                                                                const val = e.target.value;
+                                                                if (val !== '' && Number(val) > 100) return;
+                                                                setMarks(prev => ({ ...prev, [id]: val }));
+                                                            }}
                                                         />
                                                     )}
                                                 </td>

@@ -410,9 +410,9 @@ input, select, textarea {
   .modal-content {
     @apply bg-white shadow-glass-lg
            max-w-md w-full max-h-[100vh] sm:max-h-[90vh] overflow-y-auto
-           ring-1 ring-black/[0.03]
+           ring-1 ring-white
            animate-scale-in
-           dark:bg-[#1C1C1E] dark:ring-white/[0.06]
+           dark:bg-[#1C1C1E] dark:ring-[#1C1C1E]
            rounded-t-2xl sm:rounded-2xl sm:mx-4;
     -webkit-overflow-scrolling: touch;
   }
@@ -420,8 +420,8 @@ input, select, textarea {
   .modal-box-lg {
     @apply bg-white shadow-glass-lg
            w-full max-w-2xl max-h-[100vh] sm:max-h-[90vh] overflow-y-auto
-           ring-1 ring-black/[0.03]
-           dark:bg-[#1C1C1E] dark:ring-white/[0.06]
+           ring-1 ring-white
+           dark:bg-[#1C1C1E] dark:ring-[#1C1C1E]
            rounded-t-2xl sm:rounded-2xl sm:mx-4 md:mx-auto md:w-[90%];
     -webkit-overflow-scrolling: touch;
   }
