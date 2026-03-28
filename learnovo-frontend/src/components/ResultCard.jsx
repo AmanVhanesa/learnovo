@@ -51,13 +51,13 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
         <td class="num" style="font-weight:600">${s.marksObtained}</td>
         <td class="num">${s.percentage}%</td>
         <td class="ctr"><span class="grade-display"><span class="grade-dot" style="background:${dotColor}"></span> ${s.grade}</span></td>
-        <td class="ctr"><span style="color:${s.isPassed ? '#059669' : '#DC2626'};font-weight:500;font-size:10px">${s.isPassed ? 'Pass' : 'Fail'}</span></td>
-        <td style="font-size:9px;color:#9CA3AF">${s.remarks || '\u2014'}</td>
+        <td class="ctr"><span style="color:${s.isPassed ? '#059669' : '#DC2626'};font-weight:500;font-size:12px">${s.isPassed ? 'Pass' : 'Fail'}</span></td>
+        <td style="font-size:11px;color:#9CA3AF">${s.remarks || '\u2014'}</td>
       </tr>`;
     }).join('');
 
     const logoTag = schoolInfo.logo
-        ? `<div class="school-logo"><img src="${schoolInfo.logo}" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:50%"></div>`
+        ? `<div class="school-logo"><img src="${schoolInfo.logo}" alt="Logo"></div>`
         : `<div class="school-logo-fb" style="background:${brandColor}">${(schoolInfo.name || 'S')[0]}</div>`;
 
     const sigUrl = getSignatureUrl(schoolInfo.principalSignature);
@@ -69,6 +69,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
 <head>
 <meta charset="UTF-8">
 <title>Report Card \u2014 ${sName}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
@@ -76,69 +77,79 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   body{font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;color:#111827}
   .page{width:210mm;min-height:297mm;padding:20mm;margin:0 auto}
   /* Header */
-  .header{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px}
-  .school-logo{width:52px;height:52px;border-radius:50%;overflow:hidden;flex-shrink:0}
-  .school-logo-fb{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;letter-spacing:-0.02em;flex-shrink:0}
-  .school-info{flex:1}
-  .school-name{font-size:20px;font-weight:700;color:#111827;letter-spacing:-0.02em;line-height:1.2}
-  .school-addr{font-size:9px;color:#6B7280;margin-top:4px;line-height:1.5}
-  .school-meta{font-size:8px;color:#9CA3AF;margin-top:2px;letter-spacing:0.02em}
-  .accent-line{height:2.5px;background:${brandColor};margin:20px 0;border:none;border-radius:2px}
+  .header{position:relative;text-align:center;padding:0 0 12px;margin-bottom:0}
+  .logo-wrap{position:absolute;left:0;top:0;width:105px;height:105px;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden}
+  .school-logo{width:105px;height:105px;border-radius:8px;overflow:hidden;flex-shrink:0}
+  .school-logo img{width:100%;height:100%;object-fit:contain}
+  .school-logo-fb{width:105px;height:105px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:28px;letter-spacing:-0.02em;flex-shrink:0}
+  .school-info{text-align:center}
+  .school-name{font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:28px;font-weight:800;color:#1F6F6D;letter-spacing:2px;line-height:1.1;text-transform:uppercase;white-space:nowrap}
+  .school-addr{font-size:13px;color:#4b5563;font-weight:500;margin-top:4px;line-height:1.5}
+  .school-contact{font-size:13px;color:#4b5563;font-weight:500;margin-top:2px}
+  .aff-row{display:flex;justify-content:center;gap:20px;margin-top:6px;flex-wrap:wrap}
+  .aff-line{font-size:12px;color:#4b5563;font-weight:500;line-height:1.7}
+  .aff-line b{font-weight:700;color:#111827}
+  .accent-line{height:1px;background:#e5e7eb;margin:12px 0 16px;border:none}
   .title-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px}
-  .report-title{font-size:13px;font-weight:600;color:${brandColor};text-transform:uppercase;letter-spacing:0.1em}
-  .report-meta{font-size:10px;color:#9CA3AF;text-align:right;line-height:1.6}
+  .report-title{font-size:15px;font-weight:600;color:${brandColor};text-transform:uppercase;letter-spacing:0.1em}
+  .report-meta{font-size:12px;color:#9CA3AF;text-align:right;line-height:1.6}
   .report-meta .exam-type{font-weight:600;color:#6B7280;display:block}
   /* Student card */
   .stu-card{background:#F9FAFB;border-radius:10px;padding:20px 24px;margin-bottom:28px}
   .stu-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 32px}
-  .info-label{font-size:7.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#9CA3AF;margin-bottom:3px}
-  .info-value{font-size:12px;font-weight:600;color:#111827}
+  .info-label{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#9CA3AF;margin-bottom:3px}
+  .info-value{font-size:14px;font-weight:600;color:#111827}
   /* Section label */
-  .sec-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.14em;color:#9CA3AF;margin-bottom:12px}
+  .sec-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.14em;color:#9CA3AF;margin-bottom:12px}
   /* Table */
   table{width:100%;border-collapse:collapse;margin-bottom:28px}
-  thead th{font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#6B7280;padding:10px 12px;text-align:left;border-bottom:1.5px solid #E5E7EB}
+  thead th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#6B7280;padding:10px 12px;text-align:left;border-bottom:1.5px solid #E5E7EB}
   thead th.num{text-align:right}
   thead th.ctr{text-align:center}
-  tbody td{font-size:10.5px;color:#111827;padding:14px 12px;border-bottom:0.5px solid #F3F4F6;font-weight:400}
+  tbody td{font-size:12.5px;color:#111827;padding:14px 12px;border-bottom:0.5px solid #F3F4F6;font-weight:400}
   tbody td.num{text-align:right;font-variant-numeric:tabular-nums}
   tbody td.ctr{text-align:center}
   tbody td.subj{font-weight:500}
-  .exam-detail{display:block;font-size:8px;color:#9CA3AF;font-weight:400;margin-top:2px}
+  .exam-detail{display:block;font-size:10px;color:#9CA3AF;font-weight:400;margin-top:2px}
   .grade-display{display:inline-flex;align-items:center;gap:6px;font-weight:600}
   .grade-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
-  tfoot td{font-size:11px;font-weight:600;color:#111827;padding:14px 12px;border-top:1.5px solid ${brandColor};background:${brandColor}0A}
+  tfoot td{font-size:13px;font-weight:600;color:#111827;padding:14px 12px;border-top:1.5px solid ${brandColor};background:${brandColor}0A}
   tfoot td.num{text-align:right;font-variant-numeric:tabular-nums}
   tfoot td.ctr{text-align:center}
   /* Result banner */
   .result-banner{border-radius:0 8px 8px 0;padding:18px 24px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;border-left:3px solid ${isPassed ? '#059669' : '#DC2626'};background:${isPassed ? 'rgba(5,150,105,0.04)' : 'rgba(220,38,38,0.04)'}}
   .result-dot{width:10px;height:10px;border-radius:50%;background:${isPassed ? '#059669' : '#DC2626'}}
-  .result-label{font-size:15px;font-weight:700;letter-spacing:0.04em;color:${isPassed ? '#059669' : '#DC2626'}}
+  .result-label{font-size:17px;font-weight:700;letter-spacing:0.04em;color:${isPassed ? '#059669' : '#DC2626'}}
   .result-status{display:flex;align-items:center;gap:10px}
   .result-details{text-align:right}
-  .result-perf{font-size:10px;color:#6B7280;margin-bottom:2px}
-  .result-stats{font-size:9px;color:#9CA3AF}
+  .result-perf{font-size:12px;color:#6B7280;margin-bottom:2px}
+  .result-stats{font-size:11px;color:#9CA3AF}
   /* Signatures */
   .sigs{display:flex;justify-content:space-between;margin-bottom:32px;padding-top:8px}
   .sig-block{text-align:center;width:140px}
   .sig-line{width:100%;height:1px;background:#E5E7EB;margin-bottom:8px;margin-top:40px;position:relative}
   .sig-img{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);max-height:40px;max-width:120px;object-fit:contain}
-  .sig-label{font-size:9px;font-weight:600;color:#6B7280}
-  .sig-sub{font-size:7px;color:#9CA3AF;margin-top:2px}
+  .sig-label{font-size:11px;font-weight:600;color:#6B7280}
+  .sig-sub{font-size:9px;color:#9CA3AF;margin-top:2px}
   /* Footer */
   .footer{text-align:center;padding-top:16px;border-top:0.5px solid #F3F4F6}
-  .footer-text{font-size:7px;color:#9CA3AF;letter-spacing:0.02em;font-style:italic}
+  .footer-text{font-size:9px;color:#9CA3AF;letter-spacing:0.02em;font-style:italic}
   @media print{body{background:#fff}.page{padding:0}}
 </style>
 </head>
 <body>
 <div class="page">
   <div class="header">
-    ${logoTag}
+    <div class="logo-wrap">${logoTag}</div>
     <div class="school-info">
       <div class="school-name">${schoolInfo.name}</div>
-      <div class="school-addr">${[schoolInfo.address, schoolInfo.phone ? 'Phone: ' + schoolInfo.phone : '', schoolInfo.email].filter(Boolean).join(' \u00B7 ')}</div>
-      <div class="school-meta">${[schoolInfo.board, schoolInfo.affiliation ? 'Affil: ' + schoolInfo.affiliation : '', schoolInfo.udise ? 'UDISE: ' + schoolInfo.udise : ''].filter(Boolean).join(' \u00B7 ')}</div>
+      <div class="school-addr">${schoolInfo.address || ''}</div>
+      <div class="school-contact">${[schoolInfo.phone ? 'Phone: ' + schoolInfo.phone : '', schoolInfo.email ? 'Email: ' + schoolInfo.email : ''].filter(Boolean).join(' \u00A0|\u00A0 ')}</div>
+      <div class="aff-row">
+        ${schoolInfo.affiliation ? `<div class="aff-line">Affiliation No: <b>${schoolInfo.affiliation}</b></div>` : ''}
+        ${schoolInfo.board ? `<div class="aff-line">Board: <b>${schoolInfo.board}</b></div>` : ''}
+        ${schoolInfo.udise ? `<div class="aff-line">UDISE: <b>${schoolInfo.udise}</b></div>` : ''}
+      </div>
     </div>
   </div>
   <hr class="accent-line">
@@ -363,42 +374,47 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                         /* ══ Premium Report Card Preview ══ */
                         <div className="bg-white dark:bg-[#1C1C1E] shadow-xl max-w-3xl mx-auto rounded-xl overflow-hidden" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif" }}>
                             <link rel="preconnect" href="https://fonts.googleapis.com" />
-                            <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+                            <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet" />
 
                             <div className="p-6 sm:p-8">
 
                                 {/* ── Header ── */}
-                                <div className="flex items-start gap-4 mb-5">
-                                    <div className="shrink-0">
+                                <div className="relative text-center pb-3 mb-0">
+                                    <div className="absolute left-0 top-0 w-[105px] h-[105px] flex items-center justify-center rounded-lg overflow-hidden">
                                         {schoolInfo.logo
-                                            ? <img src={schoolInfo.logo} alt="Logo" className="w-[52px] h-[52px] rounded-full object-cover" />
-                                            : <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ background: brandColor, letterSpacing: '-0.02em' }}>{(schoolInfo.name || 'S')[0]}</div>
+                                            ? <img src={schoolInfo.logo} alt="Logo" className="w-[105px] h-[105px] object-contain" />
+                                            : <div className="w-[105px] h-[105px] rounded-lg flex items-center justify-center text-white font-bold text-[28px]" style={{ background: brandColor, letterSpacing: '-0.02em' }}>{(schoolInfo.name || 'S')[0]}</div>
                                         }
                                     </div>
-                                    <div className="flex-1">
-                                        <h1 className="text-xl font-bold text-gray-900 dark:text-white" style={{ letterSpacing: '-0.02em', lineHeight: 1.2 }}>{schoolInfo.name}</h1>
-                                        {(schoolInfo.address || schoolInfo.phone) && (
-                                            <p className="text-[9px] text-gray-500 dark:text-[#8E8E93] mt-1 leading-relaxed">
-                                                {[schoolInfo.address, schoolInfo.phone ? `Phone: ${schoolInfo.phone}` : '', schoolInfo.email].filter(Boolean).join(' \u00B7 ')}
+                                    <div className="text-center">
+                                        <h1 className="text-[28px] font-extrabold text-[#1F6F6D] uppercase whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif", letterSpacing: '2px', lineHeight: 1.1 }}>{schoolInfo.name}</h1>
+                                        {schoolInfo.address && (
+                                            <p className="text-[13px] text-gray-600 dark:text-[#8E8E93] mt-1 font-medium leading-relaxed">{schoolInfo.address}</p>
+                                        )}
+                                        {(schoolInfo.phone || schoolInfo.email) && (
+                                            <p className="text-[13px] text-gray-600 dark:text-[#8E8E93] mt-0.5 font-medium">
+                                                {[schoolInfo.phone ? `Phone: ${schoolInfo.phone}` : '', schoolInfo.email ? `Email: ${schoolInfo.email}` : ''].filter(Boolean).join(' \u00A0|\u00A0 ')}
                                             </p>
                                         )}
-                                        {schoolInfo.board && (
-                                            <p className="text-[8px] text-gray-400 dark:text-[#636366] mt-0.5" style={{ letterSpacing: '0.02em' }}>
-                                                {[schoolInfo.board, schoolInfo.affiliation ? `Affil: ${schoolInfo.affiliation}` : '', schoolInfo.udise ? `UDISE: ${schoolInfo.udise}` : ''].filter(Boolean).join(' \u00B7 ')}
-                                            </p>
+                                        {(schoolInfo.affiliation || schoolInfo.board || schoolInfo.udise) && (
+                                            <div className="flex justify-center gap-5 mt-1.5 flex-wrap">
+                                                {schoolInfo.affiliation && <span className="text-[12px] text-gray-600 dark:text-[#8E8E93] font-medium">Affiliation No: <b className="text-gray-900 dark:text-white">{schoolInfo.affiliation}</b></span>}
+                                                {schoolInfo.board && <span className="text-[12px] text-gray-600 dark:text-[#8E8E93] font-medium">Board: <b className="text-gray-900 dark:text-white">{schoolInfo.board}</b></span>}
+                                                {schoolInfo.udise && <span className="text-[12px] text-gray-600 dark:text-[#8E8E93] font-medium">UDISE: <b className="text-gray-900 dark:text-white">{schoolInfo.udise}</b></span>}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
 
                                 {/* ── Accent Line ── */}
-                                <div className="h-[2.5px] rounded-sm mb-5" style={{ background: brandColor }} />
+                                <div className="h-px bg-gray-200 dark:bg-[#38383A] my-3 mb-4" />
 
                                 {/* ── Title Row ── */}
                                 <div className="flex justify-between items-baseline mb-7">
-                                    <span className="text-[13px] font-semibold uppercase" style={{ color: brandColor, letterSpacing: '0.1em' }}>Student Report Card</span>
+                                    <span className="text-[15px] font-semibold uppercase" style={{ color: brandColor, letterSpacing: '0.1em' }}>Student Report Card</span>
                                     <div className="text-right">
-                                        <span className="block text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93]">{filterSeries || 'Midterm'} Examination</span>
-                                        <span className="block text-[10px] text-gray-400 dark:text-[#636366]">Issued: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+                                        <span className="block text-[12px] font-semibold text-gray-500 dark:text-[#8E8E93]">{filterSeries || 'Midterm'} Examination</span>
+                                        <span className="block text-[12px] text-gray-400 dark:text-[#636366]">Issued: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                                     </div>
                                 </div>
 
@@ -414,15 +430,15 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                             { label: 'Parent / Guardian', value: '\u2014' },
                                         ].map(f => (
                                             <div key={f.label}>
-                                                <p className="text-[7.5px] font-semibold uppercase text-gray-400 dark:text-[#636366] mb-0.5" style={{ letterSpacing: '0.12em' }}>{f.label}</p>
-                                                <p className="text-xs font-semibold text-gray-900 dark:text-white">{f.value}</p>
+                                                <p className="text-[9.5px] font-semibold uppercase text-gray-400 dark:text-[#636366] mb-0.5" style={{ letterSpacing: '0.12em' }}>{f.label}</p>
+                                                <p className="text-sm font-semibold text-gray-900 dark:text-white">{f.value}</p>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
                                 {/* ── Academic Performance ── */}
-                                <p className="text-[9px] font-semibold uppercase text-gray-400 dark:text-[#636366] mb-3" style={{ letterSpacing: '0.14em' }}>Academic Performance</p>
+                                <p className="text-[11px] font-semibold uppercase text-gray-400 dark:text-[#636366] mb-3" style={{ letterSpacing: '0.14em' }}>Academic Performance</p>
                                 <div className="overflow-x-auto mb-7">
                                     <table className="w-full" style={{ borderCollapse: 'collapse' }}>
                                         <thead>
@@ -436,48 +452,48 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                                     { label: 'Result', cls: 'text-center', w: '10%' },
                                                     { label: 'Remarks', cls: 'text-left', w: '18%' },
                                                 ].map(h => (
-                                                    <th key={h.label} className={`px-3 py-2.5 text-[8px] font-semibold uppercase text-gray-500 dark:text-[#8E8E93] ${h.cls}`} style={{ letterSpacing: '0.08em', borderBottom: '1.5px solid #E5E7EB', width: h.w }}>{h.label}</th>
+                                                    <th key={h.label} className={`px-3 py-2.5 text-[10px] font-semibold uppercase text-gray-500 dark:text-[#8E8E93] ${h.cls}`} style={{ letterSpacing: '0.08em', borderBottom: '1.5px solid #E5E7EB', width: h.w }}>{h.label}</th>
                                                 ))}
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {subjects.map((s, i) => (
                                                 <tr key={s.examId || i} style={{ background: i % 2 === 1 ? 'rgba(249,250,251,0.5)' : 'transparent' }}>
-                                                    <td className="px-3 py-3.5 text-[10.5px] font-medium text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
+                                                    <td className="px-3 py-3.5 text-[12.5px] font-medium text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
                                                         {s.subject}
-                                                        <span className="block text-[8px] text-gray-400 dark:text-[#636366] font-normal mt-0.5">
+                                                        <span className="block text-[10px] text-gray-400 dark:text-[#636366] font-normal mt-0.5">
                                                             {[s.examName, s.date ? new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''].filter(Boolean).join(' \u00B7 ')}
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-3.5 text-[10.5px] text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.totalMarks}</td>
-                                                    <td className="px-3 py-3.5 text-[10.5px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.marksObtained}</td>
-                                                    <td className="px-3 py-3.5 text-[10.5px] text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.percentage}%</td>
+                                                    <td className="px-3 py-3.5 text-[12.5px] text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.totalMarks}</td>
+                                                    <td className="px-3 py-3.5 text-[12.5px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.marksObtained}</td>
+                                                    <td className="px-3 py-3.5 text-[12.5px] text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.percentage}%</td>
                                                     <td className="px-3 py-3.5 text-center" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
-                                                        <span className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold text-gray-900 dark:text-white">
+                                                        <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-900 dark:text-white">
                                                             <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: GRADE_DOT_COLOR(s.grade) }} />
                                                             {s.grade}
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-3.5 text-center text-[10px] font-medium" style={{ borderBottom: '0.5px solid #F3F4F6', color: s.isPassed ? '#059669' : '#DC2626' }}>
+                                                    <td className="px-3 py-3.5 text-center text-[12px] font-medium" style={{ borderBottom: '0.5px solid #F3F4F6', color: s.isPassed ? '#059669' : '#DC2626' }}>
                                                         {s.isPassed ? 'Pass' : 'Fail'}
                                                     </td>
-                                                    <td className="px-3 py-3.5 text-[9px] text-gray-400 dark:text-[#636366]" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.remarks || '\u2014'}</td>
+                                                    <td className="px-3 py-3.5 text-[11px] text-gray-400 dark:text-[#636366]" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.remarks || '\u2014'}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                         <tfoot>
                                             <tr>
-                                                <td className="px-3 py-3.5 text-[11px] font-semibold text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>Grand Total</td>
-                                                <td className="px-3 py-3.5 text-[11px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.grandTotal}</td>
-                                                <td className="px-3 py-3.5 text-[11px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.grandObtained}</td>
-                                                <td className="px-3 py-3.5 text-[11px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.overallPercentage}%</td>
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>Grand Total</td>
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.grandTotal}</td>
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.grandObtained}</td>
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.overallPercentage}%</td>
                                                 <td className="px-3 py-3.5 text-center" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>
-                                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-900 dark:text-white">
+                                                    <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-900 dark:text-white">
                                                         <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: GRADE_DOT_COLOR(summary.overallGrade) }} />
                                                         {summary.overallGrade}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-3.5 text-center text-[11px] font-semibold" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A`, color: summary.overallPassed ? '#059669' : '#DC2626', letterSpacing: '0.04em' }} colSpan={2}>
+                                                <td className="px-3 py-3.5 text-center text-[13px] font-semibold" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A`, color: summary.overallPassed ? '#059669' : '#DC2626', letterSpacing: '0.04em' }} colSpan={2}>
                                                     {summary.overallPassed ? 'PASS' : 'FAIL'}
                                                 </td>
                                             </tr>
@@ -493,13 +509,13 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 }}>
                                     <div className="flex items-center gap-2.5">
                                         <div className="w-2.5 h-2.5 rounded-full" style={{ background: summary.overallPassed ? '#059669' : '#DC2626' }} />
-                                        <span className="text-[15px] font-bold" style={{ color: summary.overallPassed ? '#059669' : '#DC2626', letterSpacing: '0.04em' }}>
+                                        <span className="text-[17px] font-bold" style={{ color: summary.overallPassed ? '#059669' : '#DC2626', letterSpacing: '0.04em' }}>
                                             {summary.overallPassed ? 'PASSED' : 'FAILED'}
                                         </span>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-[10px] text-gray-500 dark:text-[#8E8E93] mb-0.5">{summary.overallPassed ? 'Satisfactory Performance' : 'Needs Improvement'}</p>
-                                        <p className="text-[9px] text-gray-400 dark:text-[#636366]">{summary.passCount} of {summary.totalSubjects} subjects passed &middot; Overall: {summary.overallPercentage}% &middot; Grade: {summary.overallGrade}</p>
+                                        <p className="text-[12px] text-gray-500 dark:text-[#8E8E93] mb-0.5">{summary.overallPassed ? 'Satisfactory Performance' : 'Needs Improvement'}</p>
+                                        <p className="text-[11px] text-gray-400 dark:text-[#636366]">{summary.passCount} of {summary.totalSubjects} subjects passed &middot; Overall: {summary.overallPercentage}% &middot; Grade: {summary.overallGrade}</p>
                                     </div>
                                 </div>
 
@@ -515,15 +531,15 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                                 {s.sig && <img src={getSignatureUrl(s.sig)} alt={s.label} className="absolute bottom-1 left-1/2 -translate-x-1/2 max-h-10 max-w-[120px] object-contain" />}
                                                 <div className="h-px bg-gray-200 dark:bg-[#38383A]" />
                                             </div>
-                                            <p className="text-[9px] font-semibold text-gray-500 dark:text-[#8E8E93]">{s.label}</p>
-                                            <p className="text-[7px] text-gray-400 dark:text-[#636366] mt-0.5">{s.sub}</p>
+                                            <p className="text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93]">{s.label}</p>
+                                            <p className="text-[9px] text-gray-400 dark:text-[#636366] mt-0.5">{s.sub}</p>
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* ── Footer ── */}
                                 <div className="text-center pt-4" style={{ borderTop: '0.5px solid #F3F4F6' }}>
-                                    <p className="text-[7px] text-gray-400 dark:text-[#636366] italic" style={{ letterSpacing: '0.02em' }}>
+                                    <p className="text-[9px] text-gray-400 dark:text-[#636366] italic" style={{ letterSpacing: '0.02em' }}>
                                         This is a computer-generated report card issued by {schoolInfo.name} &middot; Powered by Learnovo
                                     </p>
                                 </div>
