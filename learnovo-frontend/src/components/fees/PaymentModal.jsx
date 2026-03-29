@@ -6,6 +6,8 @@ import { formatCurrency } from '../../utils/formatCurrency'
 import StatusBadge from '../StatusBadge'
 import ModalWrapper from '../ModalWrapper'
 
+const preventScrollChange = (e) => e.target.blur()
+
 const DISCOUNT_TYPES = ['Scholarship', 'Sibling Discount', 'Staff Ward', 'Merit-based', 'Financial Hardship', 'Other']
 
 const PAYMENT_METHODS = [
@@ -333,6 +335,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                             className="input text-xs"
                             placeholder="e.g. 500"
                             value={discountForm.amount}
+                            onWheel={preventScrollChange}
                             onChange={e => setDiscountForm(f => ({ ...f, amount: e.target.value }))}
                           />
                         </div>
@@ -344,6 +347,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                             className="input text-xs"
                             placeholder="e.g. 10"
                             value={discountForm.percentage}
+                            onWheel={preventScrollChange}
                             onChange={e => setDiscountForm(f => ({ ...f, percentage: e.target.value }))}
                           />
                           {discountForm.percentage > 0 && (
@@ -401,6 +405,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                   type="number"
                   className="input"
                   value={form.amount}
+                  onWheel={preventScrollChange}
                   onChange={(e) => setForm(prev => ({ ...prev, amount: e.target.value }))}
                   max={selectedInvoice?.balanceAmount}
                   min="1"

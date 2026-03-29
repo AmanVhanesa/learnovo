@@ -4,6 +4,8 @@ import { discountsService } from '../../services/feesService'
 import { formatCurrency } from '../../utils/formatCurrency'
 import ModalWrapper from '../ModalWrapper'
 
+const preventScrollChange = (e) => e.target.blur()
+
 const DISCOUNT_TYPES = [
   'Scholarship',
   'Sibling Discount',
@@ -151,6 +153,7 @@ const DiscountModal = ({ isOpen, onClose, invoice, onSuccess }) => {
                 type="number"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-[#1C1C1E] dark:text-white"
                 value={form.amount}
+                onWheel={preventScrollChange}
                 onChange={(e) => setForm({ ...form, amount: e.target.value })}
                 max={invoice.totalAmount}
                 min="0"
@@ -169,6 +172,7 @@ const DiscountModal = ({ isOpen, onClose, invoice, onSuccess }) => {
                 type="number"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-[#1C1C1E] dark:text-white"
                 value={form.percentage}
+                onWheel={preventScrollChange}
                 onChange={(e) => setForm({ ...form, percentage: e.target.value })}
                 max="100"
                 min="1"
