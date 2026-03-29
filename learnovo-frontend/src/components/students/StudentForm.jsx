@@ -389,6 +389,17 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
                 {/* Form Content */}
                 <form onSubmit={handleSubmit} className="p-4 sm:p-6">
+                    {/* Validation error summary */}
+                    {Object.keys(formErrors).length > 0 && (
+                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                            <p className="text-sm font-medium text-red-800 dark:text-red-300 mb-1">Please fix the following errors:</p>
+                            <ul className="list-disc list-inside text-xs text-red-600 dark:text-red-400 space-y-0.5">
+                                {Object.values(formErrors).map((msg, i) => (
+                                    <li key={i}>{msg}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                     <div className="max-h-[60vh] overflow-y-auto">
                         {/* Section 0: Student Info */}
                         {activeSection === 0 && (
@@ -519,7 +530,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                         <div>
                                             <label className="label">Academic Year *</label>
                                             <select
-                                                className="input"
+                                                className={`input ${formErrors.academicYear ? 'border-red-500' : ''}`}
                                                 value={form.academicYear}
                                                 onChange={(e) => updateField('academicYear', e.target.value)}
                                                 required
@@ -546,11 +557,14 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             {academicYearsError && (
                                                 <p className="text-xs text-red-500 mt-1">{academicYearsError}</p>
                                             )}
+                                            {formErrors.academicYear && (
+                                                <p className="text-xs text-red-500 mt-1">{formErrors.academicYear}</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="label">Class *</label>
                                             <select
-                                                className="input"
+                                                className={`input ${formErrors.class ? 'border-red-500' : ''}`}
                                                 value={form.classId || ''}
                                                 onChange={(e) => {
                                                     const selectedCls = classOptions.find(c => c._id === e.target.value)
@@ -572,6 +586,9 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                     </option>
                                                 ))}
                                             </select>
+                                            {formErrors.class && (
+                                                <p className="text-xs text-red-500 mt-1">{formErrors.class}</p>
+                                            )}
                                         </div>
                                         <div>
                                             <label className="label">Section</label>
@@ -694,10 +711,13 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                         <label className="label">Date of Birth</label>
                                         <input
                                             type="date"
-                                            className="input"
+                                            className={`input ${formErrors.dateOfBirth ? 'border-red-500' : ''}`}
                                             value={form.dateOfBirth}
                                             onChange={(e) => updateField('dateOfBirth', e.target.value)}
                                         />
+                                        {formErrors.dateOfBirth && (
+                                            <p className="text-xs text-red-500 mt-1">{formErrors.dateOfBirth}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="label">Gender</label>
@@ -868,11 +888,14 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             <div>
                                                 <label className="label">Name *</label>
                                                 <input
-                                                    className="input"
+                                                    className={`input ${(formErrors.guardianName && guardian.isPrimary) ? 'border-red-500' : ''}`}
                                                     value={guardian.name}
                                                     onChange={(e) => updateGuardian(index, 'name', e.target.value)}
                                                     required={guardian.isPrimary}
                                                 />
+                                                {formErrors.guardianName && guardian.isPrimary && (
+                                                    <p className="text-xs text-red-500 mt-1">{formErrors.guardianName}</p>
+                                                )}
                                             </div>
                                         </div>
 
@@ -880,20 +903,29 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             <div>
                                                 <label className="label">Phone *</label>
                                                 <input
-                                                    className="input"
+                                                    className={`input ${(formErrors.guardianPhone && guardian.isPrimary) || formErrors[`guardianPhone${index}`] ? 'border-red-500' : ''}`}
                                                     value={guardian.phone}
                                                     onChange={(e) => updateGuardian(index, 'phone', e.target.value)}
                                                     required={guardian.isPrimary}
                                                 />
+                                                {formErrors.guardianPhone && guardian.isPrimary && (
+                                                    <p className="text-xs text-red-500 mt-1">{formErrors.guardianPhone}</p>
+                                                )}
+                                                {formErrors[`guardianPhone${index}`] && (
+                                                    <p className="text-xs text-red-500 mt-1">{formErrors[`guardianPhone${index}`]}</p>
+                                                )}
                                             </div>
                                             <div>
                                                 <label className="label">Email</label>
                                                 <input
                                                     type="email"
-                                                    className="input"
+                                                    className={`input ${formErrors[`guardianEmail${index}`] ? 'border-red-500' : ''}`}
                                                     value={guardian.email}
                                                     onChange={(e) => updateGuardian(index, 'email', e.target.value)}
                                                 />
+                                                {formErrors[`guardianEmail${index}`] && (
+                                                    <p className="text-xs text-red-500 mt-1">{formErrors[`guardianEmail${index}`]}</p>
+                                                )}
                                             </div>
                                         </div>
 

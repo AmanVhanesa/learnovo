@@ -198,7 +198,15 @@ const Students = () => {
       setShowForm(false)
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to save student')
+      const data = error.response?.data
+      if (data?.errors && Array.isArray(data.errors)) {
+        const msgs = data.errors.map(e => e.msg || e.message).filter(Boolean)
+        if (msgs.length) {
+          msgs.forEach(msg => toast.error(msg, { duration: 5000 }))
+          return
+        }
+      }
+      toast.error(data?.message || 'Failed to save student')
     },
   })
 
