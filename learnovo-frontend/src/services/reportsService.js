@@ -20,6 +20,11 @@ export const reportsService = {
     return data
   },
 
+  getEnrollmentTrend: async (range = '30d') => {
+    const { data } = await api.get(`/reports/enrollment-trend?range=${range}`)
+    return data
+  },
+
   getRecentActivities: async (filters = {}) => {
     const params = new URLSearchParams()
 

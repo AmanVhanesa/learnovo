@@ -46,6 +46,37 @@ ChartJS.register(
   Legend
 )
 
+const EnrollmentTrendChart = ({ range }) => {
+  const [trendData, setTrendData] = useState({ labels: [], data: [] })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    reportsService.getEnrollmentTrend(range)
+      .then(res => {
+        if (!cancelled && res.success) setTrendData(res.data)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [range])
+
+  const chartData = {
+    labels: trendData.labels?.length > 0 ? trendData.labels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    datasets: [{
+      label: 'Students Enrolled',
+      data: trendData.data?.length > 0 ? trendData.data : [0, 0, 0, 0, 0, 0],
+      borderColor: 'rgb(62, 196, 177)',
+      backgroundColor: 'rgba(62, 196, 177, 0.1)',
+      tension: 0.4
+    }]
+  }
+
+  if (loading) return <div className="flex items-center justify-center h-full text-gray-400 text-sm">Loading...</div>
+  return <Line data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
+}
+
 const Dashboard = () => {
   const { user } = useAuth()
   const { formatCurrency } = useSettings()
@@ -393,11 +424,11 @@ const Dashboard = () => {
               <>
                 <ChartCard
                   title="Student Enrollment Trend"
-                  onExport={() => exportChartAsPNG('Student Enrollment Trend', enrollmentData)}
+                  onExport={() => exportChartAsPNG('Student Enrollment Trend', {})}
                   filterOptions={{ classOptions: [], teacherOptions: [], sectionOptions: [] }}
                 >
-                  {() => (
-                    <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
+                  {({ range }) => (
+                    <EnrollmentTrendChart range={range} />
                   )}
                 </ChartCard>
 
