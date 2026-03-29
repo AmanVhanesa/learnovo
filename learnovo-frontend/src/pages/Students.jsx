@@ -148,6 +148,7 @@ const Students = () => {
       return response
     },
     placeholderData: (prev) => prev,
+    staleTime: 0,
   })
 
   const students = useMemo(() => {
@@ -236,8 +237,8 @@ const Students = () => {
       toast.error(error.response?.data?.message || 'Failed to reactivate student')
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
-      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['students-filters'] })
     },
   })
 
@@ -302,8 +303,8 @@ const Students = () => {
       toast.error(error.response?.data?.message || 'Failed to deactivate student')
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
-      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+      queryClient.invalidateQueries({ queryKey: ['students-filters'] })
     },
   })
 
@@ -343,8 +344,8 @@ const Students = () => {
       toast.error('Failed to activate students')
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
-      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'active' })
+      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'active' })
     },
   })
 
@@ -388,8 +389,8 @@ const Students = () => {
       toast.error('Failed to deactivate students')
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
-      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'active' })
+      queryClient.invalidateQueries({ queryKey: ['students-filters'], refetchType: 'active' })
     },
   })
 

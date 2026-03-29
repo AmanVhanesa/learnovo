@@ -47,6 +47,7 @@ const StudentDetail = () => {
             } catch { /* class history not available */ }
             return { student: response.data, classHistory: history, admissionClassInfo: admClass }
         },
+        staleTime: 0,
     })
 
     // Handle student fetch error — redirect back
@@ -130,8 +131,8 @@ const StudentDetail = () => {
             toast.error(`Failed to ${isDeactivation ? 'deactivate' : 'activate'} student`)
         },
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ['student', id], refetchType: 'none' })
-            queryClient.invalidateQueries({ queryKey: ['students'], refetchType: 'none' })
+            queryClient.invalidateQueries({ queryKey: ['student', id] })
+            queryClient.invalidateQueries({ queryKey: ['students'] })
         },
     })
 

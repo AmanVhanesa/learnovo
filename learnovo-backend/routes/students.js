@@ -215,7 +215,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     const total = await User.countDocuments(filter);
 
     // 30s private cache — safe for auth endpoints; avoids repeat fetches on quick back-nav
-    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.set('Cache-Control', 'no-cache');
     res.json(paginatedResponse(students, total, page, limit));
   } catch (error) {
     logger.error('GET /students error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
@@ -1727,22 +1727,31 @@ router.get('/:id', protect, canAccessStudent, async(req, res) => {
       });
     }
 
-    // Get fee details
-    const fees = await Fee.find({ student: student._id }).sort({ dueDate: -1 });
+    // Get fee summary via aggregation (single DB call instead of loading all fees)
+    const feeSummaryAgg = await Fee.aggregate([
+      { $match: { student: student._id } },
+      { $group: {
+        _id: null,
+        total: { $sum: '$amount' },
+        paid: { $sum: { $cond: [{ $eq: ['$status', 'paid'] }, '$amount', 0] } },
+        pending: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, '$amount', 0] } },
+        overdue: { $sum: { $cond: [{ $eq: ['$status', 'overdue'] }, '$amount', 0] } }
+      } }
+    ]);
+    const summary = feeSummaryAgg[0] || { total: 0, paid: 0, pending: 0, overdue: 0 };
 
-    // Get fee summary
-    const totalFees = fees.reduce((sum, fee) => sum + fee.amount, 0);
-    const paidFees = fees.filter(fee => fee.status === 'paid').reduce((sum, fee) => sum + fee.amount, 0);
-    const pendingFees = fees.filter(fee => fee.status === 'pending').reduce((sum, fee) => sum + fee.amount, 0);
-    const overdueFees = fees.filter(fee => fee.status === 'overdue').reduce((sum, fee) => sum + fee.amount, 0);
+    // Get recent fees only (limit 50 for performance)
+    const fees = await Fee.find({ student: student._id }).sort({ dueDate: -1 }).limit(50).lean();
 
-    // Format fees with currency
-    const formattedFees = await Promise.all(
-      fees.map(async(fee) => ({
-        ...fee.toJSON(),
-        formattedAmount: await formatCurrencyWithSettings(fee.amount, fee.currency)
-      }))
-    );
+    // Format currency once and reuse for all fees
+    const currencySymbol = await formatCurrencyWithSettings(0);
+    const symbolPrefix = currencySymbol.replace(/[\d.,\s]/g, '');
+    const formatAmount = (amt) => `${symbolPrefix}${Number(amt || 0).toLocaleString('en-IN')}`;
+
+    const formattedFees = fees.map(fee => ({
+      ...fee,
+      formattedAmount: formatAmount(fee.amount)
+    }));
 
     res.json({
       success: true,
@@ -1750,10 +1759,10 @@ router.get('/:id', protect, canAccessStudent, async(req, res) => {
         ...student.toJSON(),
         fees: formattedFees,
         feeSummary: {
-          total: await formatCurrencyWithSettings(totalFees),
-          paid: await formatCurrencyWithSettings(paidFees),
-          pending: await formatCurrencyWithSettings(pendingFees),
-          overdue: await formatCurrencyWithSettings(overdueFees)
+          total: formatAmount(summary.total),
+          paid: formatAmount(summary.paid),
+          pending: formatAmount(summary.pending),
+          overdue: formatAmount(summary.overdue)
         }
       },
       requestId: req.requestId
