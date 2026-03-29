@@ -150,16 +150,20 @@ const reportCardService = {
    * Used for teachers to print and fill by hand.
    */
   async getBlankReportCardData(tenantId, studentId, { examSeries, className } = {}) {
-    const { filtered, student } = await fetchFilteredResults(tenantId, studentId, { examSeries, className });
-    if (!student) return null;
+    // For blank cards, fetch student directly — don't require exam results
+    const studentDoc = await User.findOne({ _id: studentId, tenantId, role: 'student' })
+      .select('name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName skippedSubjects classId sectionId')
+      .lean();
+    if (!studentDoc) return null;
 
+    const resolvedClass = className || studentDoc.class;
     const settings = await Settings.findOne({ tenantId });
 
-    // If we have exam results, use the subject list from them but blank out marks
-    // If no results, try to get subjects from exams matching the class
+    // Try to get subject list from existing results first
+    const { filtered } = await fetchFilteredResults(tenantId, studentId, { examSeries, className: resolvedClass });
+
     let subjects;
     if (filtered.length) {
-      // Deduplicate subjects (same subject may appear across exams)
       const seen = new Set();
       subjects = filtered
         .filter(r => {
@@ -180,9 +184,10 @@ const reportCardService = {
           remarks: ''
         }));
     } else {
-      // Fallback: get subjects from exams in this class
+      // Fallback: get subjects from exams matching this student's class
       const examFilter = { tenantId };
-      if (className) examFilter.class = className;
+      if (resolvedClass) examFilter.class = resolvedClass;
+      if (studentDoc.classId) examFilter.classId = studentDoc.classId;
       if (examSeries) examFilter.examSeries = examSeries;
       const exams = await Exam.find(examFilter).select('subject totalMarks').lean();
       const seen = new Set();
@@ -208,7 +213,7 @@ const reportCardService = {
 
     return {
       school: buildSchoolData(settings),
-      student: buildStudentData(student, className || student.class, student.section),
+      student: buildStudentData(studentDoc, resolvedClass, studentDoc.section),
       exam: {
         type: examSeries || 'Mid Term',
         academicYear: settings?.academicYear || '',

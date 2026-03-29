@@ -13,35 +13,58 @@ function getQueue() {
   return pdfQueue;
 }
 
-// ── In-memory job store ──
-const jobs = new Map();
-
-// Auto-cleanup: remove expired jobs and temp files every 10 minutes
-const CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
+// ── File-based job store (shared across PM2 cluster instances) ──
 const JOB_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [jobId, job] of jobs.entries()) {
-    if (now - job.createdAt > JOB_TTL_MS) {
-      if (job.zipPath && fs.existsSync(job.zipPath)) {
-        try {
-          fs.unlinkSync(job.zipPath);
-        } catch (e) { /* ignore */ }
-      }
-      jobs.delete(jobId);
-    }
-  }
-}, CLEANUP_INTERVAL_MS);
-
-/**
- * Get the temp directory for bulk PDFs, creating it if needed.
- */
 function getTempDir() {
   const dir = path.join(os.tmpdir(), 'learnovo-bulk');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
+
+function jobMetaPath(jobId) {
+  return path.join(getTempDir(), `job-${jobId}.json`);
+}
+
+function readJob(jobId) {
+  const p = jobMetaPath(jobId);
+  if (!fs.existsSync(p)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeJob(job) {
+  fs.writeFileSync(jobMetaPath(job.id), JSON.stringify(job), 'utf8');
+}
+
+// Auto-cleanup expired jobs every 10 minutes
+setInterval(() => {
+  const dir = getTempDir();
+  try {
+    const files = fs.readdirSync(dir);
+    const now = Date.now();
+    for (const file of files) {
+      if (!file.startsWith('job-') || !file.endsWith('.json')) continue;
+      const filePath = path.join(dir, file);
+      try {
+        const job = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        if (now - job.createdAt > JOB_TTL_MS) {
+          if (job.zipPath && fs.existsSync(job.zipPath)) {
+            try {
+              fs.unlinkSync(job.zipPath);
+            } catch { /* ignore */ }
+          }
+          try {
+            fs.unlinkSync(filePath);
+          } catch { /* ignore */ }
+        }
+      } catch { /* skip corrupt files */ }
+    }
+  } catch { /* ignore */ }
+}, 10 * 60 * 1000);
 
 const bulkPdfService = {
   /**
@@ -55,8 +78,8 @@ const bulkPdfService = {
     const jobId = uuidv4();
     const job = {
       id: jobId,
-      tenantId,
-      status: 'processing', // processing | completed | failed
+      tenantId: tenantId.toString(),
+      status: 'processing',
       total: students.length,
       completed: 0,
       failed: 0,
@@ -64,14 +87,15 @@ const bulkPdfService = {
       zipPath: null,
       createdAt: Date.now()
     };
-    jobs.set(jobId, job);
+    writeJob(job);
 
     // Fire and forget — runs in background
     this._processJob(jobId, tenantId, students, options).catch(err => {
-      const j = jobs.get(jobId);
+      const j = readJob(jobId);
       if (j) {
         j.status = 'failed';
         j.errors.push(`Fatal: ${err.message}`);
+        writeJob(j);
       }
     });
 
@@ -82,10 +106,9 @@ const bulkPdfService = {
    * Process all students in the job sequentially via the global queue.
    */
   async _processJob(jobId, tenantId, students, options) {
-    const job = jobs.get(jobId);
+    const job = readJob(jobId);
     if (!job) return;
 
-    // Lazy-load heavy dependencies only when actually generating PDFs
     const archiver = require('archiver');
     const pdfService = require('./pdfService');
     const reportCardService = require('./reportCardService');
@@ -96,10 +119,8 @@ const bulkPdfService = {
     const output = fs.createWriteStream(zipPath);
     const archive = archiver('zip', { zlib: { level: 5 } });
 
-    // Pipe archive to file
     archive.pipe(output);
 
-    // Wait for the archive to finalize
     const archiveFinished = new Promise((resolve, reject) => {
       output.on('close', resolve);
       archive.on('error', reject);
@@ -107,7 +128,6 @@ const bulkPdfService = {
 
     for (const student of students) {
       try {
-        // Each PDF goes through the global concurrency queue
         await queue.add(async() => {
           let pdfBuffer;
           const studentId = student._id.toString();
@@ -123,13 +143,12 @@ const bulkPdfService = {
             if (!data) throw new Error(`No final data for student ${studentName}`);
             pdfBuffer = await pdfService.generateFinalReportCard(data);
           } else {
-            // regular
             const data = await reportCardService.getReportCardData(tenantId, studentId, { examSeries, className });
             if (!data) throw new Error(`No results for student ${studentName}`);
             pdfBuffer = await pdfService.generateReportCard(data);
           }
 
-          const filename = `${rollNo ? `${rollNo  }_` : ''}${studentName}.pdf`.replace(/\s+/g, '_');
+          const filename = `${rollNo ? `${rollNo}_` : ''}${studentName}.pdf`.replace(/\s+/g, '_');
           archive.append(pdfBuffer, { name: filename });
         });
 
@@ -139,21 +158,27 @@ const bulkPdfService = {
         const name = student.fullName || student.name || student._id;
         job.errors.push(`${name}: ${err.message}`);
       }
+
+      // Write progress to disk periodically (every 5 students or on last)
+      if (job.completed % 5 === 0 || (job.completed + job.failed) === job.total) {
+        writeJob(job);
+      }
     }
 
-    // Finalize the archive
+    // Finalize archive and wait for file to be fully written
     await archive.finalize();
     await archiveFinished;
 
     job.zipPath = zipPath;
     job.status = 'completed';
+    writeJob(job);
   },
 
   /**
    * Get current status of a bulk job.
    */
   getJobStatus(jobId) {
-    const job = jobs.get(jobId);
+    const job = readJob(jobId);
     if (!job) return null;
     return {
       id: job.id,
@@ -167,10 +192,9 @@ const bulkPdfService = {
 
   /**
    * Get the zip file path for a completed job.
-   * Returns null if job doesn't exist, isn't complete, or file is missing.
    */
   getJobZipPath(jobId) {
-    const job = jobs.get(jobId);
+    const job = readJob(jobId);
     if (!job || job.status !== 'completed' || !job.zipPath) return null;
     if (!fs.existsSync(job.zipPath)) return null;
     return job.zipPath;
@@ -180,7 +204,7 @@ const bulkPdfService = {
    * Get the tenantId for a job (for authorization checks).
    */
   getJobTenantId(jobId) {
-    const job = jobs.get(jobId);
+    const job = readJob(jobId);
     return job ? job.tenantId : null;
   }
 };
