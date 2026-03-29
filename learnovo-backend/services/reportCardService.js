@@ -349,10 +349,11 @@ const reportCardService = {
    * Get all students in a section (for bulk operations).
    */
   async getStudentsInSection(tenantId, sectionId) {
-    const section = await Section.findOne({ _id: sectionId, tenantId }).populate('classId', 'name');
+    const section = await Section.findOne({ _id: sectionId, tenantId }).populate('classId', 'name grade');
     if (!section) return { students: [], section: null };
 
-    const students = await User.find({
+    // Try finding by sectionId first (modern enrollment)
+    let students = await User.find({
       tenantId,
       role: 'student',
       sectionId,
@@ -361,6 +362,24 @@ const reportCardService = {
       .select('_id name fullName rollNumber admissionNumber class section')
       .sort({ rollNumber: 1, name: 1 })
       .lean();
+
+    // Fallback: find by string class + section name (legacy/imported students)
+    if (!students.length && section.classId) {
+      const className = section.classId.name || section.classId.grade;
+      students = await User.find({
+        tenantId,
+        role: 'student',
+        isActive: true,
+        section: section.name,
+        $or: [
+          { classId: section.classId._id },
+          { class: className }
+        ]
+      })
+        .select('_id name fullName rollNumber admissionNumber class section')
+        .sort({ rollNumber: 1, name: 1 })
+        .lean();
+    }
 
     return { students, section };
   }

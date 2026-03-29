@@ -9,6 +9,7 @@ import {
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
 import { teachersService } from '../services/teachersService';
+import { academicSessionsService } from '../services/academicsService';
 import ExamResultsModal from '../components/ExamResultsModal';
 import ResultCard from '../components/ResultCard';
 import BulkDownloadProgress from '../components/BulkDownloadProgress';
@@ -98,17 +99,31 @@ const Exams = () => {
     });
 
     /* ── Bulk download helpers ── */
-    const findSectionId = (className, sectionName) => {
-        const cls = availableClasses.find(c => c.name === className || c.grade === className);
+    const findSectionId = (className, sectionName, examList) => {
+        // Try to get classId from the exam data first (most reliable)
+        const examWithClassId = examList?.find(e => e.classId);
+        if (examWithClassId?.classId) {
+            const cls = availableClasses.find(c => c._id === examWithClassId.classId);
+            if (cls?.sections) {
+                const sec = cls.sections.find(s => s.name === sectionName);
+                if (sec?._id) return sec._id;
+            }
+        }
+        // Fallback: match by class name or grade
+        const cls = availableClasses.find(c =>
+            c.name === className || c.grade === className ||
+            c.name?.toLowerCase() === className?.toLowerCase() ||
+            c.grade?.toLowerCase() === className?.toLowerCase()
+        );
         if (!cls?.sections) return null;
         const sec = cls.sections.find(s => s.name === sectionName);
         return sec?._id || null;
     };
 
-    const handleBulkDownload = async (className, sectionName, type = 'regular') => {
-        const sectionId = findSectionId(className, sectionName);
+    const handleBulkDownload = async (className, sectionName, type = 'regular', examList = []) => {
+        const sectionId = findSectionId(className, sectionName, examList);
         if (!sectionId) {
-            toast.error('Could not find section. Please try again.');
+            toast.error('Could not find section. Make sure students are enrolled in this class and section.');
             return;
         }
         try {
@@ -117,6 +132,28 @@ const Exams = () => {
             toast.success(`Generating ${type === 'blank' ? 'blank ' : ''}report cards for ${res.data.totalStudents} students...`);
         } catch (err) {
             toast.error(err?.response?.data?.message || 'Failed to start bulk download');
+        }
+    };
+
+    const handleCumulativeDownload = async (className, sectionName, examList = []) => {
+        const sectionId = findSectionId(className, sectionName, examList);
+        if (!sectionId) {
+            toast.error('Could not find section. Make sure students are enrolled in this class and section.');
+            return;
+        }
+        try {
+            // Get the active academic session
+            const sessionRes = await academicSessionsService.getActive();
+            const session = sessionRes?.data || sessionRes;
+            if (!session?._id) {
+                toast.error('No active academic session found. Please set one in Settings.');
+                return;
+            }
+            const res = await examsService.startFinalBulkDownload(sectionId, session._id);
+            setBulkJob({ jobId: res.data.jobId, totalStudents: res.data.totalStudents });
+            toast.success(`Generating cumulative report cards for ${res.data.totalStudents} students...`);
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Failed to start cumulative download');
         }
     };
 
@@ -711,7 +748,7 @@ const Exams = () => {
                                                 <div className="flex items-center gap-1.5 px-3 shrink-0">
                                                     <button
                                                         className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
-                                                        onClick={(e) => { e.stopPropagation(); handleBulkDownload(cls, sec, 'regular'); }}
+                                                        onClick={(e) => { e.stopPropagation(); handleBulkDownload(cls, sec, 'regular', examList); }}
                                                         title="Download all report cards as ZIP"
                                                     >
                                                         <Download className="h-3 w-3" />
@@ -719,11 +756,19 @@ const Exams = () => {
                                                     </button>
                                                     <button
                                                         className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
-                                                        onClick={(e) => { e.stopPropagation(); handleBulkDownload(cls, sec, 'blank'); }}
+                                                        onClick={(e) => { e.stopPropagation(); handleBulkDownload(cls, sec, 'blank', examList); }}
                                                         title="Download blank report cards (no marks) as ZIP"
                                                     >
                                                         <FileText className="h-3 w-3" />
                                                         Blank
+                                                    </button>
+                                                    <button
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+                                                        onClick={(e) => { e.stopPropagation(); handleCumulativeDownload(cls, sec, examList); }}
+                                                        title="Download cumulative report cards (all exams combined) as ZIP"
+                                                    >
+                                                        <BarChart3 className="h-3 w-3" />
+                                                        Cumulative
                                                     </button>
                                                 </div>
                                             )}
