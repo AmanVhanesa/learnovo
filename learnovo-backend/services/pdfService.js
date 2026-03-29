@@ -247,21 +247,14 @@ function buildBlankSubjectRow(subject) {
 function buildFinalSubjectRow(subject, examSeriesList) {
   const examCells = examSeriesList.map(series => {
     const data = subject.exams[series];
-    if (!data) return '<td class="num" style="color:#9CA3AF">—</td>';
-    return `<td class="num">${data.marksObtained}/${data.totalMarks}</td>`;
+    if (!data) return '<td class="no-data">\u2014</td>';
+    return `<td>${data.grade}</td>`;
   }).join('\n');
 
-  const gradeClass = getGradeClass(subject.finalGrade);
-  const resultClass = subject.isPassed ? 'pass-text' : 'fail-text';
-  const resultText = subject.isPassed ? 'Pass' : 'Fail';
-
   return `<tr>
-        <td class="subject-name">${escapeHtml(subject.subject)}</td>
+        <td class="subject-cell">${escapeHtml(subject.subject)}</td>
         ${examCells}
-        <td class="num" style="font-weight:600">${subject.totalObtained}/${subject.totalMax}</td>
-        <td class="num">${subject.averagePercentage}%</td>
-        <td class="center"><span class="grade-display"><span class="grade-dot ${gradeClass}"></span> ${escapeHtml(subject.finalGrade)}</span></td>
-        <td class="center"><span class="${resultClass}">${resultText}</span></td>
+        <td style="font-weight:700">${escapeHtml(subject.finalGrade)}</td>
     </tr>`;
 }
 
@@ -277,11 +270,15 @@ function buildFinalReportCardPlaceholders(data) {
   // Build subject rows
   const subjectRowsHtml = subjectRows.map(row => buildFinalSubjectRow(row, examSeries)).join('\n');
 
-  // Grand total exam cells
+  // Grand total exam cells — show average grade per exam series
   const grandTotalExamCells = examSeries.map(series => {
-    const total = subjectRows.reduce((acc, r) => acc + (r.exams[series]?.marksObtained || 0), 0);
-    const max = subjectRows.reduce((acc, r) => acc + (r.exams[series]?.totalMarks || 0), 0);
-    return `<td class="num">${total}/${max}</td>`;
+    const withData = subjectRows.filter(r => r.exams[series]);
+    if (!withData.length) return '<td>\u2014</td>';
+    const totalObt = withData.reduce((acc, r) => acc + (r.exams[series]?.marksObtained || 0), 0);
+    const totalMax = withData.reduce((acc, r) => acc + (r.exams[series]?.totalMarks || 0), 0);
+    const pct = totalMax > 0 ? Math.round((totalObt / totalMax) * 100) : 0;
+    const grade = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D' : 'F';
+    return `<td style="font-weight:700">${grade}</td>`;
   }).join('\n');
 
   const dob = student.dob
@@ -698,7 +695,6 @@ const pdfService = {
       await new Promise(r => setTimeout(r, 500));
       const pdfUint8 = await page.pdf({
         format: 'A4',
-        landscape: true,
         printBackground: true,
         preferCSSPageSize: true,
         margin: { top: 0, right: 0, bottom: 0, left: 0 }

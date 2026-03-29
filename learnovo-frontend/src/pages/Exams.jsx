@@ -27,7 +27,7 @@ const STATUS_COLORS = {
     Cancelled: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
 };
 
-const EXAM_SERIES = ['Unit Test', 'Midterm', 'Final', 'Custom'];
+const EXAM_SERIES = ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom'];
 const EXAM_TYPES = ['Written', 'Practical', 'Oral'];
 const EXAM_MODES = ['Offline', 'Online'];
 const EXAM_STATUSES = ['Scheduled', 'Ongoing', 'Completed', 'Cancelled'];
@@ -236,6 +236,19 @@ const Exams = () => {
         return cls?.sections || [];
     }, [form.classId, availableClasses]);
 
+    /* ── Derived: subjects for the selected class ── */
+    const classSubjects = useMemo(() => {
+        if (!form.classId) return [];
+        const cls = availableClasses.find(c => c._id === form.classId);
+        if (!cls?.subjects) return [];
+        return cls.subjects
+            .filter(s => s.subject)
+            .map(s => ({
+                _id: s.subject._id || s.subject,
+                name: s.subject.name || s.subject.subjectCode || s.subject
+            }));
+    }, [form.classId, availableClasses]);
+
     /* ── Derived: filtered exam list ── */
     const filteredExams = useMemo(() => exams.filter(e => {
         if (filterStatus && e.status !== filterStatus) return false;
@@ -282,6 +295,7 @@ const Exams = () => {
                 const cls = availableClasses.find(c => c.grade === value);
                 next.classId = cls ? cls._id : '';
                 next.section = '';
+                next.subject = ''; // Reset subject when class changes
             }
             return next;
         });
@@ -959,12 +973,25 @@ const Exams = () => {
                                     </div>
                                     <div>
                                         <FieldLabel required>Subject</FieldLabel>
-                                        <input
-                                            className={`input ${formErrors.subject ? 'border-red-400' : ''}`}
-                                            placeholder="e.g. Physics"
-                                            value={form.subject}
-                                            onChange={e => handleField('subject', e.target.value)}
-                                        />
+                                        {classSubjects.length > 0 ? (
+                                            <Select
+                                                value={form.subject}
+                                                onChange={e => handleField('subject', e.target.value)}
+                                                placeholder="Select Subject"
+                                                className={formErrors.subject ? '[&_button]:border-red-400' : ''}
+                                                options={[
+                                                    { value: '', label: form.classId ? 'Select Subject' : 'Select class first' },
+                                                    ...classSubjects.map(s => ({ value: typeof s.name === 'string' ? s.name : String(s.name), label: typeof s.name === 'string' ? s.name : String(s.name) }))
+                                                ]}
+                                            />
+                                        ) : (
+                                            <input
+                                                className={`input ${formErrors.subject ? 'border-red-400' : ''}`}
+                                                placeholder={form.classId ? 'No subjects assigned — type manually' : 'Select class first'}
+                                                value={form.subject}
+                                                onChange={e => handleField('subject', e.target.value)}
+                                            />
+                                        )}
                                         <FieldError msg={formErrors.subject} />
                                     </div>
                                 </div>
