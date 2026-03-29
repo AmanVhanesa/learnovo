@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useTenant } from '../contexts/TenantContext'
 import { Eye, EyeOff, Sun, Moon, ArrowLeft } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { HeroGeometric } from '../components/ui/ShapeLandingHero'
@@ -21,28 +22,52 @@ const Login = () => {
 
   const { login, isAuthenticated, isLoading: authLoading, error, clearError, user } = useAuth()
   const { theme, toggleMode } = useTheme()
+  const { isSubdomainApp, tenant } = useTenant()
   const isDark = theme?.mode === 'dark'
   const navigate = useNavigate()
 
+  // Tenant branding
+  const isTenantLogin = isSubdomainApp && tenant
+  const tenantColor = tenant?.primaryColor || '#3EC4B1'
+  const tenantGradient = isTenantLogin
+    ? `linear-gradient(135deg, ${tenantColor} 0%, ${tenantColor}dd 60%, ${tenantColor}bb 100%)`
+    : 'linear-gradient(135deg, #3EC4B1 0%, #0ea5a3 60%, #0b8f8f 100%)'
+
   useEffect(() => {
     if (isAuthenticated && !authLoading && !isLoading) {
+      // If on root domain and tenant has a subdomain, redirect to subdomain
+      const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
+      const subdomain = tenant?.subdomain || tenant?.schoolCode
+      if (!isSubdomainApp && subdomain) {
+        const protocol = window.location.protocol
+        const baseDomain = import.meta.env.VITE_APP_DOMAIN || 'learnovoportal.com'
+        window.location.href = `${protocol}//${subdomain}.${baseDomain}/app/dashboard`
+        return
+      }
       navigate('/app/dashboard', { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, authLoading, isLoading, user])
+
+  // Auto-fill schoolCode from tenant on subdomain
+  useEffect(() => {
+    if (isTenantLogin) {
+      setFormData(prev => ({ ...prev, schoolCode: tenant.schoolCode || tenant.subdomain }))
+    }
+  }, [isTenantLogin, tenant])
 
   useEffect(() => {
     const savedCredentials = localStorage.getItem('learnovo_remember_me')
     if (savedCredentials) {
       try {
         const { email, schoolCode } = JSON.parse(savedCredentials)
-        setFormData(prev => ({ ...prev, email: email || '', schoolCode: schoolCode || '' }))
+        setFormData(prev => ({ ...prev, email: email || '', schoolCode: isTenantLogin ? (tenant?.schoolCode || tenant?.subdomain) : (schoolCode || '') }))
         setRememberMe(true)
       } catch (e) {
         // Ignore corrupt localStorage data
       }
     }
-  }, [])
+  }, [isTenantLogin, tenant])
 
   useEffect(() => {
     clearError()
@@ -200,15 +225,17 @@ const Login = () => {
         style={isDark ? { background: '#000000' } : { background: 'linear-gradient(150deg, #f8fffd 0%, #f0faf8 40%, #eaf6f6 100%)' }}
       >
 
-        {/* Back to home button */}
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="absolute top-6 left-6 flex items-center gap-1.5 text-[13px] text-gray-400 dark:text-[#636366] hover:text-gray-600 dark:hover:text-white transition-colors z-10"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back</span>
-        </button>
+        {/* Back to home button — hidden on tenant subdomain */}
+        {!isTenantLogin && (
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="absolute top-6 left-6 flex items-center gap-1.5 text-[13px] text-gray-400 dark:text-[#636366] hover:text-gray-600 dark:hover:text-white transition-colors z-10"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back</span>
+          </button>
+        )}
 
         {/* Dark/Light mode toggle */}
         <button
@@ -241,37 +268,58 @@ const Login = () => {
             className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-lg shadow-teal-100/40 dark:shadow-black/20 border border-gray-100 dark:border-[#38383A] px-6 sm:px-7 py-6 sm:py-7"
           >
 
-            {/* Heading */}
+            {/* Heading — branded for tenant subdomain */}
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Welcome back</h2>
-              <p className="text-gray-400 dark:text-[#8E8E93] text-[13px] mt-1">Sign in to your school account</p>
+              {isTenantLogin ? (
+                <div className="text-center">
+                  {tenant.logo ? (
+                    <img src={tenant.logo} alt={tenant.schoolName} className="h-16 w-16 object-contain mx-auto mb-3 rounded-xl" />
+                  ) : (
+                    <div
+                      className="h-16 w-16 rounded-xl mx-auto mb-3 flex items-center justify-center text-white text-2xl font-bold"
+                      style={{ background: tenantColor }}
+                    >
+                      {tenant.schoolName?.charAt(0) || 'S'}
+                    </div>
+                  )}
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">{tenant.schoolName}</h2>
+                  <p className="text-gray-400 dark:text-[#8E8E93] text-[13px] mt-1">Sign in to your account</p>
+                </div>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Welcome back</h2>
+                  <p className="text-gray-400 dark:text-[#8E8E93] text-[13px] mt-1">Sign in to your school account</p>
+                </>
+              )}
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>
 
-              {/* School Code */}
-              <div>
-                <label htmlFor="schoolCode" className="block text-[13px] font-medium text-gray-600 dark:text-[#8E8E93] mb-1">
-                  School Code
-                </label>
-                {formReady ? (
-                  <input
-                    id="schoolCode"
-                    name="schoolCode"
-                    type="text"
-                    autoFocus
-                    value={formData.schoolCode}
-                    onChange={handleChange}
-                    className={`input ${fieldErrors.schoolCode ? '!border-red-400 !ring-red-400' : ''}`}
-                    placeholder="e.g. spis"
-                  />
-                ) : (
-                  <div className="input" style={{ minHeight: '42px' }} />
-                )}
-                {fieldErrors.schoolCode && (
-                  <p className="mt-1 text-[11px] text-red-500">{fieldErrors.schoolCode}</p>
-                )}
-              </div>
+              {/* School Code — hidden on tenant subdomain (auto-filled) */}
+              {!isTenantLogin && (
+                <div>
+                  <label htmlFor="schoolCode" className="block text-[13px] font-medium text-gray-600 dark:text-[#8E8E93] mb-1">
+                    School Code
+                  </label>
+                  {formReady ? (
+                    <input
+                      id="schoolCode"
+                      name="schoolCode"
+                      type="text"
+                      autoFocus
+                      value={formData.schoolCode}
+                      onChange={handleChange}
+                      className={`input ${fieldErrors.schoolCode ? '!border-red-400 !ring-red-400' : ''}`}
+                      placeholder="e.g. spis"
+                    />
+                  ) : (
+                    <div className="input" style={{ minHeight: '42px' }} />
+                  )}
+                  {fieldErrors.schoolCode && (
+                    <p className="mt-1 text-[11px] text-red-500">{fieldErrors.schoolCode}</p>
+                  )}
+                </div>
+              )}
 
               {/* Email */}
               <div>
@@ -350,7 +398,8 @@ const Login = () => {
                       onChange={handleRememberMe}
                       className="peer sr-only"
                     />
-                    <div className="h-[16px] w-[16px] rounded-md border-2 border-gray-300 dark:border-[#48484A] bg-white dark:bg-[#2C2C2E] peer-checked:border-[#3EC4B1] peer-checked:bg-[#3EC4B1] transition-all duration-150 flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-[#3EC4B1]/40 peer-focus-visible:ring-offset-1">
+                    <div className="h-[16px] w-[16px] rounded-md border-2 border-gray-300 dark:border-[#48484A] bg-white dark:bg-[#2C2C2E] transition-all duration-150 flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-offset-1"
+                      style={rememberMe ? { borderColor: tenantColor, backgroundColor: tenantColor } : {}}>
                       {rememberMe && (
                         <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -362,7 +411,8 @@ const Login = () => {
                     Remember me
                   </span>
                 </label>
-                <Link to="/forgot-password" className="text-[11px] text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors font-medium whitespace-nowrap flex-shrink-0">
+                <Link to="/forgot-password" className="text-[11px] hover:underline transition-colors font-medium whitespace-nowrap flex-shrink-0"
+                  style={{ color: tenantColor }}>
                   Forgot password?
                 </Link>
               </div>
@@ -378,8 +428,8 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 dark:hover:shadow-teal-900/40 active:scale-95 disabled:opacity-50 disabled:pointer-events-none mt-1"
-                style={{ background: 'linear-gradient(135deg, #3EC4B1 0%, #0ea5a3 60%, #0b8f8f 100%)' }}
+                className="w-full py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:pointer-events-none mt-1"
+                style={{ background: tenantGradient, boxShadow: `0 10px 15px -3px ${tenantColor}30` }}
               >
                 {isLoading ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mx-auto" />
@@ -387,17 +437,19 @@ const Login = () => {
               </button>
             </form>
 
-            {/* Register link */}
-            <p className="text-center text-[13px] text-gray-500 dark:text-[#8E8E93] mt-4">
-              Don't have an account?{' '}
-              <Link to="/register" className="font-semibold text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors">
-                Create your school &rarr;
-              </Link>
-            </p>
+            {/* Register link — hidden on tenant subdomain */}
+            {!isTenantLogin && (
+              <p className="text-center text-[13px] text-gray-500 dark:text-[#8E8E93] mt-4">
+                Don't have an account?{' '}
+                <Link to="/register" className="font-semibold text-[#0ea5a3] dark:text-[#3EC4B1] hover:underline transition-colors">
+                  Create your school &rarr;
+                </Link>
+              </p>
+            )}
           </motion.div>
 
-          {/* Demo access */}
-          <motion.div
+          {/* Demo access — hidden on tenant subdomain */}
+          {!isTenantLogin && <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 1.2, ease: [0.25, 0.4, 0.25, 1] }}
@@ -437,7 +489,7 @@ const Login = () => {
             {fieldErrors.demo && (
               <p className="text-center text-[11px] text-amber-600 dark:text-amber-400 mt-2">{fieldErrors.demo}</p>
             )}
-          </motion.div>
+          </motion.div>}
 
           {/* Terms & Contact footer */}
           <motion.div

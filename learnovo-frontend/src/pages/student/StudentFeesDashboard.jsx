@@ -280,13 +280,26 @@ const StudentFeesDashboard = () => {
                                             <span className={invoice.balanceAmount > 0 ? "text-red-600" : "text-gray-900 dark:text-white"}>{formatCurrency(invoice.balanceAmount)}</span>
                                         </div>
                                     </div>
-                                    <div className="p-4 bg-white dark:bg-[#1C1C1E]">
+                                    <div className="p-4 bg-white dark:bg-[#1C1C1E] flex gap-2">
                                         <button
                                             onClick={() => setSelectedInvoice(invoice)}
-                                            className="w-full btn btn-outline border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:border-primary-300 dark:hover:border-primary-700"
+                                            className="flex-1 btn btn-outline border-primary-200 dark:border-primary-800 text-primary-700 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-500/10 hover:border-primary-300 dark:hover:border-primary-700"
                                         >
                                             View Details
                                         </button>
+                                        {invoice.balanceAmount > 0 && !history.some(h => h.invoiceId?._id === invoice._id && ['PENDING', 'PROCESSING', 'INITIATED', 'UNDER_REVIEW'].includes(h.status)) && (
+                                            <button
+                                                onClick={() => PAYMENT_GATEWAY_ENABLED ? handleGatewayPayment(invoice._id) : openPaymentForm(invoice)}
+                                                disabled={isGatewayPaying}
+                                                className="flex-1 btn bg-primary-600 text-white hover:bg-primary-500 shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+                                            >
+                                                {isGatewayPaying ? (
+                                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Connecting...</>
+                                                ) : (
+                                                    <><CreditCard className="h-4 w-4" /> Pay Now</>
+                                                )}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             ))}

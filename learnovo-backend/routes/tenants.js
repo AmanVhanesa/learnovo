@@ -8,6 +8,7 @@ const { protect } = require('../middleware/auth');
 const { getTenantFromRequest, validateTenantAccess } = require('../middleware/tenant');
 const { logger } = require('../middleware/errorHandler');
 const csvImportService = require('../services/csvImportService');
+const Settings = require('../models/Settings');
 const emailService = require('../services/emailService');
 
 const router = express.Router();
@@ -390,6 +391,13 @@ router.get('/public/:subdomain', async(req, res) => {
       });
     }
 
+    // Fetch institution logo from settings if tenant.logo is not set
+    let logo = tenant.logo;
+    if (!logo) {
+      const settings = await Settings.findOne({ tenantId: tenant._id }).select('institution.logo').lean();
+      logo = settings?.institution?.logo || null;
+    }
+
     res.json({
       success: true,
       tenant: {
@@ -397,7 +405,7 @@ router.get('/public/:subdomain', async(req, res) => {
         schoolName: tenant.schoolName,
         schoolCode: tenant.schoolCode,
         subdomain: tenant.subdomain,
-        logo: tenant.logo,
+        logo,
         primaryColor: tenant.primaryColor,
         secondaryColor: tenant.secondaryColor,
         plan: tenant.subscription?.plan

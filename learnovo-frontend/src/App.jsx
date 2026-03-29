@@ -80,6 +80,7 @@ const Income = lazy(() => import('./pages/Income'))
 const FinanceDashboard = lazy(() => import('./pages/FinanceDashboard'))
 const CertificateGeneration = lazy(() => import('./pages/certificates/CertificateGeneration'))
 const TemplateSettings = lazy(() => import('./pages/certificates/TemplateSettings'))
+const PaymentStatus = lazy(() => import('./pages/PaymentStatus'))
 const Search = lazy(() => import('./pages/Search'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Profile = lazy(() => import('./pages/Profile'))
@@ -127,6 +128,13 @@ const PageLoader = () => (
     <div className="loading-spinner" />
   </div>
 )
+
+// ── On subdomain, redirect "/" to login instead of landing page
+function TenantAwareRoot() {
+  const { isSubdomainApp } = useTenant()
+  if (isSubdomainApp) return <Navigate to="/login" replace />
+  return <Landing />
+}
 
 // ── Gate that blocks rendering when subdomain is loading or invalid
 function SubdomainGate({ children }) {
@@ -203,13 +211,14 @@ function App() {
 
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<Landing />} />
+                    <Route path="/" element={<TenantAwareRoot />} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
                     <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                    <Route path="/payment/status" element={<PaymentStatus />} />
                     <Route path="/app" element={
                       <ProtectedRoute>
                         <NotificationProvider>

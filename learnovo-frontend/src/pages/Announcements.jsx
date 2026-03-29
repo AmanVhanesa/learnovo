@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import announcementsService from '../services/announcementsService';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import DatePicker from '../components/ui/DatePicker';
+import TimePicker from '../components/ui/TimePicker';
 
 const Announcements = () => {
     const navigate = useNavigate();
@@ -23,7 +25,8 @@ const Announcements = () => {
         message: '',
         targetAudience: ['all'],
         priority: 'medium',
-        expiresAt: ''
+        expiresDate: '',
+        expiresTime: ''
     });
 
     const { data: announcements = [], isLoading: loading } = useQuery({
@@ -56,7 +59,7 @@ const Announcements = () => {
         onSuccess: (response) => {
             toast.success(response.message || 'Announcement created & notifications sending');
             setShowCreateModal(false);
-            setFormData({ title: '', message: '', targetAudience: ['all'], priority: 'medium', expiresAt: '' });
+            setFormData({ title: '', message: '', targetAudience: ['all'], priority: 'medium', expiresDate: '', expiresTime: '' });
             queryClient.invalidateQueries({ queryKey: ['announcements'] });
             // Trigger immediate notification refresh so bell updates for all users on next poll
             setTimeout(() => refreshNotifications(), 1500);
@@ -80,7 +83,7 @@ const Announcements = () => {
             // show a warning instead of an error
             if (error.response?.status === 500) {
                 setShowCreateModal(false);
-                setFormData({ title: '', message: '', targetAudience: ['all'], priority: 'medium', expiresAt: '' });
+                setFormData({ title: '', message: '', targetAudience: ['all'], priority: 'medium', expiresDate: '', expiresTime: '' });
                 toast.success('Announcement created (notifications may be delayed)');
             } else {
                 toast.error(msg);
@@ -92,9 +95,12 @@ const Announcements = () => {
         e.preventDefault();
         if (createMutation.isPending) return;
 
-        // Clean payload - remove empty expiresAt so backend .optional() skips it
-        const payload = { ...formData };
-        if (!payload.expiresAt) delete payload.expiresAt;
+        // Combine date + time into expiresAt, or omit if no date selected
+        const { expiresDate, expiresTime, ...rest } = formData;
+        const payload = { ...rest };
+        if (expiresDate) {
+            payload.expiresAt = expiresTime ? `${expiresDate}T${expiresTime}` : `${expiresDate}T23:59`;
+        }
         createMutation.mutate(payload);
     };
 
@@ -398,15 +404,26 @@ const Announcements = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Expires (Optional)</label>
-                                    <input
-                                        type="datetime-local"
-                                        value={formData.expiresAt}
-                                        onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#2C2C2E] dark:text-white"
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Expires Date (Optional)</label>
+                                    <DatePicker
+                                        value={formData.expiresDate}
+                                        onChange={(e) => setFormData({ ...formData, expiresDate: e.target.value })}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        placeholder="Select expiry date"
                                     />
                                 </div>
                             </div>
+
+                            {formData.expiresDate && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Expires Time (Optional)</label>
+                                <TimePicker
+                                    value={formData.expiresTime}
+                                    onChange={(e) => setFormData({ ...formData, expiresTime: e.target.value })}
+                                    placeholder="Select expiry time"
+                                />
+                            </div>
+                            )}
 
                             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-100 dark:border-[#38383A]">
                                 <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-outline w-full sm:w-auto">
