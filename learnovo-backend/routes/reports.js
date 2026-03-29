@@ -749,4 +749,125 @@ router.post('/activities/log', protect, async(req, res) => {
   }
 });
 
+// @route   GET /api/reports/enrollment-trend?range=30d
+// @access  Private (admin)
+router.get('/enrollment-trend', protect, async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const range = req.query.range || '30d';
+
+    const now = new Date();
+    let startDate;
+    let groupFormat; // MongoDB $dateToString format
+    let labelFn;     // JS function to format labels for missing buckets
+
+    switch (range) {
+      case '7d':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 6);
+        startDate.setHours(0, 0, 0, 0);
+        groupFormat = '%Y-%m-%d';
+        labelFn = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        break;
+      case '30d':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 29);
+        startDate.setHours(0, 0, 0, 0);
+        groupFormat = '%Y-%m-%d';
+        labelFn = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        break;
+      case '90d':
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 89);
+        startDate.setHours(0, 0, 0, 0);
+        groupFormat = '%Y-%U'; // group by week
+        labelFn = (d) => 'W' + getWeekNumber(d) + ' ' + d.toLocaleDateString('en-US', { month: 'short' });
+        break;
+      case 'ytd':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        groupFormat = '%Y-%m';
+        labelFn = (d) => d.toLocaleDateString('en-US', { month: 'short' });
+        break;
+      case 'all':
+        // Find the earliest student to determine start
+        const earliest = await User.findOne({ role: 'student', tenantId }).sort({ createdAt: 1 }).select('createdAt').lean();
+        startDate = earliest ? new Date(earliest.createdAt) : new Date(now.getFullYear(), 0, 1);
+        startDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        groupFormat = '%Y-%m';
+        labelFn = (d) => d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        break;
+      default:
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - 29);
+        startDate.setHours(0, 0, 0, 0);
+        groupFormat = '%Y-%m-%d';
+        labelFn = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    // Aggregate students by the chosen time bucket
+    const pipeline = [
+      { $match: { role: 'student', tenantId, createdAt: { $gte: startDate } } },
+      { $group: {
+        _id: { $dateToString: { format: groupFormat, date: '$createdAt' } },
+        count: { $sum: 1 }
+      }},
+      { $sort: { _id: 1 } }
+    ];
+
+    const results = await User.aggregate(pipeline);
+    const countMap = {};
+    for (const r of results) {
+      countMap[r._id] = r.count;
+    }
+
+    // Build complete labels array (fill in zero-count buckets)
+    const labels = [];
+    const data = [];
+
+    if (groupFormat === '%Y-%m-%d') {
+      // Daily buckets
+      const cursor = new Date(startDate);
+      while (cursor <= now) {
+        const key = cursor.toISOString().slice(0, 10); // YYYY-MM-DD
+        labels.push(labelFn(new Date(cursor)));
+        data.push(countMap[key] || 0);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    } else if (groupFormat === '%Y-%m') {
+      // Monthly buckets
+      const cursor = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      while (cursor <= now) {
+        const key = cursor.getFullYear() + '-' + String(cursor.getMonth() + 1).padStart(2, '0');
+        labels.push(labelFn(new Date(cursor)));
+        data.push(countMap[key] || 0);
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    } else {
+      // Weekly buckets (%Y-%U)
+      const cursor = new Date(startDate);
+      // Align to start of week (Sunday)
+      cursor.setDate(cursor.getDate() - cursor.getDay());
+      while (cursor <= now) {
+        const wn = getWeekNumber(cursor);
+        const key = cursor.getFullYear() + '-' + String(wn).padStart(2, '0');
+        labels.push(labelFn(new Date(cursor)));
+        data.push(countMap[key] || 0);
+        cursor.setDate(cursor.getDate() + 7);
+      }
+    }
+
+    res.json({ success: true, data: { labels, data } });
+  } catch (error) {
+    console.error('Enrollment trend error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch enrollment trend' });
+  }
+});
+
+// Helper: get week number (Sunday-based, matching MongoDB %U)
+function getWeekNumber(d) {
+  const onejan = new Date(d.getFullYear(), 0, 1);
+  const dayOfYear = Math.floor((d - onejan) / 86400000) + 1;
+  return Math.floor((dayOfYear + onejan.getDay()) / 7);
+}
+
 module.exports = router;

@@ -54,6 +54,36 @@ ChartJS.register(
   Legend
 )
 
+const EnrollmentTrendChart = ({ range }) => {
+  const { data: trendData, isLoading: trendLoading } = useQuery({
+    queryKey: ['enrollment-trend', range],
+    queryFn: async () => {
+      const res = await reportsService.getEnrollmentTrend(range)
+      return res.success ? res.data : { labels: [], data: [] }
+    },
+    staleTime: 60 * 1000,
+  })
+
+  const chartData = {
+    labels: trendData?.labels?.length > 0 ? trendData.labels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    datasets: [
+      {
+        label: 'Students Enrolled',
+        data: trendData?.data?.length > 0 ? trendData.data : [0, 0, 0, 0, 0, 0],
+        borderColor: 'rgb(62, 196, 177)',
+        backgroundColor: 'rgba(62, 196, 177, 0.1)',
+        tension: 0.4
+      }
+    ]
+  }
+
+  if (trendLoading) {
+    return <div className="flex items-center justify-center h-full text-gray-400 text-sm">Loading...</div>
+  }
+
+  return <Line data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
+}
+
 const Dashboard = () => {
   const { user, tenant } = useAuth()
   const { formatCurrency } = useSettings()
@@ -284,22 +314,7 @@ const Dashboard = () => {
     }
   }
 
-  const enrollmentData = {
-    labels: stats.enrollmentTrend?.labels && stats.enrollmentTrend.labels.length > 0
-      ? stats.enrollmentTrend.labels
-      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [
-      {
-        label: 'Students Enrolled',
-        data: stats.enrollmentTrend?.data && stats.enrollmentTrend.data.length > 0
-          ? stats.enrollmentTrend.data
-          : [0, 0, 0, 0, 0, 0],
-        borderColor: 'rgb(62, 196, 177)',
-        backgroundColor: 'rgba(62, 196, 177, 0.1)',
-        tension: 0.4
-      }
-    ]
-  }
+  // enrollmentData is now fetched dynamically by EnrollmentTrendChart below
 
   // Fee collection chart — admin only
   const feesData = {
@@ -506,11 +521,11 @@ const Dashboard = () => {
               <>
                 <ChartCard
                   title="Student Enrollment Trend"
-                  onExport={() => exportChartAsPNG('Student Enrollment Trend', enrollmentData)}
+                  onExport={() => exportChartAsPNG('Student Enrollment Trend', {})}
                   filterOptions={{ classOptions: [], teacherOptions: [], sectionOptions: [] }}
                 >
-                  {() => (
-                    <Line data={enrollmentData} options={{ responsive: true, maintainAspectRatio: false }} />
+                  {({ range }) => (
+                    <EnrollmentTrendChart range={range} />
                   )}
                 </ChartCard>
 
