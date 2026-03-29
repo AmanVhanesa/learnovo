@@ -57,9 +57,10 @@ export const attendanceService = {
     }
   },
 
-  getStudentsByClass: async (classId) => {
+  getStudentsByClass: async (classId, sectionId) => {
     try {
-      const response = await api.get(`/attendance/students-list/${classId}`)
+      const params = sectionId ? { sectionId } : {}
+      const response = await api.get(`/attendance/students-list/${classId}`, { params })
       return response.data
     } catch (error) {
       throw error.response?.data || error

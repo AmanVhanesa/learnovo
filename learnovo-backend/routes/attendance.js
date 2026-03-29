@@ -733,7 +733,7 @@ router.get('/students/:studentId', protect, async(req, res) => {
  */
 router.get('/', protect, async(req, res) => {
   try {
-    const { classId, date, subject } = req.query;
+    const { classId, date, subject, sectionId } = req.query;
 
     if (!classId || !date) {
       return res.status(400).json({
@@ -748,6 +748,11 @@ router.get('/', protect, async(req, res) => {
       date: new Date(date)
     };
     if (subject) filter.subject = subject;
+    if (sectionId) {
+      filter.sectionId = sectionId;
+    } else {
+      filter.sectionId = null;
+    }
 
     const attendance = await Attendance.findOne(filter)
       .populate('attendanceRecords.studentId', 'name email admissionNumber photo')
@@ -788,13 +793,21 @@ router.post('/', [
   handleValidationErrors
 ], async(req, res) => {
   try {
-    const { classId, date, subject, attendanceRecords } = req.body;
+    const { classId, date, subject, attendanceRecords, sectionId } = req.body;
     const tenantId = req.user.tenantId;
 
     // Validate class exists
     const classDoc = await Class.findOne({ _id: classId, tenantId });
     if (!classDoc) {
       return res.status(404).json({ success: false, message: 'Class not found' });
+    }
+
+    // Validate section if provided
+    if (sectionId) {
+      const sectionDoc = await Section.findOne({ _id: sectionId, classId: classDoc._id, tenantId });
+      if (!sectionDoc) {
+        return res.status(404).json({ success: false, message: 'Section not found' });
+      }
     }
 
     // Validate date not in future
@@ -839,7 +852,7 @@ router.post('/', [
 
     // Check for existing attendance record
     let attendance = await Attendance.findOne({
-      tenantId, classId, date: attendanceDate, subject: subjectName
+      tenantId, classId, sectionId: sectionId || null, date: attendanceDate, subject: subjectName
     });
 
     const currentYear = new Date().getFullYear();
@@ -857,6 +870,7 @@ router.post('/', [
       attendance = await Attendance.create({
         tenantId,
         classId,
+        sectionId: sectionId || null,
         teacherId: req.user._id,
         subject: subjectName,
         date: attendanceDate,
@@ -946,6 +960,7 @@ router.get('/report', protect, async(req, res) => {
 router.get('/students-list/:classId', protect, async(req, res) => {
   try {
     const { classId } = req.params;
+    const { sectionId } = req.query;
     const classDoc = await Class.findOne({ _id: classId, tenantId: req.user.tenantId })
       .populate('subjects.teacher', 'name email');
 
@@ -953,8 +968,8 @@ router.get('/students-list/:classId', protect, async(req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // Query by classId (ObjectId ref) OR class name string for backward compatibility
-    const students = await User.find({
+    // Build student query
+    const studentQuery = {
       role: 'student',
       tenantId: req.user.tenantId,
       $or: [
@@ -962,9 +977,32 @@ router.get('/students-list/:classId', protect, async(req, res) => {
         { class: classDoc.name }
       ],
       isActive: true
-    }).select('name email admissionNumber photo class section classId').sort({ name: 1 });
+    };
 
-    res.json({ success: true, data: { class: classDoc, students } });
+    // Filter by section if provided
+    if (sectionId) {
+      const sectionDoc = await Section.findOne({ _id: sectionId, classId: classDoc._id, tenantId: req.user.tenantId });
+      if (!sectionDoc) {
+        return res.status(404).json({ success: false, message: 'Section not found' });
+      }
+      studentQuery.$or = [
+        { classId: classDoc._id, sectionId: sectionDoc._id },
+        { classId: classDoc._id, section: sectionDoc.name },
+        { class: classDoc.name, sectionId: sectionDoc._id },
+        { class: classDoc.name, section: sectionDoc.name }
+      ];
+    }
+
+    const students = await User.find(studentQuery)
+      .select('name email admissionNumber photo class section classId sectionId')
+      .sort({ name: 1 });
+
+    // Also fetch sections for this class
+    const sections = await Section.find({ classId: classDoc._id, tenantId: req.user.tenantId, isActive: true })
+      .select('name capacity currentStrength')
+      .sort({ name: 1 });
+
+    res.json({ success: true, data: { class: classDoc, students, sections } });
   } catch (error) {
     console.error('Error fetching students:', error);
     res.status(500).json({ success: false, message: 'Server error while fetching students' });

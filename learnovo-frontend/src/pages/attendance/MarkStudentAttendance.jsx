@@ -19,6 +19,8 @@ const MarkStudentAttendance = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [classes, setClasses] = useState([])
   const [selectedClass, setSelectedClass] = useState(null)
+  const [sections, setSections] = useState([])
+  const [selectedSection, setSelectedSection] = useState(null)
   const [students, setStudents] = useState([])
   const [filteredStudents, setFilteredStudents] = useState([])
   const [attendance, setAttendance] = useState({})
@@ -35,11 +37,11 @@ const MarkStudentAttendance = () => {
   }, [])
 
   useEffect(() => {
-    if (selectedClass) {
+    if (selectedClass && selectedSection !== undefined) {
       fetchStudents()
       fetchExistingAttendance()
     }
-  }, [selectedClass, selectedDate])
+  }, [selectedClass, selectedSection, selectedDate])
 
   useEffect(() => {
     if (!searchTerm.trim()) {
@@ -87,9 +89,17 @@ const MarkStudentAttendance = () => {
     if (!selectedClass?._id) return
     try {
       setIsLoading(true)
-      const response = await attendanceService.getStudentsByClass(selectedClass._id)
+      const response = await attendanceService.getStudentsByClass(
+        selectedClass._id,
+        selectedSection?._id || null
+      )
       const studentList = response?.data?.students || []
       setStudents(studentList)
+
+      // Store sections from response (first load)
+      if (response?.data?.sections) {
+        setSections(response.data.sections)
+      }
 
       // Default all to present
       const initial = {}
@@ -108,10 +118,12 @@ const MarkStudentAttendance = () => {
   const fetchExistingAttendance = async () => {
     if (!selectedClass?._id) return
     try {
-      const response = await attendanceService.getAttendance({
+      const params = {
         classId: selectedClass._id,
         date: selectedDate
-      })
+      }
+      if (selectedSection?._id) params.sectionId = selectedSection._id
+      const response = await attendanceService.getAttendance(params)
 
       if (response?.data?.attendanceRecords) {
         const existing = {}
@@ -163,6 +175,7 @@ const MarkStudentAttendance = () => {
 
       await attendanceService.saveAttendance({
         classId: selectedClass._id,
+        sectionId: selectedSection?._id || null,
         date: selectedDate,
         subject: 'General',
         attendanceRecords: records
@@ -198,13 +211,13 @@ const MarkStudentAttendance = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Mark Student Attendance</h1>
-          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Select a class and mark daily attendance</p>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Select a class and section to mark daily attendance</p>
         </div>
       </div>
 
       {/* Class & Date Selection */}
       <div className="card p-4 sm:p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Date</label>
             <DatePicker
@@ -220,6 +233,8 @@ const MarkStudentAttendance = () => {
               onChange={(e) => {
                 const cls = classes.find(c => c._id === e.target.value)
                 setSelectedClass(cls || null)
+                setSelectedSection(null)
+                setSections([])
               }}
               placeholder="Select a class"
               options={[
@@ -227,6 +242,24 @@ const MarkStudentAttendance = () => {
                 ...classes.map(cls => ({
                   value: cls._id,
                   label: `${cls.name}${cls.grade ? ` (${cls.grade})` : ''}`
+                }))
+              ]}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1.5">Section</label>
+            <Select
+              value={selectedSection?._id || ''}
+              onChange={(e) => {
+                const sec = sections.find(s => s._id === e.target.value)
+                setSelectedSection(sec || null)
+              }}
+              disabled={!selectedClass || sections.length === 0}
+              options={[
+                { value: '', label: sections.length === 0 ? (selectedClass ? 'No sections' : 'Select class first') : 'All Sections' },
+                ...sections.map(sec => ({
+                  value: sec._id,
+                  label: `Section ${sec.name}`
                 }))
               ]}
             />

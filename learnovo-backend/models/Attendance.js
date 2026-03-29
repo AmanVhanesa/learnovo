@@ -20,6 +20,13 @@ const attendanceSchema = new mongoose.Schema({
     required: [true, 'Class is required']
   },
 
+  // Section reference (optional for backward compatibility)
+  sectionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Section',
+    default: null
+  },
+
   // Teacher who marked attendance
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -108,7 +115,7 @@ attendanceSchema.pre('save', function(next) {
 });
 
 // Compound index for faster queries and uniqueness
-attendanceSchema.index({ tenantId: 1, classId: 1, date: 1, subject: 1 }, { unique: true });
+attendanceSchema.index({ tenantId: 1, classId: 1, sectionId: 1, date: 1, subject: 1 }, { unique: true });
 attendanceSchema.index({ teacherId: 1 });
 attendanceSchema.index({ date: 1 });
 
