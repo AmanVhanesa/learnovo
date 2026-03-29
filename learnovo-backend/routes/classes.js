@@ -31,18 +31,32 @@ router.get('/', protect, async(req, res) => {
     const classesWithDetails = await Promise.all(
       classes.map(async(classItem) => {
         const [studentCount, sections] = await Promise.all([
-          User.countDocuments({ classId: classItem._id, role: 'student' }),
+          User.countDocuments({
+            tenantId: req.user.tenantId,
+            role: 'student',
+            $or: [
+              { classId: classItem._id },
+              { class: classItem.name },
+              { class: classItem.grade }
+            ]
+          }),
           Section.find({ classId: classItem._id, tenantId: req.user.tenantId })
             .populate('sectionTeacher', 'name fullName email')
             .sort({ name: 1 })
         ]);
 
-        // Get student count for each section
+        // Get student count for each section (match by sectionId OR string section name)
         const sectionsWithCounts = await Promise.all(
           sections.map(async(section) => {
             const sectionStudentCount = await User.countDocuments({
-              sectionId: section._id,
-              role: 'student'
+              tenantId: req.user.tenantId,
+              role: 'student',
+              $or: [
+                { sectionId: section._id },
+                { section: section.name, classId: classItem._id },
+                { section: section.name, class: classItem.name },
+                { section: section.name, class: classItem.grade }
+              ]
             });
             return {
               ...section.toObject(),
