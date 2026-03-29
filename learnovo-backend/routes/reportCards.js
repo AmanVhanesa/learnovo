@@ -2,9 +2,18 @@ const express = require('express');
 const fs = require('fs');
 const { protect, authorize } = require('../middleware/auth');
 const planGate = require('../middleware/planGate');
-const reportCardService = require('../services/reportCardService');
-const bulkPdfService = require('../services/bulkPdfService');
-const pdfService = require('../services/pdfService');
+
+// Lazy-loaded on first request to avoid adding ~500ms + 30MB to startup
+let _reportCardService, _bulkPdfService, _pdfService;
+function getReportCardService() {
+  return _reportCardService || (_reportCardService = require('../services/reportCardService'));
+}
+function getBulkPdfService() {
+  return _bulkPdfService || (_bulkPdfService = require('../services/bulkPdfService'));
+}
+function getPdfService() {
+  return _pdfService || (_pdfService = require('../services/pdfService'));
+}
 
 const router = express.Router();
 
@@ -22,7 +31,7 @@ router.get('/:studentId/blank/pdf', protect, examPlanGates, authorize('admin', '
     const { studentId } = req.params;
     const { examSeries, class: className } = req.query;
 
-    const data = await reportCardService.getBlankReportCardData(
+    const data = await getReportCardService().getBlankReportCardData(
       req.user.tenantId, studentId, { examSeries, className }
     );
 
@@ -30,7 +39,7 @@ router.get('/:studentId/blank/pdf', protect, examPlanGates, authorize('admin', '
       return res.status(404).json({ success: false, message: 'No data found for this student' });
     }
 
-    const pdfBuffer = await pdfService.generateBlankReportCard(data);
+    const pdfBuffer = await getPdfService().generateBlankReportCard(data);
     const studentName = (data.student.name || 'Student').replace(/\s+/g, '_');
     const filename = `Blank_Report_Card_${studentName}.pdf`;
 
@@ -65,13 +74,13 @@ router.post('/bulk-download', protect, examPlanGates, authorize('admin', 'teache
       return res.status(400).json({ success: false, message: 'type must be "regular" or "blank"' });
     }
 
-    const { students, section } = await reportCardService.getStudentsInSection(req.user.tenantId, sectionId);
+    const { students, section } = await getReportCardService().getStudentsInSection(req.user.tenantId, sectionId);
 
     if (!students.length) {
       return res.status(404).json({ success: false, message: 'No active students found in this section' });
     }
 
-    const jobId = bulkPdfService.startBulkJob(req.user.tenantId, students, {
+    const jobId = getBulkPdfService().startBulkJob(req.user.tenantId, students, {
       type,
       examSeries,
       className: className || section?.classId?.name
@@ -97,12 +106,12 @@ router.get('/bulk-download/:jobId/status', protect, authorize('admin', 'teacher'
   const { jobId } = req.params;
 
   // Verify tenant ownership
-  const jobTenantId = bulkPdfService.getJobTenantId(jobId);
+  const jobTenantId = getBulkPdfService().getJobTenantId(jobId);
   if (!jobTenantId || jobTenantId.toString() !== req.user.tenantId.toString()) {
     return res.status(404).json({ success: false, message: 'Job not found' });
   }
 
-  const status = bulkPdfService.getJobStatus(jobId);
+  const status = getBulkPdfService().getJobStatus(jobId);
   if (!status) {
     return res.status(404).json({ success: false, message: 'Job not found' });
   }
@@ -117,12 +126,12 @@ router.get('/bulk-download/:jobId/download', protect, authorize('admin', 'teache
   const { jobId } = req.params;
 
   // Verify tenant ownership
-  const jobTenantId = bulkPdfService.getJobTenantId(jobId);
+  const jobTenantId = getBulkPdfService().getJobTenantId(jobId);
   if (!jobTenantId || jobTenantId.toString() !== req.user.tenantId.toString()) {
     return res.status(404).json({ success: false, message: 'Job not found' });
   }
 
-  const zipPath = bulkPdfService.getJobZipPath(jobId);
+  const zipPath = getBulkPdfService().getJobZipPath(jobId);
   if (!zipPath) {
     return res.status(404).json({ success: false, message: 'Zip file not ready or expired' });
   }
@@ -153,7 +162,7 @@ router.get('/final/:studentId/:sessionId', protect, examPlanGates, async(req, re
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const data = await reportCardService.getFinalReportCardData(req.user.tenantId, studentId, sessionId);
+    const data = await getReportCardService().getFinalReportCardData(req.user.tenantId, studentId, sessionId);
 
     if (!data) {
       return res.status(404).json({ success: false, message: 'No cumulative results found' });
@@ -176,13 +185,13 @@ router.get('/final/:studentId/:sessionId/pdf', protect, examPlanGates, async(req
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const data = await reportCardService.getFinalReportCardData(req.user.tenantId, studentId, sessionId);
+    const data = await getReportCardService().getFinalReportCardData(req.user.tenantId, studentId, sessionId);
 
     if (!data) {
       return res.status(404).json({ success: false, message: 'No cumulative results found' });
     }
 
-    const pdfBuffer = await pdfService.generateFinalReportCard(data);
+    const pdfBuffer = await getPdfService().generateFinalReportCard(data);
     const studentName = (data.student.name || 'Student').replace(/\s+/g, '_');
     const filename = `Final_Report_Card_${studentName}_${data.session.name || ''}.pdf`;
 
@@ -209,13 +218,13 @@ router.post('/final/bulk-download', protect, examPlanGates, authorize('admin', '
       return res.status(400).json({ success: false, message: 'sectionId and sessionId are required' });
     }
 
-    const { students } = await reportCardService.getStudentsInSection(req.user.tenantId, sectionId);
+    const { students } = await getReportCardService().getStudentsInSection(req.user.tenantId, sectionId);
 
     if (!students.length) {
       return res.status(404).json({ success: false, message: 'No active students found in this section' });
     }
 
-    const jobId = bulkPdfService.startBulkJob(req.user.tenantId, students, {
+    const jobId = getBulkPdfService().startBulkJob(req.user.tenantId, students, {
       type: 'final',
       sessionId
     });

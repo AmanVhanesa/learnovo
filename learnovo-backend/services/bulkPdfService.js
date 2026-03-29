@@ -1,14 +1,17 @@
-const PQueue = require('p-queue').default || require('p-queue');
-const archiver = require('archiver');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { v4: uuidv4 } = require('uuid');
-const pdfService = require('./pdfService');
-const reportCardService = require('./reportCardService');
 
-// ── Global concurrency queue — 1 PDF at a time across all users ──
-const pdfQueue = new PQueue({ concurrency: 1 });
+// ── Lazy-loaded heavy deps (only when bulk download is actually used) ──
+let pdfQueue = null;
+function getQueue() {
+  if (!pdfQueue) {
+    const PQueue = require('p-queue').default || require('p-queue');
+    pdfQueue = new PQueue({ concurrency: 1 });
+  }
+  return pdfQueue;
+}
 
 // ── In-memory job store ──
 const jobs = new Map();
@@ -82,6 +85,12 @@ const bulkPdfService = {
     const job = jobs.get(jobId);
     if (!job) return;
 
+    // Lazy-load heavy dependencies only when actually generating PDFs
+    const archiver = require('archiver');
+    const pdfService = require('./pdfService');
+    const reportCardService = require('./reportCardService');
+    const queue = getQueue();
+
     const { type = 'regular', examSeries, className, sessionId } = options;
     const zipPath = path.join(getTempDir(), `bulk-${jobId}.zip`);
     const output = fs.createWriteStream(zipPath);
@@ -99,7 +108,7 @@ const bulkPdfService = {
     for (const student of students) {
       try {
         // Each PDF goes through the global concurrency queue
-        await pdfQueue.add(async() => {
+        await queue.add(async() => {
           let pdfBuffer;
           const studentId = student._id.toString();
           const studentName = (student.fullName || student.name || 'Student').replace(/[^a-zA-Z0-9 ]/g, '').trim();
