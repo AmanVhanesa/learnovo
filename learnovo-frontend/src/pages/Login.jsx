@@ -36,9 +36,11 @@ const Login = () => {
   useEffect(() => {
     if (isAuthenticated && !authLoading && !isLoading) {
       // If on root domain and tenant has a subdomain, redirect to subdomain
-      const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
-      const subdomain = tenant?.subdomain || tenant?.schoolCode
-      if (!isSubdomainApp && subdomain) {
+      // Skip subdomain redirect on localhost (dev) — subdomains don't share localStorage
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      const tenantData = JSON.parse(localStorage.getItem('tenant') || '{}')
+      const subdomain = tenantData?.subdomain || tenantData?.schoolCode
+      if (!isSubdomainApp && subdomain && !isLocalhost) {
         const protocol = window.location.protocol
         const baseDomain = import.meta.env.VITE_APP_DOMAIN || 'learnovoportal.com'
         window.location.href = `${protocol}//${subdomain}.${baseDomain}/app/dashboard`
