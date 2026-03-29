@@ -414,12 +414,12 @@ const Landing = () => {
   // ── Data ─────────────────────────────────────────────────────────────────
 
   const schoolLogos = [
-    { name: 'SP International School', file: '/images/logos/school-1.png' },
-    { name: 'Horizon Global Academy', file: '/images/logos/school-2.png' },
-    { name: 'Maple Leaf School', file: '/images/logos/school-3.png' },
-    { name: 'Crestview Public School', file: '/images/logos/school-4.png' },
-    { name: 'Pinnacle International', file: '/images/logos/school-5.png' },
-    { name: 'Bridgeford Academy', file: '/images/logos/school-6.png' },
+    { name: 'SP International School' },
+    { name: 'Horizon Global Academy' },
+    { name: 'Maple Leaf School' },
+    { name: 'Crestview Public School' },
+    { name: 'Pinnacle International' },
+    { name: 'Bridgeford Academy' },
   ]
 
   const painPoints = [
@@ -1277,29 +1277,14 @@ const Landing = () => {
 
 // ─── Logo item sub-component ───────────────────────────────────────────────
 function LogoItem({ logo, isDark }) {
-  const [imgFailed, setImgFailed] = useState(false)
-
-  if (imgFailed) {
-    return (
-      <div className={`flex-shrink-0 px-6 py-3 rounded-lg border text-sm font-medium transition-all duration-200 cursor-default select-none ${
-        isDark
-          ? 'border-[#2a2a2a] text-[#9CA3AF] hover:text-[#34D399] bg-[#1a1a1a]/50'
-          : 'border-gray-200 text-gray-400 hover:text-gray-600 bg-gray-50 grayscale hover:grayscale-0'
-      }`}>
-        {logo.name}
-      </div>
-    )
-  }
-
   return (
-    <img
-      src={logo.file}
-      alt={logo.name}
-      className={`flex-shrink-0 h-10 w-auto object-contain transition-all duration-200 ${
-        isDark ? 'invert brightness-75 hover:brightness-100' : 'grayscale opacity-60 hover:grayscale-0 hover:opacity-100'
-      }`}
-      onError={() => setImgFailed(true)}
-    />
+    <div className={`flex-shrink-0 px-6 py-3 rounded-lg border text-sm font-medium transition-all duration-200 cursor-default select-none ${
+      isDark
+        ? 'border-[#2a2a2a] text-[#9CA3AF] hover:text-[#34D399] bg-[#1a1a1a]/50'
+        : 'border-gray-200 text-gray-400 hover:text-gray-600 bg-gray-50'
+    }`}>
+      {logo.name}
+    </div>
   )
 }
 
