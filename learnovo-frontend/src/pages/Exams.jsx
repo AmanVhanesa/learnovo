@@ -4,13 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Plus, Search, Calendar, Trash2, X, ClipboardList, Edit,
     Clock, BookOpen, User, MapPin, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, FileText,
-    Award, BarChart3, TrendingUp
+    Award, BarChart3, TrendingUp, Download
 } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
 import { teachersService } from '../services/teachersService';
 import ExamResultsModal from '../components/ExamResultsModal';
 import ResultCard from '../components/ResultCard';
+import BulkDownloadProgress from '../components/BulkDownloadProgress';
 import toast from 'react-hot-toast';
 import { formatDate } from '../utils/formatDate';
 import { useAuth } from '../contexts/AuthContext';
@@ -78,6 +79,9 @@ const Exams = () => {
     const [searchText, setSearchText] = useState('');
     const [examSeriesFilter, setExamSeriesFilter] = useState('');
 
+    /* ── Bulk download state ── */
+    const [bulkJob, setBulkJob] = useState(null); // { jobId, totalStudents }
+
     /* ── Accordion collapse state: Set of "class" keys that are collapsed ── */
     const [collapsedClasses, setCollapsedClasses] = useState(new Set());
     const [collapsedSections, setCollapsedSections] = useState(new Set());
@@ -92,6 +96,29 @@ const Exams = () => {
         next.has(key) ? next.delete(key) : next.add(key);
         return next;
     });
+
+    /* ── Bulk download helpers ── */
+    const findSectionId = (className, sectionName) => {
+        const cls = availableClasses.find(c => c.name === className || c.grade === className);
+        if (!cls?.sections) return null;
+        const sec = cls.sections.find(s => s.name === sectionName);
+        return sec?._id || null;
+    };
+
+    const handleBulkDownload = async (className, sectionName, type = 'regular') => {
+        const sectionId = findSectionId(className, sectionName);
+        if (!sectionId) {
+            toast.error('Could not find section. Please try again.');
+            return;
+        }
+        try {
+            const res = await examsService.startBulkDownload(sectionId, { className, type });
+            setBulkJob({ jobId: res.data.jobId, totalStudents: res.data.totalStudents });
+            toast.success(`Generating ${type === 'blank' ? 'blank ' : ''}report cards for ${res.data.totalStudents} students...`);
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Failed to start bulk download');
+        }
+    };
 
     /* ── Data fetching with React Query ── */
     const { data: exams = [], isLoading: loading } = useQuery({
@@ -666,19 +693,41 @@ const Exams = () => {
                                 return (
                                     <div key={sec}>
                                         {/* Section sub-header */}
-                                        <button
-                                            className="w-full flex items-center gap-2.5 px-6 py-2.5 bg-indigo-50/60 dark:bg-indigo-500/10 hover:bg-indigo-100/50 dark:hover:bg-indigo-500/20 transition-colors border-b border-indigo-100 dark:border-indigo-500/20 text-left"
-                                            onClick={() => toggleSection(sectionKey)}
-                                        >
-                                            {isSecCollapsed
-                                                ? <ChevronRight className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                                                : <ChevronDown className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
-                                            }
-                                            <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-                                                {sec === 'All' ? 'All Sections' : `Section ${sec}`}
-                                            </span>
-                                            <span className="text-xs text-indigo-400 ml-auto">{examList.length} exam{examList.length !== 1 ? 's' : ''}</span>
-                                        </button>
+                                        <div className="flex items-center bg-indigo-50/60 dark:bg-indigo-500/10 border-b border-indigo-100 dark:border-indigo-500/20">
+                                            <button
+                                                className="flex-1 flex items-center gap-2.5 px-6 py-2.5 hover:bg-indigo-100/50 dark:hover:bg-indigo-500/20 transition-colors text-left"
+                                                onClick={() => toggleSection(sectionKey)}
+                                            >
+                                                {isSecCollapsed
+                                                    ? <ChevronRight className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                                                    : <ChevronDown className="h-3.5 w-3.5 text-indigo-400 shrink-0" />
+                                                }
+                                                <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                                                    {sec === 'All' ? 'All Sections' : `Section ${sec}`}
+                                                </span>
+                                                <span className="text-xs text-indigo-400 ml-auto">{examList.length} exam{examList.length !== 1 ? 's' : ''}</span>
+                                            </button>
+                                            {!isStudent && sec !== 'All' && (
+                                                <div className="flex items-center gap-1.5 px-3 shrink-0">
+                                                    <button
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
+                                                        onClick={(e) => { e.stopPropagation(); handleBulkDownload(cls, sec, 'regular'); }}
+                                                        title="Download all report cards as ZIP"
+                                                    >
+                                                        <Download className="h-3 w-3" />
+                                                        All Cards
+                                                    </button>
+                                                    <button
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
+                                                        onClick={(e) => { e.stopPropagation(); handleBulkDownload(cls, sec, 'blank'); }}
+                                                        title="Download blank report cards (no marks) as ZIP"
+                                                    >
+                                                        <FileText className="h-3 w-3" />
+                                                        Blank
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
 
                                         {/* Exam rows for this section */}
                                         {!isSecCollapsed && (
@@ -1051,6 +1100,15 @@ const Exams = () => {
                     studentName={resultCardTarget.studentName}
                     defaultExamSeries={resultCardTarget.examSeries}
                     onClose={() => setResultCardTarget(null)}
+                />
+            )}
+
+            {/* Bulk download progress modal */}
+            {bulkJob && (
+                <BulkDownloadProgress
+                    jobId={bulkJob.jobId}
+                    totalStudents={bulkJob.totalStudents}
+                    onClose={() => setBulkJob(null)}
                 />
             )}
         </div>

@@ -232,6 +232,99 @@ function getGradeClass(grade) {
   return 'poor';
 }
 
+function buildBlankSubjectRow(subject) {
+  return `<tr>
+        <td class="subject-name">${escapeHtml(subject.subject || subject.name || '')}</td>
+        <td class="num">${subject.totalMarks || ''}</td>
+        <td class="num" style="font-weight:600; border-bottom: 1px solid #d1d5db; min-width:40px">&nbsp;</td>
+        <td class="num" style="border-bottom: 1px solid #d1d5db">&nbsp;</td>
+        <td class="center" style="border-bottom: 1px solid #d1d5db">&nbsp;</td>
+        <td class="center" style="border-bottom: 1px solid #d1d5db">&nbsp;</td>
+        <td style="border-bottom: 1px solid #d1d5db">&nbsp;</td>
+    </tr>`;
+}
+
+function buildFinalSubjectRow(subject, examSeriesList) {
+  const examCells = examSeriesList.map(series => {
+    const data = subject.exams[series];
+    if (!data) return '<td class="num" style="color:#9CA3AF">—</td>';
+    return `<td class="num">${data.marksObtained}/${data.totalMarks}</td>`;
+  }).join('\n');
+
+  const gradeClass = getGradeClass(subject.finalGrade);
+  const resultClass = subject.isPassed ? 'pass-text' : 'fail-text';
+  const resultText = subject.isPassed ? 'Pass' : 'Fail';
+
+  return `<tr>
+        <td class="subject-name">${escapeHtml(subject.subject)}</td>
+        ${examCells}
+        <td class="num" style="font-weight:600">${subject.totalObtained}/${subject.totalMax}</td>
+        <td class="num">${subject.averagePercentage}%</td>
+        <td class="center"><span class="grade-display"><span class="grade-dot ${gradeClass}"></span> ${escapeHtml(subject.finalGrade)}</span></td>
+        <td class="center"><span class="${resultClass}">${resultText}</span></td>
+    </tr>`;
+}
+
+function buildFinalReportCardPlaceholders(data) {
+  const { school, student, session, examSeries, subjectRows, summary } = data;
+  const brandColor = school.brand_color || school.brandColor || '#1E3A5F';
+
+  // Build exam series header columns
+  const examHeaderCells = examSeries.map(s =>
+    `<th class="num" style="width:${Math.floor(40 / examSeries.length)}%">${escapeHtml(s)}</th>`
+  ).join('\n');
+
+  // Build subject rows
+  const subjectRowsHtml = subjectRows.map(row => buildFinalSubjectRow(row, examSeries)).join('\n');
+
+  // Grand total exam cells
+  const grandTotalExamCells = examSeries.map(series => {
+    const total = subjectRows.reduce((acc, r) => acc + (r.exams[series]?.marksObtained || 0), 0);
+    const max = subjectRows.reduce((acc, r) => acc + (r.exams[series]?.totalMarks || 0), 0);
+    return `<td class="num">${total}/${max}</td>`;
+  }).join('\n');
+
+  const dob = student.dob
+    ? new Date(student.dob).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+    : '\u2014';
+
+  const overallGrade = summary.overallGrade || '\u2014';
+  const isPassed = summary.overallPassed;
+
+  return {
+    brand_color: brandColor,
+    brand_color_light: `${brandColor}0A`,
+    school_name: school.name || '',
+    school_address: school.address || '',
+    school_phone: school.phone || '',
+    school_email: school.email || '',
+    affiliation_no: school.affiliation || '',
+    school_code: school.schoolCode || '',
+    udise_no: school.udise || '',
+    session_name: session.name || '',
+    student_name: student.name || student.fullName || '',
+    adm_number: student.admissionNumber || '\u2014',
+    class_section: `${student.class || ''}${student.section ? ` \u2014 ${student.section}` : ''}`,
+    roll_number: student.rollNumber || '\u2014',
+    dob,
+    parent_name: student.guardianName || student.fatherOrHusbandName || '\u2014',
+    exam_header_cells: examHeaderCells,
+    subject_rows: subjectRowsHtml,
+    grand_total_exam_cells: grandTotalExamCells,
+    grand_total_max: summary.grandTotalMax || 0,
+    grand_total_obtained: summary.grandTotalObtained || 0,
+    overall_percentage: summary.overallPercentage || 0,
+    overall_grade: overallGrade,
+    overall_grade_class: getGradeClass(overallGrade),
+    overall_result: isPassed ? 'PASS' : 'FAIL',
+    overall_result_color: isPassed ? 'pass' : 'fail',
+    result_banner_class: isPassed ? 'pass' : 'fail',
+    result_text: isPassed ? 'PASSED' : 'FAILED',
+    performance_tag: isPassed ? 'Satisfactory Performance' : 'Needs Improvement',
+    result_stats: `${summary.passCount || 0} of ${summary.totalSubjects || 0} subjects passed \u00B7 Overall: ${summary.overallPercentage || 0}% \u00B7 Grade: ${overallGrade}`
+  };
+}
+
 function buildSubjectRow(subject) {
   const gradeClass = getGradeClass(subject.grade);
   const resultClass = subject.isPassed ? 'pass-text' : 'fail-text';
@@ -488,6 +581,128 @@ const pdfService = {
         margin: { top: 0, right: 0, bottom: 0, left: 0 }
       });
 
+      return Buffer.from(pdfUint8);
+    } finally {
+      await page.close();
+      releaseBrowser();
+    }
+  },
+
+  /**
+   * Generate a blank report card PDF (marks cells empty for hand-filling).
+   * Reuses the standard report-card.html template.
+   */
+  generateBlankReportCard: async(data) => {
+    const templatePath = getTemplatePath('REPORT_CARD');
+    let html = fs.readFileSync(templatePath, 'utf8');
+
+    // Build blank subject rows
+    const blankRowsHtml = (data.subjects || []).map(s => buildBlankSubjectRow(s)).join('\n');
+
+    // Use standard placeholders but override subject rows and blank out totals
+    const placeholders = buildReportCardPlaceholders({
+      ...data,
+      summary: {
+        ...data.summary,
+        grandTotal: data.summary.grandTotal || '',
+        grandObtained: '',
+        overallPercentage: '',
+        overallGrade: '',
+        overallPassed: null,
+        passCount: '',
+        totalSubjects: data.summary.totalSubjects
+      }
+    });
+
+    // Replace subject rows with blank version
+    html = html.replace('{{subject_rows}}', blankRowsHtml);
+    delete placeholders.subject_rows;
+
+    // Blank out summary fields in the footer
+    placeholders.grand_total_obtained = '';
+    placeholders.overall_percentage = '';
+    placeholders.overall_grade = '';
+    placeholders.overall_grade_class = '';
+    placeholders.overall_result = '';
+    placeholders.overall_result_color = 'pass';
+    placeholders.result_banner_class = 'pass';
+    placeholders.result_text = '';
+    placeholders.performance_tag = '';
+    placeholders.result_stats = '';
+
+    html = fillTemplate(html, placeholders);
+
+    // Inject images
+    const brandColor = data.school?.brand_color || data.school?.brandColor || '#1E3A5F';
+    html = await injectReportCardLogo(html, data.school?.logo_url || data.school?.logo, brandColor);
+    html = await injectSignature(html, '<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', data.signatures?.principal);
+    html = await injectSignature(html, '<!-- CLASS_TEACHER_SIGNATURE_PLACEHOLDER -->', data.signatures?.class_teacher);
+    html = injectAttendanceSection(html, null);
+    html = injectRemarksSection(html, null);
+
+    // Hide result banner for blank cards
+    html = html.replace(
+      /<div class="result-banner[^"]*">/,
+      '<div class="result-banner pass" style="display:none">'
+    );
+
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+    try {
+      await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await new Promise(r => setTimeout(r, 500));
+      const pdfUint8 = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 }
+      });
+      return Buffer.from(pdfUint8);
+    } finally {
+      await page.close();
+      releaseBrowser();
+    }
+  },
+
+  /**
+   * Generate a final/cumulative report card PDF (landscape, multi-exam columns).
+   */
+  generateFinalReportCard: async(data) => {
+    const templatePath = path.join(__dirname, '..', 'templates', 'report-cards', 'final-report-card.html');
+    let html = fs.readFileSync(templatePath, 'utf8');
+
+    const placeholders = buildFinalReportCardPlaceholders(data);
+
+    // Inject raw HTML placeholders before fillTemplate escapes them
+    html = html.replace('{{exam_header_cells}}', placeholders.exam_header_cells);
+    delete placeholders.exam_header_cells;
+    html = html.replace('{{subject_rows}}', placeholders.subject_rows);
+    delete placeholders.subject_rows;
+    html = html.replace('{{grand_total_exam_cells}}', placeholders.grand_total_exam_cells);
+    delete placeholders.grand_total_exam_cells;
+
+    html = fillTemplate(html, placeholders);
+
+    // Inject images
+    const brandColor = data.school?.brand_color || data.school?.brandColor || '#1E3A5F';
+    html = await injectReportCardLogo(html, data.school?.logo_url || data.school?.logo, brandColor);
+    html = await injectSignature(html, '<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', data.signatures?.principal);
+    html = await injectSignature(html, '<!-- CLASS_TEACHER_SIGNATURE_PLACEHOLDER -->', data.signatures?.class_teacher);
+    html = injectAttendanceSection(html, data.attendance);
+    html = injectRemarksSection(html, null);
+
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+    try {
+      await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await new Promise(r => setTimeout(r, 500));
+      const pdfUint8 = await page.pdf({
+        format: 'A4',
+        landscape: true,
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 }
+      });
       return Buffer.from(pdfUint8);
     } finally {
       await page.close();

@@ -68,5 +68,60 @@ export const examsService = {
             responseType: 'blob'
         })
         return res.data
+    },
+
+    // ── Blank Report Card ──
+    downloadBlankReportCardPDF: async (studentId, filters = {}) => {
+        const params = new URLSearchParams()
+        if (filters.examSeries) params.append('examSeries', filters.examSeries)
+        if (filters.class) params.append('class', filters.class)
+        const res = await api.get(`/report-cards/${studentId}/blank/pdf?${params.toString()}`, {
+            responseType: 'blob'
+        })
+        return res.data
+    },
+
+    // ── Bulk Download ──
+    startBulkDownload: async (sectionId, { examSeries, className, type = 'regular' } = {}) => {
+        const res = await api.post('/report-cards/bulk-download', {
+            sectionId,
+            examSeries,
+            class: className,
+            type
+        })
+        return res.data
+    },
+
+    getBulkDownloadStatus: async (jobId) => {
+        const res = await api.get(`/report-cards/bulk-download/${jobId}/status`)
+        return res.data
+    },
+
+    downloadBulkZip: async (jobId) => {
+        const res = await api.get(`/report-cards/bulk-download/${jobId}/download`, {
+            responseType: 'blob'
+        })
+        return res.data
+    },
+
+    // ── Final / Cumulative Report Card ──
+    getFinalReportCard: async (studentId, sessionId) => {
+        const res = await api.get(`/report-cards/final/${studentId}/${sessionId}`)
+        return res.data
+    },
+
+    downloadFinalReportCardPDF: async (studentId, sessionId) => {
+        const res = await api.get(`/report-cards/final/${studentId}/${sessionId}/pdf`, {
+            responseType: 'blob'
+        })
+        return res.data
+    },
+
+    startFinalBulkDownload: async (sectionId, sessionId) => {
+        const res = await api.post('/report-cards/final/bulk-download', {
+            sectionId,
+            sessionId
+        })
+        return res.data
     }
 }

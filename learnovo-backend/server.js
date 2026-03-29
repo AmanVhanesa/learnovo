@@ -255,6 +255,7 @@ app.use('/api/payments', require('./routes/payments'));
 app.use('/api/fee-payments', require('./routes/feePayments'));
 app.use('/api/subscription', require('./routes/subscription'));
 app.use('/api/exams', require('./routes/exams'));
+app.use('/api/report-cards', require('./routes/reportCards'));
 app.use('/api/drivers', require('./routes/drivers'));
 app.use('/api/vehicles', require('./routes/vehicles'));
 app.use('/api/transport/routes', require('./routes/transportRoutes'));

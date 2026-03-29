@@ -223,6 +223,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [printing, setPrinting] = useState(false);
     const [downloading, setDownloading] = useState(false);
+    const [downloadingBlank, setDownloadingBlank] = useState(false);
     const [schoolInfo, setSchoolInfo] = useState({ name: 'School', address: '', logo: null, principalSignature: null, brandColor: '#1E3A5F' });
     const [filterSeries, setFilterSeries] = useState(defaultExamSeries || '');
 
@@ -293,6 +294,27 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
         }
     };
 
+    /* ── download blank PDF ── */
+    const handleDownloadBlank = async () => {
+        setDownloadingBlank(true);
+        try {
+            const blob = await examsService.downloadBlankReportCardPDF(studentId, { examSeries: filterSeries });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Blank_Report_Card_${(cardData?.student?.name || studentName || 'Student').replace(/\s+/g, '_')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            toast.success('Blank report card downloaded');
+        } catch {
+            toast.error('Failed to download blank PDF');
+        } finally {
+            setDownloadingBlank(false);
+        }
+    };
+
     const student = cardData?.student;
     const subjects = cardData?.subjects || [];
     const summary = cardData?.summary;
@@ -332,6 +354,15 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                         >
                             <Download className="h-4 w-4" />
                             {downloading ? 'Downloading\u2026' : 'Download PDF'}
+                        </button>
+                        <button
+                            className="btn btn-sm gap-1.5 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
+                            onClick={handleDownloadBlank}
+                            disabled={loading || downloadingBlank}
+                            title="Download blank report card (no marks filled)"
+                        >
+                            <FileText className="h-4 w-4" />
+                            {downloadingBlank ? 'Downloading\u2026' : 'Blank PDF'}
                         </button>
                         <button
                             className="btn btn-primary btn-sm gap-1.5"
