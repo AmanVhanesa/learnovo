@@ -1,4 +1,4 @@
-export const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5001').replace(/\/api\/?$/, '')
+export const SERVER_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/api\/?$/, '')
 
 // Payment gateway toggle: set to 'true' in .env when real gateway credentials are available
 // When false: students submit manual payment proof for admin verification

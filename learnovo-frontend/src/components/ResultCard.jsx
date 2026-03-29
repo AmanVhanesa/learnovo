@@ -287,8 +287,19 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             toast.success('Report card downloaded');
-        } catch {
-            toast.error('Failed to download PDF');
+        } catch (err) {
+            let msg = 'Failed to download PDF';
+            try {
+                const errorBlob = err.response?.data;
+                if (errorBlob instanceof Blob) {
+                    const text = await errorBlob.text();
+                    const json = JSON.parse(text);
+                    msg = json.message || msg;
+                } else if (err.response?.data?.message) {
+                    msg = err.response.data.message;
+                }
+            } catch { /* use default msg */ }
+            toast.error(msg);
         } finally {
             setDownloading(false);
         }
@@ -308,8 +319,20 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             toast.success('Blank report card downloaded');
-        } catch {
-            toast.error('Failed to download blank PDF');
+        } catch (err) {
+            // Blob responses need special error parsing
+            let msg = 'Failed to download blank PDF';
+            try {
+                const errorBlob = err.response?.data;
+                if (errorBlob instanceof Blob) {
+                    const text = await errorBlob.text();
+                    const json = JSON.parse(text);
+                    msg = json.message || msg;
+                } else if (err.response?.data?.message) {
+                    msg = err.response.data.message;
+                }
+            } catch { /* use default msg */ }
+            toast.error(msg);
         } finally {
             setDownloadingBlank(false);
         }
