@@ -248,13 +248,15 @@ function buildFinalSubjectRow(subject, examSeriesList) {
   const examCells = examSeriesList.map(series => {
     const data = subject.exams[series];
     if (!data) return '<td class="no-data">\u2014</td>';
-    return `<td>${data.grade}</td>`;
+    const gc = getGradeClass(data.grade);
+    return `<td><span class="grade-display"><span class="grade-dot ${gc}"></span> ${escapeHtml(data.grade)}</span></td>`;
   }).join('\n');
 
+  const totalGc = getGradeClass(subject.finalGrade);
   return `<tr>
         <td class="subject-cell">${escapeHtml(subject.subject)}</td>
         ${examCells}
-        <td style="font-weight:700">${escapeHtml(subject.finalGrade)}</td>
+        <td style="font-weight:700"><span class="grade-display"><span class="grade-dot ${totalGc}"></span> ${escapeHtml(subject.finalGrade)}</span></td>
     </tr>`;
 }
 
@@ -278,7 +280,8 @@ function buildFinalReportCardPlaceholders(data) {
     const totalMax = withData.reduce((acc, r) => acc + (r.exams[series]?.totalMarks || 0), 0);
     const pct = totalMax > 0 ? Math.round((totalObt / totalMax) * 100) : 0;
     const grade = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D' : 'F';
-    return `<td style="font-weight:700">${grade}</td>`;
+    const gc = getGradeClass(grade);
+    return `<td style="font-weight:700"><span class="grade-display"><span class="grade-dot ${gc}"></span> ${grade}</span></td>`;
   }).join('\n');
 
   const dob = student.dob
