@@ -35,6 +35,8 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
           amount: h.annualAmount || h.amount || 0,
           // Migrate legacy frequency to type
           type: h.type || (h.frequency === 'one-time' ? 'one_time' : 'recurring'),
+          // Map isOptional (backend) back to isCompulsory (frontend)
+          isCompulsory: !h.isOptional,
         }))
       : [{ ...PRESET_FEE_HEADS[0] }],
     isActive: feeStructure?.isActive ?? true,
