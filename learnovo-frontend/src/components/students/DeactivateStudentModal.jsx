@@ -1,16 +1,41 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { X, AlertCircle, AlertTriangle, IndianRupee, Loader2 } from 'lucide-react'
+import studentsService from '../../services/studentsService'
 
 const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => {
+    const navigate = useNavigate()
     const [formData, setFormData] = useState({
-        removalDate: new Date().toISOString().split('T')[0], // Today's date in YYYY-MM-DD format
+        removalDate: new Date().toISOString().split('T')[0],
         removalReason: 'Other',
         removalNotes: ''
     })
+    const [pendingFees, setPendingFees] = useState(null)
+    const [feesLoading, setFeesLoading] = useState(true)
+    const [feesSkipped, setFeesSkipped] = useState(false)
+
+    // Fetch pending fees when modal opens
+    useEffect(() => {
+        let cancelled = false
+        const fetchFees = async () => {
+            try {
+                const res = await studentsService.getPendingFees(student._id)
+                if (!cancelled) setPendingFees(res.data)
+            } catch {
+                if (!cancelled) setPendingFees({ hasPending: false, totalAmount: 0, count: 0, breakdown: [] })
+            } finally {
+                if (!cancelled) setFeesLoading(false)
+            }
+        }
+        fetchFees()
+        return () => { cancelled = true }
+    }, [student._id])
 
     const handleSubmit = (e) => {
         e.preventDefault()
+        // If there are pending fees and user hasn't acknowledged them, show the fees first
+        if (pendingFees?.hasPending && !feesSkipped) return
         onConfirm(formData)
     }
 
@@ -20,6 +45,15 @@ const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => 
             ...prev,
             [name]: value
         }))
+    }
+
+    const handleCollectFees = () => {
+        onCancel()
+        navigate(`/app/fees?student=${student._id}`)
+    }
+
+    const handleSkipFees = () => {
+        setFeesSkipped(true)
     }
 
     return createPortal(
@@ -49,6 +83,79 @@ const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => 
                             </p>
                         </div>
 
+                        {/* Pending Fees Section */}
+                        {feesLoading ? (
+                            <div className="flex items-center justify-center gap-2 py-4 text-gray-500 dark:text-[#8E8E93]">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span className="text-sm">Checking pending fees...</span>
+                            </div>
+                        ) : pendingFees?.hasPending ? (
+                            <div className="border border-red-200 dark:border-red-800 rounded-2xl overflow-hidden">
+                                {/* Fees Header */}
+                                <div className="bg-red-50 dark:bg-red-900/20 px-4 py-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                        <span className="text-sm font-semibold text-red-800 dark:text-red-300">Pending Fees Found</span>
+                                    </div>
+                                    <span className="text-base font-bold text-red-600 dark:text-red-400 flex items-center">
+                                        <IndianRupee className="h-3.5 w-3.5" />
+                                        {pendingFees.totalAmount?.toLocaleString('en-IN')}
+                                    </span>
+                                </div>
+
+                                {/* Fees Breakdown */}
+                                {pendingFees.breakdown?.length > 0 && (
+                                    <div className="max-h-36 overflow-y-auto divide-y divide-gray-100 dark:divide-[#38383A]">
+                                        {pendingFees.breakdown.map((fee, i) => (
+                                            <div key={fee.id || i} className="px-4 py-2 flex items-center justify-between text-sm">
+                                                <div className="min-w-0 flex-1 mr-3">
+                                                    <p className="text-gray-800 dark:text-gray-200 font-medium truncate">{fee.description}</p>
+                                                    <p className="text-xs text-gray-400 dark:text-[#636366] capitalize">{fee.feeType} · {fee.status}</p>
+                                                </div>
+                                                <span className="font-semibold text-gray-900 dark:text-white whitespace-nowrap flex items-center">
+                                                    <IndianRupee className="h-3 w-3" />{fee.balance?.toLocaleString('en-IN')}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Fees Action Buttons */}
+                                {!feesSkipped && (
+                                    <div className="px-4 py-3 bg-gray-50 dark:bg-[#2C2C2E] flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleCollectFees}
+                                            className="btn btn-primary flex-1 text-sm py-2"
+                                        >
+                                            Collect Fees
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSkipFees}
+                                            className="btn flex-1 text-sm py-2 bg-amber-500 hover:bg-amber-600 text-white"
+                                        >
+                                            Skip & Proceed
+                                        </button>
+                                    </div>
+                                )}
+
+                                {feesSkipped && (
+                                    <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/10 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                        <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                        Pending fees skipped — proceeding with deactivation
+                                    </div>
+                                )}
+                            </div>
+                        ) : pendingFees && (
+                            <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-3 flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
+                                    <svg className="h-3 w-3 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                                <span className="text-sm text-emerald-800 dark:text-emerald-300">No pending fees</span>
+                            </div>
+                        )}
+
                         {/* Removal Date */}
                         <div>
                             <label htmlFor="removalDate" className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
@@ -60,7 +167,7 @@ const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => 
                                 name="removalDate"
                                 value={formData.removalDate}
                                 onChange={handleChange}
-                                max={new Date().toISOString().split('T')[0]} // Can't be in future
+                                max={new Date().toISOString().split('T')[0]}
                                 required
                                 className="input"
                             />
@@ -128,7 +235,7 @@ const DeactivateStudentModal = ({ student, onConfirm, onCancel, isLoading }) => 
                         <button
                             type="submit"
                             className="btn btn-danger"
-                            disabled={isLoading}
+                            disabled={isLoading || feesLoading || (pendingFees?.hasPending && !feesSkipped)}
                         >
                             {isLoading ? 'Deactivating...' : 'Deactivate Student'}
                         </button>

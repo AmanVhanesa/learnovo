@@ -106,6 +106,12 @@ export const studentsService = {
     return res.data
   },
 
+  // Pending fees for a student
+  getPendingFees: async (id) => {
+    const res = await api.get(`/students/${id}/pending-fees`)
+    return res.data
+  },
+
   // Subject preferences — per-student opt-out of optional subjects
   getSubjectPreferences: async (id) => {
     const res = await api.get(`/students/${id}/subject-preferences`)

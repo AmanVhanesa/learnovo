@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { encrypt, decrypt, encryptObject, decryptObject } = require('../utils/encryption');
 
 const paymentAttemptSchema = new mongoose.Schema({
   // Multi-tenant support
@@ -85,6 +86,56 @@ const paymentAttemptSchema = new mongoose.Schema({
   verifiedAt: { type: Date, default: null }
 }, {
   timestamps: true
+});
+
+// --- Field-level encryption for sensitive payment data ---
+
+// Encrypt on findOneAndUpdate / findByIdAndUpdate (these bypass save hooks)
+paymentAttemptSchema.pre('findOneAndUpdate', function (next) {
+  const update = this.getUpdate();
+  if (update.gatewayResponse != null && typeof update.gatewayResponse === 'object' && Object.keys(update.gatewayResponse).length > 0) {
+    update.gatewayResponse = encryptObject(update.gatewayResponse);
+  }
+  if (update.transactionRefId) {
+    update.transactionRefId = encrypt(update.transactionRefId);
+  }
+  next();
+});
+
+// Encrypt before saving to DB
+paymentAttemptSchema.pre('save', function (next) {
+  // Encrypt gatewayResponse (raw gateway dump — may contain card/UPI info)
+  if (this.isModified('gatewayResponse') && this.gatewayResponse != null) {
+    if (typeof this.gatewayResponse === 'object' && Object.keys(this.gatewayResponse).length > 0) {
+      this.gatewayResponse = encryptObject(this.gatewayResponse);
+    }
+  }
+
+  // Encrypt transactionRefId (student-submitted UPI ref / bank transfer ID)
+  if (this.isModified('transactionRefId') && this.transactionRefId) {
+    this.transactionRefId = encrypt(this.transactionRefId);
+  }
+
+  next();
+});
+
+// Decrypt after reading from DB
+function decryptAttemptFields(doc) {
+  if (!doc) return;
+  if (doc.gatewayResponse != null) {
+    doc.gatewayResponse = decryptObject(doc.gatewayResponse);
+  }
+  if (doc.transactionRefId) {
+    doc.transactionRefId = decrypt(doc.transactionRefId);
+  }
+}
+
+paymentAttemptSchema.post('init', function (doc) {
+  decryptAttemptFields(doc);
+});
+
+paymentAttemptSchema.post('save', function (doc) {
+  decryptAttemptFields(doc);
 });
 
 // Indexes to speed up queries for students and cron jobs

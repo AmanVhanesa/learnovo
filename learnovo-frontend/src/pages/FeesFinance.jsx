@@ -481,6 +481,14 @@ const FeeStructureTab = ({ feeStructures, classes, onCreateNew, onEdit, onDelete
   const [filterClass, setFilterClass] = useState('')
   const [expandedId, setExpandedId] = useState(null)
 
+  const getClassSortOrder = (name) => {
+    const specialOrder = { 'nursery': 0, 'lkg': 1, 'ukg': 2 }
+    const lower = (name || '').toLowerCase().trim()
+    if (lower in specialOrder) return specialOrder[lower]
+    const num = parseInt(lower.replace(/\D/g, ''), 10)
+    return isNaN(num) ? 999 : num + 2
+  }
+
   const filtered = feeStructures.filter(s => {
     if (filterClass && (typeof s.classId === 'object' ? s.classId?._id : s.classId) !== filterClass) return false
     if (searchQuery) {
@@ -490,6 +498,10 @@ const FeeStructureTab = ({ feeStructures, classes, onCreateNew, onEdit, onDelete
       return cn.includes(q) || heads.includes(q)
     }
     return true
+  }).sort((a, b) => {
+    const nameA = typeof a.classId === 'object' ? a.classId?.name : ''
+    const nameB = typeof b.classId === 'object' ? b.classId?.name : ''
+    return getClassSortOrder(nameA) - getClassSortOrder(nameB)
   })
 
   return (

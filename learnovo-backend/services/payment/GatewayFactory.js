@@ -1,5 +1,6 @@
 const MockPaymentGateway = require('./MockPaymentGateway');
 const ICICIEazypayGateway = require('./ICICIEazypayGateway');
+const RazorpayGateway = require('./RazorpayGateway');
 
 /**
  * GatewayFactory — resolves the correct payment gateway for a tenant.
@@ -45,6 +46,15 @@ function getGateway(tenant) {
       subMerchantId: pgConfig.icici.subMerchantId,
       paymode: pgConfig.icici.paymode || '9',
       returnUrl: `${backendUrl}/api/student-fees/payment/icici-return`
+    });
+    break;
+  }
+
+  case 'razorpay': {
+    instance = new RazorpayGateway({
+      keyId: pgConfig.razorpay.keyId,
+      keySecret: pgConfig.razorpay.keySecret,
+      webhookSecret: pgConfig.razorpay.webhookSecret || ''
     });
     break;
   }

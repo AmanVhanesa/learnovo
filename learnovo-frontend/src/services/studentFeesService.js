@@ -1,6 +1,9 @@
 import api from './authService';
 
 export const studentFeesService = {
+    // Check if online payment gateway is enabled for this tenant
+    getGatewayStatus: () => api.get('/student-fees/gateway-status'),
+
     // Get all assigned invoices
     getInvoices: () => api.get('/student-fees'),
 
@@ -12,6 +15,9 @@ export const studentFeesService = {
 
     // Initiate payment flow (gateway mode)
     initiatePayment: (invoiceId) => api.post(`/student-fees/${invoiceId}/pay`),
+
+    // Verify Razorpay payment (popup callback)
+    verifyRazorpayPayment: (data) => api.post('/student-fees/payment/razorpay-verify', data),
 
     // Submit manual payment proof (manual mode — when gateway is not enabled)
     submitManualPayment: (invoiceId, data) => api.post(`/student-fees/${invoiceId}/submit-payment`, data),

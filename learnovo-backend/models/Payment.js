@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Counter = require('./Counter');
+const { encrypt, decrypt } = require('../utils/encryption');
 
 // Lazy-loaded to avoid circular dependency — resolved on first use
 let _financeAutoSync = null;
@@ -131,6 +132,38 @@ const paymentSchema = new mongoose.Schema({
   }
 }, {
   timestamps: true
+});
+
+// --- Field-level encryption for sensitive payment data ---
+
+// Encrypt before saving to DB
+paymentSchema.pre('save', function (next) {
+  if (this.isModified('transactionDetails.upiId') && this.transactionDetails?.upiId) {
+    this.transactionDetails.upiId = encrypt(this.transactionDetails.upiId);
+  }
+  if (this.isModified('transactionDetails.chequeNumber') && this.transactionDetails?.chequeNumber) {
+    this.transactionDetails.chequeNumber = encrypt(this.transactionDetails.chequeNumber);
+  }
+  next();
+});
+
+// Decrypt after reading from DB
+function decryptPaymentFields(doc) {
+  if (!doc?.transactionDetails) return;
+  if (doc.transactionDetails.upiId) {
+    doc.transactionDetails.upiId = decrypt(doc.transactionDetails.upiId);
+  }
+  if (doc.transactionDetails.chequeNumber) {
+    doc.transactionDetails.chequeNumber = decrypt(doc.transactionDetails.chequeNumber);
+  }
+}
+
+paymentSchema.post('init', function (doc) {
+  decryptPaymentFields(doc);
+});
+
+paymentSchema.post('save', function (doc) {
+  decryptPaymentFields(doc);
 });
 
 // Indexes

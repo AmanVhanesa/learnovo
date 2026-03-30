@@ -2272,6 +2272,86 @@ router.put('/:id', protect, canAccessStudent, [
   }
 });
 
+// @desc    Get pending fees for a student
+// @route   GET /api/students/:id/pending-fees
+// @access  Private (Admin)
+router.get('/:id/pending-fees', protect, authorize('admin'), async(req, res) => {
+  try {
+    const student = await User.findOne({
+      _id: req.params.id,
+      role: 'student',
+      tenantId: req.user.tenantId
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Check both Fee (legacy) and FeeInvoice (current) models
+    const [legacyFees, invoices] = await Promise.all([
+      Fee.find({
+        student: req.params.id,
+        tenantId: req.user.tenantId,
+        status: { $in: ['pending', 'overdue', 'partially_paid'] }
+      }),
+      FeeInvoice.find({
+        studentId: req.params.id,
+        tenantId: req.user.tenantId,
+        status: { $in: ['Pending', 'Partial', 'Overdue'] }
+      })
+    ]);
+
+    const breakdown = [];
+    let totalPending = 0;
+
+    // Legacy Fee records
+    for (const f of legacyFees) {
+      const balance = f.balance > 0 ? f.balance : f.amount - (f.paidAmount || 0);
+      totalPending += balance;
+      breakdown.push({
+        id: f._id,
+        description: f.description,
+        feeType: f.feeType || 'Fee',
+        amount: f.amount,
+        paidAmount: f.paidAmount || 0,
+        balance,
+        status: f.status,
+        dueDate: f.dueDate,
+        source: 'fee'
+      });
+    }
+
+    // FeeInvoice records
+    for (const inv of invoices) {
+      totalPending += inv.balanceAmount;
+      breakdown.push({
+        id: inv._id,
+        description: inv.invoiceNumber + (inv.items?.length ? ` — ${inv.items.map(i => i.feeHeadName).join(', ')}` : ''),
+        feeType: 'Invoice',
+        amount: inv.totalAmount,
+        paidAmount: inv.paidAmount || 0,
+        balance: inv.balanceAmount,
+        status: inv.status,
+        dueDate: inv.dueDate,
+        source: 'invoice'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        hasPending: breakdown.length > 0,
+        totalAmount: totalPending,
+        count: breakdown.length,
+        breakdown
+      }
+    });
+  } catch (error) {
+    logger.error('Get pending fees error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId });
+    res.status(500).json({ success: false, message: 'Server error while fetching pending fees' });
+  }
+});
+
 // @desc    Deactivate student (mark as inactive with removal details)
 // @route   PUT /api/students/:id/deactivate
 // @access  Private (Admin)

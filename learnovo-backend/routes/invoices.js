@@ -68,8 +68,26 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
         });
       }
 
-      // Convert feeHeads to items format
-      invoiceItems = feeStructure.feeHeads.map(head => {
+      // Convert feeHeads to items format, filtering out admission fees for imported students
+      invoiceItems = [];
+      for (const head of feeStructure.feeHeads) {
+        // Skip admission fees for imported students or students who already paid
+        if (head.isAdmissionFee) {
+          if (student.isImported || student.admissionFeePaid) {
+            continue;
+          }
+          // Check if an admission fee invoice already exists for this student
+          const existingAdmissionInvoice = await FeeInvoice.findOne({
+            tenantId: req.user.tenantId,
+            studentId: student._id,
+            'items.feeHeadName': head.name,
+            status: { $ne: 'Cancelled' }
+          });
+          if (existingAdmissionInvoice) {
+            continue;
+          }
+        }
+
         // Capitalize frequency to match FeeInvoice enum
         let frequency = head.frequency || 'one-time';
         if (frequency === 'monthly') frequency = 'Monthly';
@@ -77,12 +95,12 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
         else if (frequency === 'one-time') frequency = 'One-time';
         else if (frequency === 'annual') frequency = 'Annual';
 
-        return {
+        invoiceItems.push({
           feeHeadName: head.name,
           amount: head.amount,
           frequency: frequency
-        };
-      });
+        });
+      }
     }
 
     // Validate that we have items

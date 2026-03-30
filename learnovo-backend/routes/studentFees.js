@@ -203,14 +203,23 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
       });
       await createAuditLog(attempt._id, null, req.user.tenantId, 'INITIATED', 'PROCESSING', 'STUDENT_PORTAL', 'Gateway returned checkout UI URL');
 
+      // Build response — supports both redirect (ICICI) and popup (Razorpay) flows
+      const responseData = {
+        paymentAttemptId: attempt._id,
+        paymentUrl: gatewayResult.paymentUrl, // null for Razorpay (popup), URL for ICICI (redirect)
+        gatewayRefId: gatewayResult.gatewayRefId,
+        provider: tenant.paymentGateway?.provider || 'unknown'
+      };
+
+      // Razorpay: include order details for frontend checkout popup
+      if (gatewayResult.razorpayOrder) {
+        responseData.razorpayOrder = gatewayResult.razorpayOrder;
+      }
+
       return res.json({
         success: true,
-        message: 'Payment tracking started. Redirecting to gateway.',
-        data: {
-          paymentAttemptId: attempt._id,
-          paymentUrl: gatewayResult.paymentUrl,
-          gatewayRefId: gatewayResult.gatewayRefId
-        }
+        message: gatewayResult.paymentUrl ? 'Payment tracking started. Redirecting to gateway.' : 'Payment order created. Opening checkout.',
+        data: responseData
       });
 
     } catch (gatewayErr) {
@@ -745,6 +754,132 @@ router.post('/payment/notify', async(req, res) => {
 });
 
 /**
+ * @desc    Razorpay payment verification (frontend popup callback)
+ * @route   POST /api/student-fees/payment/razorpay-verify
+ * @access  Private (student)
+ *
+ * After the Razorpay checkout popup closes, the frontend sends
+ * razorpay_order_id, razorpay_payment_id, razorpay_signature here.
+ */
+router.post('/payment/razorpay-verify', protect, authorize('student'), async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, paymentAttemptId } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !paymentAttemptId) {
+      return res.status(400).json({ success: false, message: 'Missing required payment verification fields' });
+    }
+
+    // Find the payment attempt
+    const attempt = await PaymentAttempt.findOne({
+      _id: paymentAttemptId,
+      tenantId: req.user.tenantId,
+      studentId: req.user._id
+    });
+
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: 'Payment attempt not found' });
+    }
+
+    if (attempt.status === 'SUCCESS') {
+      return res.json({ success: true, message: 'Payment already verified', data: { status: 'SUCCESS' } });
+    }
+
+    // Resolve gateway and verify signature
+    const tenant = await Tenant.findById(req.user.tenantId).lean();
+    const gateway = getGateway(tenant);
+
+    if (!gateway || typeof gateway.verifyPaymentSignature !== 'function') {
+      return res.status(400).json({ success: false, message: 'Payment gateway not configured for verification' });
+    }
+
+    const isValid = gateway.verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    if (!isValid) {
+      attempt.status = 'FAILED';
+      attempt.gatewayResponse = { error: 'Signature verification failed', ...req.body };
+      await attempt.save();
+      await createAuditLog(attempt._id, null, attempt.tenantId, 'PROCESSING', 'FAILED', 'STUDENT_PORTAL', 'Razorpay signature verification failed');
+      return res.status(400).json({ success: false, message: 'Payment verification failed: invalid signature' });
+    }
+
+    // Signature valid — process payment
+    const previousStatus = attempt.status;
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      attempt.status = 'SUCCESS';
+      attempt.gatewayRefId = razorpay_payment_id;
+      attempt.gatewayResponse = req.body;
+      await attempt.save({ session });
+
+      // Update invoice
+      const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
+      if (invoice) {
+        invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
+        await invoice.save({ session });
+      }
+
+      // Generate receipt
+      const receiptNum = await Receipt.generateReceiptNumber(attempt.tenantId);
+      await Receipt.create([{
+        tenantId: attempt.tenantId,
+        paymentAttemptId: attempt._id,
+        studentId: attempt.studentId,
+        invoiceId: attempt.invoiceId,
+        receiptNumber: receiptNum,
+        amount: attempt.amount,
+        paymentMode: 'ONLINE',
+        paymentDate: new Date(),
+        transactionRefId: razorpay_payment_id
+      }], { session });
+
+      await createAuditLog(attempt._id, session, attempt.tenantId, previousStatus, 'SUCCESS', 'STUDENT_PORTAL',
+        `Razorpay payment verified. Payment ID: ${razorpay_payment_id}`);
+
+      await session.commitTransaction();
+      session.endSession();
+
+      // Auto-sync to Finance module (non-blocking)
+      try {
+        const student = await User.findById(attempt.studentId).select('name fullName').lean();
+        const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber').lean();
+        await syncFeePaymentToIncome({
+          tenantId: attempt.tenantId,
+          paymentId: attempt._id,
+          amount: attempt.amount,
+          paymentDate: new Date(),
+          paymentMethod: 'Online',
+          studentName: student?.fullName || student?.name || 'Student',
+          invoiceNumber: inv?.invoiceNumber,
+          addedBy: attempt.studentId,
+          paymentReference: razorpay_payment_id,
+          referenceModel: 'PaymentAttempt'
+        });
+      } catch (syncErr) {
+        console.error('[Finance-AutoSync] Razorpay verify sync failed (non-fatal):', syncErr.message);
+      }
+
+      return res.json({
+        success: true,
+        message: 'Payment verified and recorded successfully',
+        data: {
+          status: 'SUCCESS',
+          amount: attempt.amount,
+          receiptNumber: receiptNum
+        }
+      });
+    } catch (txErr) {
+      await session.abortTransaction();
+      session.endSession();
+      throw txErr;
+    }
+  } catch (error) {
+    console.error('[razorpay-verify] Error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Payment verification failed' });
+  }
+});
+
+/**
  * @desc    ICICI EazyPay return URL handler
  * @route   POST /api/student-fees/payment/icici-return
  * @access  Public (called by ICICI's redirect — NO auth, student's browser is redirected here)
@@ -883,6 +1018,29 @@ router.post('/payment/icici-return', express.urlencoded({ extended: true }), asy
     console.error('[icici-return] Error processing ICICI return:', error);
     const frontendFallback = process.env.FRONTEND_URL || 'http://localhost:5173';
     return res.redirect(`${frontendFallback}/payment/status?status=error&message=Payment+processing+error`);
+  }
+});
+
+/**
+ * @desc    Check if online payment gateway is enabled for this tenant
+ * @route   GET /api/student-fees/gateway-status
+ * @access  Private (student)
+ */
+router.get('/gateway-status', protect, authorize('student'), async (req, res) => {
+  try {
+    const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway').lean();
+    if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });
+
+    const pg = tenant.paymentGateway || {};
+    res.json({
+      success: true,
+      data: {
+        gatewayEnabled: pg.isActive && pg.provider !== 'none',
+        provider: pg.isActive ? pg.provider : 'none'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

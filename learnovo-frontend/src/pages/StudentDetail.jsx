@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Edit, Power, PowerOff, Key, Download, Printer, Loader, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, AlertCircle, X, Eye, EyeOff, FileText } from 'lucide-react'
+import { ArrowLeft, Edit, Power, PowerOff, Key, Download, Printer, Loader, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, AlertCircle, AlertTriangle, X, Eye, EyeOff, FileText, IndianRupee, Loader2 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsService } from '../services/studentsService'
 import { attendanceService } from '../services/attendanceService'
@@ -31,6 +31,9 @@ const StudentDetail = () => {
     const [showPassword, setShowPassword] = useState(false)
     const [showDeactivateModal, setShowDeactivateModal] = useState(false)
     const [deactivateReason, setDeactivateReason] = useState('')
+    const [pendingFees, setPendingFees] = useState(null)
+    const [feesLoading, setFeesLoading] = useState(false)
+    const [feesSkipped, setFeesSkipped] = useState(false)
     const [showResultCard, setShowResultCard] = useState(false)
 
     // Fetch student + class history
@@ -90,6 +93,20 @@ const StudentDetail = () => {
     })
     const examResults = examResultData?.subjects || []
     const examSummary = examResultData?.summary || null
+
+    // Fetch pending fees when deactivation modal opens
+    useEffect(() => {
+        if (!showDeactivateModal || !id) return
+        let cancelled = false
+        setFeesLoading(true)
+        setPendingFees(null)
+        setFeesSkipped(false)
+        studentsService.getPendingFees(id)
+            .then(res => { if (!cancelled) setPendingFees(res.data) })
+            .catch(() => { if (!cancelled) setPendingFees({ hasPending: false, totalAmount: 0, count: 0, breakdown: [] }) })
+            .finally(() => { if (!cancelled) setFeesLoading(false) })
+        return () => { cancelled = true }
+    }, [showDeactivateModal, id])
 
     // Toggle status mutation
     const toggleStatusMutation = useMutation({
@@ -934,22 +951,88 @@ const StudentDetail = () => {
             {/* Deactivation Modal */}
             {showDeactivateModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col">
                         <div className="p-6 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center">
                             <h2 className="text-lg font-bold text-red-600 flex items-center gap-2">
                                 <PowerOff className="h-5 w-5" />
                                 Deactivate Student
                             </h2>
-                            <button onClick={() => { setShowDeactivateModal(false); setDeactivateReason('') }} className="p-2 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-full">
+                            <button onClick={() => { setShowDeactivateModal(false); setDeactivateReason(''); setFeesSkipped(false) }} className="p-2 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-full">
                                 <X className="h-5 w-5 text-gray-400 dark:text-[#636366]" />
                             </button>
                         </div>
-                        <div className="p-6 space-y-4">
+                        <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl">
                                 <p className="text-sm text-red-700 dark:text-red-400">
                                     You are about to deactivate <strong>{student.name}</strong> ({student.admissionNumber}). This will prevent them from logging in and accessing the system.
                                 </p>
                             </div>
+
+                            {/* Pending Fees Section */}
+                            {feesLoading ? (
+                                <div className="flex items-center justify-center gap-2 py-4 text-gray-500 dark:text-[#8E8E93]">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span className="text-sm">Checking pending fees...</span>
+                                </div>
+                            ) : pendingFees?.hasPending ? (
+                                <div className="border border-red-200 dark:border-red-800 rounded-2xl overflow-hidden">
+                                    <div className="bg-red-50 dark:bg-red-900/20 px-4 py-3 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                            <span className="text-sm font-semibold text-red-800 dark:text-red-300">Pending Fees Found</span>
+                                        </div>
+                                        <span className="text-base font-bold text-red-600 dark:text-red-400 flex items-center">
+                                            <IndianRupee className="h-3.5 w-3.5" />
+                                            {pendingFees.totalAmount?.toLocaleString('en-IN')}
+                                        </span>
+                                    </div>
+                                    {pendingFees.breakdown?.length > 0 && (
+                                        <div className="max-h-36 overflow-y-auto divide-y divide-gray-100 dark:divide-[#38383A]">
+                                            {pendingFees.breakdown.map((fee, i) => (
+                                                <div key={fee.id || i} className="px-4 py-2 flex items-center justify-between text-sm">
+                                                    <div className="min-w-0 flex-1 mr-3">
+                                                        <p className="text-gray-800 dark:text-gray-200 font-medium truncate">{fee.description}</p>
+                                                        <p className="text-xs text-gray-400 dark:text-[#636366] capitalize">{fee.feeType} · {fee.status}</p>
+                                                    </div>
+                                                    <span className="font-semibold text-gray-900 dark:text-white whitespace-nowrap flex items-center">
+                                                        <IndianRupee className="h-3 w-3" />{fee.balance?.toLocaleString('en-IN')}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {!feesSkipped && (
+                                        <div className="px-4 py-3 bg-gray-50 dark:bg-[#2C2C2E] flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => { setShowDeactivateModal(false); setDeactivateReason(''); navigate(`/app/fees?student=${id}`) }}
+                                                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl"
+                                            >
+                                                Collect Fees
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFeesSkipped(true)}
+                                                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-xl"
+                                            >
+                                                Skip & Proceed
+                                            </button>
+                                        </div>
+                                    )}
+                                    {feesSkipped && (
+                                        <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/10 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                                            <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                            Pending fees skipped — proceeding with deactivation
+                                        </div>
+                                    )}
+                                </div>
+                            ) : pendingFees && (
+                                <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-3 flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                                    <span className="text-sm text-emerald-800 dark:text-emerald-300">No pending fees</span>
+                                </div>
+                            )}
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Reason for Deactivation <span className="text-red-500">*</span></label>
                                 <textarea
@@ -962,12 +1045,12 @@ const StudentDetail = () => {
                                 />
                             </div>
                             <div className="flex justify-end gap-3 pt-2">
-                                <button onClick={() => { setShowDeactivateModal(false); setDeactivateReason('') }} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-xl">
+                                <button onClick={() => { setShowDeactivateModal(false); setDeactivateReason(''); setFeesSkipped(false) }} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-xl">
                                     Cancel
                                 </button>
                                 <button
                                     onClick={() => handleToggleStatus(deactivateReason)}
-                                    disabled={!deactivateReason.trim() || toggleStatusMutation.isPending}
+                                    disabled={!deactivateReason.trim() || toggleStatusMutation.isPending || feesLoading || (pendingFees?.hasPending && !feesSkipped)}
                                     className="px-6 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-2xl shadow-glass disabled:opacity-50"
                                 >
                                     {toggleStatusMutation.isPending ? 'Deactivating...' : 'Deactivate Student'}

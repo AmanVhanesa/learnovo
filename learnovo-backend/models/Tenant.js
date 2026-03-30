@@ -153,6 +153,12 @@ const tenantSchema = new mongoose.Schema({
       // 9 = all modes, 1 = Net Banking, 2 = Credit Card, 3 = Debit Card, 4 = Cash, 6 = UPI, etc.
       paymode: { type: String, default: '9' }
     },
+    // Razorpay credentials
+    razorpay: {
+      keyId: { type: String, default: '' },
+      keySecret: { type: String, default: '' },
+      webhookSecret: { type: String, default: '' }
+    },
     isActive: {
       type: Boolean,
       default: false

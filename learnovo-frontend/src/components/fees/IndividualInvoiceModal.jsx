@@ -36,9 +36,18 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
     })
   }, [activeFeeStructures, selectedStudent])
 
+  // Filter out admission fees for imported students
+  const applicableFeeHeads = useMemo(() => {
+    if (!selectedFeeStructure?.feeHeads) return []
+    if (selectedStudent?.isImported || selectedStudent?.admissionFeePaid) {
+      return selectedFeeStructure.feeHeads.filter(h => !h.isAdmissionFee)
+    }
+    return selectedFeeStructure.feeHeads
+  }, [selectedFeeStructure, selectedStudent])
+
   const feeHeadTotal = useMemo(
-    () => selectedFeeStructure?.totalAmount || selectedFeeStructure?.feeHeads?.reduce((sum, h) => sum + (h.amount || 0), 0) || 0,
-    [selectedFeeStructure]
+    () => applicableFeeHeads.reduce((sum, h) => sum + (h.amount || 0), 0),
+    [applicableFeeHeads]
   )
 
   const handleSubmit = async (e) => {
@@ -85,8 +94,17 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
             <label className="label mb-1.5 block">Select Student *</label>
             <StudentSearch onSelectStudent={(student) => {
               setSelectedStudent(student)
-              // Reset fee structure if student class changes
-              setForm(f => ({ ...f, feeStructureId: '' }))
+              // Auto-select fee structure matching student's class
+              const studentClassId = student?.classId?._id
+              if (studentClassId) {
+                const matched = activeFeeStructures.filter(fs => {
+                  const fsClassId = typeof fs.classId === 'object' ? fs.classId._id : fs.classId
+                  return fs.isActive && fsClassId === studentClassId
+                })
+                setForm(f => ({ ...f, feeStructureId: matched.length === 1 ? matched[0]._id : '' }))
+              } else {
+                setForm(f => ({ ...f, feeStructureId: '' }))
+              }
             }} />
             {selectedStudent && (
               <div className="mt-3 flex items-center gap-3 p-3 bg-primary-50 dark:bg-primary-900/15 border border-primary-200 dark:border-primary-800/30 rounded-xl">
@@ -155,7 +173,7 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                 <span className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(feeHeadTotal)}</span>
               </div>
               <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
-                {selectedFeeStructure.feeHeads?.map((head, i) => (
+                {applicableFeeHeads.map((head, i) => (
                   <div key={i} className="px-4 py-2.5 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-700 dark:text-gray-300">{head.name}</span>
@@ -171,6 +189,13 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                     </div>
                   </div>
                 ))}
+                {selectedStudent?.isImported && selectedFeeStructure.feeHeads?.some(h => h.isAdmissionFee) && (
+                  <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/15">
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Admission fee excluded — imported students are exempt from one-time admission fees.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

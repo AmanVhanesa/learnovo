@@ -494,11 +494,19 @@ router.get('/payment-gateway', protect, authorize('admin'), async(req, res) => {
     const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway');
     if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });
 
-    // Mask the encryption key for security (only show last 4 chars)
+    // Mask sensitive keys for security (only show last 4 chars)
     const config = tenant.paymentGateway?.toObject?.() || tenant.paymentGateway || {};
     if (config.icici?.encryptionKey) {
       const key = config.icici.encryptionKey;
       config.icici.encryptionKey = key.length > 4 ? `****${  key.slice(-4)}` : '****';
+    }
+    if (config.razorpay?.keySecret) {
+      const s = config.razorpay.keySecret;
+      config.razorpay.keySecret = s.length > 4 ? `****${s.slice(-4)}` : '****';
+    }
+    if (config.razorpay?.webhookSecret) {
+      const w = config.razorpay.webhookSecret;
+      config.razorpay.webhookSecret = w.length > 4 ? `****${w.slice(-4)}` : '****';
     }
 
     res.json({ success: true, data: config });
@@ -519,7 +527,7 @@ router.get('/payment-gateway', protect, authorize('admin'), async(req, res) => {
  * }
  */
 router.put('/payment-gateway', protect, authorize('admin'), [
-  body('provider').isIn(['none', 'mock', 'icici_eazypay']).withMessage('Invalid provider'),
+  body('provider').isIn(['none', 'mock', 'icici_eazypay', 'razorpay']).withMessage('Invalid provider'),
   body('isActive').optional().isBoolean()
 ], handleValidationErrors, async(req, res) => {
   try {
@@ -538,6 +546,18 @@ router.put('/payment-gateway', protect, authorize('admin'), [
       }
       if (icici.subMerchantId) update['paymentGateway.icici.subMerchantId'] = icici.subMerchantId;
       if (icici.paymode) update['paymentGateway.icici.paymode'] = icici.paymode;
+    }
+
+    if (provider === 'razorpay' && req.body.razorpay) {
+      const rz = req.body.razorpay;
+      if (rz.keyId) update['paymentGateway.razorpay.keyId'] = rz.keyId;
+      // Only update secrets if not masked
+      if (rz.keySecret && !rz.keySecret.startsWith('****')) {
+        update['paymentGateway.razorpay.keySecret'] = rz.keySecret;
+      }
+      if (rz.webhookSecret && !rz.webhookSecret.startsWith('****')) {
+        update['paymentGateway.razorpay.webhookSecret'] = rz.webhookSecret;
+      }
     }
 
     const tenant = await Tenant.findByIdAndUpdate(

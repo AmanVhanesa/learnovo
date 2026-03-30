@@ -6,7 +6,6 @@ import { studentFeesService } from '../../services/studentFeesService';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { buildReceiptHtml, downloadReceiptAsPdf } from '../../utils/receiptHelpers';
 import { useSettings } from '../../contexts/SettingsContext';
-import { PAYMENT_GATEWAY_ENABLED } from '../../constants/config';
 
 // Format date
 const formatDate = (dateString, withTime = false) => {
@@ -36,6 +35,28 @@ const StudentFeesDashboard = () => {
 
     const [disputeModal, setDisputeModal] = useState({ isOpen: false, attemptId: null, invoiceId: null });
     const [disputeForm, setDisputeForm] = useState({ transactionId: '', bankReferenceNumber: '', amount: '', studentNote: '' });
+
+    // Check if online payment gateway is enabled for this tenant (per-tenant, not global flag)
+    const { data: gatewayStatus } = useQuery({
+        queryKey: ['gateway-status'],
+        queryFn: async () => {
+            const res = await studentFeesService.getGatewayStatus();
+            return res.data?.data || { gatewayEnabled: false, provider: 'none' };
+        },
+        staleTime: 5 * 60 * 1000, // cache for 5 min — rarely changes
+    });
+    const PAYMENT_GATEWAY_ENABLED = gatewayStatus?.gatewayEnabled || false;
+
+    // Dynamically load Razorpay checkout script when provider is razorpay
+    useEffect(() => {
+        if (gatewayStatus?.provider !== 'razorpay') return;
+        if (document.getElementById('razorpay-checkout-script')) return;
+        const script = document.createElement('script');
+        script.id = 'razorpay-checkout-script';
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        document.body.appendChild(script);
+    }, [gatewayStatus?.provider]);
 
     // Fetch invoices and history via useQuery
     const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
@@ -84,27 +105,67 @@ const StudentFeesDashboard = () => {
         return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVisible); };
     }, [hasPendingPayments, queryClient]);
 
-    // Gateway payment flow (used when PAYMENT_GATEWAY_ENABLED=true)
-    // TODO: Replace mock gateway with real Razorpay/Stripe/PayU integration
-    // Steps: 1) Call initiatePayment → backend creates order with gateway
-    //        2) Gateway returns paymentUrl → redirect student
-    //        3) On callback/webhook, backend verifies and generates receipt
+    // Gateway payment flow — supports both ICICI (redirect) and Razorpay (popup)
     const [isGatewayPaying, setIsGatewayPaying] = useState(false);
     const handleGatewayPayment = async (invoiceId) => {
         try {
             setIsGatewayPaying(true);
             const res = await studentFeesService.initiatePayment(invoiceId);
-            if (res.data?.success && res.data.data.paymentUrl) {
-                const paymentWindow = window.open(res.data.data.paymentUrl, '_blank');
-                if (!paymentWindow) window.location.href = res.data.data.paymentUrl;
+            const data = res.data?.data;
+            if (!res.data?.success || !data) throw new Error('Failed to initiate payment');
+
+            if (data.paymentUrl) {
+                // ICICI / redirect-based flow
+                const paymentWindow = window.open(data.paymentUrl, '_blank');
+                if (!paymentWindow) window.location.href = data.paymentUrl;
                 toast.success('Redirecting to payment gateway...');
                 setTimeout(() => {
                     queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
                     queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
                 }, 1500);
+            } else if (data.razorpayOrder) {
+                // Razorpay popup flow
+                const { orderId, amount, currency, keyId } = data.razorpayOrder;
+                const options = {
+                    key: keyId,
+                    amount,
+                    currency,
+                    order_id: orderId,
+                    name: schoolSettings?.schoolName || 'School Fees',
+                    description: 'Fee Payment',
+                    handler: async (response) => {
+                        try {
+                            const verifyRes = await studentFeesService.verifyRazorpayPayment({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                paymentAttemptId: data.paymentAttemptId
+                            });
+                            if (verifyRes.data?.success) {
+                                toast.success('Payment successful!');
+                            } else {
+                                toast.error('Payment verification failed. Contact school office.');
+                            }
+                        } catch {
+                            toast.error('Payment verification failed. Please check your payment history.');
+                        }
+                        queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
+                        queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
+                        queryClient.invalidateQueries({ queryKey: ['student-receipts'] });
+                    },
+                    modal: {
+                        ondismiss: () => {
+                            toast('Payment cancelled', { icon: '⚠️' });
+                            queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
+                        }
+                    },
+                    theme: { color: '#4F46E5' }
+                };
+                const rzp = new window.Razorpay(options);
+                rzp.open();
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to initiate payment');
+            toast.error(error.response?.data?.message || error.message || 'Failed to initiate payment');
         } finally {
             setIsGatewayPaying(false);
         }
