@@ -804,18 +804,24 @@ const StudentFeesDashboard = () => {
             )}
 
             {/* MANUAL PAYMENT FORM MODAL */}
-            {paymentModal.isOpen && paymentModal.invoice && (
+            {paymentModal.isOpen && (paymentModal.invoice || paymentModal.combinedInvoiceIds) && (() => {
+                const isCombined = !!paymentModal.combinedInvoiceIds;
+                const maxAmount = isCombined
+                    ? paymentModal.combinedTotal
+                    : paymentModal.invoice?.balanceAmount || 0;
+                const subtitle = isCombined
+                    ? `${paymentModal.combinedInvoiceIds.length} invoices · Total: ${formatCurrency(maxAmount)}`
+                    : `Invoice: ${paymentModal.invoice?.invoiceNumber} · Balance: ${formatCurrency(maxAmount)}`;
+                return (
                 <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in text-gray-900 dark:text-white">
                     <div className="bg-white dark:bg-[#1C1C1E] rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md overflow-hidden">
                         <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center bg-gray-50 dark:bg-[#2C2C2E]">
                             <div>
                                 <h2 className="text-lg font-bold flex items-center gap-2">
                                     <IndianRupee className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-                                    Submit Payment Proof
+                                    {isCombined ? 'Combined Payment Proof' : 'Submit Payment Proof'}
                                 </h2>
-                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
-                                    Invoice: {paymentModal.invoice.invoiceNumber} &middot; Balance: {formatCurrency(paymentModal.invoice.balanceAmount)}
-                                </p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">{subtitle}</p>
                             </div>
                             <button onClick={() => setPaymentModal({ isOpen: false, invoice: null })} className="p-2 hover:bg-gray-200 dark:hover:bg-[#2C2C2E] rounded-full transition-colors">
                                 <X className="h-5 w-5" />
@@ -823,6 +829,17 @@ const StudentFeesDashboard = () => {
                         </div>
 
                         <form onSubmit={handleSubmitPayment} className="p-4 sm:p-6 space-y-4">
+                            {isCombined && (
+                                <div className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3 space-y-1">
+                                    {invoices.filter(inv => paymentModal.combinedInvoiceIds.includes(inv._id)).map(inv => (
+                                        <div key={inv._id} className="flex justify-between text-xs">
+                                            <span className="text-gray-700 dark:text-gray-300">{inv.billingPeriod?.displayText || inv.invoiceNumber}</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">{formatCurrency(inv.balanceAmount)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Payment Mode *</label>
                                 <select
@@ -857,9 +874,9 @@ const StudentFeesDashboard = () => {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Amount Paid *</label>
                                 <input
-                                    type="number" required min="1" max={paymentModal.invoice.balanceAmount}
+                                    type="number" required min="1" max={maxAmount}
                                     className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
-                                    placeholder={String(paymentModal.invoice.balanceAmount)}
+                                    placeholder={String(maxAmount)}
                                     value={paymentForm.amount}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
                                 />
@@ -894,7 +911,8 @@ const StudentFeesDashboard = () => {
                         </form>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* PAYMENT CONFIRMATION SCREEN */}
             {paymentConfirmation && (

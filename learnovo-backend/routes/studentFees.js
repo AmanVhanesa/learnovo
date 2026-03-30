@@ -392,7 +392,10 @@ router.post('/pay-combined', protect, authorize('student'), [
 
     // Check for stuck payments on any of the invoices
     const stuckAttempt = await PaymentAttempt.findOne({
-      invoiceId: { $in: invoiceIds },
+      $or: [
+        { invoiceId: { $in: invoiceIds } },
+        { invoiceIds: { $in: invoiceIds } }
+      ],
       status: { $in: ['PENDING', 'PROCESSING'] }
     }).session(session);
 
@@ -497,7 +500,10 @@ router.post('/submit-payment-combined', protect, authorize('student'), [
 
     // Check for stuck payments
     const stuckAttempt = await PaymentAttempt.findOne({
-      invoiceId: { $in: invoiceIds },
+      $or: [
+        { invoiceId: { $in: invoiceIds } },
+        { invoiceIds: { $in: invoiceIds } }
+      ],
       status: { $in: ['PENDING', 'PROCESSING'] }
     }).session(session);
     if (stuckAttempt) throw new Error('One of the selected invoices already has a payment awaiting verification.');
