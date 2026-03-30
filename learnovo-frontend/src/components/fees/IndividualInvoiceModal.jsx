@@ -25,16 +25,38 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
   )
 
   // Auto-detect fee structure matching student's class
-  const studentClassId = typeof selectedStudent?.classId === 'object' ? selectedStudent.classId?._id : selectedStudent?.classId
+  // Student may have classId (ObjectId ref) or just class (string name) — handle both
+  const studentClassId = (selectedStudent?.classId && typeof selectedStudent.classId === 'object')
+    ? selectedStudent.classId._id
+    : selectedStudent?.classId || null
+  const studentClassName = (selectedStudent?.classId && typeof selectedStudent.classId === 'object')
+    ? selectedStudent.classId.name
+    : selectedStudent?.class || null
+
   const matchingStructure = useMemo(() => {
-    if (!studentClassId) return null
-    const sId = String(studentClassId)
-    const matched = activeFeeStructures.filter(fs => {
-      const fsClassId = typeof fs.classId === 'object' ? fs.classId._id : fs.classId
-      return String(fsClassId) === sId
-    })
-    return matched.length >= 1 ? matched[0] : null
-  }, [activeFeeStructures, studentClassId])
+    if (!studentClassId && !studentClassName) return null
+
+    // First try matching by classId (ObjectId)
+    if (studentClassId) {
+      const sId = String(studentClassId)
+      const matched = activeFeeStructures.filter(fs => {
+        const fsClassId = typeof fs.classId === 'object' ? fs.classId._id : fs.classId
+        return String(fsClassId) === sId
+      })
+      if (matched.length >= 1) return matched[0]
+    }
+
+    // Fallback: match by class name (for imported students with only class string)
+    if (studentClassName) {
+      const matched = activeFeeStructures.filter(fs => {
+        const fsClassName = typeof fs.classId === 'object' ? fs.classId.name : null
+        return fsClassName && fsClassName.toLowerCase() === studentClassName.toLowerCase()
+      })
+      if (matched.length >= 1) return matched[0]
+    }
+
+    return null
+  }, [activeFeeStructures, studentClassId, studentClassName])
 
   // Filter fee heads based on student status
   const applicableFeeHeads = useMemo(() => {

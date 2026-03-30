@@ -97,12 +97,12 @@ function calculateAnnualTotal(allocatedHeads) {
 
 function getFrequencyMultiplier(frequency) {
   switch (frequency) {
-    case 'monthly': return 12;
-    case 'quarterly': return 4;
-    case 'half-yearly': return 2;
-    case 'yearly': return 1;
-    case 'one-time': return 1;
-    default: return 1;
+  case 'monthly': return 12;
+  case 'quarterly': return 4;
+  case 'half-yearly': return 2;
+  case 'yearly': return 1;
+  case 'one-time': return 1;
+  default: return 1;
   }
 }
 
@@ -115,7 +115,7 @@ router.post('/generate', protect, authorize('admin'), [
   body('academicSessionId').notEmpty().withMessage('Academic session is required'),
   body('paymentPlan').optional().isIn(['monthly', 'quarterly', 'half-yearly', 'annual']),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { classId, sectionId, academicSessionId, paymentPlan = 'quarterly' } = req.body;
     const tenantId = req.user.tenantId;
@@ -288,7 +288,7 @@ router.post('/generate-invoices', protect, authorize('admin'), [
   body('academicSessionId').notEmpty().withMessage('Academic session is required'),
   body('dueDate').isISO8601().withMessage('Valid due date is required'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { academicSessionId, classId, dueDate, periods } = req.body;
     const tenantId = req.user.tenantId;
@@ -429,44 +429,44 @@ function generatePeriodsForPlan(plan, year) {
   const currentYear = year || new Date().getFullYear();
 
   switch (plan) {
-    case 'monthly':
-      return Array.from({ length: 12 }, (_, i) => {
-        const month = i + 1;
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'];
-        return {
-          month,
-          year: currentYear,
-          displayText: `${monthNames[i]} ${currentYear}`
-        };
-      });
+  case 'monthly':
+    return Array.from({ length: 12 }, (_, i) => {
+      const month = i + 1;
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+      return {
+        month,
+        year: currentYear,
+        displayText: `${monthNames[i]} ${currentYear}`
+      };
+    });
 
-    case 'quarterly':
-      return [
-        { quarter: 1, year: currentYear, displayText: `Q1 ${currentYear} (Jan-Mar)` },
-        { quarter: 2, year: currentYear, displayText: `Q2 ${currentYear} (Apr-Jun)` },
-        { quarter: 3, year: currentYear, displayText: `Q3 ${currentYear} (Jul-Sep)` },
-        { quarter: 4, year: currentYear, displayText: `Q4 ${currentYear} (Oct-Dec)` }
-      ];
+  case 'quarterly':
+    return [
+      { quarter: 1, year: currentYear, displayText: `Q1 ${currentYear} (Jan-Mar)` },
+      { quarter: 2, year: currentYear, displayText: `Q2 ${currentYear} (Apr-Jun)` },
+      { quarter: 3, year: currentYear, displayText: `Q3 ${currentYear} (Jul-Sep)` },
+      { quarter: 4, year: currentYear, displayText: `Q4 ${currentYear} (Oct-Dec)` }
+    ];
 
-    case 'half-yearly':
-      return [
-        { quarter: 1, year: currentYear, displayText: `H1 ${currentYear} (Jan-Jun)` },
-        { quarter: 3, year: currentYear, displayText: `H2 ${currentYear} (Jul-Dec)` }
-      ];
+  case 'half-yearly':
+    return [
+      { quarter: 1, year: currentYear, displayText: `H1 ${currentYear} (Jan-Jun)` },
+      { quarter: 3, year: currentYear, displayText: `H2 ${currentYear} (Jul-Dec)` }
+    ];
 
-    case 'annual':
-      return [
-        { year: currentYear, displayText: `Academic Year ${currentYear}-${currentYear + 1}` }
-      ];
+  case 'annual':
+    return [
+      { year: currentYear, displayText: `Academic Year ${currentYear}-${currentYear + 1}` }
+    ];
 
-    default:
-      return [
-        { quarter: 1, year: currentYear, displayText: `Q1 ${currentYear} (Jan-Mar)` },
-        { quarter: 2, year: currentYear, displayText: `Q2 ${currentYear} (Apr-Jun)` },
-        { quarter: 3, year: currentYear, displayText: `Q3 ${currentYear} (Jul-Sep)` },
-        { quarter: 4, year: currentYear, displayText: `Q4 ${currentYear} (Oct-Dec)` }
-      ];
+  default:
+    return [
+      { quarter: 1, year: currentYear, displayText: `Q1 ${currentYear} (Jan-Mar)` },
+      { quarter: 2, year: currentYear, displayText: `Q2 ${currentYear} (Apr-Jun)` },
+      { quarter: 3, year: currentYear, displayText: `Q3 ${currentYear} (Jul-Sep)` },
+      { quarter: 4, year: currentYear, displayText: `Q4 ${currentYear} (Oct-Dec)` }
+    ];
   }
 }
 
@@ -527,11 +527,11 @@ function calculatePeriodInvoice(allocation, period) {
 
 function getPlanDivisor(plan) {
   switch (plan) {
-    case 'monthly': return 12;
-    case 'quarterly': return 4;
-    case 'half-yearly': return 2;
-    case 'annual': return 1;
-    default: return 4;
+  case 'monthly': return 12;
+  case 'quarterly': return 4;
+  case 'half-yearly': return 2;
+  case 'annual': return 1;
+  default: return 4;
   }
 }
 
@@ -540,7 +540,7 @@ function getPlanDivisor(plan) {
  * @route   GET /api/fees/allocations
  * @access  Private (Admin, Accountant)
  */
-router.get('/', protect, authorize('admin', 'accountant'), async (req, res) => {
+router.get('/', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
     const { studentId, classId, academicSessionId, status, page = 1, limit = 50 } = req.query;
     const tenantId = req.user.tenantId;
@@ -603,7 +603,7 @@ router.get('/', protect, authorize('admin', 'accountant'), async (req, res) => {
  * @route   GET /api/fees/allocations/:id
  * @access  Private (Admin, Accountant)
  */
-router.get('/:id', protect, authorize('admin', 'accountant'), async (req, res) => {
+router.get('/:id', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
     const allocation = await AnnualFeeAllocation.findOne({
       _id: req.params.id,
@@ -641,7 +641,7 @@ router.get('/:id', protect, authorize('admin', 'accountant'), async (req, res) =
 router.put('/:id/payment-plan', protect, authorize('admin'), [
   body('paymentPlan').isIn(['monthly', 'quarterly', 'half-yearly', 'annual']).withMessage('Invalid payment plan'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { paymentPlan } = req.body;
     const tenantId = req.user.tenantId;
@@ -657,7 +657,7 @@ router.put('/:id/payment-plan', protect, authorize('admin'), [
     }
 
     if (allocation.paymentPlan === paymentPlan) {
-      return res.status(400).json({ success: false, message: 'Payment plan is already set to ' + paymentPlan });
+      return res.status(400).json({ success: false, message: `Payment plan is already set to ${  paymentPlan}` });
     }
 
     const oldPlan = allocation.paymentPlan;
@@ -719,7 +719,7 @@ router.put('/:id/payment-plan', protect, authorize('admin'), [
 router.put('/:id/cancel', protect, authorize('admin'), [
   body('reason').notEmpty().withMessage('Cancellation reason is required'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { reason, terminateType = 'cancelled' } = req.body;
     const tenantId = req.user.tenantId;
@@ -791,7 +791,7 @@ router.put('/:id/cancel', protect, authorize('admin'), [
 router.put('/:id/discount', protect, authorize('admin'), [
   body('discountReason').notEmpty().withMessage('Discount reason is required'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { discountPercentage, discountFixed, discountReason } = req.body;
     const tenantId = req.user.tenantId;
@@ -828,7 +828,7 @@ router.put('/:id/discount', protect, authorize('admin'), [
  * @route   GET /api/fees/allocations/dashboard
  * @access  Private (Admin, Accountant)
  */
-router.get('/dashboard/summary', protect, authorize('admin', 'accountant'), async (req, res) => {
+router.get('/dashboard/summary', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
     const { academicSessionId } = req.query;
     const tenantId = req.user.tenantId;
@@ -938,7 +938,7 @@ router.post('/mid-year', protect, authorize('admin'), [
   body('startFromMonth').optional().isInt({ min: 1, max: 12 }),
   body('dueDate').isISO8601().withMessage('Valid due date is required'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { studentId, academicSessionId, paymentPlan = 'quarterly', startFromMonth, dueDate } = req.body;
     const tenantId = req.user.tenantId;
@@ -1062,7 +1062,7 @@ router.put('/:id/waive', protect, authorize('admin'), [
   body('feeHeadNames').isArray({ min: 1 }).withMessage('At least one fee head name is required'),
   body('reason').notEmpty().withMessage('Waiver reason is required'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { feeHeadNames, reason } = req.body;
     const tenantId = req.user.tenantId;
@@ -1125,7 +1125,7 @@ router.put('/:id/waive', protect, authorize('admin'), [
 router.post('/apply-late-fees', protect, authorize('admin'), [
   body('academicSessionId').notEmpty().withMessage('Academic session is required'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { academicSessionId, classId } = req.body;
     const tenantId = req.user.tenantId;
@@ -1191,7 +1191,7 @@ router.post('/preview', protect, authorize('admin'), [
   body('academicSessionId').notEmpty().withMessage('Academic session is required'),
   body('paymentPlan').isIn(['monthly', 'quarterly', 'half-yearly', 'annual']).withMessage('Invalid payment plan'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { classId, sectionId, academicSessionId, paymentPlan } = req.body;
     const tenantId = req.user.tenantId;
@@ -1282,7 +1282,7 @@ router.post('/generate-all', protect, authorize('admin'), [
   body('academicSessionId').notEmpty().withMessage('Academic session is required'),
   body('paymentPlan').isIn(['monthly', 'quarterly', 'half-yearly', 'annual']).withMessage('Invalid payment plan'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { classId, sectionId, academicSessionId, paymentPlan, dueDay } = req.body;
     const tenantId = req.user.tenantId;
@@ -1398,7 +1398,7 @@ router.post('/generate-single', protect, authorize('admin'), [
   body('academicSessionId').notEmpty().withMessage('Academic session is required'),
   body('paymentPlan').isIn(['monthly', 'quarterly', 'half-yearly', 'annual']).withMessage('Invalid payment plan'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { studentId, academicSessionId, paymentPlan, dueDay } = req.body;
     const tenantId = req.user.tenantId;
@@ -1407,26 +1407,49 @@ router.post('/generate-single', protect, authorize('admin'), [
     const student = await User.findOne({ _id: studentId, tenantId, role: 'student' });
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
-    if (!student.classId) {
-      return res.status(400).json({ success: false, message: 'Student has no class assigned. Please update student record.' });
-    }
-
     // Get academic session
     const session = await AcademicSession.findById(academicSessionId);
     if (!session) return res.status(404).json({ success: false, message: 'Academic session not found' });
 
     // Auto-detect fee structure from student's class
-    const feeStructure = await FeeStructure.findOne({
-      tenantId,
-      classId: student.classId,
-      academicSessionId,
-      isActive: true
-    });
+    let feeStructure = null;
+
+    if (student.classId) {
+      // Primary: match by classId ObjectId
+      feeStructure = await FeeStructure.findOne({
+        tenantId,
+        classId: student.classId,
+        academicSessionId,
+        isActive: true
+      });
+    }
+
+    // Fallback: if student only has class name string (e.g., imported students), resolve classId
+    if (!feeStructure && !student.classId && student.class) {
+      const Class = require('../models/Class');
+      const classDoc = await Class.findOne({ tenantId, name: student.class });
+      if (classDoc) {
+        // Update student record with the resolved classId for future use
+        student.classId = classDoc._id;
+        await student.save();
+
+        feeStructure = await FeeStructure.findOne({
+          tenantId,
+          classId: classDoc._id,
+          academicSessionId,
+          isActive: true
+        });
+      }
+    }
+
+    if (!student.classId && !student.class) {
+      return res.status(400).json({ success: false, message: 'Student has no class assigned. Please update student record.' });
+    }
 
     if (!feeStructure) {
       return res.status(404).json({
         success: false,
-        message: `No active fee structure found for this student's class. Please create one first.`
+        message: 'No active fee structure found for this student\'s class. Please create one first.'
       });
     }
 
