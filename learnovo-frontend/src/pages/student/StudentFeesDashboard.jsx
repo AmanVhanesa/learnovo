@@ -761,7 +761,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Transaction ID / UTR *</label>
                                 <input
                                     type="text" required
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="e.g. UPI Ref 1234567890"
                                     value={disputeForm.transactionId}
                                     onChange={(e) => setDisputeForm({ ...disputeForm, transactionId: e.target.value })}
@@ -772,7 +772,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Amount Deducted (*) *</label>
                                 <input
                                     type="number" required min="1"
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="5000"
                                     value={disputeForm.amount}
                                     onChange={(e) => setDisputeForm({ ...disputeForm, amount: e.target.value })}
@@ -783,7 +783,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Explanation *</label>
                                 <textarea
                                     required rows="3"
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-shadow bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="Describe what happened..."
                                     value={disputeForm.studentNote}
                                     onChange={(e) => setDisputeForm({ ...disputeForm, studentNote: e.target.value })}
@@ -844,7 +844,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Payment Mode *</label>
                                 <select
                                     required
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-[#1C1C1E] dark:text-white"
                                     value={paymentForm.paymentMode}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, paymentMode: e.target.value })}
                                 >
@@ -864,7 +864,7 @@ const StudentFeesDashboard = () => {
                                 <input
                                     type="text"
                                     required={paymentForm.paymentMode !== 'CASH'}
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder="e.g. UPI Ref 1234567890"
                                     value={paymentForm.transactionRefId}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, transactionRefId: e.target.value })}
@@ -875,7 +875,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Amount Paid *</label>
                                 <input
                                     type="number" required min="1" max={maxAmount}
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                     placeholder={String(maxAmount)}
                                     value={paymentForm.amount}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
@@ -886,7 +886,7 @@ const StudentFeesDashboard = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Date of Payment *</label>
                                 <input
                                     type="date" required
-                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#1C1C1E] dark:text-white"
+                                    className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white dark:bg-[#1C1C1E] dark:text-white"
                                     value={paymentForm.paymentDate}
                                     onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
                                 />
