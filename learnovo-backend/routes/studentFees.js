@@ -97,7 +97,7 @@ router.get('/history', protect, authorize('student'), async(req, res) => {
  * Returns total annual fee, paid, outstanding, payment plan, and allocation info.
  * Excludes cancelled invoices from all calculations.
  */
-router.get('/summary', protect, authorize('student'), async (req, res) => {
+router.get('/summary', protect, authorize('student'), async(req, res) => {
   try {
     const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
 
@@ -817,7 +817,7 @@ router.post('/payment/notify', async(req, res) => {
  * After the Razorpay checkout popup closes, the frontend sends
  * razorpay_order_id, razorpay_payment_id, razorpay_signature here.
  */
-router.post('/payment/razorpay-verify', protect, authorize('student'), async (req, res) => {
+router.post('/payment/razorpay-verify', protect, authorize('student'), async(req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, paymentAttemptId } = req.body;
 
@@ -1082,7 +1082,7 @@ router.post('/payment/icici-return', express.urlencoded({ extended: true }), asy
  * @route   GET /api/student-fees/gateway-status
  * @access  Private (student)
  */
-router.get('/gateway-status', protect, authorize('student'), async (req, res) => {
+router.get('/gateway-status', protect, authorize('student'), async(req, res) => {
   try {
     const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway').lean();
     if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });
