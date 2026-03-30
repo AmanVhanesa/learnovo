@@ -255,6 +255,62 @@ export const feesReportsService = {
   }
 }
 
+// Annual Fee Allocations
+export const allocationsService = {
+  list: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.studentId) params.append('studentId', filters.studentId)
+    if (filters.classId) params.append('classId', filters.classId)
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
+    if (filters.status) params.append('status', filters.status)
+    if (filters.page) params.append('page', filters.page)
+    if (filters.limit) params.append('limit', filters.limit)
+
+    const url = `/fees/allocations${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url)
+    return res.data
+  },
+
+  get: async (id) => {
+    const res = await api.get(`/fees/allocations/${id}`)
+    return res.data
+  },
+
+  generate: async (data) => {
+    const res = await api.post('/fees/allocations/generate', data, { timeout: 120000 })
+    return res.data
+  },
+
+  generateInvoices: async (data) => {
+    const res = await api.post('/fees/allocations/generate-invoices', data, { timeout: 120000 })
+    return res.data
+  },
+
+  changePaymentPlan: async (id, paymentPlan) => {
+    const res = await api.put(`/fees/allocations/${id}/payment-plan`, { paymentPlan })
+    return res.data
+  },
+
+  cancel: async (id, reason, terminateType) => {
+    const res = await api.put(`/fees/allocations/${id}/cancel`, { reason, terminateType })
+    return res.data
+  },
+
+  applyDiscount: async (id, data) => {
+    const res = await api.put(`/fees/allocations/${id}/discount`, data)
+    return res.data
+  },
+
+  getDashboardSummary: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
+
+    const url = `/fees/allocations/dashboard/summary${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url)
+    return res.data
+  }
+}
+
 // Legacy fees service (keep for compatibility)
 export const feesService = {
   list: async ({ page = 1, limit = 50, status = '', className = '' } = {}) => {
@@ -291,5 +347,6 @@ export default {
   payments: paymentsService,
   refunds: refundsService,
   reports: feesReportsService,
+  allocations: allocationsService,
   fees: feesService
 }

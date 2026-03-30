@@ -50,7 +50,8 @@ router.get('/', protect, authorize('student'), async(req, res) => {
   try {
     const invoices = await FeeInvoice.find({
       studentId: req.user._id,
-      tenantId: req.user.tenantId
+      tenantId: req.user.tenantId,
+      status: { $ne: 'Cancelled' }
     })
       .populate('feeStructureId', 'name academicYear')
       .sort({ dueDate: 1 });
@@ -98,7 +99,8 @@ router.get('/:id', protect, authorize('student'), async(req, res) => {
     const invoice = await FeeInvoice.findOne({
       _id: req.params.id,
       studentId: req.user._id,
-      tenantId: req.user.tenantId
+      tenantId: req.user.tenantId,
+      status: { $ne: 'Cancelled' }
     });
 
     if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found' });

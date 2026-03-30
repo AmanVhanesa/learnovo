@@ -50,6 +50,13 @@ const feeInvoiceSchema = new mongoose.Schema({
     ref: 'FeeStructure'
   },
 
+  // Annual Allocation Reference (Phase 2 — links invoice to annual allocation)
+  annualAllocationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AnnualFeeAllocation',
+    index: true
+  },
+
   // Invoice Items (Locked at generation)
   items: [{
     feeHeadName: {
@@ -184,6 +191,15 @@ feeInvoiceSchema.index({ tenantId: 1, invoiceNumber: 1 }, { unique: true });
 feeInvoiceSchema.index({ tenantId: 1, studentId: 1, status: 1 });
 feeInvoiceSchema.index({ tenantId: 1, academicSessionId: 1, status: 1 });
 feeInvoiceSchema.index({ tenantId: 1, dueDate: 1, status: 1 });
+// Prevent duplicate active invoices for same student + billing period + academic session
+feeInvoiceSchema.index(
+  { tenantId: 1, studentId: 1, academicSessionId: 1, 'billingPeriod.displayText': 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $ne: 'Cancelled' } },
+    name: 'unique_active_invoice_per_student_period'
+  }
+);
 
 // Pre-save: Calculate balance amount with safe rounding
 feeInvoiceSchema.pre('save', function(next) {

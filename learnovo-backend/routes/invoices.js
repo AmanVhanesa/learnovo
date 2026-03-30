@@ -68,6 +68,16 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
         });
       }
 
+      // Validate student's class matches fee structure's class
+      const fsClassId = String(feeStructure.classId);
+      const stuClassId = String(student.classId || '');
+      if (feeStructure.classId && student.classId && fsClassId !== stuClassId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Fee structure does not match the student\'s class. Please select the correct fee structure.'
+        });
+      }
+
       // Convert feeHeads to items format, filtering out admission fees for imported students
       invoiceItems = [];
       for (const head of feeStructure.feeHeads) {
@@ -93,7 +103,8 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
         if (frequency === 'monthly') frequency = 'Monthly';
         else if (frequency === 'quarterly') frequency = 'Quarterly';
         else if (frequency === 'one-time') frequency = 'One-time';
-        else if (frequency === 'annual') frequency = 'Annual';
+        else if (frequency === 'annual' || frequency === 'yearly') frequency = 'Annual';
+        else if (frequency === 'half-yearly') frequency = 'Annual';
 
         invoiceItems.push({
           feeHeadName: head.name,
@@ -159,6 +170,24 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
       billingPeriod = FeeInvoice.calculateBillingPeriod(new Date(), primaryFrequency);
     }
 
+    // Check for duplicate: same student + billing period + academic session (non-cancelled)
+    if (billingPeriod && billingPeriod.displayText) {
+      const existingInvoice = await FeeInvoice.findOne({
+        tenantId: req.user.tenantId,
+        studentId,
+        academicSessionId,
+        'billingPeriod.displayText': billingPeriod.displayText,
+        status: { $ne: 'Cancelled' }
+      });
+      if (existingInvoice) {
+        return res.status(409).json({
+          success: false,
+          message: `An invoice already exists for this student for ${billingPeriod.displayText} (${existingInvoice.invoiceNumber}). Please view or edit the existing invoice instead.`,
+          data: { existingInvoiceId: existingInvoice._id, existingInvoiceNumber: existingInvoice.invoiceNumber }
+        });
+      }
+    }
+
     // Create invoice
     const invoice = await FeeInvoice.create({
       tenantId: req.user.tenantId,
@@ -176,6 +205,19 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
       remarks,
       generatedBy: req.user._id
     });
+
+    // Mark admissionFeePaid if this invoice contains an admission fee
+    if (feeStructureId) {
+      const FeeStructure = require('../models/FeeStructure');
+      const fs = await FeeStructure.findById(feeStructureId);
+      if (fs) {
+        const admissionHeadNames = fs.feeHeads.filter(h => h.isAdmissionFee).map(h => h.name);
+        const invoiceHasAdmission = invoiceItems.some(item => admissionHeadNames.includes(item.feeHeadName));
+        if (invoiceHasAdmission && !student.admissionFeePaid) {
+          await User.updateOne({ _id: studentId }, { $set: { admissionFeePaid: true } });
+        }
+      }
+    }
 
     // Log action (best-effort — never fail the response after invoice is created)
     try {
@@ -214,6 +256,14 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
       data: populated
     });
   } catch (error) {
+    // Handle duplicate key error from unique index (race condition safety net)
+    if (error.code === 11000 && error.message?.includes('unique_active_invoice_per_student_period')) {
+      return res.status(409).json({
+        success: false,
+        message: 'An invoice already exists for this student for the selected billing period. Please view or edit the existing invoice instead.'
+      });
+    }
+
     // Rollback invoice counter so the number doesn't get skipped
     try {
       const year = new Date().getFullYear();
@@ -317,7 +367,8 @@ router.post('/generate-bulk', protect, authorize('admin'), [
         if (frequency === 'monthly') frequency = 'Monthly';
         else if (frequency === 'quarterly') frequency = 'Quarterly';
         else if (frequency === 'one-time') frequency = 'One-time';
-        else if (frequency === 'annual') frequency = 'Annual';
+        else if (frequency === 'annual' || frequency === 'yearly') frequency = 'Annual';
+        else if (frequency === 'half-yearly') frequency = 'Annual';
 
         return {
           feeHeadName: head.name,
@@ -385,6 +436,30 @@ router.post('/generate-bulk', protect, authorize('admin'), [
         // Skip if no items remain after filtering
         if (studentItems.length === 0) continue;
 
+        // Check for duplicate: skip students who already have an active invoice for this period
+        let billingPeriod = req.body.billingPeriod;
+        if (!billingPeriod || !billingPeriod.displayText) {
+          const primaryFrequency = studentItems[0]?.frequency || 'One-time';
+          billingPeriod = FeeInvoice.calculateBillingPeriod(new Date(), primaryFrequency);
+        }
+        if (billingPeriod && billingPeriod.displayText) {
+          const existingInvoice = await FeeInvoice.findOne({
+            tenantId: req.user.tenantId,
+            studentId: student._id,
+            academicSessionId,
+            'billingPeriod.displayText': billingPeriod.displayText,
+            status: { $ne: 'Cancelled' }
+          });
+          if (existingInvoice) {
+            errors.push({
+              studentId: student._id,
+              studentName: student.name,
+              error: `Invoice already exists for ${billingPeriod.displayText} (${existingInvoice.invoiceNumber})`
+            });
+            continue;
+          }
+        }
+
         const studentTotalAmount = sumMoney(studentItems.map(item => item.amount));
         const invoiceNumber = await FeeInvoice.generateInvoiceNumber(req.user.tenantId);
 
@@ -407,13 +482,7 @@ router.post('/generate-bulk', protect, authorize('admin'), [
           studentClassId = classId;
         }
 
-        // Use provided billing period or calculate it
-        let billingPeriod = req.body.billingPeriod;
-        if (!billingPeriod || !billingPeriod.displayText) {
-          // Fallback: Calculate period if not provided
-          const primaryFrequency = studentItems[0]?.frequency || 'One-time';
-          billingPeriod = FeeInvoice.calculateBillingPeriod(new Date(), primaryFrequency);
-        }
+        // billingPeriod already computed above for duplicate check
 
         const invoice = await FeeInvoice.create({
           tenantId: req.user.tenantId,
@@ -432,6 +501,14 @@ router.post('/generate-bulk', protect, authorize('admin'), [
         });
 
         results.push(invoice);
+
+        // Mark admissionFeePaid if this invoice includes admission fees
+        if (admissionFeeItems.length > 0 && !student.isImported && !student.admissionFeePaid) {
+          const invoiceHasAdmission = studentItems.some(item => admissionFeeHeadNames.includes(item.feeHeadName));
+          if (invoiceHasAdmission) {
+            await User.updateOne({ _id: student._id }, { $set: { admissionFeePaid: true } });
+          }
+        }
 
         // Update balance
         await StudentBalance.updateBalance(req.user.tenantId, student._id, academicSessionId);

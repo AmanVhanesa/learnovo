@@ -8,7 +8,7 @@ import {
   Copy
 } from 'lucide-react'
 import {
-  feesReportsService, invoicesService, paymentsService, feeStructuresService, refundsService, discountsService
+  feesReportsService, invoicesService, paymentsService, feeStructuresService, refundsService, discountsService, allocationsService
 } from '../services/feesService'
 import { academicSessionsService, classesService } from '../services/academicsService'
 import { useAuth } from '../contexts/AuthContext'
@@ -32,11 +32,13 @@ import BulkInvoiceForm from '../components/fees/BulkInvoiceForm'
 import BulkDeleteInvoiceForm from '../components/fees/BulkDeleteInvoiceForm'
 import PaymentModal from '../components/fees/PaymentModal'
 import AllInvoicesTab from '../components/fees/AllInvoicesTab'
+import AnnualAllocationsTab from '../components/fees/AnnualAllocationsTab'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
+  { id: 'allocations', label: 'Annual Allocations', icon: Calendar },
   { id: 'allInvoices', label: 'All Invoices', icon: List },
   { id: 'feeStructure', label: 'Fee Structure', icon: Settings },
   { id: 'invoices', label: 'Generate Invoices', icon: Receipt },
@@ -275,6 +277,7 @@ const FeesFinance = () => {
       {/* Tab Content */}
       <div>
         {activeTab === 'dashboard' && dashboardData && <DashboardTab data={dashboardData} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onEditInvoice={setEditingInvoice} onDeleteInvoice={handleDeleteInvoice} onNavigate={setActiveTab} />}
+        {activeTab === 'allocations' && <AnnualAllocationsTab activeSession={activeSession} />}
         {activeTab === 'allInvoices' && <AllInvoicesTab activeSession={activeSession} onEditInvoice={setEditingInvoice} onCollectPayment={async (inv) => { if (inv.studentId) { const s = typeof inv.studentId === 'object' ? inv.studentId : { _id: inv.studentId }; await handleSelectStudent(s) } }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onDeleteInvoice={handleDeleteInvoice} />}
         {activeTab === 'feeStructure' && <FeeStructureTab feeStructures={feeStructures} classes={classes} onCreateNew={() => { setEditingFeeStructure(null); setShowFeeStructureModal(true) }} onEdit={(s) => { setEditingFeeStructure(s); setShowFeeStructureModal(true) }} onDelete={async (id) => { if (window.confirm('Delete this fee structure?')) { try { await feeStructuresService.delete(id); toast.success('Deleted'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } } }} onDuplicate={async (s) => { try { await feeStructuresService.create({ classId: typeof s.classId === 'object' ? s.classId._id : s.classId, sectionId: s.sectionId ? (typeof s.sectionId === 'object' ? s.sectionId._id : s.sectionId) : null, academicSessionId: activeSession._id, feeHeads: s.feeHeads.map(h => ({ name: h.name, amount: h.amount, frequency: h.frequency, isCompulsory: h.isCompulsory, dueDay: h.dueDay })), isActive: true }); toast.success('Duplicated'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } }} />}
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}

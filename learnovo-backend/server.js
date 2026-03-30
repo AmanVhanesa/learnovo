@@ -238,6 +238,7 @@ app.use('/api/student-fees', require('./routes/studentFees'));
 app.use('/api/admin-disputes', require('./routes/adminDisputes'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/fee-structures', require('./routes/feeStructures'));
+app.use('/api/fees/allocations', require('./routes/allocations'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/assignments', require('./routes/assignments'));
 app.use('/api/admissions', require('./routes/admissions'));

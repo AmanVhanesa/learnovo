@@ -143,6 +143,22 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                   {selectedStudent ? 'No fee structures found for this student\'s class' : 'No active fee structures available'}
                 </p>
               </div>
+            ) : matchingStructures.length === 1 && selectedStudent ? (
+              /* Auto-matched: show read-only info instead of dropdown */
+              <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/15 border border-green-200 dark:border-green-800/30 rounded-xl">
+                <FileText className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-green-800 dark:text-green-300">
+                    {(() => {
+                      const s = matchingStructures[0]
+                      const total = s.totalAmount || s.feeHeads?.reduce((sum, h) => sum + (h.amount || 0), 0) || 0
+                      const cn = typeof s.classId === 'object' ? s.classId?.name : ''
+                      return `${cn ? `${cn} — ` : ''}${formatCurrency(total)} (${s.feeHeads?.length} heads)`
+                    })()}
+                  </p>
+                  <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">Auto-selected based on student's class</p>
+                </div>
+              </div>
             ) : (
               <select
                 className="input"
@@ -190,10 +206,12 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                     </div>
                   </div>
                 ))}
-                {selectedStudent?.isImported && selectedFeeStructure.feeHeads?.some(h => h.isAdmissionFee) && (
+                {(selectedStudent?.isImported || selectedStudent?.admissionFeePaid) && selectedFeeStructure.feeHeads?.some(h => h.isAdmissionFee) && (
                   <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/15">
                     <p className="text-xs text-amber-600 dark:text-amber-400">
-                      Admission fee excluded — imported students are exempt from one-time admission fees.
+                      {selectedStudent?.isImported
+                        ? 'Admission fee excluded — imported students are exempt from one-time admission fees.'
+                        : 'Admission fee excluded — this student has already been charged the admission fee.'}
                     </p>
                   </div>
                 )}
