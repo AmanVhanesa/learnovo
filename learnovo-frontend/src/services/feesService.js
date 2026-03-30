@@ -91,6 +91,12 @@ export const invoicesService = {
   delete: async (id) => {
     const res = await api.delete(`/invoices/${id}`)
     return res.data
+  },
+
+  // NEW: Cancel invoice with reason
+  cancel: async (id, reason) => {
+    const res = await api.post(`/invoices/${id}/cancel`, { reason })
+    return res.data
   }
 }
 
@@ -283,6 +289,24 @@ export const allocationsService = {
 
   generateInvoices: async (data) => {
     const res = await api.post('/fees/allocations/generate-invoices', data, { timeout: 120000 })
+    return res.data
+  },
+
+  // NEW: Generate allocations + invoices in one step
+  generateAll: async (data) => {
+    const res = await api.post('/fees/allocations/generate-all', data, { timeout: 120000 })
+    return res.data
+  },
+
+  // NEW: Generate for a single student (auto-detects fee structure)
+  generateSingle: async (data) => {
+    const res = await api.post('/fees/allocations/generate-single', data)
+    return res.data
+  },
+
+  // NEW: Preview invoice generation (dry run)
+  preview: async (data) => {
+    const res = await api.post('/fees/allocations/preview', data)
     return res.data
   },
 

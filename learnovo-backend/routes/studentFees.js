@@ -90,6 +90,60 @@ router.get('/history', protect, authorize('student'), async(req, res) => {
 });
 
 /**
+ * @desc    Get annual fee summary for the logged-in student
+ * @route   GET /api/student-fees/summary
+ * @access  Private (Student)
+ *
+ * Returns total annual fee, paid, outstanding, payment plan, and allocation info.
+ * Excludes cancelled invoices from all calculations.
+ */
+router.get('/summary', protect, authorize('student'), async (req, res) => {
+  try {
+    const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
+
+    // Find active allocation for this student
+    const allocation = await AnnualFeeAllocation.findOne({
+      studentId: req.user._id,
+      tenantId: req.user.tenantId,
+      status: { $in: ['active', 'completed'] }
+    }).sort({ createdAt: -1 });
+
+    // Get non-cancelled invoices
+    const invoices = await FeeInvoice.find({
+      studentId: req.user._id,
+      tenantId: req.user.tenantId,
+      status: { $ne: 'Cancelled' }
+    }).sort({ dueDate: 1 });
+
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0) + (inv.lateFeeApplied || 0) - (inv.discountAmount || 0), 0);
+    const totalPaid = invoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
+    const totalOutstanding = Math.max(0, totalInvoiced - totalPaid);
+    const overdueInvoices = invoices.filter(inv => inv.status === 'Overdue');
+    const nextDue = invoices.find(inv => inv.status === 'Pending' || inv.status === 'Partial' || inv.status === 'Overdue');
+
+    res.json({
+      success: true,
+      data: {
+        totalAnnualFee: allocation?.totalAnnualAmount || totalInvoiced,
+        totalPaid,
+        totalOutstanding,
+        totalOverdue: overdueInvoices.reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0),
+        paymentPlan: allocation?.paymentPlan || null,
+        invoiceCount: invoices.length,
+        paidCount: invoices.filter(inv => inv.status === 'Paid').length,
+        pendingCount: invoices.filter(inv => inv.status === 'Pending' || inv.status === 'Partial').length,
+        overdueCount: overdueInvoices.length,
+        nextDueDate: nextDue?.dueDate || null,
+        nextDueAmount: nextDue?.balanceAmount || null
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching student fee summary:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/**
  * @desc    Get single invoice detail heavily populated with history
  * @route   GET /api/student-fees/:id
  * @access  Private (Student)

@@ -104,16 +104,26 @@ router.post('/', protect, authorize('admin'), async(req, res) => {
       });
     }
 
-    // Auto-set frequency and isAdmissionFee for admission fee heads
+    // Normalize fee heads: set annualAmount, type, and backward-compat fields
     feeHeads.forEach(head => {
-      if (head.isAdmissionFee) {
-        head.frequency = 'one-time';
-      }
-      // Auto-detect by name if not explicitly flagged
+      // Auto-detect admission fee by name
       if (!head.isAdmissionFee && head.name && head.name.toLowerCase().trim() === 'admission fee') {
         head.isAdmissionFee = true;
-        head.frequency = 'one-time';
       }
+
+      // Determine type: admission fees and explicit one-time are 'one_time', everything else is 'recurring'
+      if (head.isAdmissionFee || head.type === 'one_time') {
+        head.type = 'one_time';
+        head.frequency = 'one-time'; // backward compat
+      } else {
+        head.type = head.type || 'recurring';
+        head.frequency = 'yearly'; // deprecated — all amounts are now annual
+      }
+
+      // Set annualAmount: prefer explicit annualAmount, fall back to amount
+      // The frontend now sends the annual amount in the 'amount' field (label says "Annual Amount")
+      head.annualAmount = Number(head.annualAmount || head.amount || 0);
+      head.amount = head.annualAmount; // Keep backward compat: amount = annualAmount
     });
 
     // Check for duplicate fee structure
@@ -189,16 +199,23 @@ router.put('/:id', protect, authorize('admin'), async(req, res) => {
       });
     }
 
-    // Auto-set frequency and isAdmissionFee for admission fee heads
+    // Normalize fee heads: set annualAmount, type, and backward-compat fields
     if (feeHeads) {
       feeHeads.forEach(head => {
-        if (head.isAdmissionFee) {
-          head.frequency = 'one-time';
-        }
         if (!head.isAdmissionFee && head.name && head.name.toLowerCase().trim() === 'admission fee') {
           head.isAdmissionFee = true;
-          head.frequency = 'one-time';
         }
+
+        if (head.isAdmissionFee || head.type === 'one_time') {
+          head.type = 'one_time';
+          head.frequency = 'one-time';
+        } else {
+          head.type = head.type || 'recurring';
+          head.frequency = 'yearly';
+        }
+
+        head.annualAmount = Number(head.annualAmount || head.amount || 0);
+        head.amount = head.annualAmount;
       });
     }
 

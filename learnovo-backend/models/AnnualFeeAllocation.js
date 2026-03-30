@@ -12,15 +12,32 @@ const allocatedFeeHeadSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  // NEW: Annual amount — always full year cost
+  annualAmount: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  // NEW: Type — 'recurring' or 'one_time'
+  type: {
+    type: String,
+    enum: ['recurring', 'one_time'],
+    default: 'recurring'
+  },
+  // DEPRECATED: Keep for backward compat
   amount: {
     type: Number,
-    required: true,
-    min: 0
+    min: 0,
+    default: 0
   },
+  // DEPRECATED: Keep for backward compat
   frequency: {
     type: String,
-    enum: ['monthly', 'quarterly', 'half-yearly', 'yearly', 'one-time'],
-    required: true
+    enum: ['monthly', 'quarterly', 'half-yearly', 'yearly', 'one-time']
+  },
+  // Reference to the original FeeHead (for tracking admission fee charges)
+  feeHeadId: {
+    type: String
   },
   isCompulsory: {
     type: Boolean,
@@ -173,7 +190,8 @@ annualFeeAllocationSchema.pre('save', function(next) {
   if (this.status === 'cancelled' || this.status === 'terminated') return next();
 
   const includedHeads = this.allocatedFeeHeads.filter(h => h.isIncluded);
-  this.totalAnnualAmount = roundToRupee(sumMoney(includedHeads.map(h => h.amount)));
+  // Use annualAmount (new) with fallback to amount (legacy)
+  this.totalAnnualAmount = roundToRupee(sumMoney(includedHeads.map(h => h.annualAmount || h.amount)));
 
   // Apply discounts
   let discountAmount = toNumber(this.discountFixed);

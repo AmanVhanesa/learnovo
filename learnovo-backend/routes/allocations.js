@@ -7,10 +7,17 @@ const FeeInvoice = require('../models/FeeInvoice');
 const FeeAuditLog = require('../models/FeeAuditLog');
 const StudentBalance = require('../models/StudentBalance');
 const User = require('../models/User');
+const AcademicSession = require('../models/AcademicSession');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, sumMoney, validateAmount, formatRupee } = require('../utils/money');
+const {
+  generateInvoicesForStudent,
+  generateInvoicesForBulk,
+  previewInvoiceGeneration,
+  generatePeriods
+} = require('../services/invoiceGenerationService');
 
 const planGate = require('../middleware/planGate');
 
@@ -1168,6 +1175,319 @@ router.post('/apply-late-fees', protect, authorize('admin'), [
   } catch (error) {
     logger.error('Apply late fees error', error);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ============================================================================
+// NEW ENDPOINTS — Using invoice generation service (annual_amount architecture)
+// ============================================================================
+
+/**
+ * @desc    Preview invoice generation for a class (dry run)
+ * @route   POST /api/fees/allocations/preview
+ * @access  Private (Admin)
+ */
+router.post('/preview', protect, authorize('admin'), [
+  body('academicSessionId').notEmpty().withMessage('Academic session is required'),
+  body('paymentPlan').isIn(['monthly', 'quarterly', 'half-yearly', 'annual']).withMessage('Invalid payment plan'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { classId, sectionId, academicSessionId, paymentPlan } = req.body;
+    const tenantId = req.user.tenantId;
+
+    // Get academic session name for period generation
+    const session = await AcademicSession.findById(academicSessionId);
+    if (!session) return res.status(404).json({ success: false, message: 'Academic session not found' });
+
+    // Find fee structures
+    const fsQuery = { tenantId, academicSessionId, isActive: true };
+    if (classId) fsQuery.classId = classId;
+
+    const feeStructures = await FeeStructure.find(fsQuery);
+    if (feeStructures.length === 0) {
+      return res.status(404).json({ success: false, message: 'No active fee structures found' });
+    }
+
+    const allPreviews = [];
+
+    for (const fs of feeStructures) {
+      // Get students for this class
+      const studentQuery = { tenantId, role: 'student', isActive: true };
+      const classConditions = [{ classId: fs.classId }];
+      try {
+        const Class = require('../models/Class');
+        const classDoc = await Class.findById(fs.classId);
+        if (classDoc?.name) {
+          classConditions.push({ class: classDoc.name });
+          const gradeMatch = classDoc.name.match(/(\d+)/);
+          if (gradeMatch) classConditions.push({ class: gradeMatch[1] });
+        }
+      } catch (e) { /* ignore */ }
+      studentQuery.$or = classConditions;
+      if (sectionId) studentQuery.sectionId = sectionId;
+
+      const students = await User.find(studentQuery);
+
+      const previews = await previewInvoiceGeneration({
+        tenantId,
+        students,
+        feeStructure: fs,
+        paymentPlan,
+        academicYearName: session.name,
+        academicSessionId
+      });
+
+      allPreviews.push(...previews);
+    }
+
+    // Summary
+    const totalStudents = allPreviews.length;
+    const newStudents = allPreviews.filter(p => p.isNew).length;
+    const importedStudents = allPreviews.filter(p => p.isImported).length;
+    const alreadyAllocated = allPreviews.filter(p => p.hasExistingAllocation).length;
+    const totalExpected = sumMoney(allPreviews.filter(p => !p.hasExistingAllocation).map(p => p.totalAnnual));
+
+    res.json({
+      success: true,
+      data: {
+        previews: allPreviews,
+        summary: {
+          totalStudents,
+          newStudents,
+          importedStudents,
+          alreadyAllocated,
+          toGenerate: totalStudents - alreadyAllocated,
+          totalExpectedRevenue: totalExpected,
+          paymentPlan,
+          periods: generatePeriods(session.name, paymentPlan).map(p => p.label)
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Preview generation error', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+/**
+ * @desc    Generate allocations + invoices in one step (new flow)
+ * @route   POST /api/fees/allocations/generate-all
+ * @access  Private (Admin)
+ *
+ * This is the new "Generate Invoices" wizard endpoint.
+ * Creates annual allocations AND all period invoices for each student.
+ */
+router.post('/generate-all', protect, authorize('admin'), [
+  body('academicSessionId').notEmpty().withMessage('Academic session is required'),
+  body('paymentPlan').isIn(['monthly', 'quarterly', 'half-yearly', 'annual']).withMessage('Invalid payment plan'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { classId, sectionId, academicSessionId, paymentPlan, dueDay } = req.body;
+    const tenantId = req.user.tenantId;
+
+    // Get academic session
+    const session = await AcademicSession.findById(academicSessionId);
+    if (!session) return res.status(404).json({ success: false, message: 'Academic session not found' });
+
+    // Find fee structures
+    const fsQuery = { tenantId, academicSessionId, isActive: true };
+    if (classId) fsQuery.classId = classId;
+
+    const feeStructures = await FeeStructure.find(fsQuery);
+    if (feeStructures.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No active fee structures found. Create fee structures before generating invoices.'
+      });
+    }
+
+    const allResults = [];
+    const allErrors = [];
+    const allSkipped = [];
+
+    for (const fs of feeStructures) {
+      // Get students for this class
+      const studentQuery = { tenantId, role: 'student', isActive: true };
+      const classConditions = [{ classId: fs.classId }];
+      try {
+        const Class = require('../models/Class');
+        const classDoc = await Class.findById(fs.classId);
+        if (classDoc?.name) {
+          classConditions.push({ class: classDoc.name });
+          const gradeMatch = classDoc.name.match(/(\d+)/);
+          if (gradeMatch) classConditions.push({ class: gradeMatch[1] });
+        }
+      } catch (e) { /* ignore */ }
+      studentQuery.$or = classConditions;
+      if (sectionId) studentQuery.sectionId = sectionId;
+
+      const students = await User.find(studentQuery);
+
+      const { results, errors, skipped } = await generateInvoicesForBulk({
+        tenantId,
+        students,
+        feeStructure: fs,
+        paymentPlan,
+        academicSessionId,
+        academicYearName: session.name,
+        generatedBy: req.user._id,
+        dueDay: dueDay || 10
+      });
+
+      allResults.push(...results);
+      allErrors.push(...errors);
+      allSkipped.push(...skipped);
+    }
+
+    const totalInvoices = allResults.reduce((sum, r) => sum + r.invoiceCount, 0);
+
+    // Audit
+    try {
+      await FeeAuditLog.logAction({
+        tenantId,
+        action: 'INVOICE_BULK_GENERATED',
+        entityType: 'AnnualFeeAllocation',
+        entityId: null,
+        userId: req.user._id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        details: {
+          source: 'generate_all',
+          classId,
+          academicSessionId,
+          paymentPlan,
+          studentsProcessed: allResults.length,
+          invoicesGenerated: totalInvoices,
+          skipped: allSkipped.length,
+          errors: allErrors.length
+        },
+        ipAddress: req.ip
+      });
+    } catch (e) { /* non-fatal */ }
+
+    res.status(201).json({
+      success: true,
+      message: `Generated ${totalInvoices} invoices for ${allResults.length} students (${allSkipped.length} skipped, ${allErrors.length} errors)`,
+      data: {
+        generated: allResults.length,
+        totalInvoices,
+        skipped: allSkipped.length,
+        skippedDetails: allSkipped,
+        errors: allErrors.length,
+        errorDetails: allErrors,
+        results: allResults
+      }
+    });
+  } catch (error) {
+    logger.error('Generate all error', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+/**
+ * @desc    Generate allocation + invoices for a SINGLE student (new flow)
+ * @route   POST /api/fees/allocations/generate-single
+ * @access  Private (Admin)
+ *
+ * Auto-detects fee structure from student's class.
+ */
+router.post('/generate-single', protect, authorize('admin'), [
+  body('studentId').notEmpty().withMessage('Student ID is required'),
+  body('academicSessionId').notEmpty().withMessage('Academic session is required'),
+  body('paymentPlan').isIn(['monthly', 'quarterly', 'half-yearly', 'annual']).withMessage('Invalid payment plan'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { studentId, academicSessionId, paymentPlan, dueDay } = req.body;
+    const tenantId = req.user.tenantId;
+
+    // Verify student
+    const student = await User.findOne({ _id: studentId, tenantId, role: 'student' });
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+
+    if (!student.classId) {
+      return res.status(400).json({ success: false, message: 'Student has no class assigned. Please update student record.' });
+    }
+
+    // Get academic session
+    const session = await AcademicSession.findById(academicSessionId);
+    if (!session) return res.status(404).json({ success: false, message: 'Academic session not found' });
+
+    // Auto-detect fee structure from student's class
+    const feeStructure = await FeeStructure.findOne({
+      tenantId,
+      classId: student.classId,
+      academicSessionId,
+      isActive: true
+    });
+
+    if (!feeStructure) {
+      return res.status(404).json({
+        success: false,
+        message: `No active fee structure found for this student's class. Please create one first.`
+      });
+    }
+
+    const result = await generateInvoicesForStudent({
+      tenantId,
+      student,
+      feeStructure,
+      paymentPlan,
+      academicSessionId,
+      academicYearName: session.name,
+      generatedBy: req.user._id,
+      dueDay: dueDay || 10
+    });
+
+    if (result.summary.skipped) {
+      return res.status(409).json({
+        success: false,
+        message: result.summary.reason
+      });
+    }
+
+    // Audit
+    try {
+      await FeeAuditLog.logAction({
+        tenantId,
+        action: 'INVOICE_GENERATED',
+        entityType: 'AnnualFeeAllocation',
+        entityId: result.allocation?._id,
+        userId: req.user._id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        details: {
+          source: 'generate_single',
+          studentId,
+          studentName: student.name,
+          paymentPlan,
+          totalAnnual: result.summary.total,
+          invoiceCount: result.summary.invoiceCount
+        },
+        ipAddress: req.ip
+      });
+    } catch (e) { /* non-fatal */ }
+
+    res.status(201).json({
+      success: true,
+      message: `Generated ${result.invoices.length} invoices for ${student.name}. Annual total: ${formatRupee(result.summary.total)}`,
+      data: {
+        allocation: result.allocation,
+        invoices: result.invoices,
+        summary: result.summary
+      }
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'Allocation or invoices already exist for this student and academic year.'
+      });
+    }
+    logger.error('Generate single error', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 

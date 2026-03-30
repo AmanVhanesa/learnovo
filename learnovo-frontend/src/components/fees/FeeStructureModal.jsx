@@ -5,25 +5,22 @@ import { feeStructuresService } from '../../services/feesService'
 import { formatCurrency } from '../../utils/formatCurrency'
 import ModalWrapper from '../ModalWrapper'
 
-const FREQUENCY_OPTIONS = [
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'half-yearly', label: 'Half-Yearly' },
-  { value: 'yearly', label: 'Yearly' },
-  { value: 'one-time', label: 'One-time' },
+const TYPE_OPTIONS = [
+  { value: 'recurring', label: 'Recurring (splits across invoices)' },
+  { value: 'one_time', label: 'One-Time (first invoice only)' },
 ]
 
-const DEFAULT_FEE_HEAD = { name: '', amount: 0, frequency: 'monthly', isCompulsory: true, dueDay: 5, isAdmissionFee: false }
+const DEFAULT_FEE_HEAD = { name: '', amount: 0, type: 'recurring', isCompulsory: true, dueDay: 10, isAdmissionFee: false }
 
 const PRESET_FEE_HEADS = [
-  { name: 'Tuition Fee', amount: 0, frequency: 'monthly', isCompulsory: true, dueDay: 5, isAdmissionFee: false },
-  { name: 'Admission Fee', amount: 0, frequency: 'one-time', isCompulsory: true, dueDay: 5, isAdmissionFee: true },
-  { name: 'Exam Fee', amount: 0, frequency: 'half-yearly', isCompulsory: true, dueDay: 5, isAdmissionFee: false },
-  { name: 'Library Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
-  { name: 'Transport Fee', amount: 0, frequency: 'monthly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
-  { name: 'Lab Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
-  { name: 'Sports Fee', amount: 0, frequency: 'yearly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
-  { name: 'Computer Fee', amount: 0, frequency: 'monthly', isCompulsory: false, dueDay: 5, isAdmissionFee: false },
+  { name: 'Tuition Fee', amount: 0, type: 'recurring', isCompulsory: true, dueDay: 10, isAdmissionFee: false },
+  { name: 'Admission Fee', amount: 0, type: 'one_time', isCompulsory: true, dueDay: 10, isAdmissionFee: true },
+  { name: 'Exam Fee', amount: 0, type: 'recurring', isCompulsory: true, dueDay: 10, isAdmissionFee: false },
+  { name: 'Library Fee', amount: 0, type: 'recurring', isCompulsory: false, dueDay: 10, isAdmissionFee: false },
+  { name: 'Transport Fee', amount: 0, type: 'recurring', isCompulsory: false, dueDay: 10, isAdmissionFee: false },
+  { name: 'Lab Fee', amount: 0, type: 'recurring', isCompulsory: false, dueDay: 10, isAdmissionFee: false },
+  { name: 'Sports Fee', amount: 0, type: 'recurring', isCompulsory: false, dueDay: 10, isAdmissionFee: false },
+  { name: 'Computer Fee', amount: 0, type: 'recurring', isCompulsory: false, dueDay: 10, isAdmissionFee: false },
 ]
 
 const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSuccess }) => {
@@ -32,7 +29,13 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
     sectionId: feeStructure?.sectionId?._id || '',
     academicSessionId: activeSession?._id || '',
     feeHeads: feeStructure?.feeHeads?.length > 0
-      ? feeStructure.feeHeads.map(h => ({ ...h }))
+      ? feeStructure.feeHeads.map(h => ({
+          ...h,
+          // Migrate legacy data: use annualAmount or amount
+          amount: h.annualAmount || h.amount || 0,
+          // Migrate legacy frequency to type
+          type: h.type || (h.frequency === 'one-time' ? 'one_time' : 'recurring'),
+        }))
       : [{ ...PRESET_FEE_HEADS[0] }],
     isActive: feeStructure?.isActive ?? true,
   })
@@ -99,15 +102,15 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
       const updated = [...prev.feeHeads]
       updated[index] = { ...updated[index], [field]: value }
 
-      // Auto-set frequency to one-time when isAdmissionFee is enabled
+      // Auto-set type to one_time when isAdmissionFee is enabled
       if (field === 'isAdmissionFee' && value) {
-        updated[index].frequency = 'one-time'
+        updated[index].type = 'one_time'
       }
 
       // Auto-detect admission fee by name
       if (field === 'name' && value.toLowerCase().trim() === 'admission fee') {
         updated[index].isAdmissionFee = true
-        updated[index].frequency = 'one-time'
+        updated[index].type = 'one_time'
       }
 
       return { ...prev, feeHeads: updated }
@@ -159,10 +162,14 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
         ...form,
         sectionId: form.sectionId || null,
         feeHeads: form.feeHeads.map(h => ({
-          ...h,
-          amount: Number(h.amount),
-          dueDay: Number(h.dueDay),
+          name: h.name,
+          annualAmount: Number(h.amount),
+          amount: Number(h.amount), // backward compat
+          type: h.type || 'recurring',
+          dueDay: Number(h.dueDay || 10),
+          isOptional: !h.isCompulsory,
           isAdmissionFee: h.isAdmissionFee || false,
+          description: h.description || '',
         })),
       }
 
@@ -333,14 +340,14 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8E8E93] mb-1">Amount *</label>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8E8E93] mb-1">Annual Amount *</label>
                       <input
                         type="number"
                         className={`input text-sm ${errors[`feeHead_${index}_amount`] ? 'border-red-400 dark:border-red-500' : ''}`}
                         value={head.amount || ''}
                         onChange={(e) => updateFeeHead(index, 'amount', e.target.value === '' ? '' : Number(e.target.value))}
                         onWheel={(e) => e.target.blur()}
-                        placeholder="0"
+                        placeholder="e.g., 18000"
                         min="0"
                         step="1"
                       />
@@ -352,13 +359,14 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8E8E93] mb-1">Frequency</label>
+                      <label className="block text-xs font-medium text-gray-600 dark:text-[#8E8E93] mb-1">Type</label>
                       <select
                         className="input text-sm"
-                        value={head.frequency}
-                        onChange={(e) => updateFeeHead(index, 'frequency', e.target.value)}
+                        value={head.type || 'recurring'}
+                        onChange={(e) => updateFeeHead(index, 'type', e.target.value)}
+                        disabled={head.isAdmissionFee}
                       >
-                        {FREQUENCY_OPTIONS.map(opt => (
+                        {TYPE_OPTIONS.map(opt => (
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                       </select>
@@ -411,18 +419,28 @@ const FeeStructureModal = ({ feeStructure, classes, activeSession, onClose, onSu
 
           {/* Summary Card */}
           <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-xl p-4 border border-gray-100 dark:border-[#38383A]">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-[10px] font-semibold text-gray-500 dark:text-[#636366] uppercase tracking-wide">Total Amount</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{formatCurrency(totalAmount)}</p>
+            <p className="text-[10px] font-semibold text-gray-500 dark:text-[#636366] uppercase tracking-wide mb-3">Total Annual Amount</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mb-3">{formatCurrency(totalAmount)}</p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="flex items-start gap-2">
+                <span className="text-gray-400">├──</span>
+                <div>
+                  <p className="font-medium text-gray-700 dark:text-gray-300">Recurring</p>
+                  <p className="text-primary-600 dark:text-primary-400 font-semibold">
+                    {formatCurrency(form.feeHeads.filter(h => (h.type || 'recurring') === 'recurring').reduce((s, h) => s + (Number(h.amount) || 0), 0))}
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-[#636366]">Splits across invoices</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] font-semibold text-gray-500 dark:text-[#636366] uppercase tracking-wide">Compulsory</p>
-                <p className="text-lg font-bold text-primary-600 dark:text-primary-400 mt-0.5">{formatCurrency(compulsoryTotal)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold text-gray-500 dark:text-[#636366] uppercase tracking-wide">Optional</p>
-                <p className="text-lg font-bold text-gray-600 dark:text-[#8E8E93] mt-0.5">{formatCurrency(totalAmount - compulsoryTotal)}</p>
+              <div className="flex items-start gap-2">
+                <span className="text-gray-400">└──</span>
+                <div>
+                  <p className="font-medium text-gray-700 dark:text-gray-300">One-Time</p>
+                  <p className="text-amber-600 dark:text-amber-400 font-semibold">
+                    {formatCurrency(form.feeHeads.filter(h => h.type === 'one_time').reduce((s, h) => s + (Number(h.amount) || 0), 0))}
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-[#636366]">First invoice only, new students</p>
+                </div>
               </div>
             </div>
           </div>

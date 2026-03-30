@@ -72,7 +72,7 @@ const AnnualAllocationsTab = ({ activeSession }) => {
     onError: (err) => toast.error(err.response?.data?.message || 'Failed to generate allocations'),
   })
 
-  // Generate invoices from allocations
+  // Generate invoices from allocations (legacy 2-step flow)
   const generateInvoicesMutation = useMutation({
     mutationFn: (data) => allocationsService.generateInvoices(data),
     onSuccess: (res) => {
@@ -82,6 +82,19 @@ const AnnualAllocationsTab = ({ activeSession }) => {
       setShowInvoiceGenForm(false)
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Failed to generate invoices'),
+  })
+
+  // NEW: Generate allocations + invoices in one step
+  const generateAllMutation = useMutation({
+    mutationFn: (data) => allocationsService.generateAll(data),
+    onSuccess: (res) => {
+      toast.success(res.message || 'Allocations and invoices generated')
+      queryClient.invalidateQueries({ queryKey: ['allocations'] })
+      queryClient.invalidateQueries({ queryKey: ['alloc-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      setShowGenerateForm(false)
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to generate'),
   })
 
   // Change payment plan
@@ -96,7 +109,8 @@ const AnnualAllocationsTab = ({ activeSession }) => {
   })
 
   const handleGenerate = () => {
-    generateMutation.mutate({
+    // Use new one-step flow: creates allocations AND invoices together
+    generateAllMutation.mutate({
       academicSessionId: activeSession._id,
       classId: selectedClassId || undefined,
       paymentPlan: selectedPlan,
@@ -163,7 +177,7 @@ const AnnualAllocationsTab = ({ activeSession }) => {
           onClick={() => setShowGenerateForm(!showGenerateForm)}
           className="btn btn-primary flex items-center gap-2"
         >
-          <Play className="h-4 w-4" /> Generate Allocations
+          <Play className="h-4 w-4" /> Generate Invoices
         </button>
 
         <button
@@ -175,13 +189,13 @@ const AnnualAllocationsTab = ({ activeSession }) => {
         </button>
       </div>
 
-      {/* Generate Allocations Form */}
+      {/* Generate Invoices Form (new one-step flow) */}
       {showGenerateForm && (
         <div className="bg-blue-50 dark:bg-blue-900/15 border border-blue-200 dark:border-blue-800/30 rounded-xl p-4 space-y-4">
-          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Generate Annual Allocations</h3>
+          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300">Generate Invoices</h3>
           <p className="text-xs text-blue-700 dark:text-blue-400">
-            This will create an annual fee allocation for each active student based on their class fee structure.
-            Students who already have allocations will be skipped.
+            Creates annual fee allocations AND generates all invoices for the selected class in one step.
+            Students who already have allocations will be skipped. The payment plan determines how the annual fee is split.
           </p>
           <div className="flex flex-wrap items-end gap-4">
             <div>
@@ -194,10 +208,10 @@ const AnnualAllocationsTab = ({ activeSession }) => {
             </div>
             <button
               onClick={handleGenerate}
-              disabled={generateMutation.isPending}
+              disabled={generateAllMutation.isPending}
               className="btn btn-primary"
             >
-              {generateMutation.isPending ? 'Generating...' : 'Generate'}
+              {generateAllMutation.isPending ? 'Generating...' : 'Generate Allocations & Invoices'}
             </button>
             <button onClick={() => setShowGenerateForm(false)} className="btn btn-outline">Cancel</button>
           </div>

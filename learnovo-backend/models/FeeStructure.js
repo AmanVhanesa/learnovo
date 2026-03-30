@@ -41,15 +41,29 @@ const feeStructureSchema = new mongoose.Schema({
       required: true,
       trim: true
     },
+    // NEW: Annual amount — always the FULL YEAR cost (e.g., Tuition = 18000, Admission = 1000)
+    annualAmount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    // NEW: Type — 'recurring' splits across invoices, 'one_time' goes in first invoice only
+    type: {
+      type: String,
+      enum: ['recurring', 'one_time'],
+      default: 'recurring'
+    },
+    // DEPRECATED: Keep for backward compat with existing data
     amount: {
       type: Number,
-      required: true,
-      min: 0
+      min: 0,
+      default: 0
     },
+    // DEPRECATED: Frequency no longer drives invoice splitting — payment plan does
     frequency: {
       type: String,
       enum: ['monthly', 'quarterly', 'half-yearly', 'yearly', 'one-time'],
-      default: 'monthly'
+      default: 'yearly'
     },
     description: {
       type: String,
@@ -62,6 +76,13 @@ const feeStructureSchema = new mongoose.Schema({
     isAdmissionFee: {
       type: Boolean,
       default: false
+    },
+    // Due day of month for due date calculation
+    dueDay: {
+      type: Number,
+      min: 1,
+      max: 28,
+      default: 10
     }
   }],
 
@@ -106,10 +127,32 @@ const feeStructureSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual: total amount across all fee heads
+// Virtual: total annual amount across all fee heads (uses annualAmount, falls back to computed from old amount+frequency)
 feeStructureSchema.virtual('totalAmount').get(function() {
   if (!this.feeHeads || this.feeHeads.length === 0) return 0;
-  return this.feeHeads.reduce((sum, head) => sum + (head.amount || 0), 0);
+  return this.feeHeads.reduce((sum, head) => sum + (head.annualAmount || head.amount || 0), 0);
+});
+
+// Virtual: total annual amount with clear naming
+feeStructureSchema.virtual('totalAnnualAmount').get(function() {
+  if (!this.feeHeads || this.feeHeads.length === 0) return 0;
+  return this.feeHeads.reduce((sum, head) => sum + (head.annualAmount || head.amount || 0), 0);
+});
+
+// Virtual: recurring total (splits across invoices)
+feeStructureSchema.virtual('recurringTotal').get(function() {
+  if (!this.feeHeads || this.feeHeads.length === 0) return 0;
+  return this.feeHeads
+    .filter(h => (h.type || 'recurring') === 'recurring')
+    .reduce((sum, head) => sum + (head.annualAmount || head.amount || 0), 0);
+});
+
+// Virtual: one-time total (first invoice only, new students)
+feeStructureSchema.virtual('oneTimeTotal').get(function() {
+  if (!this.feeHeads || this.feeHeads.length === 0) return 0;
+  return this.feeHeads
+    .filter(h => h.type === 'one_time')
+    .reduce((sum, head) => sum + (head.annualAmount || head.amount || 0), 0);
 });
 
 // Indexes for efficient queries

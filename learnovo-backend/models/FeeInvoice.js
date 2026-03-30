@@ -57,22 +57,71 @@ const feeInvoiceSchema = new mongoose.Schema({
     index: true
   },
 
-  // Invoice Items (Locked at generation)
+  // Invoice Items / Line Items (Locked at generation)
   items: [{
     feeHeadName: {
       type: String,
       required: true
     },
+    // NEW: Full annual amount (for reference/display)
+    fullAnnualAmount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    // NEW: Period amount (the split amount for this period)
+    periodAmount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    // NEW: Discount applied to this line item
+    discount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    // NEW: Net amount (periodAmount - discount)
+    netAmount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    // NEW: Fee head type (recurring or one_time)
+    type: {
+      type: String,
+      enum: ['recurring', 'one_time']
+    },
+    // DEPRECATED: Keep for backward compat
     amount: {
       type: Number,
-      required: true,
-      min: 0
+      min: 0,
+      default: 0
     },
+    // DEPRECATED: Keep for backward compat
     frequency: {
       type: String,
-      enum: ['Monthly', 'Quarterly', 'One-time', 'Annual']
+      enum: ['Monthly', 'Quarterly', 'One-time', 'Annual', 'Half-yearly']
+    },
+    // Reference to original fee head ID (for tracking)
+    feeHeadId: {
+      type: String
     }
   }],
+
+  // NEW: Period boundaries for this invoice
+  periodLabel: {
+    type: String,
+    trim: true
+  },
+
+  periodStart: {
+    type: Date
+  },
+
+  periodEnd: {
+    type: Date
+  },
 
   // Financial Details
   totalAmount: {
@@ -171,6 +220,21 @@ const feeInvoiceSchema = new mongoose.Schema({
     }
   },
 
+  // Cancellation metadata
+  cancelledAt: {
+    type: Date
+  },
+
+  cancelledBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+
+  cancellationReason: {
+    type: String,
+    trim: true
+  },
+
   // Metadata
   remarks: {
     type: String,
@@ -200,6 +264,17 @@ feeInvoiceSchema.index(
     name: 'unique_active_invoice_per_student_period'
   }
 );
+// NEW: Period-based unique constraint (for new invoice generation flow)
+feeInvoiceSchema.index(
+  { tenantId: 1, studentId: 1, academicSessionId: 1, periodStart: 1, periodEnd: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $ne: 'Cancelled' }, periodStart: { $exists: true } },
+    name: 'unique_active_invoice_per_student_period_dates',
+    sparse: true
+  }
+);
+feeInvoiceSchema.index({ tenantId: 1, annualAllocationId: 1, status: 1 });
 
 // Pre-save: Calculate balance amount with safe rounding
 feeInvoiceSchema.pre('save', function(next) {

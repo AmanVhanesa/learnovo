@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const { body } = require('express-validator');
 const FeeInvoice = require('../models/FeeInvoice');
+const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
 const Payment = require('../models/Payment');
 const StudentBalance = require('../models/StudentBalance');
 const FeeAuditLog = require('../models/FeeAuditLog');
@@ -1086,6 +1087,9 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async(req, res)
     // Financial records should never be permanently deleted for audit trail integrity
     invoice.status = 'Cancelled';
     invoice.balanceAmount = 0;
+    invoice.cancelledAt = new Date();
+    invoice.cancelledBy = req.user._id;
+    invoice.cancellationReason = req.body?.reason || 'Cancelled by admin';
     await invoice.save();
 
     // Log action (best-effort)
@@ -1710,5 +1714,70 @@ router.get('/payments/:id/receipt/pdf', protect, async(req, res) => {
   }
 });
 
-module.exports = router;
+// @desc    Cancel an invoice with reason (proper cancel, not delete)
+// @route   POST /api/invoices/:id/cancel
+// @access  Private (Admin)
+router.post('/:id/cancel', protect, authorize('admin'), [
+  body('reason').notEmpty().withMessage('Cancellation reason is required'),
+  handleValidationErrors
+], async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const tenantId = req.user.tenantId;
 
+    const invoice = await FeeInvoice.findOne({ _id: req.params.id, tenantId });
+    if (!invoice) {
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
+    }
+
+    if (invoice.status === 'Cancelled') {
+      return res.status(400).json({ success: false, message: 'Invoice is already cancelled' });
+    }
+
+    if (invoice.status === 'Paid') {
+      return res.status(400).json({ success: false, message: 'Cannot cancel a fully paid invoice. Please reverse payments first.' });
+    }
+
+    invoice.status = 'Cancelled';
+    invoice.balanceAmount = 0;
+    invoice.cancelledAt = new Date();
+    invoice.cancelledBy = req.user._id;
+    invoice.cancellationReason = reason;
+    await invoice.save();
+
+    // Audit
+    try {
+      await FeeAuditLog.logAction({
+        tenantId,
+        action: 'INVOICE_CANCELLED',
+        entityType: 'FeeInvoice',
+        entityId: invoice._id,
+        userId: req.user._id,
+        userName: req.user.name,
+        userRole: req.user.role,
+        details: { invoiceNumber: invoice.invoiceNumber, reason },
+        ipAddress: req.ip
+      });
+    } catch (e) { /* non-fatal */ }
+
+    await StudentBalance.updateBalance(tenantId, invoice.studentId, invoice.academicSessionId);
+
+    // Update allocation if linked
+    if (invoice.annualAllocationId) {
+      try {
+        await AnnualFeeAllocation.recalculateFromInvoices(invoice.annualAllocationId);
+      } catch (e) { /* non-fatal */ }
+    }
+
+    res.json({
+      success: true,
+      message: 'Invoice cancelled successfully',
+      data: invoice
+    });
+  } catch (error) {
+    logger.error('Cancel invoice error', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+module.exports = router;
