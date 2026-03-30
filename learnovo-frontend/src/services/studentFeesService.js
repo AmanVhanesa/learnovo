@@ -16,11 +16,17 @@ export const studentFeesService = {
     // Initiate payment flow (gateway mode)
     initiatePayment: (invoiceId) => api.post(`/student-fees/${invoiceId}/pay`),
 
+    // Pay multiple invoices in one transaction (gateway mode)
+    initiateCombinedPayment: (invoiceIds) => api.post('/student-fees/pay-combined', { invoiceIds }),
+
     // Verify Razorpay payment (popup callback)
     verifyRazorpayPayment: (data) => api.post('/student-fees/payment/razorpay-verify', data),
 
     // Submit manual payment proof (manual mode — when gateway is not enabled)
     submitManualPayment: (invoiceId, data) => api.post(`/student-fees/${invoiceId}/submit-payment`, data),
+
+    // Submit manual payment proof for multiple invoices
+    submitCombinedManualPayment: (invoiceIds, data) => api.post('/student-fees/submit-payment-combined', { invoiceIds, ...data }),
 
     // Check attempt status directly
     checkPaymentStatus: (attemptId) => api.get(`/student-fees/payment/${attemptId}/status`),

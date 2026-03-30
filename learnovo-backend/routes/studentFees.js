@@ -42,6 +42,73 @@ async function createAuditLog(paymentAttemptId, session, tenantId, previousStatu
 }
 
 /**
+ * Helper: Get all invoice IDs for a payment attempt (supports both single and combined).
+ * Returns array of ObjectIds.
+ */
+function getAttemptInvoiceIds(attempt) {
+  if (attempt.invoiceIds && attempt.invoiceIds.length > 0) {
+    return attempt.invoiceIds;
+  }
+  return attempt.invoiceId ? [attempt.invoiceId] : [];
+}
+
+/**
+ * Helper: Apply a successful payment across one or more invoices.
+ * Distributes the payment amount proportionally, generates receipts,
+ * and syncs to finance. Works inside a Mongoose session (transaction).
+ */
+async function applyPaymentToInvoices(attempt, session, opts = {}) {
+  const invoiceIds = getAttemptInvoiceIds(attempt);
+  if (invoiceIds.length === 0) return [];
+
+  const invoices = await FeeInvoice.find({ _id: { $in: invoiceIds } }).session(session);
+  let remaining = toNumber(attempt.amount);
+  const receipts = [];
+
+  for (const invoice of invoices) {
+    if (remaining <= 0) break;
+    const balance = toNumber(invoice.balanceAmount);
+    if (balance <= 0) continue;
+
+    const applyAmount = Math.min(remaining, balance);
+    const newPaid = roundToRupee(toNumber(invoice.paidAmount) + applyAmount);
+    invoice.paidAmount = newPaid;
+    invoice.balanceAmount = roundToRupee(toNumber(invoice.totalAmount) - newPaid);
+
+    if (isFullyPaid(invoice.totalAmount, newPaid)) {
+      invoice.status = 'Paid';
+      invoice.paidDate = new Date();
+    } else {
+      invoice.status = 'Partially Paid';
+    }
+
+    await invoice.save({ session });
+    remaining = roundToRupee(remaining - applyAmount);
+
+    // Generate receipt per invoice
+    const receiptNum = await Receipt.generateReceiptNumber(attempt.tenantId);
+    const receipt = new Receipt({
+      tenantId: attempt.tenantId,
+      paymentAttemptId: attempt._id,
+      studentId: attempt.studentId,
+      invoiceId: invoice._id,
+      receiptNumber: receiptNum,
+      amount: applyAmount,
+      paymentMode: opts.paymentMode || 'ONLINE',
+      paymentDate: opts.paymentDate || new Date(),
+      transactionRefId: opts.transactionRefId || null,
+      ...(opts.initiatedBy && { initiatedBy: opts.initiatedBy }),
+      ...(opts.verifiedByUserId && { verifiedByUserId: opts.verifiedByUserId }),
+      ...(opts.verifiedByName && { verifiedByName: opts.verifiedByName }),
+    });
+    await receipt.save({ session });
+    receipts.push(receipt);
+  }
+
+  return receipts;
+}
+
+/**
  * @desc    Get all fee invoices assigned to the logged-in student
  * @route   GET /api/student-fees
  * @access  Private (Student)
@@ -293,6 +360,181 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
     await session.abortTransaction();
     session.endSession();
     res.status(400).json({ success: false, message: error.message || 'Payment initiation failed' });
+  }
+});
+
+/**
+ * @desc    Pay multiple invoices in one gateway transaction
+ * @route   POST /api/student-fees/pay-combined
+ * @access  Private (Student)
+ */
+router.post('/pay-combined', protect, authorize('student'), [
+  body('invoiceIds').isArray({ min: 2 }).withMessage('At least 2 invoice IDs required'),
+  handleValidationErrors
+], async(req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { invoiceIds } = req.body;
+
+    // Validate all invoices belong to this student and have balance
+    const invoices = await FeeInvoice.find({
+      _id: { $in: invoiceIds },
+      studentId: req.user._id,
+      tenantId: req.user.tenantId,
+      status: { $nin: ['Paid', 'Cancelled'] }
+    }).session(session);
+
+    if (invoices.length === 0) {
+      throw new Error('No payable invoices found');
+    }
+
+    // Check for stuck payments on any of the invoices
+    const stuckAttempt = await PaymentAttempt.findOne({
+      invoiceId: { $in: invoiceIds },
+      status: { $in: ['PENDING', 'PROCESSING'] }
+    }).session(session);
+
+    if (stuckAttempt) {
+      throw new Error('One of the selected invoices already has a payment undergoing verification. Please wait or check your history.');
+    }
+
+    const totalAmount = roundToRupee(invoices.reduce((sum, inv) => sum + toNumber(inv.balanceAmount), 0));
+    const idempotencyKey = `idmp_combined_${req.user._id}_${Date.now()}`;
+
+    const attempt = new PaymentAttempt({
+      tenantId: req.user.tenantId,
+      idempotencyKey,
+      studentId: req.user._id,
+      invoiceId: invoices[0]._id, // primary invoice (backward compat)
+      invoiceIds: invoices.map(inv => inv._id),
+      amount: totalAmount,
+      status: 'INITIATED',
+      triggerSource: 'STUDENT_PORTAL'
+    });
+
+    await attempt.save({ session });
+    await createAuditLog(attempt._id, session, req.user.tenantId, null, 'INITIATED', 'STUDENT_PORTAL',
+      `Combined payment for ${invoices.length} invoices`);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Resolve gateway
+    const tenant = await Tenant.findById(req.user.tenantId).lean();
+    const gateway = getGateway(tenant);
+
+    if (!gateway) {
+      await PaymentAttempt.findByIdAndUpdate(attempt._id, { status: 'FAILED' });
+      return res.status(400).json({ success: false, message: 'Online payments are not yet configured for your school.' });
+    }
+
+    try {
+      const gatewayResult = await gateway.initiatePayment({
+        amount: totalAmount,
+        currency: 'INR',
+        reference: idempotencyKey,
+        customerInfo: { name: req.user.fullName, email: req.user.email }
+      });
+
+      await PaymentAttempt.findByIdAndUpdate(attempt._id, {
+        status: 'PROCESSING',
+        gatewayRefId: gatewayResult.gatewayRefId,
+        gatewayResponse: gatewayResult.raw
+      });
+
+      const responseData = {
+        paymentAttemptId: attempt._id,
+        paymentUrl: gatewayResult.paymentUrl,
+        gatewayRefId: gatewayResult.gatewayRefId,
+        provider: tenant.paymentGateway?.provider || 'unknown',
+        invoiceCount: invoices.length,
+        totalAmount
+      };
+
+      if (gatewayResult.razorpayOrder) {
+        responseData.razorpayOrder = gatewayResult.razorpayOrder;
+      }
+
+      return res.json({ success: true, message: `Payment initiated for ${invoices.length} invoices.`, data: responseData });
+    } catch (gatewayErr) {
+      await PaymentAttempt.findByIdAndUpdate(attempt._id, { status: 'FAILED', gatewayResponse: { error: gatewayErr.message } });
+      res.status(502).json({ success: false, message: 'Payment gateway could not be reached. Try again later.' });
+    }
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(400).json({ success: false, message: error.message || 'Combined payment initiation failed' });
+  }
+});
+
+/**
+ * @desc    Submit manual payment proof for multiple invoices
+ * @route   POST /api/student-fees/submit-payment-combined
+ * @access  Private (Student)
+ */
+router.post('/submit-payment-combined', protect, authorize('student'), [
+  body('invoiceIds').isArray({ min: 2 }).withMessage('At least 2 invoice IDs required'),
+  body('paymentMode').isIn(['UPI', 'BANK_TRANSFER', 'CASH', 'CHEQUE', 'OTHER']).withMessage('Invalid payment mode'),
+  body('paymentDate').isISO8601().withMessage('Valid payment date required'),
+  handleValidationErrors
+], async(req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { invoiceIds, paymentMode, paymentDate, transactionRefId, proofScreenshotUrl } = req.body;
+
+    const invoices = await FeeInvoice.find({
+      _id: { $in: invoiceIds },
+      studentId: req.user._id,
+      tenantId: req.user.tenantId,
+      status: { $nin: ['Paid', 'Cancelled'] }
+    }).session(session);
+
+    if (invoices.length === 0) throw new Error('No payable invoices found');
+
+    // Check for stuck payments
+    const stuckAttempt = await PaymentAttempt.findOne({
+      invoiceId: { $in: invoiceIds },
+      status: { $in: ['PENDING', 'PROCESSING'] }
+    }).session(session);
+    if (stuckAttempt) throw new Error('One of the selected invoices already has a payment awaiting verification.');
+
+    const totalAmount = roundToRupee(invoices.reduce((sum, inv) => sum + toNumber(inv.balanceAmount), 0));
+
+    const attempt = new PaymentAttempt({
+      tenantId: req.user.tenantId,
+      idempotencyKey: `idmp_combined_manual_${req.user._id}_${Date.now()}`,
+      studentId: req.user._id,
+      invoiceId: invoices[0]._id,
+      invoiceIds: invoices.map(inv => inv._id),
+      amount: totalAmount,
+      status: 'PENDING',
+      triggerSource: 'STUDENT_PORTAL',
+      paymentMode,
+      paymentDate: new Date(paymentDate),
+      transactionRefId: transactionRefId || null,
+      proofScreenshotUrl: proofScreenshotUrl || null
+    });
+
+    await attempt.save({ session });
+    await createAuditLog(attempt._id, session, req.user.tenantId, null, 'PENDING', 'STUDENT_PORTAL',
+      `Combined manual payment for ${invoices.length} invoices: ${paymentMode}`);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    res.json({
+      success: true,
+      message: `Payment for ${invoices.length} invoices submitted for verification.`,
+      data: { paymentAttemptId: attempt._id, status: 'PENDING', invoiceCount: invoices.length, totalAmount }
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(400).json({ success: false, message: error.message || 'Combined payment submission failed' });
   }
 });
 
@@ -616,31 +858,16 @@ router.post('/admin/verify-payment/:attemptId', protect, authorize('admin', 'acc
     attempt.verifiedAt = new Date();
     await attempt.save({ session });
 
-    // Update invoice
-    const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
-    if (invoice) {
-      // Safe rounding — pre-save hook handles balance + status
-      invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
-      await invoice.save({ session });
-    }
-
-    // Generate Receipt
-    const receiptNum = await Receipt.generateReceiptNumber(req.user.tenantId);
-    const receipt = new Receipt({
-      tenantId: req.user.tenantId,
-      paymentAttemptId: attempt._id,
-      studentId: attempt.studentId,
-      invoiceId: attempt.invoiceId,
-      receiptNumber: receiptNum,
+    // Apply payment to invoice(s) and generate receipts
+    const receipts = await applyPaymentToInvoices(attempt, session, {
+      paymentMode: attempt.paymentMode || 'OTHER',
+      paymentDate: attempt.paymentDate || attempt.createdAt,
+      transactionRefId: attempt.transactionRefId || null,
       initiatedBy: attempt.triggerSource === 'ADMIN_MANUAL' ? 'admin' : 'student',
       verifiedByUserId: req.user._id,
       verifiedByName: req.user.name || req.user.fullName || 'Admin',
-      amount: attempt.amount,
-      paymentMode: attempt.paymentMode || 'OTHER',
-      transactionRefId: attempt.transactionRefId || null,
-      paymentDate: attempt.paymentDate || attempt.createdAt
     });
-    await receipt.save({ session });
+    const receipt = receipts[0];
 
     await createAuditLog(attempt._id, session, req.user.tenantId, previousStatus, 'VERIFIED', 'ADMIN_MANUAL', `Verified by ${req.user.name || 'Admin'}`);
 
@@ -738,36 +965,9 @@ router.post('/payment/notify', async(req, res) => {
         `Gateway webhook: ${status}`
       );
 
-      // If payment succeeded, update the invoice
+      // If payment succeeded, apply to invoice(s) and generate receipts
       if (newStatus === 'SUCCESS') {
-        const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
-        if (invoice) {
-          const newPaid = toNumber(invoice.paidAmount) + toNumber(attempt.amount);
-          invoice.paidAmount = roundToRupee(newPaid);
-          invoice.balanceAmount = roundToRupee(toNumber(invoice.totalAmount) - newPaid);
-
-          if (isFullyPaid(invoice.totalAmount, newPaid)) {
-            invoice.status = 'Paid';
-            invoice.paidDate = new Date();
-          } else {
-            invoice.status = 'Partially Paid';
-          }
-
-          await invoice.save({ session });
-
-          // Generate receipt
-          const receipt = new Receipt({
-            tenantId: attempt.tenantId,
-            invoiceId: invoice._id,
-            studentId: attempt.studentId,
-            paymentAttemptId: attempt._id,
-            amount: attempt.amount,
-            receiptNumber: `RCP-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
-            paymentMode: 'ONLINE',
-            paymentDate: new Date()
-          });
-          await receipt.save({ session });
-        }
+        await applyPaymentToInvoices(attempt, session, { paymentMode: 'ONLINE' });
       }
 
       await session.commitTransaction();
@@ -868,26 +1068,12 @@ router.post('/payment/razorpay-verify', protect, authorize('student'), async(req
       attempt.gatewayResponse = req.body;
       await attempt.save({ session });
 
-      // Update invoice
-      const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
-      if (invoice) {
-        invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
-        await invoice.save({ session });
-      }
-
-      // Generate receipt
-      const receiptNum = await Receipt.generateReceiptNumber(attempt.tenantId);
-      await Receipt.create([{
-        tenantId: attempt.tenantId,
-        paymentAttemptId: attempt._id,
-        studentId: attempt.studentId,
-        invoiceId: attempt.invoiceId,
-        receiptNumber: receiptNum,
-        amount: attempt.amount,
+      // Apply payment to invoice(s) and generate receipts
+      const receipts = await applyPaymentToInvoices(attempt, session, {
         paymentMode: 'ONLINE',
-        paymentDate: new Date(),
         transactionRefId: razorpay_payment_id
-      }], { session });
+      });
+      const receiptNum = receipts[0]?.receiptNumber;
 
       await createAuditLog(attempt._id, session, attempt.tenantId, previousStatus, 'SUCCESS', 'STUDENT_PORTAL',
         `Razorpay payment verified. Payment ID: ${razorpay_payment_id}`);
@@ -1005,26 +1191,11 @@ router.post('/payment/icici-return', express.urlencoded({ extended: true }), asy
         attempt.gatewayResponse = data;
         await attempt.save({ session });
 
-        // Update invoice
-        const invoice = await FeeInvoice.findById(attempt.invoiceId).session(session);
-        if (invoice) {
-          invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
-          await invoice.save({ session });
-        }
-
-        // Generate receipt
-        const receiptNum = await Receipt.generateReceiptNumber(attempt.tenantId);
-        await Receipt.create([{
-          tenantId: attempt.tenantId,
-          paymentAttemptId: attempt._id,
-          studentId: attempt.studentId,
-          invoiceId: attempt.invoiceId,
-          receiptNumber: receiptNum,
-          amount: attempt.amount,
+        // Apply payment to invoice(s) and generate receipts
+        await applyPaymentToInvoices(attempt, session, {
           paymentMode: 'ONLINE',
-          paymentDate: new Date(),
           transactionRefId: parsed.uniqueRefNumber
-        }], { session });
+        });
 
         await createAuditLog(attempt._id, session, attempt.tenantId, previousStatus, 'SUCCESS', 'WEBHOOK',
           `ICICI EazyPay payment successful. Bank Ref: ${parsed.uniqueRefNumber}`);

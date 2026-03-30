@@ -36,6 +36,9 @@ const StudentFeesDashboard = () => {
     const [disputeModal, setDisputeModal] = useState({ isOpen: false, attemptId: null, invoiceId: null });
     const [disputeForm, setDisputeForm] = useState({ transactionId: '', bankReferenceNumber: '', amount: '', studentNote: '' });
 
+    // Multi-invoice selection for combined payment
+    const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+
     // Check if online payment gateway is enabled for this tenant (per-tenant, not global flag)
     const { data: gatewayStatus } = useQuery({
         queryKey: ['gateway-status'],
@@ -171,6 +174,81 @@ const StudentFeesDashboard = () => {
         }
     };
 
+    // Combined payment for multiple selected invoices
+    const handleCombinedPayment = async () => {
+        if (selectedInvoiceIds.length < 2) return;
+        try {
+            setIsGatewayPaying(true);
+            const res = await studentFeesService.initiateCombinedPayment(selectedInvoiceIds);
+            const data = res.data?.data;
+            if (!res.data?.success || !data) throw new Error('Failed to initiate combined payment');
+
+            if (data.paymentUrl) {
+                const paymentWindow = window.open(data.paymentUrl, '_blank');
+                if (!paymentWindow) window.location.href = data.paymentUrl;
+                toast.success(`Redirecting to pay ${data.invoiceCount} invoices...`);
+                setTimeout(() => {
+                    queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
+                    queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
+                }, 1500);
+            } else if (data.razorpayOrder) {
+                const { orderId, amount, currency, keyId } = data.razorpayOrder;
+                const options = {
+                    key: keyId, amount, currency, order_id: orderId,
+                    name: schoolSettings?.schoolName || 'School Fees',
+                    description: `Combined payment for ${data.invoiceCount} invoices`,
+                    handler: async (response) => {
+                        try {
+                            const verifyRes = await studentFeesService.verifyRazorpayPayment({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                paymentAttemptId: data.paymentAttemptId
+                            });
+                            if (verifyRes.data?.success) toast.success('Payment successful!');
+                            else toast.error('Payment verification failed. Contact school office.');
+                        } catch { toast.error('Payment verification failed.'); }
+                        queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
+                        queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
+                        queryClient.invalidateQueries({ queryKey: ['student-receipts'] });
+                        setSelectedInvoiceIds([]);
+                    },
+                    modal: { ondismiss: () => { toast('Payment cancelled', { icon: '⚠️' }); } },
+                    theme: { color: '#4F46E5' }
+                };
+                const rzp = new window.Razorpay(options);
+                rzp.open();
+            }
+            setSelectedInvoiceIds([]);
+        } catch (error) {
+            toast.error(error.response?.data?.message || error.message || 'Failed to initiate combined payment');
+        } finally {
+            setIsGatewayPaying(false);
+        }
+    };
+
+    // Combined manual payment for multiple invoices
+    const handleCombinedManualPayment = () => {
+        if (selectedInvoiceIds.length < 2) return;
+        const selected = invoices.filter(inv => selectedInvoiceIds.includes(inv._id));
+        const totalBalance = selected.reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0);
+        setPaymentForm({
+            paymentMode: '',
+            transactionRefId: '',
+            amount: String(totalBalance),
+            paymentDate: new Date().toISOString().split('T')[0]
+        });
+        setSelectedInvoice(null);
+        setPaymentModal({ isOpen: true, invoice: null, combinedInvoiceIds: selectedInvoiceIds, combinedTotal: totalBalance });
+    };
+
+    // Toggle invoice selection
+    const toggleInvoiceSelection = (invoiceId) => {
+        setSelectedInvoiceIds(prev =>
+            prev.includes(invoiceId) ? prev.filter(id => id !== invoiceId) : [...prev, invoiceId]
+        );
+    };
+
     // Open manual payment form for an invoice
     const openPaymentForm = (invoice) => {
         setPaymentForm({
@@ -183,14 +261,18 @@ const StudentFeesDashboard = () => {
         setPaymentModal({ isOpen: true, invoice });
     };
 
-    // Submit manual payment proof
+    // Submit manual payment proof (single or combined)
     const submitPaymentMutation = useMutation({
-        mutationFn: async ({ invoiceId, data }) => {
+        mutationFn: async ({ invoiceId, invoiceIds, data }) => {
+            if (invoiceIds && invoiceIds.length >= 2) {
+                return studentFeesService.submitCombinedManualPayment(invoiceIds, data);
+            }
             return studentFeesService.submitManualPayment(invoiceId, data);
         },
         onSuccess: () => {
             setPaymentModal({ isOpen: false, invoice: null });
             setPaymentConfirmation(true);
+            setSelectedInvoiceIds([]);
             queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
             queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
         },
@@ -202,10 +284,13 @@ const StudentFeesDashboard = () => {
     const handleSubmitPayment = (e) => {
         e.preventDefault();
         const inv = paymentModal.invoice;
-        if (!inv) return;
+        const combinedIds = paymentModal.combinedInvoiceIds;
+
+        if (!inv && !combinedIds) return;
 
         submitPaymentMutation.mutate({
-            invoiceId: inv._id,
+            invoiceId: inv?._id,
+            invoiceIds: combinedIds,
             data: {
                 paymentMode: paymentForm.paymentMode,
                 amount: Number(paymentForm.amount),
@@ -309,14 +394,62 @@ const StudentFeesDashboard = () => {
                 <>
                     {/* INVOICES TAB */}
                     {activeTab === 'invoices' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-fade-in text-gray-900 dark:text-white">
+                        <div className="space-y-4 sm:space-y-6 animate-fade-in text-gray-900 dark:text-white">
+                            {/* Select All / Pay Selected bar */}
+                            {invoices.filter(inv => inv.balanceAmount > 0 && inv.status !== 'Paid').length > 1 && (
+                                <div className="flex items-center justify-between bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-200 dark:border-[#38383A] px-4 py-3">
+                                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedInvoiceIds.length === invoices.filter(inv => inv.balanceAmount > 0 && inv.status !== 'Paid').length && selectedInvoiceIds.length > 0}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedInvoiceIds(invoices.filter(inv => inv.balanceAmount > 0 && inv.status !== 'Paid').map(inv => inv._id));
+                                                } else {
+                                                    setSelectedInvoiceIds([]);
+                                                }
+                                            }}
+                                            className="rounded border-gray-300 dark:border-[#48484A] text-primary-600 focus:ring-primary-500"
+                                        />
+                                        Select all unpaid
+                                    </label>
+                                    {selectedInvoiceIds.length >= 2 && (
+                                        <span className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                                            {selectedInvoiceIds.length} selected &middot; {formatCurrency(invoices.filter(inv => selectedInvoiceIds.includes(inv._id)).reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0))}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                             {invoices.length === 0 && <p className="col-span-full py-10 text-center text-gray-500 dark:text-[#8E8E93]">No invoices have been assigned to you yet.</p>}
 
-                            {invoices.map(invoice => (
-                                <div key={invoice._id} className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden hover:shadow-md transition-shadow">
+                            {invoices.map(invoice => {
+                                const isPayable = invoice.balanceAmount > 0 && invoice.status !== 'Paid';
+                                const isSelected = selectedInvoiceIds.includes(invoice._id);
+                                return (
+                                <div key={invoice._id} className={`bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border overflow-hidden hover:shadow-md transition-all ${isSelected ? 'border-primary-400 dark:border-primary-600 ring-2 ring-primary-200 dark:ring-primary-800' : 'border-gray-200 dark:border-[#38383A]'}`}>
                                     {invoice.billingPeriod?.displayText && (
-                                        <div className="px-4 sm:px-5 py-2.5 bg-primary-50 dark:bg-primary-900/20 border-b border-primary-100 dark:border-primary-800/30">
+                                        <div className={`px-4 sm:px-5 py-2.5 border-b flex items-center justify-between ${isSelected ? 'bg-primary-100 dark:bg-primary-900/30 border-primary-200 dark:border-primary-800/30' : 'bg-primary-50 dark:bg-primary-900/20 border-primary-100 dark:border-primary-800/30'}`}>
                                             <span className="text-sm font-bold text-primary-700 dark:text-primary-400">{invoice.billingPeriod.displayText}</span>
+                                            {isPayable && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleInvoiceSelection(invoice._id)}
+                                                    className="rounded border-gray-300 dark:border-[#48484A] text-primary-600 focus:ring-primary-500 cursor-pointer"
+                                                />
+                                            )}
+                                        </div>
+                                    )}
+                                    {!invoice.billingPeriod?.displayText && isPayable && (
+                                        <div className="px-4 sm:px-5 py-2 border-b border-gray-100 dark:border-[#38383A] flex justify-end">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleInvoiceSelection(invoice._id)}
+                                                className="rounded border-gray-300 dark:border-[#48484A] text-primary-600 focus:ring-primary-500 cursor-pointer"
+                                            />
                                         </div>
                                     )}
                                     <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-start">
@@ -368,7 +501,42 @@ const StudentFeesDashboard = () => {
                                         )}
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
+                            </div>
+
+                            {/* Sticky Pay Selected bar */}
+                            {selectedInvoiceIds.length >= 2 && (
+                                <div className="sticky bottom-0 z-10 bg-white dark:bg-[#1C1C1E] border-t border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg p-4 flex items-center justify-between gap-3 mt-4">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                            {selectedInvoiceIds.length} invoices selected
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                                            Total: {formatCurrency(invoices.filter(inv => selectedInvoiceIds.includes(inv._id)).reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0))}
+                                        </p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => setSelectedInvoiceIds([])}
+                                            className="btn btn-outline text-sm px-4 py-2"
+                                        >
+                                            Clear
+                                        </button>
+                                        <button
+                                            onClick={() => PAYMENT_GATEWAY_ENABLED ? handleCombinedPayment() : handleCombinedManualPayment()}
+                                            disabled={isGatewayPaying}
+                                            className="btn bg-primary-600 text-white hover:bg-primary-500 shadow-sm text-sm px-5 py-2 flex items-center gap-2 active:scale-95"
+                                        >
+                                            {isGatewayPaying ? (
+                                                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Connecting...</>
+                                            ) : (
+                                                <><CreditCard className="h-4 w-4" /> Pay {selectedInvoiceIds.length} Invoices</>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

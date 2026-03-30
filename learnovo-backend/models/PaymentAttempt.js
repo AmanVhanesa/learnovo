@@ -28,9 +28,14 @@ const paymentAttemptSchema = new mongoose.Schema({
   invoiceId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'FeeInvoice',
-    required: true,
     index: true
   },
+
+  // Combined payment: multiple invoices paid in one transaction
+  invoiceIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FeeInvoice'
+  }],
 
   amount: {
     type: Number,
