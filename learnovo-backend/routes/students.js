@@ -195,6 +195,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     try {
       students = await User.find(filter)
         .select('-password')
+        .populate({ path: 'classId', select: 'name grade', strictPopulate: false })
         .populate({ path: 'subDepartment', select: 'name', strictPopulate: false })
         .populate({ path: 'driverId', select: 'name phone', strictPopulate: false })
         .sort({ createdAt: -1 })

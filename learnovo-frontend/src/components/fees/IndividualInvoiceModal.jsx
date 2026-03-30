@@ -28,13 +28,14 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
   )
 
   // Auto-filter structures matching student's class
+  const studentClassId = typeof selectedStudent?.classId === 'object' ? selectedStudent.classId?._id : selectedStudent?.classId
   const matchingStructures = useMemo(() => {
-    if (!selectedStudent?.classId?._id) return activeFeeStructures
+    if (!studentClassId) return activeFeeStructures
     return activeFeeStructures.filter(fs => {
       const fsClassId = typeof fs.classId === 'object' ? fs.classId._id : fs.classId
-      return fsClassId === selectedStudent.classId._id
+      return fsClassId === studentClassId
     })
-  }, [activeFeeStructures, selectedStudent])
+  }, [activeFeeStructures, studentClassId])
 
   // Filter out admission fees for imported students
   const applicableFeeHeads = useMemo(() => {
@@ -95,7 +96,7 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
             <StudentSearch onSelectStudent={(student) => {
               setSelectedStudent(student)
               // Auto-select fee structure matching student's class
-              const studentClassId = student?.classId?._id
+              const studentClassId = typeof student?.classId === 'object' ? student.classId._id : student?.classId
               if (studentClassId) {
                 const matched = activeFeeStructures.filter(fs => {
                   const fsClassId = typeof fs.classId === 'object' ? fs.classId._id : fs.classId
