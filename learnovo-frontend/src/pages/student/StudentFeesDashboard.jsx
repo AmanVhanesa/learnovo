@@ -314,6 +314,11 @@ const StudentFeesDashboard = () => {
 
                             {invoices.map(invoice => (
                                 <div key={invoice._id} className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-200 dark:border-[#38383A] overflow-hidden hover:shadow-md transition-shadow">
+                                    {invoice.billingPeriod?.displayText && (
+                                        <div className="px-4 sm:px-5 py-2.5 bg-primary-50 dark:bg-primary-900/20 border-b border-primary-100 dark:border-primary-800/30">
+                                            <span className="text-sm font-bold text-primary-700 dark:text-primary-400">{invoice.billingPeriod.displayText}</span>
+                                        </div>
+                                    )}
                                     <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-start">
                                         <div>
                                             <h3 className="font-semibold text-lg text-gray-900 dark:text-white">{invoice.invoiceNumber}</h3>
