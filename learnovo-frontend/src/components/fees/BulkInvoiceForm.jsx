@@ -19,25 +19,25 @@ const BulkInvoiceForm = ({ classes, feeStructures, activeSession, onSuccess }) =
   const [isSaving, setIsSaving] = useState(false)
   const [result, setResult] = useState(null)
 
-  const selectedClass = classes.find(c => c._id === form.classId)
+  const selectedClass = classes.find(c => String(c._id) === String(form.classId))
   const sections = selectedClass?.sections || []
 
   const filteredStructures = useMemo(
     () => feeStructures.filter(fs => {
       if (!fs.isActive) return false
-      const fsClassId = typeof fs.classId === 'object' ? fs.classId?._id : fs.classId
-      if (fsClassId !== form.classId) return false
+      const fsClassId = String(typeof fs.classId === 'object' ? fs.classId?._id : fs.classId)
+      if (fsClassId !== String(form.classId)) return false
       // If a section is selected, show structures for that section OR all-section structures
       if (form.sectionId) {
         const fsSectionId = typeof fs.sectionId === 'object' ? fs.sectionId?._id : fs.sectionId
-        return !fsSectionId || fsSectionId === form.sectionId
+        return !fsSectionId || String(fsSectionId) === String(form.sectionId)
       }
       return true
     }),
     [feeStructures, form.classId, form.sectionId]
   )
 
-  const selectedFeeStructure = feeStructures.find(fs => fs._id === form.feeStructureId)
+  const selectedFeeStructure = feeStructures.find(fs => String(fs._id) === String(form.feeStructureId))
   const feeFrequency = normalizeFrequency(selectedFeeStructure?.feeHeads?.[0]?.frequency)
   const feeTotal = selectedFeeStructure?.totalAmount || selectedFeeStructure?.feeHeads?.reduce((sum, h) => sum + (h.amount || 0), 0) || 0
 

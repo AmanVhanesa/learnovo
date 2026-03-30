@@ -83,7 +83,7 @@ const FeesFinance = () => {
   const { data: feeStructures = [] } = useQuery({
     queryKey: ['fee-structures', activeSession?._id],
     queryFn: async () => { const res = await feeStructuresService.list({ academicSessionId: activeSession?._id }); return res.data || [] },
-    enabled: !!activeSession && (activeTab === 'feeStructure' || activeTab === 'invoices'),
+    enabled: !!activeSession && (activeTab === 'feeStructure' || activeTab === 'invoices' || showInvoiceModal),
   })
 
   const { data: classes = [] } = useQuery({

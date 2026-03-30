@@ -28,11 +28,12 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
   const studentClassId = typeof selectedStudent?.classId === 'object' ? selectedStudent.classId?._id : selectedStudent?.classId
   const matchingStructure = useMemo(() => {
     if (!studentClassId) return null
+    const sId = String(studentClassId)
     const matched = activeFeeStructures.filter(fs => {
       const fsClassId = typeof fs.classId === 'object' ? fs.classId._id : fs.classId
-      return fsClassId === studentClassId
+      return String(fsClassId) === sId
     })
-    return matched.length === 1 ? matched[0] : matched.length > 1 ? matched[0] : null
+    return matched.length >= 1 ? matched[0] : null
   }, [activeFeeStructures, studentClassId])
 
   // Filter fee heads based on student status
