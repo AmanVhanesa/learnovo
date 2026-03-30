@@ -205,7 +205,8 @@ class CSVImportService {
         guardianName: row.guardianName?.trim(),
         guardianPhone: row.guardianPhone?.trim(),
         address: row.address?.trim(),
-        admissionDate: new Date()
+        admissionDate: new Date(),
+        isImported: true
       });
     }
 
