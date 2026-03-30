@@ -21,6 +21,27 @@ const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService')
 
 const router = express.Router();
 
+/**
+ * Helper: Clean up allocation when all its invoices are cancelled.
+ * Deletes the AnnualFeeAllocation so invoices can be regenerated.
+ */
+async function cleanupOrphanedAllocations(tenantId, studentIds, academicSessionId) {
+  for (const studentId of studentIds) {
+    // Check if any non-cancelled invoices remain for this student+session
+    const activeInvoice = await FeeInvoice.findOne({
+      tenantId,
+      studentId,
+      academicSessionId,
+      status: { $ne: 'Cancelled' }
+    });
+
+    // If no active invoices remain, delete the allocation to allow regeneration
+    if (!activeInvoice) {
+      await AnnualFeeAllocation.deleteMany({ tenantId, studentId, academicSessionId });
+    }
+  }
+}
+
 // All invoice routes require fees/finance feature (Basic+)
 router.use(planGate.requireActiveSubscription);
 router.use(planGate.checkFeesAndFinance);
@@ -667,6 +688,9 @@ router.delete('/bulk', protect, authorize('admin'), [
       )
     );
 
+    // Clean up allocations for students whose invoices are all cancelled (allows regeneration)
+    await cleanupOrphanedAllocations(req.user.tenantId, distinctStudentIds, academicSessionId);
+
     // Log action (best-effort)
     try {
       await FeeAuditLog.logAction({
@@ -1021,6 +1045,12 @@ router.delete('/batch', protect, authorize('admin'), [
       })
     );
 
+    // Clean up allocations for students whose invoices are all cancelled (allows regeneration)
+    for (const key of distinctStudents) {
+      const [studentId, academicSessionId] = key.split('|');
+      await cleanupOrphanedAllocations(tenantId, [studentId], academicSessionId);
+    }
+
     // Log action (best-effort)
     try {
       await FeeAuditLog.logAction({
@@ -1115,6 +1145,9 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async(req, res)
 
     // Update student balance
     await StudentBalance.updateBalance(tenantId, studentId, academicSessionId);
+
+    // Clean up allocation if all invoices are now cancelled (allows regeneration)
+    await cleanupOrphanedAllocations(tenantId, [studentId], academicSessionId);
 
     res.json({
       success: true,
