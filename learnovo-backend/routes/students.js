@@ -123,30 +123,37 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     }
 
     // Add class filter from query — match by class string OR classId
-    // Students may store class as name or grade, so we match both ways
-    if (req.query.classId) {
-      if (!filter.$and) filter.$and = [];
-      const classOr = [{ classId: req.query.classId }];
-      if (req.query.class) classOr.push({ class: req.query.class });
-      filter.$and.push({ $or: classOr });
-    } else if (req.query.class) {
+    // Students may store class as name or grade, so we match both ways.
+    // Always look up the Class document to match by all identifiers (classId, name, grade).
+    if (req.query.classId || req.query.class) {
       let classDoc;
       try {
-        classDoc = await Class.findOne({
-          tenantId: req.user.tenantId,
-          $or: [{ grade: req.query.class }, { name: req.query.class }]
-        }).select('_id name grade').lean();
+        if (req.query.classId) {
+          classDoc = await Class.findById(req.query.classId).select('_id name grade').lean();
+        }
+        if (!classDoc && req.query.class) {
+          classDoc = await Class.findOne({
+            tenantId: req.user.tenantId,
+            $or: [{ grade: req.query.class }, { name: req.query.class }]
+          }).select('_id name grade').lean();
+        }
       } catch (_) { /* ignore */ }
 
       if (classDoc) {
         if (!filter.$and) filter.$and = [];
-        const classOr = [
-          { class: req.query.class },
-          { classId: classDoc._id }
-        ];
-        // Also match by the other name (grade vs name)
-        if (classDoc.name && classDoc.name !== req.query.class) classOr.push({ class: classDoc.name });
-        if (classDoc.grade && classDoc.grade !== req.query.class) classOr.push({ class: classDoc.grade });
+        const classOr = [{ classId: classDoc._id }];
+        if (classDoc.name) classOr.push({ class: classDoc.name });
+        if (classDoc.grade && classDoc.grade !== classDoc.name) classOr.push({ class: classDoc.grade });
+        // Also match the raw query value in case it differs from both name and grade
+        if (req.query.class && req.query.class !== classDoc.name && req.query.class !== classDoc.grade) {
+          classOr.push({ class: req.query.class });
+        }
+        filter.$and.push({ $or: classOr });
+      } else if (req.query.classId) {
+        // classDoc not found but we have a classId — try direct match
+        if (!filter.$and) filter.$and = [];
+        const classOr = [{ classId: req.query.classId }];
+        if (req.query.class) classOr.push({ class: req.query.class });
         filter.$and.push({ $or: classOr });
       } else {
         filter.class = req.query.class;

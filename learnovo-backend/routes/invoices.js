@@ -437,11 +437,14 @@ router.post('/generate-bulk', protect, authorize('admin'), [
             // Skip admission fees if student already paid
             studentItems = cleanItems(regularItems);
           } else {
-            // Skip admission fees if an admission fee invoice already exists
+            // Skip admission fees if an admission fee invoice already exists (any status except Cancelled)
             const existingAdmissionInvoice = await FeeInvoice.findOne({
               tenantId: req.user.tenantId,
               studentId: student._id,
-              'items.feeHeadName': { $in: admissionFeeHeadNames },
+              $or: [
+                { 'items.feeHeadName': { $in: admissionFeeHeadNames } },
+                { 'billingPeriod.displayText': 'Admission Fee' }
+              ],
               status: { $ne: 'Cancelled' }
             });
 
@@ -1007,7 +1010,7 @@ router.delete('/batch', protect, authorize('admin'), [
     // Find all matching invoices for this tenant
     const invoices = await FeeInvoice.find({
       _id: { $in: invoiceIds },
-      tenantId,
+      tenantId
     });
 
     if (invoices.length === 0) {
@@ -1064,7 +1067,7 @@ router.delete('/batch', protect, authorize('admin'), [
         details: {
           count: deletable.length,
           skipped,
-          invoiceIds: deletableIds,
+          invoiceIds: deletableIds
         },
         ipAddress: req.ip
       });
@@ -1076,7 +1079,7 @@ router.delete('/batch', protect, authorize('admin'), [
       success: true,
       message: `Successfully deleted ${deletable.length} invoice(s)${skipped > 0 ? `. ${skipped} skipped (have payments).` : ''}`,
       deleted: deletable.length,
-      skipped,
+      skipped
     });
 
   } catch (error) {
@@ -1236,7 +1239,7 @@ router.post('/:invoiceId/discount', protect, authorize('admin', 'accountant'), [
   body('amount').isNumeric().toFloat().custom(v => v > 0).withMessage('Valid positive amount is required'),
   body('reason').notEmpty().withMessage('Reason is required'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { invoiceId } = req.params;
     const { type, amount, percentage, reason } = req.body;
@@ -1322,7 +1325,7 @@ router.post('/:invoiceId/discount', protect, authorize('admin', 'accountant'), [
 // @desc    Remove discount / waiver from an invoice
 // @route   DELETE /api/invoices/:invoiceId/discount
 // @access  Private (Admin, Accountant)
-router.delete('/:invoiceId/discount', protect, authorize('admin', 'accountant'), async (req, res) => {
+router.delete('/:invoiceId/discount', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
     const { invoiceId } = req.params;
     const tenantId = req.user.tenantId;
@@ -1401,40 +1404,45 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
   body('paymentDate').isISO8601().withMessage('Valid payment date is required'),
   handleValidationErrors
 ], async(req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // Only use transactions if MongoDB supports them (replica set / Atlas)
+  const topology = mongoose.connection?.db?.s?.topology?.description?.type
+    || mongoose.connection?.readyState;
+  const canUseTransactions = topology === 'ReplicaSetWithPrimary' || topology === 'Sharded'
+    || (mongoose.connection?.client?.options?.replicaSet);
+
+  let session = null;
+  if (canUseTransactions) {
+    session = await mongoose.startSession();
+    session.startTransaction();
+  }
+
+  const sessionOpts = session ? { session } : {};
 
   try {
     const { studentId, invoiceId, amount, paymentMethod, paymentDate, transactionDetails, remarks } = req.body;
     const tenantId = req.user.tenantId;
 
-    // Verify invoice exists (within transaction for consistency)
-    const invoice = await FeeInvoice.findOne({
-      _id: invoiceId,
-      tenantId
-    }).session(session);
+    // Verify invoice exists
+    const invoice = await FeeInvoice.findOne({ _id: invoiceId, tenantId });
 
     if (!invoice) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({
-        success: false,
-        message: 'Invoice not found'
-      });
+      if (session) {
+        await session.abortTransaction(); session.endSession();
+      }
+      return res.status(404).json({ success: false, message: 'Invoice not found' });
     }
 
     if (invoice.status === 'Paid') {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        success: false,
-        message: 'This invoice is already fully paid'
-      });
+      if (session) {
+        await session.abortTransaction(); session.endSession();
+      }
+      return res.status(400).json({ success: false, message: 'This invoice is already fully paid' });
     }
 
     if (toNumber(amount) > toNumber(invoice.balanceAmount) + 0.01) {
-      await session.abortTransaction();
-      session.endSession();
+      if (session) {
+        await session.abortTransaction(); session.endSession();
+      }
       return res.status(400).json({
         success: false,
         message: `Amount exceeds pending balance of ${roundToRupee(invoice.balanceAmount)}`
@@ -1461,11 +1469,11 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       collectedBy: req.user._id
     });
 
-    await payment.save({ session });
+    await payment.save(sessionOpts);
 
     // Update Invoice — use safe rounding; pre-save hook handles balance + status
     invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(amount));
-    await invoice.save({ session });
+    await invoice.save(sessionOpts);
 
     // Create PaymentAttempt + Receipt so student can see it in their portal
     const idempotencyKey = `admin_${invoiceId}_${payment._id}`;
@@ -1486,7 +1494,7 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       verifiedBy: req.user._id,
       verifiedAt: new Date()
     });
-    await attempt.save({ session });
+    await attempt.save(sessionOpts);
 
     const studentReceiptNum = await Receipt.generateReceiptNumber(tenantId);
     const studentReceipt = new Receipt({
@@ -1503,12 +1511,14 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       transactionRefId: transactionDetails?.referenceNumber || null,
       paymentDate: new Date(paymentDate)
     });
-    await studentReceipt.save({ session });
+    await studentReceipt.save(sessionOpts);
 
-    await session.commitTransaction();
-    session.endSession();
+    if (session) {
+      await session.commitTransaction();
+      session.endSession();
+    }
 
-    // Audit log (outside transaction — best effort)
+    // Audit log (best effort)
     try {
       await FeeAuditLog.logAction({
         tenantId,
@@ -1531,14 +1541,26 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       console.error('Audit log failed (non-fatal):', auditErr.message);
     }
 
-    // Update student balance (outside transaction — best effort)
+    // Update student balance (best effort)
     try {
       await StudentBalance.updateBalance(tenantId, studentId, invoice.academicSessionId);
     } catch (balanceErr) {
       console.error('Balance update failed (non-fatal):', balanceErr.message);
     }
 
-    // Auto-sync to Finance module (non-blocking, outside transaction)
+    // Mark admission fee as paid if this invoice was an admission fee and is now fully paid
+    if (invoice.status === 'Paid' && invoice.billingPeriod?.displayText === 'Admission Fee') {
+      try {
+        await User.updateOne(
+          { _id: studentId, tenantId },
+          { $set: { admissionFeePaid: true } }
+        );
+      } catch (flagErr) {
+        console.error('admissionFeePaid flag update failed (non-fatal):', flagErr.message);
+      }
+    }
+
+    // Auto-sync to Finance module (non-blocking)
     try {
       const student = await User.findById(studentId).select('name fullName').lean();
       await syncFeePaymentToIncome({
@@ -1560,16 +1582,20 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
     res.json({
       success: true,
       message: 'Payment collected successfully',
-      data: {
-        payment,
-        invoice
-      }
+      data: { payment, invoice }
     });
 
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    if (session) {
+      try {
+        await session.abortTransaction();
+      } catch (_) { /* ignore abort errors */ }
+      try {
+        session.endSession();
+      } catch (_) { /* ignore session cleanup errors */ }
+    }
 
+    console.error('Collect payment error:', error.message);
     logger.error('Collect payment error', error);
     res.status(500).json({
       success: false,
@@ -1753,7 +1779,7 @@ router.get('/payments/:id/receipt/pdf', protect, async(req, res) => {
 router.post('/:id/cancel', protect, authorize('admin'), [
   body('reason').notEmpty().withMessage('Cancellation reason is required'),
   handleValidationErrors
-], async (req, res) => {
+], async(req, res) => {
   try {
     const { reason } = req.body;
     const tenantId = req.user.tenantId;
