@@ -18,7 +18,7 @@ const { logger } = require('../middleware/errorHandler');
 function buildExamDateTimes(exam) {
   const examDate = new Date(exam.date);
 
-  let startDT = new Date(examDate);
+  const startDT = new Date(examDate);
   if (exam.startTime) {
     const [h, m] = exam.startTime.split(':').map(Number);
     startDT.setHours(h, m, 0, 0);
