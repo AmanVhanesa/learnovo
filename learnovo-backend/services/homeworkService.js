@@ -2,6 +2,30 @@ const Homework = require('../models/Homework');
 const HomeworkSubmission = require('../models/HomeworkSubmission');
 const User = require('../models/User');
 const Class = require('../models/Class');
+
+/**
+ * Compute the real-time status of a homework based on dates.
+ * pending  → assignedDate is in the future
+ * active   → assignedDate <= now AND dueDate >= now (end of day)
+ * overdue  → dueDate < now AND dueDate + 7 days >= now
+ * expired  → dueDate + 7 days < now
+ */
+function computeHomeworkStatus(hw) {
+  const now = new Date();
+  const assignedDate = new Date(hw.assignedDate);
+  const dueDate = new Date(hw.dueDate);
+  dueDate.setHours(23, 59, 59, 999); // end of due day
+
+  if (assignedDate > now) return 'pending';
+
+  const expiredDate = new Date(dueDate);
+  expiredDate.setDate(expiredDate.getDate() + 7);
+
+  if (now <= dueDate) return 'active';
+  if (now <= expiredDate) return 'overdue';
+  return 'expired';
+}
+
 /**
  * Resolve ObjectId(s) for a student's class.
  * Homework.class is an ObjectId ref — we must NEVER pass plain strings into it.
@@ -127,7 +151,8 @@ class HomeworkService {
       const homework = new Homework({
         ...data,
         assignedBy: teacherId,
-        tenantId
+        tenantId,
+        status: computeHomeworkStatus({ assignedDate: data.assignedDate || new Date(), dueDate: data.dueDate })
       });
 
       await homework.save();
@@ -254,7 +279,7 @@ class HomeworkService {
         if (filters.endDate) baseQuery.assignedDate.$lte = new Date(filters.endDate);
       }
 
-      const homework = await Homework.find(baseQuery)
+      let homework = await Homework.find(baseQuery)
         .populate('subject', 'name')
         .populate('class', 'name grade')
         .populate('section', 'name')
@@ -262,53 +287,71 @@ class HomeworkService {
         .sort({ assignedDate: -1 })
         .lean();
 
-      // For teachers, add submission statistics
-      if (userRole === 'teacher') {
+      // Enrich with real-time computed status
+      for (const hw of homework) {
+        hw.status = computeHomeworkStatus(hw);
+      }
+
+      // Apply server-side status filter if provided
+      if (filters.status) {
+        const statusFilter = filters.status;
+        homework = homework.filter(hw => hw.status === statusFilter);
+      }
+
+      // For teachers, add submission statistics (batch queries instead of N+1)
+      if (userRole === 'teacher' && homework.length > 0) {
+        const hwIds = homework.map(hw => hw._id);
+
+        // Batch: count submissions per homework
+        const submissionCounts = await HomeworkSubmission.aggregate([
+          { $match: { homeworkId: { $in: hwIds }, status: { $in: ['submitted', 'reviewed'] } } },
+          { $group: { _id: '$homeworkId', count: { $sum: 1 } } }
+        ]);
+        const submissionMap = new Map(submissionCounts.map(s => [s._id.toString(), s.count]));
+
+        // Batch: count students per class/section
+        const classIds = [...new Set(homework.map(hw => (hw.class?._id || hw.class)?.toString()).filter(Boolean))];
+        const classNames = [...new Set(homework.map(hw => hw.class?.grade || hw.class?.name).filter(Boolean))];
+        const sectionIds = [...new Set(homework.map(hw => (hw.section?._id || hw.section)?.toString()).filter(Boolean))];
+
+        // Get all student counts grouped by classId+sectionId
+        const studentCountPipeline = [
+          { $match: { tenantId, role: 'student', isActive: true, $or: [{ classId: { $in: classIds } }, { class: { $in: classNames } }] } },
+          { $group: { _id: { classId: '$classId', sectionId: '$sectionId' }, count: { $sum: 1 } } }
+        ];
+        const studentCounts = classIds.length > 0 || classNames.length > 0
+          ? await User.aggregate(studentCountPipeline)
+          : [];
+
         for (const hw of homework) {
-          const submissions = await HomeworkSubmission.countDocuments({
-            homeworkId: hw._id,
-            status: { $in: ['submitted', 'reviewed'] }
-          });
+          const classId = (hw.class?._id || hw.class)?.toString();
+          const sectionId = (hw.section?._id || hw.section)?.toString();
 
-          // Count students in the class/section using flexible matching
-          const classId = hw.class?._id || hw.class;
-          const sectionId = hw.section?._id || hw.section;
-
-          const studentQuery = {
-            tenantId,
-            role: 'student',
-            isActive: true
-          };
-
-          if (classId) {
-            studentQuery.$or = [
-              { classId: classId },
-              { class: hw.class?.grade || hw.class?.name }
-            ];
+          let total = 0;
+          for (const sc of studentCounts) {
+            const matchesClass = sc._id.classId?.toString() === classId;
+            const matchesSection = !sectionId || sc._id.sectionId?.toString() === sectionId;
+            if (matchesClass && matchesSection) total += sc.count;
           }
-
-          if (sectionId) {
-            studentQuery.sectionId = sectionId;
-          }
-
-          const totalStudents = await User.countDocuments(studentQuery);
 
           hw.submissionStats = {
-            submitted: submissions,
-            total: totalStudents
+            submitted: submissionMap.get(hw._id.toString()) || 0,
+            total
           };
         }
       }
 
-      // For students, add submission status
-      if (userRole === 'student') {
-        for (const hw of homework) {
-          const submission = await HomeworkSubmission.findOne({
-            homeworkId: hw._id,
-            studentId: userId
-          }).select('status submittedAt teacherFeedback grade');
+      // For students, add submission status (batch query instead of N+1)
+      if (userRole === 'student' && homework.length > 0) {
+        const hwIds = homework.map(hw => hw._id);
+        const submissions = await HomeworkSubmission.find({
+          homeworkId: { $in: hwIds },
+          studentId: userId
+        }).select('homeworkId status submittedAt teacherFeedback grade').lean();
 
-          hw.mySubmission = submission;
+        const submissionMap = new Map(submissions.map(s => [s.homeworkId.toString(), s]));
+        for (const hw of homework) {
+          hw.mySubmission = submissionMap.get(hw._id.toString()) || null;
         }
       }
 
@@ -333,6 +376,9 @@ class HomeworkService {
       if (!homework) {
         throw new Error('Homework not found');
       }
+
+      // Enrich with real-time computed status
+      homework.status = computeHomeworkStatus(homework);
 
       if (userRole === 'student') {
         const submission = await HomeworkSubmission.findOne({
@@ -658,4 +704,6 @@ class HomeworkService {
   }
 }
 
-module.exports = new HomeworkService();
+const homeworkService = new HomeworkService();
+homeworkService.computeHomeworkStatus = computeHomeworkStatus;
+module.exports = homeworkService;

@@ -96,5 +96,6 @@ const examSchema = new mongoose.Schema({
 
 examSchema.index({ tenantId: 1, class: 1, subject: 1 });
 examSchema.index({ tenantId: 1, class: 1, section: 1, date: 1 });
+examSchema.index({ tenantId: 1, status: 1, date: 1 });
 
 module.exports = mongoose.model('Exam', examSchema);

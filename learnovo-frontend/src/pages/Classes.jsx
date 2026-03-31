@@ -130,8 +130,8 @@ const Classes = () => {
   const isSaving = saveMutation.isPending
 
   const filteredClasses = classes.filter(classItem => {
-    const matchesSearch = classItem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      classItem.grade.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = (classItem.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (classItem.grade || '').toLowerCase().includes(searchQuery.toLowerCase())
     const matchesGrade = !gradeFilter || classItem.grade === gradeFilter
     const matchesYear = !academicYearFilter || classItem.academicYear === academicYearFilter
     return matchesSearch && matchesGrade && matchesYear

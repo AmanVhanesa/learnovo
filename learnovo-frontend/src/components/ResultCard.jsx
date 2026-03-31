@@ -126,9 +126,9 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   .result-stats{font-size:12px;color:#374151}
   /* Signatures */
   .sigs{display:flex;justify-content:space-between;margin-bottom:32px;padding-top:8px}
-  .sig-block{text-align:center;width:140px}
-  .sig-line{width:100%;height:1.5px;background:#9CA3AF;margin-bottom:8px;margin-top:40px;position:relative}
-  .sig-img{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);max-height:40px;max-width:120px;object-fit:contain}
+  .sig-block{text-align:center;width:160px}
+  .sig-line{width:100%;height:1.5px;background:#9CA3AF;margin-bottom:8px;margin-top:50px;position:relative}
+  .sig-img{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);max-height:70px;max-width:150px;object-fit:contain}
   .sig-label{font-size:12px;font-weight:700;color:#111827}
   .sig-sub{font-size:10px;color:#374151;margin-top:2px}
   /* Footer */
@@ -580,9 +580,9 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                         { label: 'Principal', sub: 'Signature & Seal', sig: schoolInfo.principalSignature },
                                         { label: 'Parent / Guardian', sub: 'Signature', sig: null },
                                     ].map(s => (
-                                        <div key={s.label} className="text-center w-[140px]">
-                                            <div className="relative mt-10 mb-2">
-                                                {s.sig && <img src={getSignatureUrl(s.sig)} alt={s.label} className="absolute bottom-1 left-1/2 -translate-x-1/2 max-h-10 max-w-[120px] object-contain" />}
+                                        <div key={s.label} className="text-center w-[160px]">
+                                            <div className="relative mt-12 mb-2">
+                                                {s.sig && <img src={getSignatureUrl(s.sig)} alt={s.label} className="absolute bottom-1 left-1/2 -translate-x-1/2 max-h-[70px] max-w-[150px] object-contain" />}
                                                 <div className="h-px bg-gray-200 dark:bg-[#38383A]" />
                                             </div>
                                             <p className="text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93]">{s.label}</p>

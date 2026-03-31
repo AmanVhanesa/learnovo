@@ -1134,24 +1134,35 @@ const Exams = () => {
                                 </div>
                             </ModalSection>
 
-                            {/* ── Section 7: Status ── */}
-                            <ModalSection icon={<AlertCircle className="h-4 w-4" />} title="Status">
-                                <div className="flex flex-wrap gap-2">
-                                    {EXAM_STATUSES.map(s => (
-                                        <button
-                                            key={s}
-                                            type="button"
-                                            onClick={() => handleField('status', s)}
-                                            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all
-                                                ${form.status === s
-                                                    ? STATUS_COLORS[s] + ' border-current ring-2 ring-offset-1'
-                                                    : 'border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] hover:border-gray-400 dark:hover:border-[#48484A]'}`}
-                                        >
-                                            {s}
-                                        </button>
-                                    ))}
-                                </div>
-                            </ModalSection>
+                            {/* ── Section 7: Status (edit only — cancel action) ── */}
+                            {editing && (
+                                <ModalSection icon={<AlertCircle className="h-4 w-4" />} title="Status">
+                                    <div className="flex items-center gap-3">
+                                        <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${STATUS_COLORS[form.status] || 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93]'}`}>
+                                            {form.status}
+                                        </span>
+                                        <p className="text-xs text-gray-400 dark:text-[#636366]">Status updates automatically based on date &amp; time</p>
+                                        {form.status !== 'Cancelled' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleField('status', 'Cancelled')}
+                                                className="ml-auto px-3 py-1.5 rounded-full text-sm font-medium border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                            >
+                                                Cancel Exam
+                                            </button>
+                                        )}
+                                        {form.status === 'Cancelled' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleField('status', 'Scheduled')}
+                                                className="ml-auto px-3 py-1.5 rounded-full text-sm font-medium border border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+                                            >
+                                                Restore Exam
+                                            </button>
+                                        )}
+                                    </div>
+                                </ModalSection>
+                            )}
 
                         </form>
 

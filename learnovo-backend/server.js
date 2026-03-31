@@ -315,6 +315,27 @@ try {
   console.error('Failed to start backup job:', e);
 }
 
+try {
+  const homeworkStatusUpdater = require('./jobs/homeworkStatusUpdater');
+  homeworkStatusUpdater.startJob();
+} catch (e) {
+  console.error('Failed to start homework status updater:', e);
+}
+
+try {
+  const examStatusUpdater = require('./jobs/examStatusUpdater');
+  examStatusUpdater.startJob();
+} catch (e) {
+  console.error('Failed to start exam status updater:', e);
+}
+
+try {
+  const announcementExpiry = require('./jobs/announcementExpiry');
+  announcementExpiry.startJob();
+} catch (e) {
+  console.error('Failed to start announcement expiry job:', e);
+}
+
 // ── Memory monitoring ───────────────────────────────────────────────
 setInterval(() => {
   const mem = process.memoryUsage();

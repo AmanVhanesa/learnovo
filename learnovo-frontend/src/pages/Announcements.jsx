@@ -30,20 +30,47 @@ const Announcements = () => {
     });
 
     const { data: announcements = [], isLoading: loading } = useQuery({
-        queryKey: ['announcements'],
+        queryKey: ['announcements', isAdmin],
         queryFn: async () => {
-            const response = await announcementsService.getAnnouncements();
+            // Admin sees all including expired; others only see active non-expired
+            const params = isAdmin ? { includeExpired: true } : {};
+            const response = await announcementsService.getAnnouncements(params);
             return response.data || [];
         },
     });
 
-    const filteredAnnouncements = useMemo(() => {
-        if (!searchText.trim()) return announcements;
-        const q = searchText.toLowerCase().trim();
-        return announcements.filter(
-            (a) => a.title.toLowerCase().includes(q) || a.message.toLowerCase().includes(q)
-        );
-    }, [announcements, searchText]);
+    const { activeAnnouncements, expiredAnnouncements } = useMemo(() => {
+        let filtered = announcements;
+        if (searchText.trim()) {
+            const q = searchText.toLowerCase().trim();
+            filtered = filtered.filter(
+                (a) => (a.title || '').toLowerCase().includes(q) || (a.message || '').toLowerCase().includes(q)
+            );
+        }
+        if (!isAdmin) return { activeAnnouncements: filtered, expiredAnnouncements: [] };
+        const active = [];
+        const expired = [];
+        for (const a of filtered) {
+            if (a.expiresAt && new Date(a.expiresAt) < new Date()) {
+                expired.push(a);
+            } else {
+                active.push(a);
+            }
+        }
+        return { activeAnnouncements: active, expiredAnnouncements: expired };
+    }, [announcements, searchText, isAdmin]);
+
+    const getRemainingTime = (expiresAt) => {
+        if (!expiresAt) return null;
+        const diff = new Date(expiresAt) - new Date();
+        if (diff <= 0) return null;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        if (days > 0) return `Expires in ${days}d ${hours}h`;
+        if (hours > 0) return `Expires in ${hours}h`;
+        const mins = Math.floor(diff / (1000 * 60));
+        return `Expires in ${mins}m`;
+    };
 
     const toggleExpanded = (id) => {
         setExpandedIds((prev) => {
@@ -219,7 +246,7 @@ const Announcements = () => {
             </div>
 
             {/* Announcements List */}
-            {filteredAnnouncements.length === 0 ? (
+            {activeAnnouncements.length === 0 && expiredAnnouncements.length === 0 ? (
                 <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-6 sm:p-12 text-center">
                     <div className="w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mx-auto mb-4">
                         <Megaphone className="h-6 w-6 text-gray-400 dark:text-[#636366]" />
@@ -235,15 +262,15 @@ const Announcements = () => {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {filteredAnnouncements.map((announcement) => {
+                    {activeAnnouncements.map((announcement) => {
                         const style = getPriorityStyle(announcement.priority);
-                        const expired = isExpired(announcement.expiresAt);
                         const isExpanded = expandedIds.has(announcement._id);
+                        const remaining = getRemainingTime(announcement.expiresAt);
 
                         return (
                             <div
                                 key={announcement._id}
-                                className={`bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 sm:p-6 border-l-4 ${style.border} ${expired ? 'opacity-60' : ''} ${deletingId === announcement._id ? 'opacity-40 pointer-events-none' : ''}`}
+                                className={`bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 sm:p-6 border-l-4 ${style.border} ${deletingId === announcement._id ? 'opacity-40 pointer-events-none' : ''}`}
                             >
                                 <div className="flex justify-between items-start gap-4">
                                     <div className="flex-1 min-w-0">
@@ -252,9 +279,9 @@ const Announcements = () => {
                                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${style.badge}`}>
                                                 {announcement.priority}
                                             </span>
-                                            {expired && (
-                                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-[#2C2C2E] dark:text-[#8E8E93]">
-                                                    Expired
+                                            {remaining && (
+                                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
+                                                    {remaining}
                                                 </span>
                                             )}
                                         </div>
@@ -304,7 +331,7 @@ const Announcements = () => {
                                         </div>
                                     )}
                                     {announcement.expiresAt && (
-                                        <div className={`flex items-center gap-1.5 ${expired ? 'text-gray-400' : 'text-orange-500'}`}>
+                                        <div className="flex items-center gap-1.5 text-orange-500">
                                             <AlertCircle className="h-3.5 w-3.5" />
                                             Expires: {formatDate(announcement.expiresAt)}
                                         </div>
@@ -318,6 +345,79 @@ const Announcements = () => {
                             </div>
                         );
                     })}
+
+                    {/* Expired Announcements Section — Admin only */}
+                    {isAdmin && expiredAnnouncements.length > 0 && (
+                        <>
+                            <div className="flex items-center gap-3 mt-8 mb-2">
+                                <div className="h-px flex-1 bg-gray-200 dark:bg-[#38383A]" />
+                                <span className="text-xs font-medium text-gray-400 dark:text-[#636366] uppercase tracking-wide">Expired</span>
+                                <div className="h-px flex-1 bg-gray-200 dark:bg-[#38383A]" />
+                            </div>
+                            {expiredAnnouncements.map((announcement) => {
+                                const style = getPriorityStyle(announcement.priority);
+                                const isExpanded = expandedIds.has(announcement._id);
+
+                                return (
+                                    <div
+                                        key={announcement._id}
+                                        className={`bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-4 sm:p-6 border-l-4 border-l-gray-300 dark:border-l-[#48484A] opacity-60 ${deletingId === announcement._id ? 'opacity-40 pointer-events-none' : ''}`}
+                                    >
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{announcement.title}</h3>
+                                                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-[#2C2C2E] dark:text-[#8E8E93]">
+                                                        Expired
+                                                    </span>
+                                                </div>
+                                                <p className={`text-gray-700 dark:text-[#8E8E93] text-sm leading-relaxed whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}>
+                                                    {announcement.message}
+                                                </p>
+                                                {announcement.message.length > 200 && (
+                                                    <button
+                                                        onClick={() => toggleExpanded(announcement._id)}
+                                                        className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                                                    >
+                                                        {isExpanded ? (
+                                                            <>Read less <ChevronUp className="h-3 w-3" /></>
+                                                        ) : (
+                                                            <>Read more <ChevronDown className="h-3 w-3" /></>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => handleDelete(announcement._id)}
+                                                disabled={deletingId === announcement._id}
+                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg flex-shrink-0"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-[#8E8E93] mt-4 pt-3 border-t border-gray-100 dark:border-[#38383A]">
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock className="h-3.5 w-3.5" />
+                                                {timeAgo(announcement.createdAt)}
+                                            </div>
+                                            {announcement.expiresAt && (
+                                                <div className="flex items-center gap-1.5 text-gray-400">
+                                                    <AlertCircle className="h-3.5 w-3.5" />
+                                                    Expired: {formatDate(announcement.expiresAt)}
+                                                </div>
+                                            )}
+                                            {announcement.createdBy?.name && (
+                                                <div className="flex items-center gap-1.5">
+                                                    By: {announcement.createdBy.name}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </>
+                    )}
                 </div>
             )}
 

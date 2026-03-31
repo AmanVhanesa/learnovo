@@ -103,7 +103,7 @@ const StudentLists = () => {
     };
 
     const filteredLists = lists.filter(list =>
-        list.name.toLowerCase().includes(searchQuery.toLowerCase())
+        (list.name || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const [showSidebar, setShowSidebar] = useState(true);

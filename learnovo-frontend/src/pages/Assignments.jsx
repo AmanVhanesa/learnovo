@@ -236,7 +236,7 @@ const Assignments = () => {
 
   const filteredAssignments = assignments.filter(assignment => {
     const matchesSearch = !searchQuery ||
-      assignment.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (assignment.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (assignment.description || '').toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = !statusFilter || assignment.status === statusFilter
     const matchesClass = !classFilter || assignment.class === classFilter

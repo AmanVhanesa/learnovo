@@ -77,28 +77,34 @@ const Homework = () => {
     const homework = useMemo(() => {
         let data = rawHomework;
 
-        // For students, filter by status if selected
-        if (isStudent && statusFilter) {
-            data = data.filter(hw => {
-                if (statusFilter === 'pending') {
-                    return !hw.mySubmission || hw.mySubmission.status === 'pending';
-                } else if (statusFilter === 'submitted') {
-                    return hw.mySubmission && hw.mySubmission.status !== 'pending';
-                }
-                return true;
-            });
+        if (statusFilter) {
+            if (isStudent) {
+                // Student submission-based filtering
+                data = data.filter(hw => {
+                    if (statusFilter === 'pending') {
+                        return !hw.mySubmission || hw.mySubmission.status === 'pending';
+                    } else if (statusFilter === 'submitted') {
+                        return hw.mySubmission && hw.mySubmission.status !== 'pending';
+                    }
+                    return true;
+                });
+            } else {
+                // Teacher/admin: filter by homework lifecycle status from backend
+                data = data.filter(hw => hw.status === statusFilter);
+            }
         }
 
         // Apply search filter
         if (searchQuery) {
+            const q = searchQuery.toLowerCase();
             data = data.filter(hw =>
-                hw.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                hw.description.toLowerCase().includes(searchQuery.toLowerCase())
+                (hw.title || '').toLowerCase().includes(q) ||
+                (hw.description || '').toLowerCase().includes(q)
             );
         }
 
         return data;
-    }, [rawHomework, isStudent, statusFilter, searchQuery]);
+    }, [rawHomework, isStudent, isTeacher, statusFilter, searchQuery]);
 
     // Delete mutation
     const deleteMutation = useMutation({
@@ -160,21 +166,39 @@ const Homework = () => {
         queryClient.invalidateQueries({ queryKey: ['homework'] });
     };
 
+    const HOMEWORK_STATUS_COLORS = {
+        pending: 'bg-gray-100 text-gray-700 dark:bg-gray-500/20 dark:text-gray-400',
+        active: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
+        overdue: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400',
+        expired: 'bg-gray-200 text-gray-500 dark:bg-[#2C2C2E] dark:text-[#636366]',
+    };
+
     const getStatusBadge = (hw) => {
-        if (!isStudent) return null;
+        if (isStudent) {
+            const submission = hw.mySubmission;
+            const isOverdue = new Date(hw.dueDate) < new Date() && (!submission || submission.status === 'pending');
 
-        const submission = hw.mySubmission;
-        const isOverdue = new Date(hw.dueDate) < new Date() && (!submission || submission.status === 'pending');
-
-        if (isOverdue) {
-            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400">Overdue</span>;
-        } else if (submission?.status === 'reviewed') {
-            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400">Reviewed</span>;
-        } else if (submission?.status === 'submitted') {
-            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400">Submitted</span>;
-        } else {
-            return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400">Pending</span>;
+            if (isOverdue) {
+                return <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400">Overdue</span>;
+            } else if (submission?.status === 'reviewed') {
+                return <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-400">Reviewed</span>;
+            } else if (submission?.status === 'submitted') {
+                return <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400">Submitted</span>;
+            } else {
+                return <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400">Pending</span>;
+            }
         }
+
+        // For teachers/admins — show homework lifecycle status
+        if (hw.status) {
+            const label = hw.status.charAt(0).toUpperCase() + hw.status.slice(1);
+            return (
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${HOMEWORK_STATUS_COLORS[hw.status] || ''}`}>
+                    {label}
+                </span>
+            );
+        }
+        return null;
     };
 
     const formatDate = (date) => formatDateShort(date);
@@ -262,18 +286,27 @@ const Homework = () => {
                             </select>
                         )}
 
-                        {/* Status Filter (for students) */}
-                        {isStudent && (
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
-                            >
-                                <option value="">All Status</option>
-                                <option value="pending">Pending</option>
-                                <option value="submitted">Submitted</option>
-                            </select>
-                        )}
+                        {/* Status Filter */}
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                        >
+                            <option value="">All Status</option>
+                            {isStudent ? (
+                                <>
+                                    <option value="pending">Pending</option>
+                                    <option value="submitted">Submitted</option>
+                                </>
+                            ) : (
+                                <>
+                                    <option value="active">Active</option>
+                                    <option value="overdue">Overdue</option>
+                                    <option value="expired">Expired</option>
+                                    <option value="pending">Pending</option>
+                                </>
+                            )}
+                        </select>
                     </div>
                 </div>
             </div>

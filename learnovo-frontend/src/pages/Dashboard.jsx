@@ -111,10 +111,19 @@ const Dashboard = () => {
       const dashData = res.status === 'fulfilled' ? res.value : null
       const actData = activitiesRes.status === 'fulfilled' ? activitiesRes.value : null
       if (dashData?.success && dashData?.data) {
+        const d = dashData.data
         return {
           ...defaultStats,
-          ...dashData.data,
-          recentActivities: actData?.success ? actData.data : []
+          ...d,
+          students: { ...defaultStats.students, ...d.students },
+          teachers: { ...defaultStats.teachers, ...d.teachers },
+          admissions: { ...defaultStats.admissions, ...d.admissions },
+          fees: { ...defaultStats.fees, ...d.fees },
+          teacher: { ...defaultStats.teacher, ...d.teacher },
+          student: { ...defaultStats.student, ...d.student },
+          parent: { ...defaultStats.parent, ...d.parent },
+          enrollmentTrend: { ...defaultStats.enrollmentTrend, ...d.enrollmentTrend },
+          recentActivities: actData?.success ? (actData.data || []) : []
         }
       }
       // If the dashboard stats request itself failed, re-throw so React Query shows the error

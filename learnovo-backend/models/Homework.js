@@ -79,7 +79,14 @@ const homeworkSchema = new mongoose.Schema({
     }
   }],
 
-  // Status
+  // Status — auto-computed by cron job + query-time enrichment
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'overdue', 'expired'],
+    default: 'pending'
+  },
+
+  // Soft delete
   isActive: {
     type: Boolean,
     default: true
@@ -103,6 +110,7 @@ homeworkSchema.index({ tenantId: 1, assignedBy: 1 });
 homeworkSchema.index({ tenantId: 1, subject: 1 });
 homeworkSchema.index({ tenantId: 1, dueDate: 1 });
 homeworkSchema.index({ tenantId: 1, isActive: 1 });
+homeworkSchema.index({ tenantId: 1, status: 1 });
 
 // Pre-save middleware
 homeworkSchema.pre('save', function(next) {

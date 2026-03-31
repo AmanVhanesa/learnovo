@@ -332,7 +332,7 @@ const FinanceDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {dashData.recentTransactions.map(txn => (
+                {(dashData?.recentTransactions || []).map(txn => (
                   <tr key={txn._id} className="border-b border-gray-50 dark:border-[#38383A]/20 hover:bg-primary-50/40 dark:hover:bg-primary-500/[0.03] transition-colors">
                     <td className="py-3 px-5">
                       <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${

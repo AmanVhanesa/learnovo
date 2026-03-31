@@ -63,6 +63,44 @@ async function resolveTeacherClassNames(teacherId, tenantId) {
   return [...classNames];
 }
 
+/**
+ * Compute the real-time status of an exam based on date + time.
+ * Cancelled exams are NEVER overridden.
+ * Scheduled → Ongoing → Completed (auto-transitions based on date/time)
+ */
+function computeExamStatus(exam) {
+  // Never override cancelled
+  if (exam.status === 'Cancelled') return 'Cancelled';
+
+  const now = new Date();
+  const examDate = new Date(exam.date);
+
+  // Build start datetime
+  const startDT = new Date(examDate);
+  if (exam.startTime) {
+    const [h, m] = exam.startTime.split(':').map(Number);
+    startDT.setHours(h, m, 0, 0);
+  } else {
+    startDT.setHours(0, 0, 0, 0); // start of day
+  }
+
+  // Build end datetime
+  let endDT = new Date(examDate);
+  if (exam.endTime) {
+    const [h, m] = exam.endTime.split(':').map(Number);
+    endDT.setHours(h, m, 0, 0);
+  } else if (exam.startTime) {
+    // No end time but has start → assume 2 hours default duration
+    endDT = new Date(startDT.getTime() + 2 * 60 * 60 * 1000);
+  } else {
+    endDT.setHours(23, 59, 59, 999); // end of day
+  }
+
+  if (now < startDT) return 'Scheduled';
+  if (now >= startDT && now <= endDT) return 'Ongoing';
+  return 'Completed';
+}
+
 // Helper: calculate grade from percentage
 function calculateGrade(percentage) {
   if (percentage >= 90) return 'A+';
@@ -172,7 +210,13 @@ router.get('/', protect, examPlanGates, [
 
     const exams = await Exam.find(filter)
       .populate('supervisor', 'name')
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
+
+    // Enrich with real-time computed status
+    for (const exam of exams) {
+      exam.status = computeExamStatus(exam);
+    }
 
     res.json({
       success: true,
@@ -546,7 +590,11 @@ router.get('/:id', protect, examPlanGates, async(req, res) => {
       return res.status(404).json({ success: false, message: 'Exam not found' });
     }
 
-    res.json({ success: true, data: exam });
+    // Enrich with real-time computed status
+    const examObj = exam.toObject();
+    examObj.status = computeExamStatus(examObj);
+
+    res.json({ success: true, data: examObj });
   } catch (error) {
     console.error('Get exam error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -776,3 +824,4 @@ router.put('/:id/results/publish', protect, examPlanGates, authorize('admin', 't
 });
 
 module.exports = router;
+module.exports.computeExamStatus = computeExamStatus;

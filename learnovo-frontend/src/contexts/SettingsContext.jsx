@@ -91,19 +91,21 @@ export function SettingsProvider({ children }) {
   }
 
   const formatCurrency = (amount, currency = null) => {
-    if (!state.settings) return `₹${amount}`
-    
-    const currencySettings = state.settings.currency
-    const currencyCode = currency || currencySettings.default
-    const symbol = currencySettings.symbol
-    const position = currencySettings.position
-    
+    const num = Math.round(Number(amount) || 0)
+    const currencySettings = state.settings?.currency
+    if (!currencySettings) {
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num)
+    }
+
+    const symbol = currencySettings.symbol || '₹'
+    const position = currencySettings.position || 'before'
+
     const formattedAmount = new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: currencySettings.decimalPlaces,
-      maximumFractionDigits: currencySettings.decimalPlaces
-    }).format(amount)
-    
-    return position === 'before' 
+      minimumFractionDigits: currencySettings.decimalPlaces || 0,
+      maximumFractionDigits: currencySettings.decimalPlaces || 0
+    }).format(num)
+
+    return position === 'before'
       ? `${symbol}${formattedAmount}`
       : `${formattedAmount} ${symbol}`
   }

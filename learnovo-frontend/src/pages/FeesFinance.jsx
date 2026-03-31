@@ -497,7 +497,7 @@ const FeeStructureTab = ({ feeStructures, classes, onCreateNew, onEdit, onDelete
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       const cn = (typeof s.classId === 'object' ? s.classId?.name : '').toLowerCase()
-      const heads = (s.feeHeads || []).map(h => h.name.toLowerCase()).join(' ')
+      const heads = (s.feeHeads || []).map(h => (h.name || '').toLowerCase()).join(' ')
       return cn.includes(q) || heads.includes(q)
     }
     return true
@@ -892,7 +892,7 @@ const DisputesTab = ({ data, loading, resolvingDispute, resolveForm, onSetResolv
           <div className="flex items-center gap-2"><AlertCircle className="h-5 w-5 text-red-500" /><h3 className="font-semibold text-gray-900 dark:text-white">Active Disputes</h3>{data.disputes?.length > 0 && <span className="px-2 py-0.5 text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">{data.disputes.length}</span>}</div>
           <button onClick={onRefresh} className="text-sm text-primary-600 dark:text-primary-400 font-medium">Refresh</button>
         </div>
-        {data.disputes?.length === 0 ? (
+        {!data.disputes?.length ? (
           <div className="text-center py-16"><div className="h-12 w-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3"><Check className="h-6 w-6 text-green-600 dark:text-green-400" /></div><p className="text-gray-600 dark:text-[#8E8E93] font-medium">No active disputes</p></div>
         ) : (
           <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
