@@ -45,14 +45,14 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
         const examDate = s.date ? new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
         const detail = [s.examName, examDate].filter(Boolean).join(' \u00B7 ');
         return `
-      <tr style="background:${i % 2 === 0 ? '#fff' : 'rgba(249,250,251,0.5)'};-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important">
+      <tr style="background:${i % 2 === 0 ? '#fff' : '#F3F4F6'};-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important">
         <td class="subj">${s.subject}<span class="exam-detail">${detail}</span></td>
         <td class="num">${s.totalMarks}</td>
         <td class="num" style="font-weight:600">${s.marksObtained}</td>
         <td class="num">${s.percentage}%</td>
         <td class="ctr"><span class="grade-display"><span class="grade-dot" style="background:${dotColor}"></span> ${s.grade}</span></td>
-        <td class="ctr"><span style="color:${s.isPassed ? '#059669' : '#DC2626'};font-weight:500;font-size:12px">${s.isPassed ? 'Pass' : 'Fail'}</span></td>
-        <td style="font-size:11px;color:#9CA3AF">${s.remarks || '\u2014'}</td>
+        <td class="ctr"><span style="color:${s.isPassed ? '#059669' : '#DC2626'};font-weight:700;font-size:13px">${s.isPassed ? 'Pass' : 'Fail'}</span></td>
+        <td style="font-size:12px;color:#374151">${s.remarks || '\u2014'}</td>
       </tr>`;
     }).join('');
 
@@ -73,7 +73,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  @page{size:A4;margin:20mm}
+  @page{size:A4;margin:0}
   body{font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;color:#111827}
   .page{width:210mm;min-height:297mm;padding:20mm;margin:0 auto}
   /* Header */
@@ -84,57 +84,57 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   .school-logo-fb{width:105px;height:105px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:28px;letter-spacing:-0.02em;flex-shrink:0}
   .school-info{text-align:center}
   .school-name{font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:28px;font-weight:800;color:#1F6F6D;letter-spacing:2px;line-height:1.1;text-transform:uppercase;white-space:nowrap}
-  .school-addr{font-size:13px;color:#4b5563;font-weight:500;margin-top:4px;line-height:1.5}
-  .school-contact{font-size:13px;color:#4b5563;font-weight:500;margin-top:2px}
+  .school-addr{font-size:14px;color:#1f2937;font-weight:500;margin-top:4px;line-height:1.5}
+  .school-contact{font-size:14px;color:#1f2937;font-weight:500;margin-top:2px}
   .aff-row{display:flex;justify-content:center;gap:20px;margin-top:6px;flex-wrap:wrap}
-  .aff-line{font-size:12px;color:#4b5563;font-weight:500;line-height:1.7}
+  .aff-line{font-size:13px;color:#1f2937;font-weight:500;line-height:1.7}
   .aff-line b{font-weight:700;color:#111827}
-  .accent-line{height:1px;background:#e5e7eb;margin:12px 0 16px;border:none}
+  .accent-line{height:1.5px;background:#9ca3af;margin:12px 0 16px;border:none}
   .title-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px}
-  .report-title{font-size:15px;font-weight:600;color:${brandColor};text-transform:uppercase;letter-spacing:0.1em}
-  .report-meta{font-size:12px;color:#9CA3AF;text-align:right;line-height:1.6}
-  .report-meta .exam-type{font-weight:600;color:#6B7280;display:block}
+  .report-title{font-size:16px;font-weight:700;color:${brandColor};text-transform:uppercase;letter-spacing:0.1em}
+  .report-meta{font-size:13px;color:#374151;text-align:right;line-height:1.6}
+  .report-meta .exam-type{font-weight:700;color:#111827;display:block}
   /* Student card */
-  .stu-card{background:#F9FAFB;border-radius:10px;padding:20px 24px;margin-bottom:28px}
+  .stu-card{background:#F3F4F6;border-radius:10px;padding:20px 24px;margin-bottom:28px;border:1px solid #D1D5DB}
   .stu-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 32px}
-  .info-label{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:#9CA3AF;margin-bottom:3px}
-  .info-value{font-size:14px;font-weight:600;color:#111827}
+  .info-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#374151;margin-bottom:3px}
+  .info-value{font-size:15px;font-weight:600;color:#111827}
   /* Section label */
-  .sec-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.14em;color:#9CA3AF;margin-bottom:12px}
+  .sec-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#374151;margin-bottom:12px}
   /* Table */
   table{width:100%;border-collapse:collapse;margin-bottom:28px}
-  thead th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#6B7280;padding:10px 12px;text-align:left;border-bottom:1.5px solid #E5E7EB}
+  thead th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#111827;padding:10px 12px;text-align:left;border-bottom:2px solid #6B7280}
   thead th.num{text-align:right}
   thead th.ctr{text-align:center}
-  tbody td{font-size:12.5px;color:#111827;padding:14px 12px;border-bottom:0.5px solid #F3F4F6;font-weight:400}
+  tbody td{font-size:14px;color:#111827;padding:14px 12px;border-bottom:1px solid #D1D5DB;font-weight:400}
   tbody td.num{text-align:right;font-variant-numeric:tabular-nums}
   tbody td.ctr{text-align:center}
-  tbody td.subj{font-weight:500}
-  .exam-detail{display:block;font-size:10px;color:#9CA3AF;font-weight:400;margin-top:2px}
-  .grade-display{display:inline-flex;align-items:center;gap:6px;font-weight:600}
-  .grade-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
-  tfoot td{font-size:13px;font-weight:600;color:#111827;padding:14px 12px;border-top:1.5px solid ${brandColor};background:${brandColor}0A}
+  tbody td.subj{font-weight:600}
+  .exam-detail{display:block;font-size:11px;color:#374151;font-weight:400;margin-top:2px}
+  .grade-display{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+  .grade-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  tfoot td{font-size:14px;font-weight:700;color:#111827;padding:14px 12px;border-top:2px solid ${brandColor};background:${brandColor}0A}
   tfoot td.num{text-align:right;font-variant-numeric:tabular-nums}
   tfoot td.ctr{text-align:center}
   /* Result banner */
-  .result-banner{border-radius:0 8px 8px 0;padding:18px 24px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;border-left:3px solid ${isPassed ? '#059669' : '#DC2626'};background:${isPassed ? 'rgba(5,150,105,0.04)' : 'rgba(220,38,38,0.04)'}}
+  .result-banner{border-radius:0 8px 8px 0;padding:18px 24px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;border-left:4px solid ${isPassed ? '#059669' : '#DC2626'};background:${isPassed ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.08)'}}
   .result-dot{width:10px;height:10px;border-radius:50%;background:${isPassed ? '#059669' : '#DC2626'}}
-  .result-label{font-size:17px;font-weight:700;letter-spacing:0.04em;color:${isPassed ? '#059669' : '#DC2626'}}
+  .result-label{font-size:18px;font-weight:800;letter-spacing:0.04em;color:${isPassed ? '#059669' : '#DC2626'}}
   .result-status{display:flex;align-items:center;gap:10px}
   .result-details{text-align:right}
-  .result-perf{font-size:12px;color:#6B7280;margin-bottom:2px}
-  .result-stats{font-size:11px;color:#9CA3AF}
+  .result-perf{font-size:13px;color:#1f2937;font-weight:500;margin-bottom:2px}
+  .result-stats{font-size:12px;color:#374151}
   /* Signatures */
   .sigs{display:flex;justify-content:space-between;margin-bottom:32px;padding-top:8px}
   .sig-block{text-align:center;width:140px}
-  .sig-line{width:100%;height:1px;background:#E5E7EB;margin-bottom:8px;margin-top:40px;position:relative}
+  .sig-line{width:100%;height:1.5px;background:#9CA3AF;margin-bottom:8px;margin-top:40px;position:relative}
   .sig-img{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);max-height:40px;max-width:120px;object-fit:contain}
-  .sig-label{font-size:11px;font-weight:600;color:#6B7280}
-  .sig-sub{font-size:9px;color:#9CA3AF;margin-top:2px}
+  .sig-label{font-size:12px;font-weight:700;color:#111827}
+  .sig-sub{font-size:10px;color:#374151;margin-top:2px}
   /* Footer */
-  .footer{text-align:center;padding-top:16px;border-top:0.5px solid #F3F4F6}
-  .footer-text{font-size:9px;color:#9CA3AF;letter-spacing:0.02em;font-style:italic}
-  @media print{body{background:#fff}.page{padding:0}}
+  .footer{text-align:center;padding-top:16px;border-top:1px solid #9CA3AF}
+  .footer-text{font-size:10px;color:#374151;letter-spacing:0.02em;font-style:italic}
+  @media print{body{background:#fff}.page{padding:20mm}}
 </style>
 </head>
 <body>
