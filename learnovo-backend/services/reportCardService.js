@@ -247,14 +247,8 @@ const reportCardService = {
     const session = await AcademicSession.findOne({ _id: sessionId, tenantId });
     if (!session) return null;
 
-    // Get all published results for this student in the date range
-    const resultFilter = {
-      tenantId,
-      student: studentId,
-      isPublished: true
-    };
-
-    const results = await Result.find(resultFilter)
+    // Fetch ALL results for this student (published and unpublished)
+    const allResults = await Result.find({ tenantId, student: studentId })
       .populate({
         path: 'exam',
         select: 'name subject class section date totalMarks passingMarks examSeries examType'
@@ -262,17 +256,43 @@ const reportCardService = {
       .populate('student', 'name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName skippedSubjects')
       .sort({ 'exam.date': 1 });
 
-    if (!results.length) return null;
+    if (!allResults.length) return null;
 
-    // Filter to exams within the session date range
-    let filtered = results.filter(r => {
-      if (!r.exam) return false;
+    // Remove results with missing exam refs
+    const validResults = allResults.filter(r => r.exam);
+    if (!validResults.length) return null;
+
+    // Strategy 1: Published results within session date range (strictest)
+    // Strategy 2: ALL results within session date range (if no published ones)
+    // Strategy 3: Published results regardless of date range (if dates don't match)
+    // Strategy 4: ALL results regardless of date range (most lenient)
+    let filtered = [];
+
+    const inDateRange = (r) => {
       const examDate = new Date(r.exam.date);
       return examDate >= session.startDate && examDate <= session.endDate;
-    });
+    };
+
+    // Try strict first: published + date range
+    filtered = validResults.filter(r => r.isPublished && inDateRange(r));
+
+    // Fallback: all results in date range (results may not be published yet)
+    if (!filtered.length) {
+      filtered = validResults.filter(r => inDateRange(r));
+    }
+
+    // Fallback: published results regardless of date range (session dates may be misconfigured)
+    if (!filtered.length) {
+      filtered = validResults.filter(r => r.isPublished);
+    }
+
+    // Final fallback: all results regardless of date range
+    if (!filtered.length) {
+      filtered = validResults;
+    }
 
     // Exclude skipped subjects
-    const studentDoc = results[0]?.student;
+    const studentDoc = validResults[0]?.student;
     const skippedSubjects = studentDoc?.skippedSubjects || [];
     if (skippedSubjects.length > 0) {
       filtered = filtered.filter(r => !skippedSubjects.includes(r.exam.subject));

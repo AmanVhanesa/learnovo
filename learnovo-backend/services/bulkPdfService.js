@@ -140,7 +140,7 @@ const bulkPdfService = {
             pdfBuffer = await pdfService.generateBlankReportCard(data);
           } else if (type === 'final') {
             const data = await reportCardService.getFinalReportCardData(tenantId, studentId, sessionId);
-            if (!data) throw new Error(`No final data for student ${studentName}`);
+            if (!data) throw new Error(`No exam results found for ${studentName} in any exam`);
             pdfBuffer = await pdfService.generateFinalReportCard(data);
           } else {
             const data = await reportCardService.getReportCardData(tenantId, studentId, { examSeries, className });

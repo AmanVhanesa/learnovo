@@ -237,7 +237,6 @@ function buildBlankSubjectRow(subject) {
         <td class="subject-name">${escapeHtml(subject.subject || subject.name || '')}</td>
         <td class="num">${subject.totalMarks || ''}</td>
         <td class="num" style="font-weight:600; border-bottom: 1px solid #d1d5db; min-width:40px">&nbsp;</td>
-        <td class="num" style="border-bottom: 1px solid #d1d5db">&nbsp;</td>
         <td class="center" style="border-bottom: 1px solid #d1d5db">&nbsp;</td>
         <td class="center" style="border-bottom: 1px solid #d1d5db">&nbsp;</td>
         <td style="border-bottom: 1px solid #d1d5db">&nbsp;</td>
@@ -248,15 +247,21 @@ function buildFinalSubjectRow(subject, examSeriesList) {
   const examCells = examSeriesList.map(series => {
     const data = subject.exams[series];
     if (!data) return '<td class="no-data">\u2014</td>';
-    const gc = getGradeClass(data.grade);
-    return `<td><span class="grade-display"><span class="grade-dot ${gc}"></span> ${escapeHtml(data.grade)}</span></td>`;
+    return `<td>${data.marksObtained}</td>`;
   }).join('\n');
 
   const totalGc = getGradeClass(subject.finalGrade);
+  const isPassed = subject.isPassed;
+  const resultClass = isPassed ? 'pass-text' : 'fail-text';
+  const resultText = isPassed ? 'Pass' : 'Fail';
   return `<tr>
         <td class="subject-cell">${escapeHtml(subject.subject)}</td>
         ${examCells}
-        <td style="font-weight:700"><span class="grade-display"><span class="grade-dot ${totalGc}"></span> ${escapeHtml(subject.finalGrade)}</span></td>
+        <td style="font-weight:700">${subject.totalObtained}</td>
+        <td>${subject.totalMax}</td>
+        <td style="font-weight:600">${subject.averagePercentage}%</td>
+        <td><span class="grade-display"><span class="grade-dot ${totalGc}"></span> ${escapeHtml(subject.finalGrade)}</span></td>
+        <td class="center"><span class="${resultClass}">${resultText}</span></td>
     </tr>`;
 }
 
@@ -264,24 +269,24 @@ function buildFinalReportCardPlaceholders(data) {
   const { school, student, session, examSeries, subjectRows, summary } = data;
   const brandColor = school.brand_color || school.brandColor || '#1E3A5F';
 
-  // Build exam series header columns
-  const examHeaderCells = examSeries.map(s =>
-    `<th class="num" style="width:${Math.floor(40 / examSeries.length)}%">${escapeHtml(s)}</th>`
-  ).join('\n');
+  // Build exam series header columns — show exam name with max marks
+  const examHeaderCells = examSeries.map(s => {
+    // Find the max marks for this exam series from the first subject that has data
+    const sampleRow = subjectRows.find(r => r.exams[s]);
+    const maxMarks = sampleRow?.exams[s]?.totalMarks || '';
+    const label = maxMarks ? `${escapeHtml(s)}<br><span style="font-weight:400;font-size:8px;color:var(--rc-text-muted)">(${maxMarks})</span>` : escapeHtml(s);
+    return `<th class="num">${label}</th>`;
+  }).join('\n');
 
   // Build subject rows
   const subjectRowsHtml = subjectRows.map(row => buildFinalSubjectRow(row, examSeries)).join('\n');
 
-  // Grand total exam cells — show average grade per exam series
+  // Grand total exam cells — show total marks obtained per exam series
   const grandTotalExamCells = examSeries.map(series => {
     const withData = subjectRows.filter(r => r.exams[series]);
     if (!withData.length) return '<td>\u2014</td>';
     const totalObt = withData.reduce((acc, r) => acc + (r.exams[series]?.marksObtained || 0), 0);
-    const totalMax = withData.reduce((acc, r) => acc + (r.exams[series]?.totalMarks || 0), 0);
-    const pct = totalMax > 0 ? Math.round((totalObt / totalMax) * 100) : 0;
-    const grade = pct >= 90 ? 'A+' : pct >= 80 ? 'A' : pct >= 70 ? 'B' : pct >= 60 ? 'C' : pct >= 50 ? 'D' : 'F';
-    const gc = getGradeClass(grade);
-    return `<td style="font-weight:700"><span class="grade-display"><span class="grade-dot ${gc}"></span> ${grade}</span></td>`;
+    return `<td style="font-weight:700">${totalObt}</td>`;
   }).join('\n');
 
   const dob = student.dob
@@ -339,10 +344,9 @@ function buildSubjectRow(subject) {
         <td class="subject-name">${escapeHtml(subject.subject || subject.name || '')}<span class="exam-detail">${escapeHtml(examDetail)}</span></td>
         <td class="num">${subject.totalMarks}</td>
         <td class="num" style="font-weight:600">${subject.marksObtained}</td>
-        <td class="num">${subject.percentage}%</td>
         <td class="center"><span class="grade-display"><span class="grade-dot ${gradeClass}"></span> ${escapeHtml(subject.grade)}</span></td>
         <td class="center"><span class="${resultClass}">${resultText}</span></td>
-        <td style="font-size:9px; color: var(--rc-text-muted)">${escapeHtml(remarks)}</td>
+        <td style="font-size:9px; color: #555555">${escapeHtml(remarks)}</td>
     </tr>`;
 }
 

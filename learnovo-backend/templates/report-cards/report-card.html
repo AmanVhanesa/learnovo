@@ -290,9 +290,11 @@
   .marks-table tbody td.subject-name .exam-detail {
     display: block;
     font-size: 10px;
-    color: var(--rc-text-muted);
+    color: #555555;
     font-weight: 400;
     margin-top: 2px;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Grade dot */
@@ -572,12 +574,11 @@
   <table class="marks-table">
     <thead>
       <tr>
-        <th style="width:28%">Subject</th>
-        <th class="num" style="width:10%">Max</th>
-        <th class="num" style="width:12%">Obtained</th>
-        <th class="num" style="width:10%">%</th>
-        <th class="center" style="width:12%">Grade</th>
-        <th class="center" style="width:10%">Result</th>
+        <th style="width:30%">Subject</th>
+        <th class="num" style="width:12%">Max</th>
+        <th class="num" style="width:14%">Obtained</th>
+        <th class="center" style="width:14%">Grade</th>
+        <th class="center" style="width:12%">Result</th>
         <th style="width:18%">Remarks</th>
       </tr>
     </thead>

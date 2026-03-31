@@ -5,18 +5,23 @@
  */
 
 export function openPrintWindow(html) {
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url, '_blank');
+  // Use document.write instead of blob URL to avoid "about:blank" / "blob:..." in print headers
+  const win = window.open('', '_blank', 'width=900,height=700');
   if (!win) {
+    // Fallback: download as HTML file if popup is blocked
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'print-document.html';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+    return;
   }
-  setTimeout(() => URL.revokeObjectURL(url), 120000);
+  win.document.write(html);
+  win.document.close();
 }
 
 /* ═══════════════════════════════════════════════════════════

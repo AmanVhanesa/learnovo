@@ -49,7 +49,6 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
         <td class="subj">${s.subject}<span class="exam-detail">${detail}</span></td>
         <td class="num">${s.totalMarks}</td>
         <td class="num" style="font-weight:600">${s.marksObtained}</td>
-        <td class="num">${s.percentage}%</td>
         <td class="ctr"><span class="grade-display"><span class="grade-dot" style="background:${dotColor}"></span> ${s.grade}</span></td>
         <td class="ctr"><span style="color:${s.isPassed ? '#059669' : '#DC2626'};font-weight:700;font-size:13px">${s.isPassed ? 'Pass' : 'Fail'}</span></td>
         <td style="font-size:12px;color:#374151">${s.remarks || '\u2014'}</td>
@@ -173,12 +172,11 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   <div class="sec-label">Academic Performance</div>
   <table>
     <thead><tr>
-      <th style="width:28%">Subject</th>
-      <th class="num" style="width:10%">Max</th>
-      <th class="num" style="width:12%">Obtained</th>
-      <th class="num" style="width:10%">%</th>
-      <th class="ctr" style="width:12%">Grade</th>
-      <th class="ctr" style="width:10%">Result</th>
+      <th style="width:30%">Subject</th>
+      <th class="num" style="width:12%">Max</th>
+      <th class="num" style="width:14%">Obtained</th>
+      <th class="ctr" style="width:14%">Grade</th>
+      <th class="ctr" style="width:12%">Result</th>
       <th style="width:18%">Remarks</th>
     </tr></thead>
     <tbody>${subjectRows}</tbody>
@@ -186,9 +184,9 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
       <td>Grand Total</td>
       <td class="num">${summary.grandTotal}</td>
       <td class="num">${summary.grandObtained}</td>
-      <td class="num">${summary.overallPercentage}%</td>
       <td class="ctr"><span class="grade-display"><span class="grade-dot" style="background:${overallDotColor}"></span> ${summary.overallGrade}</span></td>
-      <td class="ctr" colspan="2" style="color:${isPassed ? '#059669' : '#DC2626'};letter-spacing:0.04em">${isPassed ? 'PASS' : 'FAIL'}</td>
+      <td class="ctr" style="color:${isPassed ? '#059669' : '#DC2626'};letter-spacing:0.04em">${isPassed ? 'PASS' : 'FAIL'}</td>
+      <td class="num">${summary.overallPercentage}%</td>
     </tr></tfoot>
   </table>
   <div class="result-banner">
@@ -498,12 +496,11 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                         <thead>
                                             <tr>
                                                 {[
-                                                    { label: 'Subject', cls: 'text-left', w: '28%' },
-                                                    { label: 'Max', cls: 'text-right', w: '10%' },
-                                                    { label: 'Obtained', cls: 'text-right', w: '12%' },
-                                                    { label: '%', cls: 'text-right', w: '10%' },
-                                                    { label: 'Grade', cls: 'text-center', w: '12%' },
-                                                    { label: 'Result', cls: 'text-center', w: '10%' },
+                                                    { label: 'Subject', cls: 'text-left', w: '30%' },
+                                                    { label: 'Max', cls: 'text-right', w: '12%' },
+                                                    { label: 'Obtained', cls: 'text-right', w: '14%' },
+                                                    { label: 'Grade', cls: 'text-center', w: '14%' },
+                                                    { label: 'Result', cls: 'text-center', w: '12%' },
                                                     { label: 'Remarks', cls: 'text-left', w: '18%' },
                                                 ].map(h => (
                                                     <th key={h.label} className={`px-3 py-2.5 text-[10px] font-semibold uppercase text-gray-500 dark:text-[#8E8E93] ${h.cls}`} style={{ letterSpacing: '0.08em', borderBottom: '1.5px solid #E5E7EB', width: h.w }}>{h.label}</th>
@@ -515,13 +512,12 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                                 <tr key={s.examId || i} style={{ background: i % 2 === 1 ? 'rgba(249,250,251,0.5)' : 'transparent' }}>
                                                     <td className="px-3 py-3.5 text-[12.5px] font-medium text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
                                                         {s.subject}
-                                                        <span className="block text-[10px] text-gray-400 dark:text-[#636366] font-normal mt-0.5">
+                                                        <span className="block text-[10px] text-gray-600 dark:text-[#8E8E93] font-normal mt-0.5">
                                                             {[s.examName, s.date ? new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''].filter(Boolean).join(' \u00B7 ')}
                                                         </span>
                                                     </td>
                                                     <td className="px-3 py-3.5 text-[12.5px] text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.totalMarks}</td>
                                                     <td className="px-3 py-3.5 text-[12.5px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.marksObtained}</td>
-                                                    <td className="px-3 py-3.5 text-[12.5px] text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.percentage}%</td>
                                                     <td className="px-3 py-3.5 text-center" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
                                                         <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-900 dark:text-white">
                                                             <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: GRADE_DOT_COLOR(s.grade) }} />
@@ -540,16 +536,16 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                                 <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>Grand Total</td>
                                                 <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.grandTotal}</td>
                                                 <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.grandObtained}</td>
-                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.overallPercentage}%</td>
                                                 <td className="px-3 py-3.5 text-center" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>
                                                     <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-900 dark:text-white">
                                                         <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: GRADE_DOT_COLOR(summary.overallGrade) }} />
                                                         {summary.overallGrade}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-3.5 text-center text-[13px] font-semibold" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A`, color: summary.overallPassed ? '#059669' : '#DC2626', letterSpacing: '0.04em' }} colSpan={2}>
+                                                <td className="px-3 py-3.5 text-center text-[13px] font-semibold" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A`, color: summary.overallPassed ? '#059669' : '#DC2626', letterSpacing: '0.04em' }}>
                                                     {summary.overallPassed ? 'PASS' : 'FAIL'}
                                                 </td>
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.overallPercentage}%</td>
                                             </tr>
                                         </tfoot>
                                     </table>
