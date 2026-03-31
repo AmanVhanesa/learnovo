@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { encrypt, decrypt } = require('../utils/encryption');
 
 const tenantSchema = new mongoose.Schema({
   // Basic school information
@@ -202,6 +203,47 @@ tenantSchema.virtual('fullAddress').get(function() {
     .join(', ');
 });
 
+// ── Payment gateway credential encryption helpers ──
+const SENSITIVE_ICICI_FIELDS = ['merchantId', 'encryptionKey', 'subMerchantId'];
+const SENSITIVE_RAZORPAY_FIELDS = ['keyId', 'keySecret', 'webhookSecret'];
+
+function isAlreadyEncrypted(value) {
+  // Encrypted format is iv:authTag:ciphertext (hex values separated by colons)
+  return typeof value === 'string' && value.split(':').length === 3;
+}
+
+function encryptGatewayCredentials(pg) {
+  if (!pg) return;
+  if (pg.icici) {
+    for (const field of SENSITIVE_ICICI_FIELDS) {
+      if (pg.icici[field] && !isAlreadyEncrypted(pg.icici[field])) {
+        pg.icici[field] = encrypt(pg.icici[field]);
+      }
+    }
+  }
+  if (pg.razorpay) {
+    for (const field of SENSITIVE_RAZORPAY_FIELDS) {
+      if (pg.razorpay[field] && !isAlreadyEncrypted(pg.razorpay[field])) {
+        pg.razorpay[field] = encrypt(pg.razorpay[field]);
+      }
+    }
+  }
+}
+
+function decryptGatewayCredentials(pg) {
+  if (!pg) return;
+  if (pg.icici) {
+    for (const field of SENSITIVE_ICICI_FIELDS) {
+      if (pg.icici[field]) pg.icici[field] = decrypt(pg.icici[field]);
+    }
+  }
+  if (pg.razorpay) {
+    for (const field of SENSITIVE_RAZORPAY_FIELDS) {
+      if (pg.razorpay[field]) pg.razorpay[field] = decrypt(pg.razorpay[field]);
+    }
+  }
+}
+
 // Pre-save middleware
 tenantSchema.pre('save', function(next) {
   this.updatedAt = new Date();
@@ -209,7 +251,25 @@ tenantSchema.pre('save', function(next) {
   if (!this.subdomain && this.schoolCode) {
     this.subdomain = this.schoolCode.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   }
+  // Encrypt payment gateway credentials before persisting
+  if (this.isModified('paymentGateway') && this.paymentGateway) {
+    encryptGatewayCredentials(this.paymentGateway);
+  }
   next();
+});
+
+// Decrypt payment gateway credentials after loading from DB
+function decryptAfterLoad(doc) {
+  if (doc && doc.paymentGateway) {
+    decryptGatewayCredentials(doc.paymentGateway);
+  }
+}
+
+tenantSchema.post('findOne', decryptAfterLoad);
+tenantSchema.post('findOneAndUpdate', decryptAfterLoad);
+tenantSchema.post('save', decryptAfterLoad);
+tenantSchema.post('find', (docs) => {
+  if (Array.isArray(docs)) docs.forEach(decryptAfterLoad);
 });
 
 module.exports = mongoose.model('Tenant', tenantSchema);

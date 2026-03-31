@@ -483,6 +483,7 @@ router.post('/upload-signature', protect, authorize('admin'), upload.single('sig
 // ── Payment Gateway Configuration ─────────────────────────────────
 const Tenant = require('../models/Tenant');
 const { clearCache } = require('../services/payment/GatewayFactory');
+const { encrypt } = require('../utils/encryption');
 
 /**
  * @desc    Get payment gateway config for this tenant
@@ -539,24 +540,24 @@ router.put('/payment-gateway', protect, authorize('admin'), [
     }
 
     if (provider === 'icici_eazypay' && icici) {
-      if (icici.merchantId) update['paymentGateway.icici.merchantId'] = icici.merchantId;
+      if (icici.merchantId) update['paymentGateway.icici.merchantId'] = encrypt(icici.merchantId);
       // Only update encryption key if it's not the masked value
       if (icici.encryptionKey && !icici.encryptionKey.startsWith('****')) {
-        update['paymentGateway.icici.encryptionKey'] = icici.encryptionKey;
+        update['paymentGateway.icici.encryptionKey'] = encrypt(icici.encryptionKey);
       }
-      if (icici.subMerchantId) update['paymentGateway.icici.subMerchantId'] = icici.subMerchantId;
+      if (icici.subMerchantId) update['paymentGateway.icici.subMerchantId'] = encrypt(icici.subMerchantId);
       if (icici.paymode) update['paymentGateway.icici.paymode'] = icici.paymode;
     }
 
     if (provider === 'razorpay' && req.body.razorpay) {
       const rz = req.body.razorpay;
-      if (rz.keyId) update['paymentGateway.razorpay.keyId'] = rz.keyId;
+      if (rz.keyId) update['paymentGateway.razorpay.keyId'] = encrypt(rz.keyId);
       // Only update secrets if not masked
       if (rz.keySecret && !rz.keySecret.startsWith('****')) {
-        update['paymentGateway.razorpay.keySecret'] = rz.keySecret;
+        update['paymentGateway.razorpay.keySecret'] = encrypt(rz.keySecret);
       }
       if (rz.webhookSecret && !rz.webhookSecret.startsWith('****')) {
-        update['paymentGateway.razorpay.webhookSecret'] = rz.webhookSecret;
+        update['paymentGateway.razorpay.webhookSecret'] = encrypt(rz.webhookSecret);
       }
     }
 

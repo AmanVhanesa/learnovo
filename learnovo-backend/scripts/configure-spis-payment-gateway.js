@@ -14,6 +14,7 @@
 require('dotenv').config({ path: './config.env' });
 const mongoose = require('mongoose');
 const Tenant = require('../models/Tenant');
+// encrypt/decrypt handled automatically by Tenant model hooks
 
 async function configure() {
   const [merchantId, encryptionKey, subMerchantId] = process.argv.slice(2);
