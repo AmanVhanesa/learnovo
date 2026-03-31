@@ -157,7 +157,7 @@ const Reports = () => {
   const refetchPromotions = () => queryClient.invalidateQueries({ queryKey: ['reports-promotions'] })
 
   const fees = dashboard?.fees || {}
-  const enroll = dashboard?.enrollmentTrend || { labels: [], data: [] }
+  const enroll = { labels: [], data: [], ...(dashboard?.enrollmentTrend || {}) }
   const maxEnroll = enroll.data.length ? Math.max(...enroll.data, 1) : 1
 
   const dashboardErrorMsg = dashboardError?.response?.data?.message || (dashboardError ? 'Failed to load overview' : null)

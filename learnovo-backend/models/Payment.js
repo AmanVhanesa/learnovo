@@ -137,7 +137,7 @@ const paymentSchema = new mongoose.Schema({
 // --- Field-level encryption for sensitive payment data ---
 
 // Encrypt before saving to DB
-paymentSchema.pre('save', function (next) {
+paymentSchema.pre('save', function(next) {
   if (this.isModified('transactionDetails.upiId') && this.transactionDetails?.upiId) {
     this.transactionDetails.upiId = encrypt(this.transactionDetails.upiId);
   }
@@ -158,11 +158,11 @@ function decryptPaymentFields(doc) {
   }
 }
 
-paymentSchema.post('init', function (doc) {
+paymentSchema.post('init', (doc) => {
   decryptPaymentFields(doc);
 });
 
-paymentSchema.post('save', function (doc) {
+paymentSchema.post('save', (doc) => {
   decryptPaymentFields(doc);
 });
 

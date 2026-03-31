@@ -99,7 +99,7 @@ async function applyPaymentToInvoices(attempt, session, opts = {}) {
       transactionRefId: opts.transactionRefId || null,
       ...(opts.initiatedBy && { initiatedBy: opts.initiatedBy }),
       ...(opts.verifiedByUserId && { verifiedByUserId: opts.verifiedByUserId }),
-      ...(opts.verifiedByName && { verifiedByName: opts.verifiedByName }),
+      ...(opts.verifiedByName && { verifiedByName: opts.verifiedByName })
     });
     await receipt.save({ session });
     receipts.push(receipt);
@@ -871,7 +871,7 @@ router.post('/admin/verify-payment/:attemptId', protect, authorize('admin', 'acc
       transactionRefId: attempt.transactionRefId || null,
       initiatedBy: attempt.triggerSource === 'ADMIN_MANUAL' ? 'admin' : 'student',
       verifiedByUserId: req.user._id,
-      verifiedByName: req.user.name || req.user.fullName || 'Admin',
+      verifiedByName: req.user.name || req.user.fullName || 'Admin'
     });
     const receipt = receipts[0];
 

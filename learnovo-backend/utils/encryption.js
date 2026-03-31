@@ -2,7 +2,7 @@ const crypto = require('crypto');
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16; // 128-bit IV for GCM
-const AUTH_TAG_LENGTH = 16; // 128-bit auth tag
+const _AUTH_TAG_LENGTH = 16; // 128-bit auth tag
 
 function getEncryptionKey() {
   const key = process.env.ENCRYPTION_KEY;

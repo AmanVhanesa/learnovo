@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { body, query: queryValidator } = require('express-validator');
+const { body } = require('express-validator');
 const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
 const FeeStructure = require('../models/FeeStructure');
 const FeeInvoice = require('../models/FeeInvoice');
@@ -11,7 +11,7 @@ const AcademicSession = require('../models/AcademicSession');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { logger } = require('../middleware/errorHandler');
-const { toNumber, roundToRupee, sumMoney, validateAmount, formatRupee } = require('../utils/money');
+const { toNumber, roundToRupee, sumMoney, formatRupee } = require('../utils/money');
 const {
   generateInvoicesForStudent,
   generateInvoicesForBulk,

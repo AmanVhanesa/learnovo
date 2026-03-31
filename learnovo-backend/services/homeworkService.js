@@ -312,7 +312,7 @@ class HomeworkService {
         // Batch: count students per class/section
         const classIds = [...new Set(homework.map(hw => (hw.class?._id || hw.class)?.toString()).filter(Boolean))];
         const classNames = [...new Set(homework.map(hw => hw.class?.grade || hw.class?.name).filter(Boolean))];
-        const sectionIds = [...new Set(homework.map(hw => (hw.section?._id || hw.section)?.toString()).filter(Boolean))];
+        const _sectionIds = [...new Set(homework.map(hw => (hw.section?._id || hw.section)?.toString()).filter(Boolean))];
 
         // Get all student counts grouped by classId+sectionId
         const studentCountPipeline = [

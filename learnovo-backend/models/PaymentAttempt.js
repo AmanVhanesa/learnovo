@@ -96,7 +96,7 @@ const paymentAttemptSchema = new mongoose.Schema({
 // --- Field-level encryption for sensitive payment data ---
 
 // Encrypt on findOneAndUpdate / findByIdAndUpdate (these bypass save hooks)
-paymentAttemptSchema.pre('findOneAndUpdate', function (next) {
+paymentAttemptSchema.pre('findOneAndUpdate', function(next) {
   const update = this.getUpdate();
   if (update.gatewayResponse != null && typeof update.gatewayResponse === 'object' && Object.keys(update.gatewayResponse).length > 0) {
     update.gatewayResponse = encryptObject(update.gatewayResponse);
@@ -108,7 +108,7 @@ paymentAttemptSchema.pre('findOneAndUpdate', function (next) {
 });
 
 // Encrypt before saving to DB
-paymentAttemptSchema.pre('save', function (next) {
+paymentAttemptSchema.pre('save', function(next) {
   // Encrypt gatewayResponse (raw gateway dump — may contain card/UPI info)
   if (this.isModified('gatewayResponse') && this.gatewayResponse != null) {
     if (typeof this.gatewayResponse === 'object' && Object.keys(this.gatewayResponse).length > 0) {
@@ -135,11 +135,11 @@ function decryptAttemptFields(doc) {
   }
 }
 
-paymentAttemptSchema.post('init', function (doc) {
+paymentAttemptSchema.post('init', (doc) => {
   decryptAttemptFields(doc);
 });
 
-paymentAttemptSchema.post('save', function (doc) {
+paymentAttemptSchema.post('save', (doc) => {
   decryptAttemptFields(doc);
 });
 

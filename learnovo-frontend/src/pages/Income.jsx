@@ -297,7 +297,7 @@ const Income = () => {
 
   // Charts data
   const monthlyChartData = {
-    labels: monthlyData.map(d => `${MONTH_NAMES[d._id.month - 1]} ${d._id.year}`),
+    labels: monthlyData.map(d => `${MONTH_NAMES[(d._id?.month || 1) - 1]} ${d._id?.year || ''}`),
     datasets: [{
       label: 'Income',
       data: monthlyData.map(d => d.total),

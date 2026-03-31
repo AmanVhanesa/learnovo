@@ -288,7 +288,7 @@ const Announcements = () => {
                                         <p className={`text-gray-700 dark:text-[#8E8E93] text-sm leading-relaxed whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}>
                                             {announcement.message}
                                         </p>
-                                        {announcement.message.length > 200 && (
+                                        {(announcement.message?.length || 0) > 200 && (
                                             <button
                                                 onClick={() => toggleExpanded(announcement._id)}
                                                 className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
@@ -315,9 +315,9 @@ const Announcements = () => {
                                 <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-[#8E8E93] mt-4 pt-3 border-t border-gray-100 dark:border-[#38383A]">
                                     <div className="flex items-center gap-1.5">
                                         <Users className="h-3.5 w-3.5" />
-                                        {announcement.targetAudience.includes('all')
+                                        {(announcement.targetAudience || []).includes('all')
                                             ? 'Everyone'
-                                            : announcement.targetAudience.map(a => a.charAt(0).toUpperCase() + a.slice(1)).join(', ')
+                                            : (announcement.targetAudience || []).map(a => a.charAt(0).toUpperCase() + a.slice(1)).join(', ')
                                         }
                                     </div>
                                     <div className="flex items-center gap-1.5">
@@ -374,7 +374,7 @@ const Announcements = () => {
                                                 <p className={`text-gray-700 dark:text-[#8E8E93] text-sm leading-relaxed whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}>
                                                     {announcement.message}
                                                 </p>
-                                                {announcement.message.length > 200 && (
+                                                {(announcement.message?.length || 0) > 200 && (
                                                     <button
                                                         onClick={() => toggleExpanded(announcement._id)}
                                                         className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"

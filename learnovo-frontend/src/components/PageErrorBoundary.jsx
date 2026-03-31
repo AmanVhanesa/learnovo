@@ -22,7 +22,10 @@ class PageErrorBoundary extends React.Component {
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null })
+    this.setState({ hasError: false, error: null }, () => {
+      // Force window reload so React Query refetches fresh data
+      window.location.reload()
+    })
   }
 
   render() {
