@@ -8,6 +8,7 @@ import studentsService from '../../services/studentsService';
 import { reportsService } from '../../services/reportsService';
 import { toast } from 'react-hot-toast';
 import CertificatePreviewContent from './CertificatePreviewContent';
+import { openPrintWindow, buildCertificatePrintHTML } from '../../utils/printHelper';
 
 const Loader2 = ({ className }) => <svg className={`w-5 h-5 ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>;
 
@@ -202,6 +203,15 @@ const CertificateGeneration = () => {
             message: `${certLabel} previewed for student ${selectedStudent.fullName || selectedStudent.name}`,
             studentName: selectedStudent.fullName || selectedStudent.name
         });
+    };
+
+    const handlePrintPreview = () => {
+        const html = buildCertificatePrintHTML({
+            type: certType,
+            data: getMergedData(),
+            certificateNumber: 'To be assigned',
+        });
+        openPrintWindow(html);
     };
 
     return (
@@ -538,9 +548,16 @@ const CertificateGeneration = () => {
                         {/* Modal footer with action buttons */}
                         <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-[#1C1C1E] px-5 py-4 rounded-b-2xl">
                             <button
+                                onClick={handlePrintPreview}
+                                className="btn btn-primary gap-2 w-full sm:w-auto text-sm"
+                            >
+                                <Printer className="h-4 w-4" />
+                                Print
+                            </button>
+                            <button
                                 onClick={() => { setShowPreviewModal(false); handleGenerate(); }}
                                 disabled={generating}
-                                className="btn btn-primary gap-2 w-full sm:w-auto text-sm"
+                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
                             >
                                 <Download className="h-4 w-4" />
                                 Export as PDF

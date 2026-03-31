@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award, Eye, X } from 'lucide-react';
+import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award, Eye, X, Printer } from 'lucide-react';
 import certificateService from '../../services/certificateService';
 import { formatDate } from '../../utils/formatDate';
 import { reportsService } from '../../services/reportsService';
@@ -10,6 +10,7 @@ import { toast } from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
 import CertificatePreviewContent from './CertificatePreviewContent';
+import { openPrintWindow, buildCertificatePrintHTML } from '../../utils/printHelper';
 
 const CertificateManager = () => {
     const navigate = useNavigate();
@@ -96,6 +97,15 @@ const CertificateManager = () => {
         });
     };
 
+    const handlePrint = (cert) => {
+        const html = buildCertificatePrintHTML({
+            type: cert.type,
+            data: cert.contentSnapshot,
+            certificateNumber: cert.certificateNumber,
+        });
+        openPrintWindow(html);
+    };
+
     const filteredHistory = history.filter(cert =>
         cert.student?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cert.certificateNumber?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -127,6 +137,7 @@ const CertificateManager = () => {
                                 <td className="px-5 py-3.5 text-right">
                                     <div className="flex items-center justify-end gap-1">
                                         <button onClick={() => handlePreviewCert(cert)} className="btn-icon" title="Preview"><Eye className="h-4 w-4" /></button>
+                                        <button onClick={() => handlePrint(cert)} className="btn-icon" title="Print"><Printer className="h-4 w-4" /></button>
                                         <button onClick={() => handleDownload(cert)} className="btn-icon" title="Download"><Download className="h-4 w-4" /></button>
                                         <button onClick={() => openEditModal(cert)} className="btn-icon" title="Edit"><Edit className="h-4 w-4" /></button>
                                         <button onClick={() => handleDelete(cert._id)} className="btn-icon hover:!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/20" title="Delete"><Trash2 className="h-4 w-4" /></button>
@@ -320,8 +331,15 @@ const CertificateManager = () => {
                         {/* Modal footer */}
                         <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-[#1C1C1E] px-5 py-4 rounded-b-2xl">
                             <button
-                                onClick={() => { setPreviewCert(null); handleDownload(previewCert); }}
+                                onClick={() => { handlePrint(previewCert); }}
                                 className="btn btn-primary gap-2 w-full sm:w-auto text-sm"
+                            >
+                                <Printer className="h-4 w-4" />
+                                Print
+                            </button>
+                            <button
+                                onClick={() => { setPreviewCert(null); handleDownload(previewCert); }}
+                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
                             >
                                 <Download className="h-4 w-4" />
                                 Export as PDF

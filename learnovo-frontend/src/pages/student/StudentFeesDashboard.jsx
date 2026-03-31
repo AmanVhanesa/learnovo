@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee, Filter, ChevronDown, ArrowUpDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee, Filter, ChevronDown, ArrowUpDown, RotateCcw, SlidersHorizontal, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { studentFeesService } from '../../services/studentFeesService';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { buildReceiptHtml, downloadReceiptAsPdf } from '../../utils/receiptHelpers';
+import { openPrintWindow } from '../../utils/printHelper';
 import { useSettings } from '../../contexts/SettingsContext';
 
 // Format date
@@ -370,6 +371,21 @@ const StudentFeesDashboard = () => {
             toast.success('Receipt downloaded', { id: 'receipt' });
         } catch (e) {
             toast.error('Receipt unavailable', { id: 'receipt' });
+        }
+    }
+
+    const handlePrintReceipt = async (attempt) => {
+        try {
+            toast.loading('Preparing receipt...', { id: 'receipt-print' });
+            const res = await studentFeesService.getReceipt(attempt._id);
+            const payment = res.data?.data || res.data;
+            if (!payment) { toast.error('Receipt data not available', { id: 'receipt-print' }); return; }
+            const school = schoolSettings || {};
+            toast.dismiss('receipt-print');
+            const html = buildReceiptHtml(payment, school);
+            openPrintWindow(html);
+        } catch (e) {
+            toast.error('Receipt unavailable', { id: 'receipt-print' });
         }
     }
 
@@ -820,10 +836,16 @@ const StudentFeesDashboard = () => {
                                                         </div>
                                                     )}
                                                     {['SUCCESS', 'VERIFIED'].includes(attempt.status) && (
-                                                        <button onClick={() => handleDownloadReceipt(attempt)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg transition-colors" title="Download Receipt">
-                                                            <Download className="h-3.5 w-3.5" />
-                                                            Receipt
-                                                        </button>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <button onClick={() => handlePrintReceipt(attempt)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-lg transition-colors" title="Print Receipt">
+                                                                <Printer className="h-3.5 w-3.5" />
+                                                                Print
+                                                            </button>
+                                                            <button onClick={() => handleDownloadReceipt(attempt)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg transition-colors" title="Download Receipt">
+                                                                <Download className="h-3.5 w-3.5" />
+                                                                PDF
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </td>
                                             </tr>
@@ -872,11 +894,18 @@ const StudentFeesDashboard = () => {
                                                     {formatCurrency(receipt.amount || receipt.paymentAttemptId?.amount || 0)}
                                                 </span>
                                                 <button
+                                                    onClick={() => handlePrintReceipt({ _id: receipt.paymentAttemptId?._id || receipt._id })}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-lg transition-colors"
+                                                >
+                                                    <Printer className="h-3.5 w-3.5" />
+                                                    Print
+                                                </button>
+                                                <button
                                                     onClick={() => handleDownloadReceipt({ _id: receipt.paymentAttemptId?._id || receipt._id })}
                                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg transition-colors"
                                                 >
                                                     <Download className="h-3.5 w-3.5" />
-                                                    Download
+                                                    PDF
                                                 </button>
                                             </div>
                                         </div>

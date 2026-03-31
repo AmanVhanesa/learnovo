@@ -160,51 +160,51 @@ function buildReceiptBlock(payment, school, logoSrc, signatureSrc) {
 }
 
 const RECEIPT_STYLES = `
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'DM Sans', system-ui, -apple-system, sans-serif; padding: 0; margin: 0; color: #334155; -webkit-print-color-adjust: exact; print-color-adjust: exact; -webkit-font-smoothing: antialiased; }
-    .header { display: flex; align-items: center; gap: 14px; padding: 14px 24px 12px; border-bottom: 1.5px solid #e5e7eb; }
-    .logo-box { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #eff6ff, #dbeafe); border-radius: 12px; flex-shrink: 0; overflow: hidden; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { font-family: 'DM Sans', system-ui, -apple-system, sans-serif; padding: 0; margin: 0; color: #111827; -webkit-font-smoothing: antialiased; }
+    .header { display: flex; align-items: center; gap: 14px; padding: 16px 24px 14px; border-bottom: 2px solid #9ca3af; }
+    .logo-box { width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #eff6ff, #dbeafe); border-radius: 12px; flex-shrink: 0; overflow: hidden; }
     .logo-box img { width: 100%; height: 100%; object-fit: contain; }
-    .logo-initials { font-size: 20px; font-weight: 700; color: #2563eb; letter-spacing: 1px; }
+    .logo-initials { font-size: 22px; font-weight: 700; color: #2563eb; letter-spacing: 1px; }
     .school-info { flex: 1; min-width: 0; }
-    .school-name { font-size: 15px; font-weight: 700; color: #0f172a; text-transform: uppercase; margin-bottom: 2px; letter-spacing: .3px; line-height: 1.2; }
-    .school-address { font-size: 7.5px; color: #475569; line-height: 1.5; font-weight: 500; margin-bottom: 1px; }
-    .school-contact { font-size: 7px; color: #6b7280; line-height: 1.5; font-weight: 500; }
-    .school-codes { display: inline-flex; gap: 8px; margin-top: 2px; }
-    .school-code-tag { font-size: 6.5px; font-weight: 600; color: #3b82f6; background: #eff6ff; padding: 1.5px 6px; border-radius: 3px; letter-spacing: .3px; }
-    .receipt-badge { display: flex; justify-content: space-between; align-items: center; margin: 8px 24px 0; background: linear-gradient(90deg, #eff6ff, #f8fafc); padding: 6px 14px; border-radius: 6px; border-left: 3px solid #2563eb; }
-    .badge-title { font-size: 9.5px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: .8px; }
-    .badge-number { font-size: 8.5px; font-weight: 600; color: #475569; font-family: 'DM Sans', monospace; }
-    .grid-wrapper { padding: 8px 24px 4px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 28px; }
-    .col-title { font-size: 7px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .7px; padding-bottom: 2px; margin-bottom: 3px; border-bottom: 1px solid #e5e7eb; }
-    .row { display: flex; margin-bottom: 2px; }
-    .lbl { width: 65px; min-width: 65px; font-size: 7.5px; font-weight: 500; color: #6b7280; }
-    .val { flex: 1; font-size: 8.5px; font-weight: 600; color: #111827; }
-    .val.accent { color: #2563eb; }
-    .val.status { color: #059669; font-weight: 700; }
+    .school-name { font-size: 17px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin-bottom: 2px; letter-spacing: .3px; line-height: 1.2; }
+    .school-address { font-size: 9px; color: #1f2937; line-height: 1.5; font-weight: 500; margin-bottom: 1px; }
+    .school-contact { font-size: 8.5px; color: #374151; line-height: 1.5; font-weight: 500; }
+    .school-codes { display: inline-flex; gap: 8px; margin-top: 3px; }
+    .school-code-tag { font-size: 8px; font-weight: 700; color: #1d4ed8; background: #eff6ff; padding: 2px 7px; border-radius: 3px; letter-spacing: .3px; }
+    .receipt-badge { display: flex; justify-content: space-between; align-items: center; margin: 10px 24px 0; background: linear-gradient(90deg, #eff6ff, #f8fafc); padding: 8px 16px; border-radius: 6px; border-left: 4px solid #2563eb; }
+    .badge-title { font-size: 11px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: .8px; }
+    .badge-number { font-size: 10px; font-weight: 700; color: #111827; font-family: 'DM Sans', monospace; }
+    .grid-wrapper { padding: 10px 24px 6px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 28px; }
+    .col-title { font-size: 8.5px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: .7px; padding-bottom: 3px; margin-bottom: 4px; border-bottom: 1.5px solid #9ca3af; }
+    .row { display: flex; margin-bottom: 3px; }
+    .lbl { width: 70px; min-width: 70px; font-size: 9px; font-weight: 600; color: #374151; }
+    .val { flex: 1; font-size: 10px; font-weight: 700; color: #111827; }
+    .val.accent { color: #1d4ed8; }
+    .val.status { color: #047857; font-weight: 800; }
     .table-wrapper { padding: 0 24px; }
-    .fee-tbl { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-    .fee-tbl thead th { font-size: 6.5px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; padding: 4px 0; text-align: left; border-bottom: 1.5px solid #e5e7eb; }
+    .fee-tbl { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    .fee-tbl thead th { font-size: 8px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: .5px; padding: 5px 0; text-align: left; border-bottom: 2px solid #6b7280; }
     .fee-tbl thead th:last-child { text-align: right; }
-    .fee-tbl tbody td { font-size: 8.5px; font-weight: 500; color: #374151; padding: 3px 0; border-bottom: 1px solid #f3f4f6; }
-    .fee-tbl tbody td:last-child { text-align: right; font-weight: 600; color: #111827; font-variant-numeric: tabular-nums; }
+    .fee-tbl tbody td { font-size: 10px; font-weight: 500; color: #111827; padding: 4px 0; border-bottom: 1px solid #d1d5db; }
+    .fee-tbl tbody td:last-child { text-align: right; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
     .amount-wrapper { padding: 0 24px; }
-    .amount-box { background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 1.5px solid #93c5fd; border-radius: 8px; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .amt-label { font-size: 8px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: .5px; }
-    .amt-value { font-size: 22px; font-weight: 700; color: #1e40af; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
-    .amt-value .rs { font-size: 14px; font-weight: 600; margin-right: 2px; }
+    .amount-box { background: linear-gradient(135deg, #eff6ff, #dbeafe); border: 2px solid #60a5fa; border-radius: 8px; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .amt-label { font-size: 10px; font-weight: 700; color: #1d4ed8; text-transform: uppercase; letter-spacing: .5px; }
+    .amt-value { font-size: 24px; font-weight: 800; color: #1e3a8a; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+    .amt-value .rs { font-size: 16px; font-weight: 700; margin-right: 2px; }
     .sigs-wrapper { padding: 0 24px; }
-    .sigs { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px; padding: 0 6px; }
+    .sigs { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 8px; padding: 0 6px; }
     .sig-block { text-align: center; display: flex; flex-direction: column; align-items: center; }
-    .sig-empty { width: 110px; height: 34px; }
-    .sig-img { width: 110px; height: 34px; display: flex; align-items: flex-end; justify-content: center; }
+    .sig-empty { width: 110px; height: 36px; }
+    .sig-img { width: 110px; height: 36px; display: flex; align-items: flex-end; justify-content: center; }
     .sig-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
-    .sig-line { width: 110px; border-top: 1px solid #d1d5db; }
-    .sig-text { font-size: 7px; font-weight: 500; color: #6b7280; margin-top: 2px; }
-    .footer { margin-top: 8px; text-align: center; font-size: 6.5px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding: 5px 24px 4px; font-weight: 500; }
-    .footer .brand { color: #2563eb; font-weight: 600; }
-    .footer .generated-on { margin-top: 2px; font-size: 6.5px; color: #9ca3af; font-weight: 500; }
+    .sig-line { width: 110px; border-top: 1.5px solid #374151; }
+    .sig-text { font-size: 8.5px; font-weight: 700; color: #111827; margin-top: 3px; }
+    .footer { margin-top: 10px; text-align: center; font-size: 8px; color: #374151; border-top: 1.5px solid #9ca3af; padding: 6px 24px 5px; font-weight: 500; }
+    .footer .brand { color: #1d4ed8; font-weight: 700; }
+    .footer .generated-on { margin-top: 2px; font-size: 7.5px; color: #374151; font-weight: 500; }
 `
 
 export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
@@ -233,12 +233,12 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
       .print-page { width: 210mm; min-height: 297mm; padding: 8mm 14mm; margin: 0 auto; }
       .container { width: 100%; }
     }
-    .toolbar { position: fixed; top: 0; left: 0; right: 0; background: #fff; color: #1f2937; padding: 10px 24px; display: flex; gap: 10px; align-items: center; z-index: 999; box-shadow: 0 1px 3px rgba(0,0,0,.08); border-bottom: 1px solid #e5e7eb; font-family: 'DM Sans', sans-serif; }
+    .toolbar { position: fixed; top: 0; left: 0; right: 0; background: #1C1C1E; color: #fff; padding: 10px 24px; display: flex; gap: 10px; align-items: center; z-index: 999; font-family: 'DM Sans', sans-serif; }
     .toolbar-title { flex: 1; font-size: 13px; font-weight: 500; }
-    .btn { padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif; transition: opacity .15s; }
+    .btn { padding: 7px 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; font-family: 'DM Sans', sans-serif; transition: opacity .15s; }
     .btn:hover { opacity: .85; }
     .btn-print { background: #3b82f6; color: white; }
-    .btn-close { background: #f3f4f6; color: #6b7280; }
+    .btn-close { background: #38383A; color: #8E8E93; }
     .page-body { padding-top: 54px; }
   </style>
 </head>
