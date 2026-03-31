@@ -4,7 +4,7 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 class PageErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null }
+    this.state = { hasError: false, error: null, retryKey: 0 }
   }
 
   static getDerivedStateFromError(error) {
@@ -22,10 +22,13 @@ class PageErrorBoundary extends React.Component {
   }
 
   handleRetry = () => {
-    this.setState({ hasError: false, error: null }, () => {
-      // Force window reload so React Query refetches fresh data
-      window.location.reload()
-    })
+    // Increment retryKey to force React to unmount and remount children,
+    // which gives React Query a clean slate to refetch
+    this.setState(prev => ({
+      hasError: false,
+      error: null,
+      retryKey: prev.retryKey + 1
+    }))
   }
 
   render() {
@@ -64,7 +67,7 @@ class PageErrorBoundary extends React.Component {
       )
     }
 
-    return this.props.children
+    return <React.Fragment key={this.state.retryKey}>{this.props.children}</React.Fragment>
   }
 }
 

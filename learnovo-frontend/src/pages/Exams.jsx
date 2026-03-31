@@ -165,6 +165,8 @@ const Exams = () => {
             const res = await examsService.list();
             return res.data || [];
         },
+        retry: 2,
+        staleTime: 2 * 60 * 1000,
     });
 
     const { data: availableClasses = [] } = useQuery({

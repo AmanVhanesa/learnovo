@@ -25,35 +25,38 @@ const examPlanGates = [planGate.requireActiveSubscription, planGate.checkGradesA
 async function resolveTeacherClassNames(teacherId, tenantId) {
   const classNames = new Set();
   try {
-    // 1. Class model: classTeacher or subjects[].teacher
-    const directClasses = await Class.find({
-      tenantId,
-      $or: [{ classTeacher: teacherId }, { 'subjects.teacher': teacherId }]
-    }).select('grade').lean();
+    const Section = require('../models/Section');
+    const TSA = require('../models/TeacherSubjectAssignment');
+
+    // Run all lookups in parallel instead of sequentially
+    const [directClasses, sectionDocs, tsaDocs, teacher] = await Promise.all([
+      // 1. Class model: classTeacher or subjects[].teacher
+      Class.find({
+        tenantId,
+        $or: [{ classTeacher: teacherId }, { 'subjects.teacher': teacherId }]
+      }).select('grade').lean(),
+      // 2. Section model: sectionTeacher
+      Section.find({
+        tenantId, sectionTeacher: teacherId, isActive: true
+      }).select('classId').lean(),
+      // 3. TeacherSubjectAssignment
+      TSA.find({ teacherId, tenantId, isActive: true }).select('classId').lean(),
+      // 4. Legacy User.assignedClasses
+      User.findById(teacherId).select('assignedClasses').lean()
+    ]);
+
     directClasses.forEach(c => c.grade && classNames.add(c.grade));
 
-    // 2. Section model: sectionTeacher
-    const Section = require('../models/Section');
-    const sectionDocs = await Section.find({
-      tenantId, sectionTeacher: teacherId, isActive: true
-    }).select('classId').lean();
-    if (sectionDocs.length > 0) {
-      const ids = [...new Set(sectionDocs.map(s => s.classId?.toString()).filter(Boolean))];
-      const cls = await Class.find({ _id: { $in: ids }, tenantId }).select('grade').lean();
+    // Collect all classIds from sections and TSA, then resolve in one query
+    const classIdsFromSections = sectionDocs.map(s => s.classId?.toString()).filter(Boolean);
+    const classIdsFromTSA = tsaDocs.map(a => a.classId?.toString()).filter(Boolean);
+    const allClassIds = [...new Set([...classIdsFromSections, ...classIdsFromTSA])];
+
+    if (allClassIds.length > 0) {
+      const cls = await Class.find({ _id: { $in: allClassIds }, tenantId }).select('grade').lean();
       cls.forEach(c => c.grade && classNames.add(c.grade));
     }
 
-    // 3. TeacherSubjectAssignment
-    const TSA = require('../models/TeacherSubjectAssignment');
-    const tsaDocs = await TSA.find({ teacherId, tenantId, isActive: true }).select('classId').lean();
-    if (tsaDocs.length > 0) {
-      const ids = [...new Set(tsaDocs.map(a => a.classId?.toString()).filter(Boolean))];
-      const cls = await Class.find({ _id: { $in: ids }, tenantId }).select('grade').lean();
-      cls.forEach(c => c.grade && classNames.add(c.grade));
-    }
-
-    // 4. Legacy User.assignedClasses
-    const teacher = await User.findById(teacherId).select('assignedClasses').lean();
     if (teacher && Array.isArray(teacher.assignedClasses)) {
       teacher.assignedClasses.forEach(c => c && classNames.add(c));
     }

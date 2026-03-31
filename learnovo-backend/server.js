@@ -206,9 +206,9 @@ if (process.env.NODE_ENV !== 'production') {
 // ── Request timeout middleware ───────────────────────────────────────
 app.use((req, res, next) => {
   // Long-running routes get a generous timeout (3 min)
-  const longRunningPaths = ['/api/invoices/generate-bulk', '/api/invoices/bulk'];
-  const isLongRunning = longRunningPaths.some(p => req.path === p || req.originalUrl === p);
-  const timeout = isLongRunning ? 180000 : 15000;
+  const longRunningPaths = ['/api/invoices/generate-bulk', '/api/invoices/bulk', '/api/report-cards/bulk-download'];
+  const isLongRunning = longRunningPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p));
+  const timeout = isLongRunning ? 180000 : 30000;
 
   req.setTimeout(timeout, () => {
     if (!res.headersSent) {

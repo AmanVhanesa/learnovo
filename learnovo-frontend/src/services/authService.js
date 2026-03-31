@@ -13,6 +13,7 @@ const _currentSubdomain = getSubdomain()
 // Create axios instance
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 30000,
 })
 
 // Add token, Content-Type, and tenant subdomain header to every request
