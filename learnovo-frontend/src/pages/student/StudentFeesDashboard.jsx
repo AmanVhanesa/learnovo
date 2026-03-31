@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee, Filter, ChevronDown, ArrowUpDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { studentFeesService } from '../../services/studentFeesService';
 import { formatCurrency } from '../../utils/formatCurrency';
@@ -38,6 +39,33 @@ const StudentFeesDashboard = () => {
 
     // Multi-invoice selection for combined payment
     const [selectedInvoiceIds, setSelectedInvoiceIds] = useState([]);
+
+    // Filter & sort state synced with URL search params
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [filterQuarter, setFilterQuarter] = useState(searchParams.get('quarter') || 'all');
+    const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || 'all');
+    const [filterYear, setFilterYear] = useState(searchParams.get('year') || 'all');
+    const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'due_asc');
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+    // Sync filters to URL
+    useEffect(() => {
+        const params = {};
+        if (filterQuarter !== 'all') params.quarter = filterQuarter;
+        if (filterStatus !== 'all') params.status = filterStatus;
+        if (filterYear !== 'all') params.year = filterYear;
+        if (sortBy !== 'due_asc') params.sort = sortBy;
+        setSearchParams(params, { replace: true });
+    }, [filterQuarter, filterStatus, filterYear, sortBy, setSearchParams]);
+
+    const hasActiveFilters = filterQuarter !== 'all' || filterStatus !== 'all' || filterYear !== 'all';
+
+    const clearFilters = useCallback(() => {
+        setFilterQuarter('all');
+        setFilterStatus('all');
+        setFilterYear('all');
+        setSortBy('due_asc');
+    }, []);
 
     // Check if online payment gateway is enabled for this tenant (per-tenant, not global flag)
     const { data: gatewayStatus } = useQuery({
@@ -347,6 +375,72 @@ const StudentFeesDashboard = () => {
 
     const totalOutstanding = invoices.reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0);
 
+    // Derive available years from invoices
+    const availableYears = useMemo(() => {
+        const years = new Set();
+        invoices.forEach(inv => {
+            if (inv.billingPeriod?.year) years.add(inv.billingPeriod.year);
+            else if (inv.dueDate) years.add(new Date(inv.dueDate).getFullYear());
+        });
+        return [...years].sort();
+    }, [invoices]);
+
+    // Status counts for quick filter chips
+    const statusCounts = useMemo(() => {
+        const counts = { Pending: 0, Overdue: 0, Paid: 0, Partial: 0 };
+        invoices.forEach(inv => { if (counts[inv.status] !== undefined) counts[inv.status]++; });
+        return counts;
+    }, [invoices]);
+
+    // Filtered & sorted invoices
+    const filteredInvoices = useMemo(() => {
+        let result = [...invoices];
+
+        // Quarter filter
+        if (filterQuarter !== 'all') {
+            const qNum = parseInt(filterQuarter);
+            result = result.filter(inv => inv.billingPeriod?.quarter === qNum);
+        }
+
+        // Status filter
+        if (filterStatus !== 'all') {
+            result = result.filter(inv => inv.status === filterStatus);
+        }
+
+        // Year filter
+        if (filterYear !== 'all') {
+            const yr = parseInt(filterYear);
+            result = result.filter(inv => {
+                if (inv.billingPeriod?.year) return inv.billingPeriod.year === yr;
+                if (inv.dueDate) return new Date(inv.dueDate).getFullYear() === yr;
+                return false;
+            });
+        }
+
+        // Sort
+        result.sort((a, b) => {
+            switch (sortBy) {
+                case 'due_desc':
+                    return new Date(b.dueDate) - new Date(a.dueDate);
+                case 'amount_asc':
+                    return (a.totalAmount || 0) - (b.totalAmount || 0);
+                case 'amount_desc':
+                    return (b.totalAmount || 0) - (a.totalAmount || 0);
+                case 'due_asc':
+                default:
+                    return new Date(a.dueDate) - new Date(b.dueDate);
+            }
+        });
+
+        return result;
+    }, [invoices, filterQuarter, filterStatus, filterYear, sortBy]);
+
+    // Payable invoices from the FILTERED set (for "select all unpaid")
+    const filteredPayable = useMemo(() =>
+        filteredInvoices.filter(inv => inv.balanceAmount > 0 && inv.status !== 'Paid'),
+        [filteredInvoices]
+    );
+
     return (
         <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-gray-900 dark:text-white border-b border-gray-200 dark:border-[#38383A] pb-4">
@@ -395,23 +489,156 @@ const StudentFeesDashboard = () => {
                     {/* INVOICES TAB */}
                     {activeTab === 'invoices' && (
                         <div className="space-y-4 sm:space-y-6 animate-fade-in text-gray-900 dark:text-white">
+
+                            {/* Quick Filter Chips */}
+                            {invoices.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { key: 'Pending', label: 'Pending', color: 'yellow' },
+                                        { key: 'Overdue', label: 'Overdue', color: 'red' },
+                                        { key: 'Paid', label: 'Paid', color: 'green' },
+                                        { key: 'Partial', label: 'Partially Paid', color: 'blue' },
+                                    ].filter(c => statusCounts[c.key] > 0).map(chip => {
+                                        const isActive = filterStatus === chip.key;
+                                        const colorMap = {
+                                            yellow: isActive ? 'bg-yellow-500 text-white border-yellow-500' : 'bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-500/20',
+                                            red: isActive ? 'bg-red-500 text-white border-red-500' : 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-500/20',
+                                            green: isActive ? 'bg-green-500 text-white border-green-500' : 'bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-500/20',
+                                            blue: isActive ? 'bg-blue-500 text-white border-blue-500' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-500/20',
+                                        };
+                                        return (
+                                            <button
+                                                key={chip.key}
+                                                onClick={() => setFilterStatus(isActive ? 'all' : chip.key)}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${colorMap[chip.color]}`}
+                                            >
+                                                {chip.label}
+                                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${isActive ? 'bg-white/25' : 'bg-black/5 dark:bg-white/10'}`}>
+                                                    {statusCounts[chip.key]}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* Filter & Sort Bar */}
+                            {invoices.length > 0 && (
+                                <div className="bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-200 dark:border-[#38383A] overflow-hidden">
+                                    {/* Mobile toggle */}
+                                    <button
+                                        onClick={() => setShowMobileFilters(!showMobileFilters)}
+                                        className="w-full sm:hidden flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <SlidersHorizontal className="h-4 w-4" />
+                                            Filters & Sort
+                                            {hasActiveFilters && (
+                                                <span className="w-2 h-2 rounded-full bg-primary-500"></span>
+                                            )}
+                                        </span>
+                                        <ChevronDown className={`h-4 w-4 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {/* Filter controls — always visible on desktop, toggleable on mobile */}
+                                    <div className={`${showMobileFilters ? 'block' : 'hidden'} sm:block`}>
+                                        <div className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3 flex-wrap">
+                                            {/* Quarter */}
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <label className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">Quarter</label>
+                                                <select
+                                                    value={filterQuarter}
+                                                    onChange={(e) => setFilterQuarter(e.target.value)}
+                                                    className="flex-1 sm:w-auto text-sm px-3 py-1.5 border border-gray-200 dark:border-[#38383A] rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                                                >
+                                                    <option value="all">All Quarters</option>
+                                                    <option value="1">Q1 (Apr-Jun)</option>
+                                                    <option value="2">Q2 (Jul-Sep)</option>
+                                                    <option value="3">Q3 (Oct-Dec)</option>
+                                                    <option value="4">Q4 (Jan-Mar)</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Status */}
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <label className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">Status</label>
+                                                <select
+                                                    value={filterStatus}
+                                                    onChange={(e) => setFilterStatus(e.target.value)}
+                                                    className="flex-1 sm:w-auto text-sm px-3 py-1.5 border border-gray-200 dark:border-[#38383A] rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                                                >
+                                                    <option value="all">All Status</option>
+                                                    <option value="Pending">Pending</option>
+                                                    <option value="Paid">Paid</option>
+                                                    <option value="Partial">Partially Paid</option>
+                                                    <option value="Overdue">Overdue</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Year */}
+                                            {availableYears.length > 1 && (
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <label className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">Year</label>
+                                                    <select
+                                                        value={filterYear}
+                                                        onChange={(e) => setFilterYear(e.target.value)}
+                                                        className="flex-1 sm:w-auto text-sm px-3 py-1.5 border border-gray-200 dark:border-[#38383A] rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                                                    >
+                                                        <option value="all">All Years</option>
+                                                        {availableYears.map(yr => (
+                                                            <option key={yr} value={yr}>{yr}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+
+                                            {/* Sort */}
+                                            <div className="flex items-center gap-2 min-w-0 sm:ml-auto">
+                                                <ArrowUpDown className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366] shrink-0" />
+                                                <select
+                                                    value={sortBy}
+                                                    onChange={(e) => setSortBy(e.target.value)}
+                                                    className="flex-1 sm:w-auto text-sm px-3 py-1.5 border border-gray-200 dark:border-[#38383A] rounded-lg bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none"
+                                                >
+                                                    <option value="due_asc">Due Date (Earliest)</option>
+                                                    <option value="due_desc">Due Date (Latest)</option>
+                                                    <option value="amount_asc">Amount (Low to High)</option>
+                                                    <option value="amount_desc">Amount (High to Low)</option>
+                                                </select>
+                                            </div>
+
+                                            {/* Clear Filters */}
+                                            {hasActiveFilters && (
+                                                <button
+                                                    onClick={clearFilters}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-lg transition-colors"
+                                                >
+                                                    <RotateCcw className="h-3.5 w-3.5" />
+                                                    Clear Filters
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Select All / Pay Selected bar */}
-                            {invoices.filter(inv => inv.balanceAmount > 0 && inv.status !== 'Paid').length > 1 && (
+                            {filteredPayable.length > 1 && (
                                 <div className="flex items-center justify-between bg-white dark:bg-[#1C1C1E] rounded-xl border border-gray-200 dark:border-[#38383A] px-4 py-3">
                                     <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
                                         <input
                                             type="checkbox"
-                                            checked={selectedInvoiceIds.length === invoices.filter(inv => inv.balanceAmount > 0 && inv.status !== 'Paid').length && selectedInvoiceIds.length > 0}
+                                            checked={filteredPayable.length > 0 && filteredPayable.every(inv => selectedInvoiceIds.includes(inv._id))}
                                             onChange={(e) => {
                                                 if (e.target.checked) {
-                                                    setSelectedInvoiceIds(invoices.filter(inv => inv.balanceAmount > 0 && inv.status !== 'Paid').map(inv => inv._id));
+                                                    setSelectedInvoiceIds(filteredPayable.map(inv => inv._id));
                                                 } else {
                                                     setSelectedInvoiceIds([]);
                                                 }
                                             }}
                                             className="rounded border-gray-300 dark:border-[#48484A] text-primary-600 focus:ring-primary-500"
                                         />
-                                        Select all unpaid
+                                        Select all unpaid {hasActiveFilters && <span className="text-xs text-gray-400 dark:text-[#636366]">(filtered)</span>}
                                     </label>
                                     {selectedInvoiceIds.length >= 2 && (
                                         <span className="text-xs text-gray-500 dark:text-[#8E8E93]">
@@ -421,10 +648,24 @@ const StudentFeesDashboard = () => {
                                 </div>
                             )}
 
+                            {/* Invoice count indicator when filtered */}
+                            {hasActiveFilters && (
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                                    Showing {filteredInvoices.length} of {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
+                                </p>
+                            )}
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                             {invoices.length === 0 && <p className="col-span-full py-10 text-center text-gray-500 dark:text-[#8E8E93]">No invoices have been assigned to you yet.</p>}
+                            {invoices.length > 0 && filteredInvoices.length === 0 && (
+                                <div className="col-span-full py-10 text-center">
+                                    <Filter className="h-8 w-8 mx-auto mb-2 text-gray-300 dark:text-[#48484A]" />
+                                    <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No invoices match your filters</p>
+                                    <button onClick={clearFilters} className="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline">Clear all filters</button>
+                                </div>
+                            )}
 
-                            {invoices.map(invoice => {
+                            {filteredInvoices.map(invoice => {
                                 const isPayable = invoice.balanceAmount > 0 && invoice.status !== 'Paid';
                                 const isSelected = selectedInvoiceIds.includes(invoice._id);
                                 return (
