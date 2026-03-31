@@ -829,9 +829,9 @@ const Exams = () => {
                                                                     ) : <span className="text-gray-300 dark:text-[#636366] text-xs">—</span>}
                                                                 </td>
                                                                 <td className="px-5 py-3">
-                                                                    <span className="font-medium text-gray-900 dark:text-white">{exam.totalMarks}</span>
+                                                                    <span className="font-medium text-gray-900 dark:text-white">{exam.passingMarks != null ? exam.passingMarks : exam.totalMarks}</span>
                                                                     {exam.passingMarks != null && (
-                                                                        <span className="text-gray-400 dark:text-[#636366] text-xs ml-1">/ {exam.passingMarks} pass</span>
+                                                                        <span className="text-gray-400 dark:text-[#636366] text-xs ml-1">/ {exam.totalMarks} pass</span>
                                                                     )}
                                                                 </td>
                                                                 <td className="px-5 py-3">
