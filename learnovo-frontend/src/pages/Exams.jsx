@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
+import { subjectsService } from '../services/subjectsService';
 import { teachersService } from '../services/teachersService';
 import { academicSessionsService } from '../services/academicsService';
 import ExamResultsModal from '../components/ExamResultsModal';
@@ -182,6 +183,14 @@ const Exams = () => {
         },
     });
 
+    const { data: allSubjects = [] } = useQuery({
+        queryKey: ['exams-subjects'],
+        queryFn: async () => {
+            const res = await subjectsService.list();
+            return res.data || [];
+        },
+    });
+
     /* ── Student's own result card data ── */
     const isStudent = user.role === 'student';
     const { data: myResultData, isLoading: loadingMyResults } = useQuery({
@@ -236,18 +245,23 @@ const Exams = () => {
         return cls?.sections || [];
     }, [form.classId, availableClasses]);
 
-    /* ── Derived: subjects for the selected class ── */
+    /* ── Derived: subjects for the selected class (fallback to all subjects) ── */
     const classSubjects = useMemo(() => {
-        if (!form.classId) return [];
-        const cls = availableClasses.find(c => c._id === form.classId);
-        if (!cls?.subjects) return [];
-        return cls.subjects
-            .filter(s => s.subject)
-            .map(s => ({
-                _id: s.subject._id || s.subject,
-                name: s.subject.name || s.subject.subjectCode || s.subject
-            }));
-    }, [form.classId, availableClasses]);
+        if (form.classId) {
+            const cls = availableClasses.find(c => c._id === form.classId);
+            const assigned = (cls?.subjects || [])
+                .filter(s => s.subject)
+                .map(s => ({
+                    _id: s.subject._id || s.subject,
+                    name: s.subject.name || s.subject.subjectCode || s.subject
+                }));
+            if (assigned.length > 0) return assigned;
+        }
+        // Fallback: show all tenant subjects
+        return allSubjects
+            .filter(s => s.isActive !== false)
+            .map(s => ({ _id: s._id, name: s.name }));
+    }, [form.classId, availableClasses, allSubjects]);
 
     /* ── Derived: filtered exam list ── */
     const filteredExams = useMemo(() => exams.filter(e => {
@@ -687,7 +701,7 @@ const Exams = () => {
                         { value: '', label: 'All Classes' },
                         ...availableClasses.map(c => ({
                             value: c.grade,
-                            label: c.name === c.grade ? c.name : `${c.name} (${c.grade})`
+                            label: c.name
                         }))
                     ]}
                 />
@@ -952,7 +966,7 @@ const Exams = () => {
                                                 { value: '', label: 'Select Class' },
                                                 ...availableClasses.map(cls => ({
                                                     value: cls.grade,
-                                                    label: cls.name === cls.grade ? cls.name : `${cls.name} (${cls.grade})`
+                                                    label: cls.name
                                                 }))
                                             ]}
                                         />
@@ -980,14 +994,14 @@ const Exams = () => {
                                                 placeholder="Select Subject"
                                                 className={formErrors.subject ? '[&_button]:border-red-400' : ''}
                                                 options={[
-                                                    { value: '', label: form.classId ? 'Select Subject' : 'Select class first' },
+                                                    { value: '', label: 'Select Subject' },
                                                     ...classSubjects.map(s => ({ value: typeof s.name === 'string' ? s.name : String(s.name), label: typeof s.name === 'string' ? s.name : String(s.name) }))
                                                 ]}
                                             />
                                         ) : (
                                             <input
                                                 className={`input ${formErrors.subject ? 'border-red-400' : ''}`}
-                                                placeholder={form.classId ? 'No subjects assigned — type manually' : 'Select class first'}
+                                                placeholder="No subjects available — type manually"
                                                 value={form.subject}
                                                 onChange={e => handleField('subject', e.target.value)}
                                             />
