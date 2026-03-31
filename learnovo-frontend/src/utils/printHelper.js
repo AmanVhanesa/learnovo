@@ -91,11 +91,19 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
 
   const hl = (text) => `<span style="font-weight:700;color:#111827;border-bottom:1.5px solid rgba(62,196,177,0.35)">${text || '-'}</span>`;
 
-  // School header — matches CertificatePreviewContent header exactly
+  // School header — matches backend tc-minimal.html template
   const phoneEmail = [
     d.schoolPhone ? `Phone: ${d.schoolPhone}` : '',
     d.schoolEmail ? `Email: ${d.schoolEmail}` : '',
   ].filter(Boolean).join(' | ');
+
+  const logoHtml = d.schoolLogo
+    ? `<div style="position:absolute;left:20px;top:10px;width:78px;height:78px;display:flex;align-items:center;justify-content:center;border-radius:6px;overflow:hidden"><img src="${d.schoolLogo}" style="width:78px;height:78px;object-fit:contain" /></div>`
+    : '';
+
+  const principalSigHtml = d.principalSignature
+    ? `<img src="${d.principalSignature}" style="max-height:52px;max-width:120px;object-fit:contain;margin:0 auto 3px;display:block" />`
+    : '';
 
   const affiliationRow = (d.affiliationNumber || d.schoolCode || d.udiseCode)
     ? `<div style="display:flex;justify-content:center;gap:15px;margin-top:5px;flex-wrap:wrap">
@@ -155,6 +163,7 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
 <head>
 <meta charset="UTF-8">
 <title>${title} ${certificateNumber ? '\u2014 ' + certificateNumber : ''}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   @page{size:A4 portrait;margin:0}
@@ -200,9 +209,10 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
     <div class="deco"><div class="c1"></div><div class="c2"></div><div class="c3"></div><div class="c4"></div></div>
     <div class="watermark">${watermark}</div>
     <div class="content">
-      <!-- Header — matches CertificatePreviewContent header -->
-      <div style="padding:16px 20px 8px;text-align:center;flex-shrink:0">
-        <div style="font-family:Georgia,'Times New Roman',serif;font-size:21px;font-weight:800;color:#1A2E5A;letter-spacing:2px;line-height:1.1;text-transform:uppercase">${d.schoolName || 'School Name'}</div>
+      <!-- Header — matches backend tc-minimal.html -->
+      <div style="position:relative;padding:16px 20px 8px;text-align:center;flex-shrink:0">
+        ${logoHtml}
+        <div style="font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:21px;font-weight:800;color:#1F6F6D;letter-spacing:2px;line-height:1.1;text-transform:uppercase;white-space:nowrap">${d.schoolName || 'School Name'}</div>
         <div style="font-size:9px;color:#4b5563;font-weight:500;margin-top:3px">${d.schoolAddress || ''}</div>
         ${phoneEmail ? `<div style="font-size:9px;color:#4b5563;font-weight:500;margin-top:2px">${phoneEmail}</div>` : ''}
         ${affiliationRow}
@@ -225,17 +235,18 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
       ${isTC ? tcContent : bonafideContent}
       <!-- Spacer -->
       <div style="flex:1;min-height:6px"></div>
-      <!-- Signatures -->
+      <!-- Signatures — matches backend tc-minimal.html -->
       <div style="padding:0 20px 10px;flex-shrink:0">
-        <div style="display:flex;justify-content:space-between;align-items:flex-end;height:80px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;height:75px">
           <div style="text-align:center;width:130px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
             <div style="width:85px;height:1px;background:#9ca3af;margin-bottom:3px"></div>
             <div style="font-size:9px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px">Class Teacher</div>
           </div>
           <div style="text-align:center;width:85px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
-            <div style="width:80px;height:80px;border:2px dashed #d1d5db;border-radius:50%"></div>
+            <div style="width:82px;height:82px;border:2px dashed #d1d5db;border-radius:50%"></div>
           </div>
           <div style="text-align:center;width:130px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
+            ${principalSigHtml}
             <div style="width:85px;height:1px;background:#9ca3af;margin-bottom:3px"></div>
             <div style="font-size:9px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px">Principal</div>
           </div>

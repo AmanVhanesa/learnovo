@@ -13,7 +13,7 @@ import React from 'react';
 const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewWatermark = true }) => {
     const d = data || {};
 
-    // TC table rows matching the minimal PDF template exactly
+    // TC table rows matching the backend tc-minimal.html template exactly
     const tcRows = [
         ['Name of the Student', d.studentName, true],
         ["Father's / Guardian's Name", d.fatherName],
@@ -75,11 +75,11 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                 display: 'flex',
                 flexDirection: 'column',
             }}>
-                {/* Decorative background shapes */}
+                {/* Decorative background shapes — matches backend tc-minimal.html proportionally */}
                 <div style={{ position: 'absolute', top: 0, right: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0, overflow: 'hidden', borderRadius: 14 }}>
-                    <div style={{ position: 'absolute', top: -60, right: -40, width: 240, height: 240, background: 'rgba(62,196,177,0.06)', borderRadius: '50%' }} />
+                    <div style={{ position: 'absolute', top: -45, right: -30, width: 240, height: 240, background: 'rgba(62,196,177,0.06)', borderRadius: '50%' }} />
                     <div style={{ position: 'absolute', top: 60, right: -60, width: 180, height: 340, background: 'rgba(62,196,177,0.04)', transform: 'rotate(-25deg)', borderRadius: 60 }} />
-                    <div style={{ position: 'absolute', bottom: -40, left: -45, width: 195, height: 195, background: 'rgba(62,196,177,0.05)', borderRadius: '50%' }} />
+                    <div style={{ position: 'absolute', bottom: -38, left: -45, width: 195, height: 195, background: 'rgba(62,196,177,0.05)', borderRadius: '50%' }} />
                     <div style={{ position: 'absolute', bottom: 90, left: 30, width: 120, height: 225, background: 'rgba(62,196,177,0.03)', transform: 'rotate(20deg)', borderRadius: 45 }} />
                 </div>
 
@@ -101,12 +101,24 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                 {/* All content above deco shapes */}
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
 
-                    {/* Header */}
-                    <div style={{ padding: '16px 20px 8px', textAlign: 'center', flexShrink: 0 }}>
+                    {/* Header — matches backend tc-minimal.html with logo */}
+                    <div style={{ position: 'relative', padding: '16px 20px 8px', textAlign: 'center', flexShrink: 0 }}>
+                        {/* School Logo */}
+                        {d.schoolLogo && (
+                            <div style={{
+                                position: 'absolute', left: 20, top: 10,
+                                width: 78, height: 78,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                borderRadius: 6, overflow: 'hidden',
+                            }}>
+                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 78, height: 78, objectFit: 'contain' }} />
+                            </div>
+                        )}
                         <div style={{
-                            fontFamily: "'Georgia', 'Times New Roman', serif",
-                            fontSize: 21, fontWeight: 800, color: '#1A2E5A',
+                            fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
+                            fontSize: 21, fontWeight: 800, color: '#1F6F6D',
                             letterSpacing: 2, lineHeight: 1.1, textTransform: 'uppercase',
+                            whiteSpace: 'nowrap',
                         }}>
                             {d.schoolName || 'School Name'}
                         </div>
@@ -322,11 +334,11 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                     {/* Spacer */}
                     <div style={{ flex: 1, minHeight: 6 }} />
 
-                    {/* Signatures */}
+                    {/* Signatures — matches backend tc-minimal.html */}
                     <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
                         <div style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
-                            height: 80,
+                            marginTop: 6, height: 75,
                         }}>
                             <div style={{ textAlign: 'center', width: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 <div style={{ width: 85, height: 1, background: '#9ca3af', marginBottom: 3 }} />
@@ -334,11 +346,14 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                             </div>
                             <div style={{ textAlign: 'center', width: 85, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 <div style={{
-                                    width: 80, height: 80, border: '2px dashed #d1d5db',
+                                    width: 82, height: 82, border: '2px dashed #d1d5db',
                                     borderRadius: '50%',
                                 }} />
                             </div>
                             <div style={{ textAlign: 'center', width: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
+                                {d.principalSignature && (
+                                    <img src={d.principalSignature} alt="Principal Signature" style={{ maxHeight: 52, maxWidth: 120, objectFit: 'contain', marginBottom: 3 }} />
+                                )}
                                 <div style={{ width: 85, height: 1, background: '#9ca3af', marginBottom: 3 }} />
                                 <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.8 }}>Principal</div>
                             </div>
