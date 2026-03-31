@@ -160,7 +160,8 @@ jobs:
             --exclude=coverage \
             --exclude=.eslintrc.js \
             --exclude=jest.config.js \
-            .
+            --warning=no-file-changed \
+            . || [ $? -eq 1 ]
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
