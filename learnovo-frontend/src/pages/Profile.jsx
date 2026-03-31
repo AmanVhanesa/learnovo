@@ -376,6 +376,7 @@ const Profile = () => {
               <input
                 type="email"
                 name="email"
+                autoComplete="off"
                 className="input bg-gray-50 dark:bg-[#000000]"
                 value={formData.email}
                 disabled
@@ -605,6 +606,7 @@ const Profile = () => {
                 <input
                   type="password"
                   name="currentPassword"
+                  autoComplete="new-password"
                   className="input"
                   value={formData.currentPassword}
                   onChange={handleChange}
@@ -615,6 +617,7 @@ const Profile = () => {
                 <input
                   type="password"
                   name="newPassword"
+                  autoComplete="new-password"
                   className={`input ${passwordError ? 'border-red-500 dark:border-red-500' : ''}`}
                   value={formData.newPassword}
                   onChange={(e) => { handleChange(e); setPasswordError('') }}
@@ -629,6 +632,7 @@ const Profile = () => {
                 <input
                   type="password"
                   name="confirmPassword"
+                  autoComplete="new-password"
                   className="input"
                   value={formData.confirmPassword}
                   onChange={handleChange}

@@ -459,11 +459,11 @@ const CreateTenantModal = ({ onClose, onSuccess }) => {
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Admin Email *</label>
-                        <input type="email" value={form.adminEmail} onChange={e => setForm(p => ({ ...p, adminEmail: e.target.value }))} className="block w-full h-11 sm:h-10 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] dark:text-white px-3.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-[#3EC4B1] dark:focus:border-[#3EC4B1]" required />
+                        <input type="email" autoComplete="off" value={form.adminEmail} onChange={e => setForm(p => ({ ...p, adminEmail: e.target.value }))} className="block w-full h-11 sm:h-10 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] dark:text-white px-3.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-[#3EC4B1] dark:focus:border-[#3EC4B1]" required />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Admin Password *</label>
-                        <input type="password" value={form.adminPassword} onChange={e => setForm(p => ({ ...p, adminPassword: e.target.value }))} className="block w-full h-11 sm:h-10 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] dark:text-white px-3.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-[#3EC4B1] dark:focus:border-[#3EC4B1]" required minLength={8} placeholder="Min 8 characters" />
+                        <input type="password" autoComplete="new-password" value={form.adminPassword} onChange={e => setForm(p => ({ ...p, adminPassword: e.target.value }))} className="block w-full h-11 sm:h-10 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] dark:text-white px-3.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-[#3EC4B1] dark:focus:border-[#3EC4B1]" required minLength={8} placeholder="Min 8 characters" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Phone Number</label>

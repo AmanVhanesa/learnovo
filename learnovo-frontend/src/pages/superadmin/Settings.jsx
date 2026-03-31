@@ -51,6 +51,7 @@ const FormField = ({ label, value, onChange, type = 'text', placeholder, multili
         <div className="relative">
           <input
             type={showPassword ? 'text' : 'password'}
+            autoComplete="new-password"
             value={value || ''}
             onChange={e => onChange(e.target.value)}
             className="input w-full pr-10"
@@ -74,6 +75,7 @@ const FormField = ({ label, value, onChange, type = 'text', placeholder, multili
       <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">{label}</label>
       <input
         type={type}
+        autoComplete="off"
         value={value || ''}
         onChange={e => onChange(e.target.value)}
         className="input w-full"

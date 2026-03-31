@@ -187,6 +187,7 @@ const ResetPassword = () => {
                         id="password"
                         name="password"
                         type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         autoFocus
                         required
                         value={password}

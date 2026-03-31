@@ -138,6 +138,7 @@ const Profile = () => {
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
                 <input
                   type="email"
+                  autoComplete="off"
                   value={profileForm.email}
                   onChange={(e) => setProfileForm(prev => ({ ...prev, email: e.target.value }))}
                   className="input pl-10"

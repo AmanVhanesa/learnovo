@@ -419,6 +419,7 @@ const Register = () => {
                       id="email"
                       name="email"
                       type="email"
+                      autoComplete="off"
                       required
                       value={formData.email}
                       onChange={handleInputChange}
@@ -566,6 +567,7 @@ const Register = () => {
                         id="password"
                         name="password"
                         type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         required
                         value={formData.password}
                         onChange={handleInputChange}

@@ -207,7 +207,7 @@ const Admissions = () => {
                 </div>
                 <div className="md:col-span-2">
                   <label className="label">Email</label>
-                  <input type="email" className="input" value={form.contactInfo.email} onChange={(e) => setForm({ ...form, contactInfo: { ...form.contactInfo, email: e.target.value } })} required />
+                  <input type="email" autoComplete="off" className="input" value={form.contactInfo.email} onChange={(e) => setForm({ ...form, contactInfo: { ...form.contactInfo, email: e.target.value } })} required />
                 </div>
                 <div className="md:col-span-2">
                   <label className="label">Phone</label>

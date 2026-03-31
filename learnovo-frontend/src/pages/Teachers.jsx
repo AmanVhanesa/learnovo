@@ -240,11 +240,11 @@ const Teachers = () => {
                 </div>
                 <div>
                   <label className="label">Email</label>
-                  <input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                  <input type="email" autoComplete="off" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
                 </div>
                 <div>
                   <label className="label">Password</label>
-                  <input type="password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+                  <input type="password" autoComplete="new-password" className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
                 </div>
                 <div>
                   <label className="label">Phone</label>

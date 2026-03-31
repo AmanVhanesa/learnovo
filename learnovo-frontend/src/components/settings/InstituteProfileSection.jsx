@@ -139,6 +139,7 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                         <label className="label">Email</label>
                         <input
                             type="email"
+                            autoComplete="off"
                             className="input"
                             value={form.institution?.contact?.email || ''}
                             onChange={(e) => updateField('institution.contact.email', e.target.value)}

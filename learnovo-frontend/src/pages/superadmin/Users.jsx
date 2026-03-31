@@ -335,6 +335,7 @@ function SuperAdminModal({ open, onClose, initialData, onSubmit, loading }) {
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label>
                         <input
                             type="email"
+                            autoComplete="off"
                             value={form.email}
                             onChange={(e) => setForm({ ...form, email: e.target.value })}
                             className="w-full h-11 sm:h-10 px-3.5 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#636366] focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#3EC4B1] text-sm transition-colors"
@@ -347,6 +348,7 @@ function SuperAdminModal({ open, onClose, initialData, onSubmit, loading }) {
                         </label>
                         <input
                             type="password"
+                            autoComplete="new-password"
                             value={form.password}
                             onChange={(e) => setForm({ ...form, password: e.target.value })}
                             className="w-full h-11 sm:h-10 px-3.5 rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-[#636366] focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-[#3EC4B1] text-sm transition-colors"

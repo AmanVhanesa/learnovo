@@ -464,6 +464,7 @@ const DriverModal = ({ driver, onClose }) => {
                             <input
                                 type="email"
                                 name="email"
+                                autoComplete="off"
                                 value={formData.email}
                                 onChange={handleChange}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"

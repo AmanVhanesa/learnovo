@@ -474,6 +474,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                         <label className="label">Email {form.createLogin && !student && <span className="text-red-500">*</span>}</label>
                                         <input
                                             type="email"
+                                            autoComplete="off"
                                             className={`input ${formErrors.email ? 'border-red-500' : ''}`}
                                             value={form.email}
                                             onChange={(e) => { updateField('email', e.target.value); setFormErrors(prev => ({ ...prev, email: undefined })) }}
@@ -503,6 +504,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             <label className="label">Password (optional)</label>
                                             <input
                                                 type="password"
+                                                autoComplete="new-password"
                                                 className="input"
                                                 value={form.password}
                                                 onChange={(e) => updateField('password', e.target.value)}
@@ -919,6 +921,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 <label className="label">Email</label>
                                                 <input
                                                     type="email"
+                                                    autoComplete="off"
                                                     className={`input ${formErrors[`guardianEmail${index}`] ? 'border-red-500' : ''}`}
                                                     value={guardian.email}
                                                     onChange={(e) => updateGuardian(index, 'email', e.target.value)}

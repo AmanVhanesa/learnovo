@@ -414,6 +414,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                     <label className="label">Email {form.createLogin && <span className="text-red-500">*</span>}</label>
                                     <input
                                         type="email"
+                                        autoComplete="off"
                                         className={`input ${formErrors.email ? 'border-red-500' : ''}`}
                                         value={form.email}
                                         onChange={(e) => updateField('email', e.target.value)}
@@ -535,6 +536,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         <div className="relative">
                                             <input
                                                 type={showPassword ? 'text' : 'password'}
+                                                autoComplete="new-password"
                                                 className="input pr-10"
                                                 value={form.password}
                                                 onChange={(e) => updateField('password', e.target.value)}
