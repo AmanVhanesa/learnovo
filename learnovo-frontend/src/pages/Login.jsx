@@ -43,7 +43,11 @@ const Login = () => {
       if (!isSubdomainApp && subdomain && !isLocalhost) {
         const protocol = window.location.protocol
         const baseDomain = import.meta.env.VITE_APP_DOMAIN || 'learnovoportal.com'
-        window.location.href = `${protocol}//${subdomain}.${baseDomain}/app/dashboard`
+        // Pass the auth token via URL so the subdomain can pick it up
+        // (localStorage is not shared across different origins/subdomains)
+        const token = localStorage.getItem('token')
+        const tokenParam = token ? `?authToken=${encodeURIComponent(token)}` : ''
+        window.location.href = `${protocol}//${subdomain}.${baseDomain}/app/dashboard${tokenParam}`
         return
       }
       navigate('/app/dashboard', { replace: true })

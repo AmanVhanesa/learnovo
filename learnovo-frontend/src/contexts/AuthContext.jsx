@@ -71,15 +71,30 @@ export function AuthProvider({ children }) {
   // Check if user is logged in on app start
   useEffect(() => {
     const checkAuth = async () => {
+      // Check for auth token passed via URL (cross-subdomain login handoff)
+      // When a user logs in on the root domain and is redirected to a tenant
+      // subdomain, localStorage isn't shared, so the token is passed via URL.
+      const urlParams = new URLSearchParams(window.location.search)
+      const urlToken = urlParams.get('authToken')
+      if (urlToken) {
+        localStorage.setItem('token', urlToken)
+        // Clean the token from URL without reloading the page
+        urlParams.delete('authToken')
+        const cleanUrl = urlParams.toString()
+          ? `${window.location.pathname}?${urlParams.toString()}`
+          : window.location.pathname
+        window.history.replaceState({}, '', cleanUrl)
+      }
+
       const token = localStorage.getItem('token')
       const user = localStorage.getItem('user')
       const tenant = localStorage.getItem('tenant')
 
-      if (token && user) {
+      if (token) {
         try {
-          // Try to get fresh user data
+          // Fetch fresh user data from server (also returns tenant for cross-subdomain handoff)
           const response = await authService.getCurrentUser()
-          const cachedUser = JSON.parse(user)
+          const cachedUser = user ? JSON.parse(user) : {}
           // Merge: prefer fresh server data but fall back to cached for missing fields
           const mergedUser = {
             ...cachedUser,      // base: cached (includes avatar from login)
@@ -88,26 +103,36 @@ export function AuthProvider({ children }) {
             avatar: response.user?.avatar || cachedUser?.avatar || null,
             photo: response.user?.photo || cachedUser?.photo || null,
           }
-          // Keep localStorage in sync with the merged user
+          // Use tenant from server response if available (cross-subdomain handoff),
+          // otherwise fall back to cached tenant
+          const resolvedTenant = response.tenant || (tenant ? JSON.parse(tenant) : null)
+          // Keep localStorage in sync
           localStorage.setItem('user', JSON.stringify(mergedUser))
+          if (resolvedTenant) localStorage.setItem('tenant', JSON.stringify(resolvedTenant))
           dispatch({
             type: 'AUTH_SUCCESS',
             payload: {
               user: mergedUser,
-              tenant: tenant ? JSON.parse(tenant) : null,
+              tenant: resolvedTenant,
               token
             }
           })
         } catch (error) {
-          // If API call fails, use cached data
-          dispatch({
-            type: 'AUTH_SUCCESS',
-            payload: {
-              user: JSON.parse(user),
-              tenant: tenant ? JSON.parse(tenant) : null,
-              token
-            }
-          })
+          if (user) {
+            // API failed but we have cached data — use it
+            dispatch({
+              type: 'AUTH_SUCCESS',
+              payload: {
+                user: JSON.parse(user),
+                tenant: tenant ? JSON.parse(tenant) : null,
+                token
+              }
+            })
+          } else {
+            // Token is invalid or expired and no cached data — force re-login
+            localStorage.removeItem('token')
+            dispatch({ type: 'AUTH_FAILURE', payload: null })
+          }
         }
       } else {
         dispatch({ type: 'AUTH_FAILURE', payload: null })

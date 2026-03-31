@@ -386,6 +386,22 @@ router.get('/me', protect, async(req, res) => {
   try {
     const user = await User.findById(req.user.id);
 
+    // Also fetch tenant data (needed for cross-subdomain login handoff)
+    let tenant = null;
+    if (user.tenantId) {
+      const tenantDoc = await Tenant.findById(user.tenantId);
+      if (tenantDoc) {
+        tenant = {
+          id: tenantDoc._id,
+          schoolName: tenantDoc.schoolName,
+          schoolCode: tenantDoc.schoolCode,
+          subdomain: tenantDoc.subdomain,
+          primaryColor: tenantDoc.primaryColor,
+          secondaryColor: tenantDoc.secondaryColor
+        };
+      }
+    }
+
     res.json({
       success: true,
       user: {
@@ -427,7 +443,8 @@ router.get('/me', protect, async(req, res) => {
         education: user.education,
         experience: user.experience,
         guardians: user.guardians
-      }
+      },
+      tenant
     });
   } catch (error) {
     console.error('Get user error:', error);
