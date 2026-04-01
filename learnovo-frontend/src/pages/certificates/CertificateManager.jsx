@@ -497,7 +497,7 @@ const CertificateManager = () => {
                         </div>
 
                         {/* A4 Paper area */}
-                        <div className="w-full flex-1 overflow-y-auto bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
+                        <div className="w-full flex-1 min-h-0 overflow-y-auto bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
                             <CertificatePreviewContent
                                 type={previewCert.type}
                                 data={previewCert.contentSnapshot}
