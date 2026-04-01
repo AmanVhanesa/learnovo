@@ -210,7 +210,7 @@ app.use((req, res, next) => {
     '/api/invoices/generate-bulk', '/api/invoices/bulk', '/api/report-cards/bulk-download',
     '/api/students/import', '/api/employees/import',
     '/api/transitions/year-rollover',
-    '/api/fees/allocations/generate',
+    '/api/fees/allocations/generate'
   ];
   // Medium-timeout routes (60s) — heavier queries that may exceed 30s
   const mediumPaths = [
@@ -218,7 +218,7 @@ app.use((req, res, next) => {
     '/api/fees/defaulters', '/api/fees/dashboard', '/api/fees/statistics',
     '/api/finance/dashboard', '/api/finance/report',
     '/api/reports', '/api/attendance',
-    '/api/exams', '/api/payroll',
+    '/api/exams', '/api/payroll'
   ];
   const isLongRunning = longRunningPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p));
   const isMedium = !isLongRunning && mediumPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p));
