@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp } from 'lucide-react'
+import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
@@ -131,7 +131,7 @@ const Students = () => {
   })
 
   // Fetch students with React Query
-  const { data: studentsResponse, isLoading } = useQuery({
+  const { data: studentsResponse, isLoading, error: studentsError, refetch: refetchStudents } = useQuery({
     queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage],
     queryFn: async () => {
       const filters = {
@@ -533,10 +533,10 @@ const Students = () => {
             <>
               <button
                 className="btn btn-outline text-gray-700 dark:text-[#8E8E93]"
-                onClick={() => navigate('/app/students/bulk-promote')}
+                onClick={() => navigate('/app/academic/promotion')}
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
-                Bulk Promote
+                Manage Promotions
               </button>
               <button
                 className="btn btn-outline text-gray-700 dark:text-[#8E8E93]"
@@ -553,6 +553,23 @@ const Students = () => {
           )}
         </div>
       </div>
+
+      {/* Error Message */}
+      {studentsError && (
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200/60 dark:border-red-500/20 rounded-2xl p-4 animate-fade-in">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 flex-shrink-0" />
+            <p className="text-sm text-red-700 dark:text-red-400">{studentsError.response?.data?.message || 'Failed to load students. Please check your connection and try again.'}</p>
+          </div>
+          <button
+            onClick={() => refetchStudents()}
+            className="mt-2 inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Try again
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="card p-4">

@@ -2,11 +2,12 @@ import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
-  TrendingUp, TrendingDown, Users, Search, ChevronDown, ChevronUp,
-  CheckSquare, Square, AlertTriangle, GraduationCap, Loader2, RotateCcw
+  TrendingUp, TrendingDown, Users, Search,
+  CheckSquare, Square, AlertTriangle, GraduationCap, Loader2, ArrowRightLeft
 } from 'lucide-react'
 import { transitionsService } from '../services/transitionsService'
 import { studentsService } from '../services/studentsService'
+import { sortClasses, getNextClass, getPreviousClass } from '../utils/classOrder'
 
 export default function PromotionDashboard() {
   const queryClient = useQueryClient()
@@ -19,11 +20,11 @@ export default function PromotionDashboard() {
   const [targetSection, setTargetSection] = useState('')
   const [academicYear, setAcademicYear] = useState(() => {
     const y = new Date().getFullYear()
-    return `${y}-${y + 1}`
+    const m = new Date().getMonth()
+    return m < 3 ? `${y}-${y + 1}` : `${y + 1}-${y + 2}`
   })
   const [remarks, setRemarks] = useState('')
   const [forceOverride, setForceOverride] = useState(false)
-  const [selectedStudents, setSelectedStudents] = useState(new Set())
   const [excludedStudents, setExcludedStudents] = useState(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
@@ -32,6 +33,8 @@ export default function PromotionDashboard() {
   // Individual action state
   const [individualStudent, setIndividualStudent] = useState(null)
   const [individualAction, setIndividualAction] = useState('promote')
+  const [individualTargetClass, setIndividualTargetClass] = useState('')
+  const [individualTargetSection, setIndividualTargetSection] = useState('')
   const [individualReason, setIndividualReason] = useState('')
 
   // Queries
@@ -40,9 +43,18 @@ export default function PromotionDashboard() {
     queryFn: () => studentsService.getFilters()
   })
 
-  const { data: hierarchyData } = useQuery({
-    queryKey: ['class-hierarchy'],
-    queryFn: () => transitionsService.getClassHierarchy()
+  // Per-class sections for source
+  const { data: sourceSectionsData } = useQuery({
+    queryKey: ['class-sections', sourceClass],
+    queryFn: () => transitionsService.getSectionsForClass(sourceClass),
+    enabled: !!sourceClass
+  })
+
+  // Per-class sections for target
+  const { data: targetSectionsData } = useQuery({
+    queryKey: ['class-sections', targetClass],
+    queryFn: () => transitionsService.getSectionsForClass(targetClass),
+    enabled: !!targetClass && targetClass !== 'GRADUATED'
   })
 
   const { data: studentsData, isLoading: loadingStudents } = useQuery({
@@ -51,28 +63,30 @@ export default function PromotionDashboard() {
       class: sourceClass,
       section: sourceSection || undefined,
       status: 'active',
-      limit: 500
+      limit: 500,
+      lightweight: true
     }),
     enabled: !!sourceClass
   })
 
-  const classes = filtersData?.data?.classes || filtersData?.classes || []
-  const sections = filtersData?.data?.sections || filtersData?.sections || []
-  const hierarchy = hierarchyData?.data || []
+  const rawClasses = filtersData?.data?.classes || filtersData?.classes || []
+  const classes = useMemo(() => sortClasses(rawClasses), [rawClasses])
+  const sourceSections = (sourceSectionsData?.data || []).map(s => s.name)
+  const targetSections = (targetSectionsData?.data || []).map(s => s.name)
   const students = studentsData?.data || studentsData?.students || []
 
-  // Auto-suggest next class from hierarchy
+  // Auto-suggest next/previous class
   useEffect(() => {
-    if (sourceClass && hierarchy.length > 0 && activeTab === 'promote') {
-      const normalizedSource = sourceClass.toLowerCase().replace(/^class\s+/i, '')
-      const idx = hierarchy.findIndex(h => h.name.toLowerCase().replace(/^class\s+/i, '') === normalizedSource)
-      if (idx !== -1 && idx < hierarchy.length - 1) {
-        setTargetClass(hierarchy[idx + 1].name)
-      } else if (idx === hierarchy.length - 1) {
-        setTargetClass('GRADUATED')
+    if (sourceClass && classes.length > 0) {
+      if (activeTab === 'promote') {
+        const next = getNextClass(sourceClass, classes)
+        setTargetClass(next || 'GRADUATED')
+      } else if (activeTab === 'demote') {
+        const prev = getPreviousClass(sourceClass, classes)
+        setTargetClass(prev || '')
       }
     }
-  }, [sourceClass, hierarchy, activeTab])
+  }, [sourceClass, classes, activeTab])
 
   // Filter students by search
   const filteredStudents = useMemo(() => {
@@ -87,21 +101,8 @@ export default function PromotionDashboard() {
     )
   }, [students, searchQuery])
 
-  // Select all / deselect all
-  const toggleSelectAll = () => {
-    if (selectedStudents.size === filteredStudents.length) {
-      setSelectedStudents(new Set())
-    } else {
-      setSelectedStudents(new Set(filteredStudents.map(s => s._id)))
-    }
-  }
-
-  const toggleStudent = (id) => {
-    const next = new Set(selectedStudents)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setSelectedStudents(next)
-  }
+  // Count of students to be promoted (excluding excluded)
+  const promotionCount = filteredStudents.length - excludedStudents.size
 
   const toggleExclude = (id) => {
     const next = new Set(excludedStudents)
@@ -118,30 +119,34 @@ export default function PromotionDashboard() {
       setShowConfirm(false)
       queryClient.invalidateQueries({ queryKey: ['students-for-promotion'] })
       queryClient.invalidateQueries({ queryKey: ['student-filters'] })
-      toast.success(`Promotion complete: ${data.data.promoted} promoted, ${data.data.graduated} graduated`)
+      queryClient.invalidateQueries({ queryKey: ['class-sections'] })
+      const d = data.data
+      toast.success(`Complete: ${d.promoted} promoted, ${d.graduated} graduated, ${d.skipped} skipped`)
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || error.response?.data?.errors?.[0] || 'Promotion failed')
+      toast.error(error.response?.data?.message || error.response?.data?.errors?.[0] || 'Operation failed')
     }
   })
 
-  const individualPromoteMutation = useMutation({
-    mutationFn: ({ studentId, ...payload }) =>
-      individualAction === 'promote'
-        ? transitionsService.promoteStudent(studentId, payload)
-        : transitionsService.demoteStudent(studentId, payload),
+  const individualMutation = useMutation({
+    mutationFn: ({ studentId, action, ...payload }) => {
+      if (action === 'promote') return transitionsService.promoteStudent(studentId, payload)
+      if (action === 'demote') return transitionsService.demoteStudent(studentId, payload)
+      if (action === 'shift') return transitionsService.shiftSection(studentId, payload)
+    },
     onSuccess: (data) => {
       toast.success(data.message || 'Action completed')
       setIndividualStudent(null)
       queryClient.invalidateQueries({ queryKey: ['students-for-promotion'] })
+      queryClient.invalidateQueries({ queryKey: ['class-sections'] })
     },
     onError: (error) => {
       toast.error(error.response?.data?.message || error.response?.data?.errors?.[0] || 'Action failed')
     }
   })
 
-  const handleBulkPromote = () => {
-    const payload = {
+  const handleBulkAction = () => {
+    bulkPromoteMutation.mutate({
       fromClass: sourceClass,
       fromSection: sourceSection || undefined,
       toClass: targetClass !== 'GRADUATED' ? targetClass : undefined,
@@ -150,36 +155,45 @@ export default function PromotionDashboard() {
       excludeStudents: Array.from(excludedStudents),
       forceOverride,
       remarks
-    }
-    bulkPromoteMutation.mutate(payload)
+    })
   }
 
   const handleIndividualAction = () => {
     if (!individualStudent) return
-    const payload = {
-      studentId: individualStudent._id,
-      toClass: targetClass,
-      toSection: targetSection || undefined,
-      academicYear,
-      remarks: individualAction === 'promote' ? remarks : undefined,
-      reason: individualAction === 'demote' ? individualReason : undefined,
-      forceOverride
+    const payload = { studentId: individualStudent._id, action: individualAction }
+    if (individualAction === 'promote') {
+      payload.toClass = individualTargetClass || undefined
+      payload.toSection = individualTargetSection || undefined
+      payload.academicYear = academicYear
+      payload.remarks = remarks
+      payload.forceOverride = forceOverride
+    } else if (individualAction === 'demote') {
+      payload.toClass = individualTargetClass
+      payload.toSection = individualTargetSection || undefined
+      payload.academicYear = academicYear
+      payload.reason = individualReason
+      payload.forceOverride = forceOverride
+    } else if (individualAction === 'shift') {
+      payload.toSection = individualTargetSection
+      payload.reason = individualReason
     }
-    individualPromoteMutation.mutate(payload)
+    individualMutation.mutate(payload)
   }
 
-  const availableSections = sourceClass
-    ? sections.filter(s => s !== '').sort()
-    : []
+  // Classes available as demotion targets (below source)
+  const demotionClasses = useMemo(() => {
+    if (!sourceClass) return classes
+    const sorted = sortClasses(classes)
+    const idx = sorted.findIndex(c => c === sourceClass)
+    return idx > 0 ? sorted.slice(0, idx) : []
+  }, [sourceClass, classes])
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Promotion Dashboard</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Promote, demote, or detain students across classes</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Promotion Dashboard</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Promote, demote, or manage student transitions</p>
       </div>
 
       {/* Tabs */}
@@ -191,7 +205,7 @@ export default function PromotionDashboard() {
         ].map(tab => (
           <button
             key={tab.key}
-            onClick={() => { setActiveTab(tab.key); setResults(null) }}
+            onClick={() => { setActiveTab(tab.key); setResults(null); setExcludedStudents(new Set()) }}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
               activeTab === tab.key
                 ? 'border-teal-500 text-teal-600 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-900/20'
@@ -207,7 +221,7 @@ export default function PromotionDashboard() {
       {/* Configuration Panel */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          {activeTab === 'individual' ? 'Student Selection' : 'Promotion Configuration'}
+          {activeTab === 'individual' ? 'Find Student' : activeTab === 'promote' ? 'Promotion Configuration' : 'Demotion Configuration'}
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -216,7 +230,7 @@ export default function PromotionDashboard() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Class</label>
             <select
               value={sourceClass}
-              onChange={e => { setSourceClass(e.target.value); setSourceSection(''); setSelectedStudents(new Set()); setExcludedStudents(new Set()); setResults(null) }}
+              onChange={e => { setSourceClass(e.target.value); setSourceSection(''); setExcludedStudents(new Set()); setResults(null) }}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               <option value="">Select class</option>
@@ -229,40 +243,54 @@ export default function PromotionDashboard() {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Section</label>
             <select
               value={sourceSection}
-              onChange={e => { setSourceSection(e.target.value); setSelectedStudents(new Set()); setExcludedStudents(new Set()) }}
+              onChange={e => { setSourceSection(e.target.value); setExcludedStudents(new Set()) }}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              disabled={!sourceClass}
             >
               <option value="">All sections</option>
-              {availableSections.map(s => <option key={s} value={s}>{s}</option>)}
+              {sourceSections.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
 
           {/* Target Class */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Class</label>
-            <select
-              value={targetClass}
-              onChange={e => setTargetClass(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            >
-              <option value="">Auto (next class)</option>
-              {classes.map(c => <option key={c} value={c}>{c}</option>)}
-              <option value="GRADUATED">Graduated / Alumni</option>
-            </select>
-          </div>
+          {activeTab !== 'individual' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Class</label>
+              <select
+                value={targetClass}
+                onChange={e => setTargetClass(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              >
+                {activeTab === 'promote' ? (
+                  <>
+                    <option value="">Auto (next class)</option>
+                    {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="GRADUATED">Graduated / Alumni</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="">Select target class</option>
+                    {demotionClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                  </>
+                )}
+              </select>
+            </div>
+          )}
 
           {/* Target Section */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Section</label>
-            <select
-              value={targetSection}
-              onChange={e => setTargetSection(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-            >
-              <option value="">Keep current section</option>
-              {availableSections.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
+          {activeTab !== 'individual' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Section</label>
+              <select
+                value={targetSection}
+                onChange={e => setTargetSection(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              >
+                <option value="">Keep current section</option>
+                {targetSections.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
 
           {/* Academic Year */}
           <div>
@@ -276,14 +304,16 @@ export default function PromotionDashboard() {
             />
           </div>
 
-          {/* Remarks */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Remarks</label>
+          {/* Remarks / Reason */}
+          <div className={activeTab === 'demote' ? '' : 'md:col-span-2'}>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {activeTab === 'demote' ? 'Reason (required)' : 'Remarks'}
+            </label>
             <input
               type="text"
               value={remarks}
               onChange={e => setRemarks(e.target.value)}
-              placeholder="Optional remarks"
+              placeholder={activeTab === 'demote' ? 'Reason for demotion (required)' : 'Optional remarks'}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
@@ -297,7 +327,7 @@ export default function PromotionDashboard() {
                 onChange={e => setForceOverride(e.target.checked)}
                 className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
               />
-              Force override (allow re-promotion)
+              Force override (re-promote)
             </label>
           </div>
         </div>
@@ -307,20 +337,10 @@ export default function PromotionDashboard() {
       {sourceClass && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                Students in {sourceClass}{sourceSection ? `-${sourceSection}` : ''}
-                <span className="ml-2 text-gray-500 font-normal">({filteredStudents.length} found)</span>
-              </h3>
-              {activeTab !== 'individual' && (
-                <button
-                  onClick={toggleSelectAll}
-                  className="text-xs text-teal-600 dark:text-teal-400 hover:underline"
-                >
-                  {selectedStudents.size === filteredStudents.length ? 'Deselect all' : 'Select all'}
-                </button>
-              )}
-            </div>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+              Students in {sourceClass}{sourceSection ? `-${sourceSection}` : ''}
+              <span className="ml-2 text-gray-500 font-normal">({filteredStudents.length} found)</span>
+            </h3>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -345,49 +365,32 @@ export default function PromotionDashboard() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700/50 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   <tr>
-                    {activeTab !== 'individual' && <th className="px-4 py-3 w-10"></th>}
                     <th className="px-4 py-3">Adm. No</th>
                     <th className="px-4 py-3">Name</th>
                     <th className="px-4 py-3">Roll No</th>
                     <th className="px-4 py-3">Section</th>
-                    <th className="px-4 py-3">Action</th>
+                    <th className="px-4 py-3 w-28">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {filteredStudents.map(student => {
                     const isExcluded = excludedStudents.has(student._id)
+                    const displayName = student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || '-'
                     return (
-                      <tr key={student._id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${isExcluded ? 'opacity-50 bg-red-50 dark:bg-red-900/10' : ''}`}>
-                        {activeTab !== 'individual' && (
-                          <td className="px-4 py-2.5">
-                            <button onClick={() => toggleStudent(student._id)}>
-                              {selectedStudents.has(student._id) ? (
-                                <CheckSquare className="w-4 h-4 text-teal-500" />
-                              ) : (
-                                <Square className="w-4 h-4 text-gray-400" />
-                              )}
-                            </button>
-                          </td>
-                        )}
+                      <tr key={student._id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${isExcluded ? 'opacity-50 bg-red-50/50 dark:bg-red-900/10' : ''}`}>
                         <td className="px-4 py-2.5 font-mono text-xs text-gray-600 dark:text-gray-400">{student.admissionNumber || '-'}</td>
-                        <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">{student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || '-'}</td>
+                        <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">{displayName}</td>
                         <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{student.rollNumber || '-'}</td>
                         <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{student.section || '-'}</td>
                         <td className="px-4 py-2.5">
                           {activeTab === 'individual' ? (
                             <div className="flex gap-1">
-                              <button
-                                onClick={() => { setIndividualStudent(student); setIndividualAction('promote') }}
-                                className="px-2 py-1 text-xs rounded bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/30 dark:text-teal-300"
-                              >
-                                Promote
-                              </button>
-                              <button
-                                onClick={() => { setIndividualStudent(student); setIndividualAction('demote') }}
-                                className="px-2 py-1 text-xs rounded bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300"
-                              >
-                                Demote
-                              </button>
+                              <button onClick={() => { setIndividualStudent(student); setIndividualAction('promote'); setIndividualTargetClass(getNextClass(student.class, classes) || ''); setIndividualTargetSection('') }}
+                                className="px-2 py-1 text-xs rounded bg-teal-50 text-teal-700 hover:bg-teal-100 dark:bg-teal-900/30 dark:text-teal-300">Promote</button>
+                              <button onClick={() => { setIndividualStudent(student); setIndividualAction('demote'); setIndividualTargetClass(''); setIndividualTargetSection('') }}
+                                className="px-2 py-1 text-xs rounded bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300">Demote</button>
+                              <button onClick={() => { setIndividualStudent(student); setIndividualAction('shift'); setIndividualTargetSection('') }}
+                                className="px-2 py-1 text-xs rounded bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300">Shift</button>
                             </div>
                           ) : (
                             <button
@@ -410,17 +413,17 @@ export default function PromotionDashboard() {
           {activeTab !== 'individual' && filteredStudents.length > 0 && (
             <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-700/30 rounded-b-xl">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                <span className="font-medium text-gray-900 dark:text-white">{filteredStudents.length - excludedStudents.size}</span> students will be {activeTab === 'promote' ? 'promoted' : 'demoted'}
-                {excludedStudents.size > 0 && <span className="text-amber-600"> ({excludedStudents.size} excluded)</span>}
-                {targetClass && <span> to <span className="font-medium">{targetClass}</span></span>}
+                <span className="font-semibold text-gray-900 dark:text-white">{promotionCount}</span> of {filteredStudents.length} students will be {activeTab === 'promote' ? 'promoted' : 'demoted'}
+                {excludedStudents.size > 0 && <span className="text-amber-600 ml-1">({excludedStudents.size} excluded)</span>}
+                {targetClass && <span> to <span className="font-medium">{targetClass === 'GRADUATED' ? 'Graduated' : targetClass}</span></span>}
               </div>
               <button
                 onClick={() => setShowConfirm(true)}
-                disabled={bulkPromoteMutation.isPending || !academicYear}
+                disabled={bulkPromoteMutation.isPending || !academicYear || promotionCount === 0 || (activeTab === 'demote' && (!remarks || !targetClass))}
                 className="px-6 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {bulkPromoteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
-                {activeTab === 'promote' ? 'Promote All' : 'Demote All'}
+                {bulkPromoteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : activeTab === 'promote' ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                Execute {activeTab === 'promote' ? 'Promotion' : 'Demotion'} ({promotionCount})
               </button>
             </div>
           )}
@@ -436,28 +439,22 @@ export default function PromotionDashboard() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Confirm Bulk {activeTab === 'promote' ? 'Promotion' : 'Demotion'}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                  This will {activeTab === 'promote' ? 'promote' : 'demote'}{' '}
-                  <strong>{filteredStudents.length - excludedStudents.size}</strong> students from{' '}
+                  This will {activeTab} <strong>{promotionCount}</strong> students from{' '}
                   <strong>{sourceClass}{sourceSection ? `-${sourceSection}` : ''}</strong> to{' '}
                   <strong>{targetClass || 'next class'}</strong> for academic year <strong>{academicYear}</strong>.
                 </p>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">This action can be undone within 7 days.</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">This action can be undone within 7 days from Transition History.</p>
               </div>
             </div>
             <div className="flex gap-3 mt-6 justify-end">
+              <button onClick={() => setShowConfirm(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
               <button
-                onClick={() => setShowConfirm(false)}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBulkPromote}
+                onClick={handleBulkAction}
                 disabled={bulkPromoteMutation.isPending}
                 className="px-4 py-2 text-sm rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 flex items-center gap-2"
               >
                 {bulkPromoteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                Confirm {activeTab === 'promote' ? 'Promotion' : 'Demotion'}
+                Confirm
               </button>
             </div>
           </div>
@@ -468,36 +465,74 @@ export default function PromotionDashboard() {
       {individualStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setIndividualStudent(null)}>
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {individualAction === 'promote' ? 'Promote' : 'Demote'} Student
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+              {individualAction === 'promote' ? 'Promote' : individualAction === 'demote' ? 'Demote' : 'Shift Section'} Student
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
               {individualStudent.name || `${individualStudent.firstName || ''} ${individualStudent.lastName || ''}`.trim()}{' '}
-              ({individualStudent.admissionNumber}) — Currently in {individualStudent.class}-{individualStudent.section}
+              ({individualStudent.admissionNumber}) — {individualStudent.class}-{individualStudent.section}
             </p>
 
             <div className="space-y-3">
+              {/* Action Picker */}
+              <div className="flex gap-2">
+                {['promote', 'demote', 'shift'].map(a => (
+                  <button
+                    key={a}
+                    onClick={() => { setIndividualAction(a); setIndividualTargetClass(''); setIndividualTargetSection('') }}
+                    className={`px-3 py-1.5 text-xs rounded-lg border ${individualAction === a ? 'border-teal-500 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}
+                  >
+                    {a === 'promote' ? 'Promote' : a === 'demote' ? 'Demote' : 'Shift Section'}
+                  </button>
+                ))}
+              </div>
+
+              {individualAction !== 'shift' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Target Class</label>
+                  <select
+                    value={individualTargetClass}
+                    onChange={e => setIndividualTargetClass(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                  >
+                    {individualAction === 'promote' ? (
+                      <>
+                        <option value="">Auto (next class)</option>
+                        {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="GRADUATED">Graduated</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="">Select target class</option>
+                        {demotionClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                      </>
+                    )}
+                  </select>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Target Class</label>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {individualAction === 'shift' ? 'Target Section' : 'Target Section (optional)'}
+                </label>
                 <select
-                  value={targetClass}
-                  onChange={e => setTargetClass(e.target.value)}
+                  value={individualTargetSection}
+                  onChange={e => setIndividualTargetSection(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
                 >
-                  <option value="">Auto (next class)</option>
-                  {classes.map(c => <option key={c} value={c}>{c}</option>)}
-                  <option value="GRADUATED">Graduated</option>
+                  <option value="">{individualAction === 'shift' ? 'Select section' : 'Keep current'}</option>
+                  {sourceSections.filter(s => s !== individualStudent.section).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
 
-              {individualAction === 'demote' && (
+              {(individualAction === 'demote' || individualAction === 'shift') && (
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Reason (required)</label>
                   <input
                     type="text"
                     value={individualReason}
                     onChange={e => setIndividualReason(e.target.value)}
-                    placeholder="Reason for demotion"
+                    placeholder="Reason for this action"
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
                   />
                 </div>
@@ -508,11 +543,17 @@ export default function PromotionDashboard() {
               <button onClick={() => setIndividualStudent(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
               <button
                 onClick={handleIndividualAction}
-                disabled={individualPromoteMutation.isPending || (individualAction === 'demote' && (!individualReason || !targetClass))}
-                className={`px-4 py-2 text-sm rounded-lg text-white flex items-center gap-2 disabled:opacity-50 ${individualAction === 'promote' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-amber-600 hover:bg-amber-700'}`}
+                disabled={
+                  individualMutation.isPending ||
+                  (individualAction === 'demote' && (!individualReason || !individualTargetClass)) ||
+                  (individualAction === 'shift' && !individualTargetSection)
+                }
+                className={`px-4 py-2 text-sm rounded-lg text-white flex items-center gap-2 disabled:opacity-50 ${
+                  individualAction === 'promote' ? 'bg-teal-600 hover:bg-teal-700' : individualAction === 'demote' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
               >
-                {individualPromoteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                {individualAction === 'promote' ? 'Promote' : 'Demote'}
+                {individualMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {individualAction === 'promote' ? 'Promote' : individualAction === 'demote' ? 'Demote' : 'Shift'}
               </button>
             </div>
           </div>
@@ -524,24 +565,28 @@ export default function PromotionDashboard() {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <GraduationCap className="w-5 h-5 text-teal-500" />
-            Promotion Results
+            Results
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            {[
-              { label: 'Promoted', value: results.promoted, color: 'teal' },
-              { label: 'Graduated', value: results.graduated, color: 'blue' },
-              { label: 'Skipped', value: results.skipped, color: 'amber' },
-              { label: 'Failed', value: results.failed, color: 'red' }
-            ].map(stat => (
-              <div key={stat.label} className={`p-3 rounded-lg bg-${stat.color}-50 dark:bg-${stat.color}-900/20 border border-${stat.color}-200 dark:border-${stat.color}-800`}>
-                <p className={`text-2xl font-bold text-${stat.color}-600 dark:text-${stat.color}-400`}>{stat.value}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">{stat.label}</p>
-              </div>
-            ))}
+            <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
+              <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">{results.promoted || 0}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Promoted</p>
+            </div>
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{results.graduated || 0}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Graduated</p>
+            </div>
+            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{results.skipped || 0}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Skipped</p>
+            </div>
+            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+              <p className="text-2xl font-bold text-red-600 dark:text-red-400">{results.failed || 0}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">Failed</p>
+            </div>
           </div>
 
-          {/* Detailed results */}
-          {results.details && results.details.length > 0 && (
+          {results.details?.length > 0 && (
             <details className="mt-4">
               <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-teal-600">
                 View detailed results ({results.details.length} entries)
@@ -567,7 +612,7 @@ export default function PromotionDashboard() {
                             'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
                           }`}>{d.status}</span>
                         </td>
-                        <td className="px-3 py-1.5 text-gray-500">{d.reason || (d.toClass ? `→ ${d.toClass}-${d.toSection || ''}` : '')}</td>
+                        <td className="px-3 py-1.5 text-gray-500">{d.reason || (d.toClass ? `→ ${d.toClass}${d.toSection ? `-${d.toSection}` : ''}` : '')}</td>
                       </tr>
                     ))}
                   </tbody>

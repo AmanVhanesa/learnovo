@@ -12,16 +12,21 @@ import ProtectedRoute from './components/ProtectedRoute'
 import SuperAdminRoute from './components/superadmin/SuperAdminRoute'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
+import { setPageErrorBoundaryQueryClient } from './components/PageErrorBoundary'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30 * 1000,
       refetchOnWindowFocus: true,
-      retry: 1,
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
     },
   },
 })
+
+// Allow PageErrorBoundary to clear query cache on retry
+setPageErrorBoundaryQueryClient(queryClient)
 
 // ── Public / auth pages — kept eager (tiny, shown before auth)
 import Landing from './pages/Landing'
@@ -53,7 +58,6 @@ const SuperAdminLayout = lazy(() => import('./components/superadmin/SuperAdminLa
 // ── App pages — all lazy-loaded for code splitting
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Students = lazy(() => import('./pages/Students'))
-const BulkPromotion = lazy(() => import('./pages/BulkPromotion'))
 const PromotionDashboard = lazy(() => import('./pages/PromotionDashboard'))
 const SectionManagement = lazy(() => import('./pages/SectionManagement'))
 const YearRollover = lazy(() => import('./pages/YearRollover'))
@@ -235,11 +239,6 @@ function App() {
                       <Route path="students" element={
                         <ProtectedRoute allowedRoles={['admin', 'teacher', 'parent']}>
                           <Students />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="students/bulk-promote" element={
-                        <ProtectedRoute allowedRoles={['admin']}>
-                          <BulkPromotion />
                         </ProtectedRoute>
                       } />
                       <Route path="academic/promotion" element={

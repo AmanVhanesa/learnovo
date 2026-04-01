@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { transitionsService } from '../services/transitionsService'
 import { studentsService } from '../services/studentsService'
+import { sortClasses } from '../utils/classOrder'
 
 export default function SectionManagement() {
   const queryClient = useQueryClient()
@@ -51,12 +52,14 @@ export default function SectionManagement() {
       class: selectedClass,
       section: shiftFromSection || undefined,
       status: 'active',
-      limit: 500
+      limit: 500,
+      lightweight: true
     }),
     enabled: !!selectedClass && activeTab === 'shift' && !!shiftFromSection
   })
 
-  const classes = filtersData?.data?.classes || filtersData?.classes || []
+  const rawClasses = filtersData?.data?.classes || filtersData?.classes || []
+  const classes = useMemo(() => sortClasses(rawClasses), [rawClasses])
   const classSections = sectionsData?.data || [] // [{name, studentCount, capacity, currentStrength}]
   const students = studentsData?.data || studentsData?.students || []
 

@@ -160,13 +160,9 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       }
     }
 
-    // Add section filter — SIMPLE STRING MATCH ONLY (no sectionId!)
-    // Using sectionId caused students with orphaned/deleted section IDs to be invisible.
-    // The section string field is always reliable.
+    // Add section filter — exact match (sections are stored uppercase)
     if (req.query.section) {
-      const sectionStr = req.query.section.trim();
-      // Case-insensitive exact match
-      filter.section = new RegExp(`^${sectionStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      filter.section = req.query.section.trim().toUpperCase();
     }
 
     // Add academic year filter
@@ -197,30 +193,32 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       ];
     }
 
-    // Get students
-    let students;
-    try {
-      students = await User.find(filter)
-        .select('-password')
-        .populate({ path: 'classId', select: 'name grade', strictPopulate: false })
-        .populate({ path: 'subDepartment', select: 'name', strictPopulate: false })
-        .populate({ path: 'driverId', select: 'name phone', strictPopulate: false })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
-    } catch (populateError) {
-      // Populate failed (e.g. ref model not loaded) — retry without populates
-      logger.error('GET /students populate error (retrying without populate)', populateError, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });
-      students = await User.find(filter)
-        .select('-password')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
-    }
+    // Determine if this is a lightweight list request (e.g. for promotion/section pages)
+    const isLightweight = req.query.lightweight === 'true';
+    const selectFields = isLightweight
+      ? '_id name firstName lastName fullName admissionNumber rollNumber class section classId sectionId academicYear isActive gender photo'
+      : '-password';
 
-    const total = await User.countDocuments(filter);
+    // Run count and find in parallel for speed
+    const [students, total] = await Promise.all([
+      User.find(filter)
+        .select(selectFields)
+        .populate(isLightweight ? [] : [
+          { path: 'classId', select: 'name grade', strictPopulate: false },
+          { path: 'subDepartment', select: 'name', strictPopulate: false },
+          { path: 'driverId', select: 'name phone', strictPopulate: false }
+        ])
+        .sort(req.query.search ? { score: { $meta: 'textScore' } } : { name: 1, admissionNumber: 1 })
+        .collation({ locale: 'en', numericOrdering: true })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .catch(async() => {
+          // Populate failed — retry without
+          return User.find(filter).select(selectFields).sort({ name: 1 }).skip(skip).limit(limit).lean();
+        }),
+      User.countDocuments(filter)
+    ]);
 
     // 30s private cache — safe for auth endpoints; avoids repeat fetches on quick back-nav
     res.set('Cache-Control', 'no-cache');
@@ -1410,7 +1408,15 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
       Driver.find({ tenantId, isActive: true }).select('_id name').sort({ name: 1 })
     ]);
 
-    // Sort values for better UI
+    // Sort classes in educational hierarchy order (Nursery → LKG → UKG → 1 → 2 → ...)
+    const prePrimaryOrder = { 'pre-nursery': 0, 'nursery': 1, 'lkg': 2, 'ukg': 3, 'jr. kg': 2, 'sr. kg': 3, 'playgroup': 0 };
+    const getClassOrder = (name) => {
+      if (!name) return 9999;
+      const n = name.toString().trim().toLowerCase();
+      if (prePrimaryOrder[n] !== undefined) return prePrimaryOrder[n] - 100;
+      const num = parseInt(n.replace(/^(class|grade|std|standard)\s*/i, ''), 10);
+      return isNaN(num) ? 9000 : num;
+    };
     const sortAlphaNum = (a, b) => {
       return a.toString().localeCompare(b.toString(), undefined, { numeric: true, sensitivity: 'base' });
     };
@@ -1418,7 +1424,7 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
     res.json({
       success: true,
       data: {
-        classes: classes.filter(Boolean).sort(sortAlphaNum),
+        classes: classes.filter(Boolean).sort((a, b) => getClassOrder(a) - getClassOrder(b)),
         sections: sections.filter(Boolean).sort(sortAlphaNum),
         academicYears: academicYears.filter(Boolean).sort().reverse(), // Newest first
         genders: ['Male', 'Female', 'Other'],
