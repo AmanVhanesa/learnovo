@@ -603,7 +603,7 @@ function buildTCWordHtml(data, cert, logoDataUri, signatureDataUri) {
     const valWeight = r.bold ? 'font-weight:700;color:#111827;' : 'font-weight:500;color:#374151;';
     return `<tr style="background:${bg};">
       <td style="width:30px;text-align:center;font-size:9pt;font-weight:600;color:#4b5563;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:4px 4px;">${r.num}</td>
-      <td style="width:42%;font-size:10pt;font-weight:600;color:#1f2937;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:4px 10px;">${r.label}</td>
+      <td style="width:300px;font-size:10pt;font-weight:600;color:#1f2937;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:4px 10px;">${r.label}</td>
       <td style="font-size:10pt;${valWeight}border-bottom:1px solid #e5e7eb;padding:4px 10px;">${r.val}</td>
     </tr>`;
   }).join('\n');
@@ -621,7 +621,7 @@ function buildTCWordHtml(data, cert, logoDataUri, signatureDataUri) {
   <table style="width:100%;margin-bottom:6px;">
     <tr>
       ${logoDataUri ? `<td style="width:90px;vertical-align:top;padding:4px 10px 0 0;">
-        <img src="${logoDataUri}" alt="School Logo" style="width:85px;height:85px;object-fit:contain;" />
+        <img src="${logoDataUri}" alt="School Logo" style="width:85px;height:85px;" />
       </td>` : ''}
       <td style="text-align:center;vertical-align:top;">
         <p style="font-family:Georgia,'Times New Roman',serif;font-size:22pt;font-weight:800;color:#1F6F6D;letter-spacing:2px;text-transform:uppercase;margin:0;line-height:1.1;">${schoolName}</p>
@@ -690,15 +690,15 @@ function buildTCWordHtml(data, cert, logoDataUri, signatureDataUri) {
   <!-- SIGNATURES -->
   <table style="width:100%;margin-top:40px;">
     <tr>
-      <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:50px;">
+      <td style="width:240px;text-align:center;vertical-align:bottom;padding-top:50px;">
         <hr style="width:110px;border:none;height:1px;background:#9ca3af;margin:0 auto 4px;" />
         <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Class Teacher</p>
       </td>
-      <td style="width:34%;text-align:center;vertical-align:bottom;">
+      <td style="width:240px;text-align:center;vertical-align:bottom;">
         <div style="width:90px;height:90px;border:2px dashed #d1d5db;margin:0 auto;">&nbsp;</div>
       </td>
-      <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:10px;">
-        ${signatureDataUri ? `<img src="${signatureDataUri}" alt="Principal Signature" style="max-height:70px;max-width:150px;display:block;margin:0 auto 4px;object-fit:contain;" />` : ''}
+      <td style="width:240px;text-align:center;vertical-align:bottom;padding-top:10px;">
+        ${signatureDataUri ? `<img src="${signatureDataUri}" alt="Principal Signature" style="max-height:70px;max-width:150px;display:block;margin:0 auto 4px;" />` : ''}
         <hr style="width:110px;border:none;height:1px;background:#9ca3af;margin:0 auto 4px;" />
         <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Principal</p>
       </td>
@@ -752,7 +752,7 @@ function buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri) {
   <table style="width:100%;margin-bottom:6px;">
     <tr>
       ${logoDataUri ? `<td style="width:90px;vertical-align:top;padding:4px 10px 0 0;">
-        <img src="${logoDataUri}" alt="School Logo" style="width:85px;height:85px;object-fit:contain;" />
+        <img src="${logoDataUri}" alt="School Logo" style="width:85px;height:85px;" />
       </td>` : ''}
       <td style="text-align:center;vertical-align:top;">
         <p style="font-family:Georgia,'Times New Roman',serif;font-size:22pt;font-weight:800;color:#1F6F6D;letter-spacing:2px;text-transform:uppercase;margin:0;line-height:1.1;">${schoolName}</p>
@@ -818,41 +818,41 @@ function buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri) {
   <!-- DETAILS GRID -->
   <table style="width:100%;background:#f0fdfa;border:1px solid #e5e7eb;margin-bottom:14px;">
     <tr>
-      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+      <td style="width:360px;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Student Name</p>
         <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${studentName}</p>
       </td>
-      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+      <td style="width:360px;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Admission Number</p>
         <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${admNo}</p>
       </td>
     </tr>
     <tr>
-      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+      <td style="width:360px;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Father's Name</p>
         <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${fatherName}</p>
       </td>
-      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+      <td style="width:360px;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Mother's Name</p>
         <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${motherName}</p>
       </td>
     </tr>
     <tr>
-      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+      <td style="width:360px;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Class &amp; Section</p>
         <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${className} - ${section}</p>
       </td>
-      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+      <td style="width:360px;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Date of Birth</p>
         <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${dob}</p>
       </td>
     </tr>
     <tr>
-      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+      <td style="width:360px;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Academic Session</p>
         <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${academicYear}</p>
       </td>
-      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+      <td style="width:360px;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Board / Affiliation</p>
         <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${schoolBoard}</p>
       </td>
@@ -873,15 +873,15 @@ function buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri) {
   <!-- SIGNATURES -->
   <table style="width:100%;margin-top:40px;">
     <tr>
-      <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:50px;">
+      <td style="width:240px;text-align:center;vertical-align:bottom;padding-top:50px;">
         <hr style="width:110px;border:none;height:1px;background:#9ca3af;margin:0 auto 4px;" />
         <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Class Teacher</p>
       </td>
-      <td style="width:34%;text-align:center;vertical-align:bottom;">
+      <td style="width:240px;text-align:center;vertical-align:bottom;">
         <div style="width:90px;height:90px;border:2px dashed #d1d5db;margin:0 auto;">&nbsp;</div>
       </td>
-      <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:10px;">
-        ${signatureDataUri ? `<img src="${signatureDataUri}" alt="Principal Signature" style="max-height:70px;max-width:150px;display:block;margin:0 auto 4px;object-fit:contain;" />` : ''}
+      <td style="width:240px;text-align:center;vertical-align:bottom;padding-top:10px;">
+        ${signatureDataUri ? `<img src="${signatureDataUri}" alt="Principal Signature" style="max-height:70px;max-width:150px;display:block;margin:0 auto 4px;" />` : ''}
         <hr style="width:110px;border:none;height:1px;background:#9ca3af;margin:0 auto 4px;" />
         <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Principal</p>
       </td>
