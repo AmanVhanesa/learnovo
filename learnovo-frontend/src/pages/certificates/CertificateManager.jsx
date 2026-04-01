@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award, Eye, X, Printer } from 'lucide-react';
+import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award, Eye, X, Printer, FileDown } from 'lucide-react';
 import certificateService from '../../services/certificateService';
 import { formatDate } from '../../utils/formatDate';
 import { reportsService } from '../../services/reportsService';
@@ -60,13 +60,63 @@ const CertificateManager = () => {
         deleteMutation.mutate(id);
     };
 
+    const handleDownloadWord = async (cert) => {
+        try {
+            const studentName = (cert.student?.fullName || cert.student?.name || 'certificate').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
+            const token = localStorage.getItem('token');
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+            const response = await fetch(`${API_URL}/certificates/${cert._id}/download-word`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Download failed');
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${cert.type}_${studentName}.docx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success('Word document downloaded');
+        } catch (error) {
+            toast.error('Word download failed');
+        }
+    };
+
     const openEditModal = (cert) => {
         setEditingCert(cert);
+        const s = cert.contentSnapshot || {};
         setEditForm({
-            remarks: cert.contentSnapshot?.remarks || '',
-            leavingReason: cert.contentSnapshot?.leavingReason || '',
-            conduct: cert.contentSnapshot?.conduct || '',
-            boardResult: cert.contentSnapshot?.boardResult || ''
+            // Student details
+            studentName: s.studentName || '',
+            fatherName: s.fatherName || '',
+            motherName: s.motherName || '',
+            dob: s.dob || '',
+            dobWords: s.dobWords || '',
+            admissionNumber: s.admissionNumber || '',
+            class: s.class || '',
+            section: s.section || '',
+            academicYear: s.academicYear || '',
+            nationality: s.nationality || '',
+            category: s.category || '',
+            penNumber: s.penNumber || '',
+            srNumber: s.srNumber || '',
+            // Dates & place
+            issueDate: s.issueDate || '',
+            applicationDate: s.applicationDate || '',
+            place: s.place || '',
+            // TC-specific
+            admissionDate: s.admissionDate || '',
+            boardResult: s.boardResult || '',
+            promotionStatus: s.promotionStatus || '',
+            subjects: s.subjects || '',
+            feeStatus: s.feeStatus || '',
+            conduct: s.conduct || '',
+            leavingReason: s.leavingReason || '',
+            remarks: s.remarks || '',
+            // Bonafide-specific
+            purpose: s.purpose || '',
         });
     };
 
@@ -138,7 +188,8 @@ const CertificateManager = () => {
                                     <div className="flex items-center justify-end gap-1">
                                         <button onClick={() => handlePreviewCert(cert)} className="btn-icon" title="Preview"><Eye className="h-4 w-4" /></button>
                                         <button onClick={() => handlePrint(cert)} className="btn-icon" title="Print"><Printer className="h-4 w-4" /></button>
-                                        <button onClick={() => handleDownload(cert)} className="btn-icon" title="Download"><Download className="h-4 w-4" /></button>
+                                        <button onClick={() => handleDownload(cert)} className="btn-icon" title="Download PDF"><Download className="h-4 w-4" /></button>
+                                        <button onClick={() => handleDownloadWord(cert)} className="btn-icon" title="Download Word"><FileDown className="h-4 w-4" /></button>
                                         <button onClick={() => openEditModal(cert)} className="btn-icon" title="Edit"><Edit className="h-4 w-4" /></button>
                                         <button onClick={() => handleDelete(cert._id)} className="btn-icon hover:!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/20" title="Delete"><Trash2 className="h-4 w-4" /></button>
                                     </div>
@@ -255,48 +306,175 @@ const CertificateManager = () => {
             {/* Edit Modal */}
             {editingCert && createPortal(
                 <div className="modal-overlay" onClick={() => setEditingCert(null)}>
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-md w-full mx-4 animate-scale-in" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b border-gray-100 dark:border-[#38383A]">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-2xl w-full mx-4 animate-scale-in max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-[#38383A] flex items-center justify-between shrink-0">
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Certificate Details</h3>
+                            <button onClick={() => setEditingCert(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-white"><X className="h-5 w-5" /></button>
                         </div>
-                        <form onSubmit={handleUpdate} className="p-6 space-y-4">
+                        <form onSubmit={handleUpdate} className="p-6 space-y-5 overflow-y-auto flex-1">
+                            {/* Student Information */}
                             <div>
-                                <label className="label mb-1.5 block">Reason for Leaving (TC)</label>
-                                <div className="space-y-2">
-                                    <select
-                                        className="input"
-                                        value={['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(editForm.leavingReason) ? editForm.leavingReason : 'Other'}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setEditForm({ ...editForm, leavingReason: val === 'Other' ? '' : val });
-                                        }}
-                                    >
-                                        <option value="Parent Request">Parent Request</option>
-                                        <option value="Completed Studies">Completed Studies</option>
-                                        <option value="Transfer">Transfer</option>
-                                        <option value="Medical Grounds">Medical Grounds</option>
-                                        <option value="Other">Other (Custom)</option>
-                                    </select>
-                                    {!['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(editForm.leavingReason) && (
-                                        <input type="text" placeholder="Enter custom reason" className="input bg-gray-50 dark:bg-[#1C1C1E]" value={editForm.leavingReason} onChange={e => setEditForm({ ...editForm, leavingReason: e.target.value })} />
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Student Information</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Student Name</label>
+                                        <input type="text" className="input" value={editForm.studentName} onChange={e => setEditForm({ ...editForm, studentName: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Father&apos;s Name</label>
+                                        <input type="text" className="input" value={editForm.fatherName} onChange={e => setEditForm({ ...editForm, fatherName: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Mother&apos;s Name</label>
+                                        <input type="text" className="input" value={editForm.motherName} onChange={e => setEditForm({ ...editForm, motherName: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Date of Birth</label>
+                                        <input type="text" className="input" value={editForm.dob} onChange={e => setEditForm({ ...editForm, dob: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">DOB in Words</label>
+                                        <input type="text" className="input" value={editForm.dobWords} onChange={e => setEditForm({ ...editForm, dobWords: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Admission Number</label>
+                                        <input type="text" className="input" value={editForm.admissionNumber} onChange={e => setEditForm({ ...editForm, admissionNumber: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Class</label>
+                                        <input type="text" className="input" value={editForm.class} onChange={e => setEditForm({ ...editForm, class: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Section</label>
+                                        <input type="text" className="input" value={editForm.section} onChange={e => setEditForm({ ...editForm, section: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Academic Year</label>
+                                        <input type="text" className="input" value={editForm.academicYear} onChange={e => setEditForm({ ...editForm, academicYear: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Nationality</label>
+                                        <input type="text" className="input" value={editForm.nationality} onChange={e => setEditForm({ ...editForm, nationality: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Category</label>
+                                        <input type="text" className="input" value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">PEN Number</label>
+                                        <input type="text" className="input" value={editForm.penNumber} onChange={e => setEditForm({ ...editForm, penNumber: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">SR / GR Number</label>
+                                        <input type="text" className="input" value={editForm.srNumber} onChange={e => setEditForm({ ...editForm, srNumber: e.target.value })} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Dates & Place */}
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Dates & Place</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Issue Date</label>
+                                        <input type="text" className="input" value={editForm.issueDate} onChange={e => setEditForm({ ...editForm, issueDate: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Place</label>
+                                        <input type="text" className="input" value={editForm.place} onChange={e => setEditForm({ ...editForm, place: e.target.value })} />
+                                    </div>
+                                    {editingCert.type === 'TC' && (
+                                        <>
+                                            <div>
+                                                <label className="label mb-1 block text-xs">Application Date</label>
+                                                <input type="text" className="input" value={editForm.applicationDate} onChange={e => setEditForm({ ...editForm, applicationDate: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="label mb-1 block text-xs">Date of Admission</label>
+                                                <input type="text" className="input" value={editForm.admissionDate} onChange={e => setEditForm({ ...editForm, admissionDate: e.target.value })} />
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             </div>
+
+                            {/* TC-Specific Fields */}
+                            {editingCert.type === 'TC' && (
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Transfer Certificate Details</h4>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="label mb-1 block text-xs">Conduct</label>
+                                            <input type="text" className="input" value={editForm.conduct} onChange={e => setEditForm({ ...editForm, conduct: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className="label mb-1 block text-xs">Board Exam Result</label>
+                                            <input type="text" className="input" value={editForm.boardResult} onChange={e => setEditForm({ ...editForm, boardResult: e.target.value })} />
+                                        </div>
+                                        <div>
+                                            <label className="label mb-1 block text-xs">Promotion Status</label>
+                                            <select className="input" value={editForm.promotionStatus} onChange={e => setEditForm({ ...editForm, promotionStatus: e.target.value })}>
+                                                <option value="Yes">Yes</option>
+                                                <option value="No">No</option>
+                                                <option value="N/A">N/A</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="label mb-1 block text-xs">Fee Status</label>
+                                            <input type="text" className="input" value={editForm.feeStatus} onChange={e => setEditForm({ ...editForm, feeStatus: e.target.value })} />
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="label mb-1 block text-xs">Reason for Leaving</label>
+                                            <div className="space-y-2">
+                                                <select
+                                                    className="input"
+                                                    value={['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(editForm.leavingReason) ? editForm.leavingReason : 'Other'}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setEditForm({ ...editForm, leavingReason: val === 'Other' ? '' : val });
+                                                    }}
+                                                >
+                                                    <option value="Parent Request">Parent Request</option>
+                                                    <option value="Completed Studies">Completed Studies</option>
+                                                    <option value="Transfer">Transfer</option>
+                                                    <option value="Medical Grounds">Medical Grounds</option>
+                                                    <option value="Other">Other (Custom)</option>
+                                                </select>
+                                                {!['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(editForm.leavingReason) && (
+                                                    <input type="text" placeholder="Enter custom reason" className="input bg-gray-50 dark:bg-[#1C1C1E]" value={editForm.leavingReason} onChange={e => setEditForm({ ...editForm, leavingReason: e.target.value })} />
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="label mb-1 block text-xs">Subjects Studied</label>
+                                            <textarea className="input min-h-[60px]" rows="2" value={editForm.subjects} onChange={e => setEditForm({ ...editForm, subjects: e.target.value })} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Bonafide-Specific Fields */}
+                            {editingCert.type === 'BONAFIDE' && (
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Bonafide Details</h4>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">Purpose</label>
+                                        <input type="text" className="input" value={editForm.purpose} onChange={e => setEditForm({ ...editForm, purpose: e.target.value })} />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Remarks (both types) */}
                             <div>
-                                <label className="label mb-1.5 block">Conduct</label>
-                                <input type="text" className="input" value={editForm.conduct} onChange={e => setEditForm({ ...editForm, conduct: e.target.value })} />
+                                <label className="label mb-1 block text-xs">Remarks</label>
+                                <textarea className="input min-h-[70px]" rows="2" value={editForm.remarks} onChange={e => setEditForm({ ...editForm, remarks: e.target.value })} />
                             </div>
-                            <div>
-                                <label className="label mb-1.5 block">Board Exam Result</label>
-                                <input type="text" className="input" value={editForm.boardResult} onChange={e => setEditForm({ ...editForm, boardResult: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="label mb-1.5 block">Remarks</label>
-                                <textarea className="input min-h-[80px]" rows="3" value={editForm.remarks} onChange={e => setEditForm({ ...editForm, remarks: e.target.value })} />
-                            </div>
+
                             <div className="flex justify-end gap-2 pt-4 border-t border-gray-100 dark:border-[#38383A]">
                                 <button type="button" onClick={() => setEditingCert(null)} className="btn btn-outline">Cancel</button>
-                                <button type="submit" className="btn btn-primary">Save Changes</button>
+                                <button type="submit" className="btn btn-primary" disabled={updateMutation.isPending}>
+                                    {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -343,6 +521,13 @@ const CertificateManager = () => {
                             >
                                 <Download className="h-4 w-4" />
                                 Export as PDF
+                            </button>
+                            <button
+                                onClick={() => { setPreviewCert(null); handleDownloadWord(previewCert); }}
+                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
+                            >
+                                <FileDown className="h-4 w-4" />
+                                Export as Word
                             </button>
                             <button
                                 onClick={() => setPreviewCert(null)}

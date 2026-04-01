@@ -182,12 +182,12 @@ export default function SectionManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Section Management</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Shift students between sections, merge or split sections</p>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Shift students between sections, merge or split sections</p>
         </div>
         <button
           onClick={() => recalcMutation.mutate()}
           disabled={recalcMutation.isPending}
-          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
         >
           <RefreshCw className={`w-4 h-4 ${recalcMutation.isPending ? 'animate-spin' : ''}`} />
           Recalculate Strengths
@@ -195,7 +195,7 @@ export default function SectionManagement() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex gap-2 border-b border-gray-200 dark:border-[#38383A]">
         {[
           { key: 'shift', label: 'Section Shift', icon: ArrowRightLeft },
           { key: 'merge', label: 'Merge Sections', icon: Merge },
@@ -207,7 +207,7 @@ export default function SectionManagement() {
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
               activeTab === tab.key
                 ? 'border-teal-500 text-teal-600 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-900/20'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-[#8E8E93]'
             }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -217,14 +217,14 @@ export default function SectionManagement() {
       </div>
 
       {/* Class Selector + Section Overview */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Class</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Class</label>
             <select
               value={selectedClass}
               onChange={e => handleClassChange(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+              className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
             >
               <option value="">Select class</option>
               {classes.map(c => <option key={c} value={c}>{c}</option>)}
@@ -235,11 +235,11 @@ export default function SectionManagement() {
           {activeTab === 'shift' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">From Section</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">From Section</label>
                 <select
                   value={shiftFromSection}
                   onChange={e => { setShiftFromSection(e.target.value); setShiftStudentIds(new Set()) }}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
                   disabled={!selectedClass || loadingSections}
                 >
                   <option value="">Select section</option>
@@ -249,11 +249,11 @@ export default function SectionManagement() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To Section</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">To Section</label>
                 <select
                   value={shiftToSection}
                   onChange={e => setShiftToSection(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
                   disabled={!selectedClass || loadingSections}
                 >
                   <option value="">Select target section</option>
@@ -268,7 +268,7 @@ export default function SectionManagement() {
           {activeTab === 'merge' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Sections (to dissolve)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Source Sections (to dissolve)</label>
                 {loadingSections ? (
                   <div className="flex items-center gap-2 mt-2 text-sm text-gray-400"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
                 ) : sectionNames.length === 0 ? (
@@ -288,10 +288,10 @@ export default function SectionManagement() {
                             mergeSources.includes(s)
                               ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300'
                               : isTarget
-                                ? 'border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed'
+                                ? 'border-gray-200 bg-gray-100 text-gray-400 dark:border-[#38383A] dark:bg-[#1C1C1E] dark:text-[#636366] cursor-not-allowed'
                                 : isEmpty
-                                  ? 'border-gray-200 bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500'
-                                  : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                  ? 'border-gray-200 bg-gray-50 text-gray-400 dark:border-[#38383A] dark:bg-[#1C1C1E] dark:text-[#8E8E93]'
+                                  : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
                           }`}
                         >
                           {s} <span className="text-xs opacity-70">({count})</span>
@@ -302,7 +302,7 @@ export default function SectionManagement() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Sections (absorb into)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Target Sections (absorb into)</label>
                 {!loadingSections && sectionNames.length > 0 && (
                   <>
                     <div className="flex flex-wrap gap-2 mt-1">
@@ -315,7 +315,7 @@ export default function SectionManagement() {
                             className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                               mergeTargets.includes(s)
                                 ? 'border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
-                                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
                             }`}
                           >
                             {s} <span className="text-xs opacity-70">({count})</span>
@@ -324,11 +324,11 @@ export default function SectionManagement() {
                       })}
                     </div>
                     <div className="mt-2">
-                      <label className="text-xs text-gray-500 dark:text-gray-400">Distribution:</label>
+                      <label className="text-xs text-gray-500 dark:text-[#8E8E93]">Distribution:</label>
                       <select
                         value={mergeDistribution}
                         onChange={e => setMergeDistribution(e.target.value)}
-                        className="ml-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 text-xs"
+                        className="ml-2 rounded border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-2 py-1 text-xs"
                       >
                         <option value="even">Even</option>
                         <option value="manual">Manual</option>
@@ -343,11 +343,11 @@ export default function SectionManagement() {
           {activeTab === 'split' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Section (to split)</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Source Section (to split)</label>
                 <select
                   value={splitSource}
                   onChange={e => setSplitSource(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
                   disabled={!selectedClass || loadingSections}
                 >
                   <option value="">Select section</option>
@@ -357,7 +357,7 @@ export default function SectionManagement() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Sections</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Target Sections</label>
                 {!loadingSections && sectionNames.length > 0 ? (
                   <>
                     <div className="flex flex-wrap gap-2 mt-1">
@@ -368,7 +368,7 @@ export default function SectionManagement() {
                           className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                             splitTargets.includes(s)
                               ? 'border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
-                              : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
                           }`}
                         >
                           {s} <span className="text-xs opacity-70">({getStudentCount(s)})</span>
@@ -376,11 +376,11 @@ export default function SectionManagement() {
                       ))}
                     </div>
                     <div className="mt-2">
-                      <label className="text-xs text-gray-500 dark:text-gray-400">Distribution:</label>
+                      <label className="text-xs text-gray-500 dark:text-[#8E8E93]">Distribution:</label>
                       <select
                         value={splitDistribution}
                         onChange={e => setSplitDistribution(e.target.value)}
-                        className="ml-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 text-xs"
+                        className="ml-2 rounded border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-2 py-1 text-xs"
                       >
                         <option value="even">Even</option>
                         <option value="manual">Manual</option>
@@ -397,13 +397,13 @@ export default function SectionManagement() {
 
         {/* Section Overview (when class selected) */}
         {selectedClass && classSections.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Section Overview for {selectedClass}</p>
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-[#38383A]">
+            <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-2">Section Overview for {selectedClass}</p>
             <div className="flex flex-wrap gap-2">
               {classSections.map(s => (
-                <div key={s.name} className="px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-sm">
+                <div key={s.name} className="px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] text-sm">
                   <span className="font-medium text-gray-900 dark:text-white">{s.name}</span>
-                  <span className="text-gray-500 dark:text-gray-400 ml-1.5">{s.studentCount} / {s.capacity}</span>
+                  <span className="text-gray-500 dark:text-[#8E8E93] ml-1.5">{s.studentCount} / {s.capacity}</span>
                 </div>
               ))}
             </div>
@@ -447,8 +447,8 @@ export default function SectionManagement() {
 
       {/* Student List (for shift tab) */}
       {activeTab === 'shift' && selectedClass && shiftFromSection && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A]">
+          <div className="p-4 border-b border-gray-200 dark:border-[#38383A]">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
               Students in {selectedClass}-{shiftFromSection}
               <span className="ml-2 text-gray-500 font-normal">({students.length})</span>
@@ -465,7 +465,7 @@ export default function SectionManagement() {
           ) : (
             <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700/50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <thead className="sticky top-0 bg-gray-50 dark:bg-[#2C2C2E] text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3 w-10">
                       <input
@@ -483,9 +483,9 @@ export default function SectionManagement() {
                     <th className="px-4 py-3">Roll No</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
                   {students.map(s => (
-                    <tr key={s._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                    <tr key={s._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/50">
                       <td className="px-4 py-2.5">
                         <input
                           type="checkbox"
@@ -494,9 +494,9 @@ export default function SectionManagement() {
                           className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
                         />
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600 dark:text-gray-400">{s.admissionNumber || '-'}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600 dark:text-[#8E8E93]">{s.admissionNumber || '-'}</td>
                       <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">{s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim() || '-'}</td>
-                      <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{s.rollNumber || '-'}</td>
+                      <td className="px-4 py-2.5 text-gray-600 dark:text-[#8E8E93]">{s.rollNumber || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -509,14 +509,14 @@ export default function SectionManagement() {
       {/* Confirmation Dialog */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowConfirm(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Confirm {showConfirm === 'shift' ? 'Section Shift' : showConfirm === 'merge' ? 'Section Merge' : 'Section Split'}
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                <p className="text-sm text-gray-600 dark:text-[#8E8E93] mt-2">
                   {showConfirm === 'shift' && `Move ${shiftStudentIds.size > 0 ? shiftStudentIds.size : 'all'} students from ${selectedClass}-${shiftFromSection} to ${selectedClass}-${shiftToSection}`}
                   {showConfirm === 'merge' && `Merge sections ${mergeSources.join(', ')} into ${mergeTargets.join(', ')} for class ${selectedClass}`}
                   {showConfirm === 'split' && `Split section ${splitSource} into ${splitTargets.join(', ')} for class ${selectedClass}`}
@@ -524,7 +524,7 @@ export default function SectionManagement() {
               </div>
             </div>
             <div className="flex gap-3 mt-6 justify-end">
-              <button onClick={() => setShowConfirm(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+              <button onClick={() => setShowConfirm(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">Cancel</button>
               <button
                 onClick={() => {
                   if (showConfirm === 'shift') handleShift()
@@ -544,20 +544,20 @@ export default function SectionManagement() {
 
       {/* Results */}
       {results && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Results</h3>
           {results.shifted !== undefined && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">{results.shifted} students shifted, {results.skipped} skipped, {results.failed} failed</p>
+            <p className="text-sm text-gray-600 dark:text-[#8E8E93]">{results.shifted} students shifted, {results.skipped} skipped, {results.failed} failed</p>
           )}
           {results.merged !== undefined && (
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{results.merged} students redistributed</p>
+              <p className="text-sm text-gray-600 dark:text-[#8E8E93]">{results.merged} students redistributed</p>
               {results.distribution && (
                 <div className="mt-2 flex gap-3">
                   {Object.entries(results.distribution).map(([sec, count]) => (
                     <div key={sec} className="px-3 py-2 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
                       <span className="text-lg font-bold text-teal-600 dark:text-teal-400">{count}</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">→ Section {sec}</span>
+                      <span className="text-xs text-gray-500 dark:text-[#8E8E93] ml-1">→ Section {sec}</span>
                     </div>
                   ))}
                 </div>

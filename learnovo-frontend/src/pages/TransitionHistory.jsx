@@ -82,14 +82,14 @@ export default function TransitionHistory() {
             <History className="w-7 h-7 text-teal-500" />
             Transition History
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">View and manage all student transitions</p>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">View and manage all student transitions</p>
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors ${
             hasActiveFilters
               ? 'border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/20 dark:text-teal-300'
-              : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+              : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
           }`}
         >
           <Filter className="w-4 h-4" />
@@ -100,7 +100,7 @@ export default function TransitionHistory() {
 
       {/* Filters */}
       {showFilters && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Filters</h3>
             {hasActiveFilters && (
@@ -111,11 +111,11 @@ export default function TransitionHistory() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Type</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">Type</label>
               <select
                 value={filters.type}
                 onChange={e => handleFilterChange('type', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
               >
                 <option value="">All types</option>
                 {Object.entries(TYPE_LABELS).map(([key, val]) => (
@@ -124,29 +124,29 @@ export default function TransitionHistory() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From Date</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">From Date</label>
               <input
                 type="date"
                 value={filters.fromDate}
                 onChange={e => handleFilterChange('fromDate', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To Date</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">To Date</label>
               <input
                 type="date"
                 value={filters.toDate}
                 onChange={e => handleFilterChange('toDate', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Per Page</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">Per Page</label>
               <select
                 value={filters.limit}
                 onChange={e => handleFilterChange('limit', parseInt(e.target.value))}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
               >
                 {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
@@ -156,7 +156,7 @@ export default function TransitionHistory() {
       )}
 
       {/* Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin text-teal-500" />
@@ -164,14 +164,14 @@ export default function TransitionHistory() {
           </div>
         ) : logs.length === 0 ? (
           <div className="py-16 text-center">
-            <History className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">No transition records found</p>
+            <History className="w-10 h-10 text-gray-300 dark:text-[#636366] mx-auto mb-3" />
+            <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No transition records found</p>
           </div>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-700/50 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <thead className="bg-gray-50 dark:bg-[#2C2C2E] text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Type</th>
@@ -184,7 +184,7 @@ export default function TransitionHistory() {
                     <th className="px-4 py-3 w-20">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
                   {logs.map(log => {
                     const typeInfo = TYPE_LABELS[log.type] || { label: log.type, color: 'gray' }
                     const studentName = log.studentId
@@ -193,25 +193,25 @@ export default function TransitionHistory() {
                     const performerName = log.performedBy?.name || log.performedBy?.email || '-'
 
                     return (
-                      <tr key={log._id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${log.reversedAt ? 'opacity-50 line-through decoration-red-400' : ''}`}>
-                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(log.createdAt)}</td>
+                      <tr key={log._id} className={`hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/50 ${log.reversedAt ? 'opacity-50 line-through decoration-red-400' : ''}`}>
+                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{formatDate(log.createdAt)}</td>
                         <td className="px-4 py-2.5">
                           <span className={`px-2 py-0.5 rounded text-xs font-medium bg-${typeInfo.color}-100 text-${typeInfo.color}-700 dark:bg-${typeInfo.color}-900/30 dark:text-${typeInfo.color}-300`}>
                             {typeInfo.label}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white whitespace-nowrap">{studentName}</td>
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-[#8E8E93] whitespace-nowrap">
                           {log.fromClass}{log.fromSection ? `-${log.fromSection}` : ''}
                         </td>
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-[#8E8E93] whitespace-nowrap">
                           {log.toClass}{log.toSection ? `-${log.toSection}` : ''}
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">
                           {log.fromAcademicYear && log.toAcademicYear ? `${log.fromAcademicYear} → ${log.toAcademicYear}` : log.toAcademicYear || '-'}
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{performerName}</td>
-                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 max-w-[150px] truncate" title={log.reason}>{log.reason || '-'}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{performerName}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-[#8E8E93] max-w-[150px] truncate" title={log.reason}>{log.reason || '-'}</td>
                         <td className="px-4 py-2.5">
                           {canUndo(log) && (
                             <button
@@ -235,25 +235,25 @@ export default function TransitionHistory() {
             </div>
 
             {/* Pagination */}
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/30">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E]/50">
+              <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
                 Showing {(pagination.page - 1) * pagination.limit + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
               </p>
               <div className="flex gap-1">
                 <button
                   onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
                   disabled={pagination.page <= 1}
-                  className="p-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50"
+                  className="p-1.5 rounded border border-gray-300 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#3A3A3C] disabled:opacity-50"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300">
+                <span className="px-3 py-1.5 text-sm text-gray-700 dark:text-[#8E8E93]">
                   {pagination.page} / {pagination.pages || 1}
                 </span>
                 <button
                   onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
                   disabled={pagination.page >= pagination.pages}
-                  className="p-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 disabled:opacity-50"
+                  className="p-1.5 rounded border border-gray-300 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#3A3A3C] disabled:opacity-50"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

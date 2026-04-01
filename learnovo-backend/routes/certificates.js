@@ -19,6 +19,7 @@ router.get('/history', authorize('admin', 'principal', 'teacher'), certificateCo
 
 // Management
 router.get('/:id/download', authorize('admin', 'principal', 'teacher'), certificateController.downloadCertificate);
+router.get('/:id/download-word', authorize('admin', 'principal', 'teacher'), certificateController.downloadCertificateWord);
 router.delete('/:id', authorize('admin', 'principal'), certificateController.deleteCertificate);
 router.put('/:id', authorize('admin', 'principal'), certificateController.updateCertificate);
 

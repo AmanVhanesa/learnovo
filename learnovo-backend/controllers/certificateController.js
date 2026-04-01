@@ -8,6 +8,7 @@ const ClassSubject = require('../models/ClassSubject');
 const AcademicSession = require('../models/AcademicSession');
 const pdfService = require('../services/pdfService');
 const { format } = require('date-fns');
+const HTMLtoDOCX = require('html-to-docx');
 
 // Helper to convert date to words (e.g., "15 March 2025" → "Fifteenth March, Two Thousand Twenty-Five")
 const dateToWords = (dateStr) => {
@@ -472,6 +473,151 @@ exports.downloadCertificate = async(req, res) => {
     }
   }
 };
+
+/**
+ * Download Certificate as Word (DOCX)
+ * Generates an editable Word document from stored snapshot.
+ */
+exports.downloadCertificateWord = async(req, res) => {
+  try {
+    const { id } = req.params;
+    const cert = await GeneratedCertificate.findOne({ _id: id, tenantId: req.user.tenantId });
+
+    if (!cert) {
+      return res.status(404).json({ message: 'Certificate not found' });
+    }
+
+    const data = cert.contentSnapshot || {};
+    const isTC = cert.type === 'TC';
+
+    // Build a clean HTML document for Word conversion
+    const html = `
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Times New Roman', serif; font-size: 13pt; color: #000; margin: 40px; }
+          h1 { text-align: center; font-size: 18pt; margin-bottom: 4px; }
+          h2 { text-align: center; font-size: 14pt; font-weight: normal; margin-top: 0; color: #333; }
+          h3 { text-align: center; font-size: 15pt; text-decoration: underline; margin-top: 20px; margin-bottom: 20px; }
+          .header { text-align: center; margin-bottom: 10px; }
+          .header p { margin: 2px 0; font-size: 11pt; color: #444; }
+          .cert-number { display: flex; justify-content: space-between; margin: 15px 0; font-size: 11pt; }
+          table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+          td { padding: 6px 10px; vertical-align: top; font-size: 12pt; }
+          td:first-child { width: 45%; font-weight: bold; }
+          .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
+          .sig-block { text-align: center; }
+          .declaration { text-align: justify; line-height: 1.8; margin: 20px 0; font-size: 12pt; }
+          .student-grid { margin: 15px 0; }
+          .student-grid td { padding: 4px 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>${escapeHtml(data.schoolName || '')}</h1>
+          <p>${escapeHtml(data.schoolAddress || '')}</p>
+          ${data.schoolPhone ? `<p>Phone: ${escapeHtml(data.schoolPhone)}${data.schoolEmail ? ` | Email: ${escapeHtml(data.schoolEmail)}` : ''}</p>` : ''}
+          ${data.affiliationNumber ? `<p>Affiliation No: ${escapeHtml(data.affiliationNumber)} | Board: ${escapeHtml(data.schoolBoard || '')} | UDISE: ${escapeHtml(data.udiseCode || '')}</p>` : ''}
+        </div>
+
+        <h3>${isTC ? 'TRANSFER / LEAVING CERTIFICATE' : 'BONAFIDE CERTIFICATE'}</h3>
+
+        <div class="cert-number">
+          <span>Certificate No: <strong>${escapeHtml(cert.certificateNumber || '')}</strong></span>
+          <span>Date: <strong>${escapeHtml(data.issueDate || '')}</strong></span>
+        </div>
+
+        ${isTC ? `
+        <table>
+          <tr><td>Name of the Student</td><td>${escapeHtml(data.studentName || '')}</td></tr>
+          <tr><td>Father's Name</td><td>${escapeHtml(data.fatherName || '')}</td></tr>
+          <tr><td>Mother's Name</td><td>${escapeHtml(data.motherName || '')}</td></tr>
+          <tr><td>Date of Birth</td><td>${escapeHtml(data.dob || '')}${data.dobWords ? ` (${escapeHtml(data.dobWords)})` : ''}</td></tr>
+          <tr><td>Nationality</td><td>${escapeHtml(data.nationality || '')}</td></tr>
+          <tr><td>Category</td><td>${escapeHtml(data.categoryOverride || data.category || '')}</td></tr>
+          <tr><td>Admission Number</td><td>${escapeHtml(data.admissionNumber || '')}</td></tr>
+          <tr><td>PEN Number</td><td>${escapeHtml(data.penNumber || '-')}</td></tr>
+          <tr><td>SR / GR Number</td><td>${escapeHtml(data.srNumber || '-')}</td></tr>
+          <tr><td>Date of Admission</td><td>${escapeHtml(data.admissionDate || '')}</td></tr>
+          <tr><td>Class in which last studied</td><td>${escapeHtml(data.classOverride || data.class || '')} - ${escapeHtml(data.section || '')}</td></tr>
+          <tr><td>Academic Year</td><td>${escapeHtml(data.academicYear || '')}</td></tr>
+          <tr><td>Subjects Studied</td><td>${escapeHtml(data.subjects || '')}</td></tr>
+          <tr><td>Whether qualified for Promotion</td><td>${escapeHtml(data.promotionStatus || '')}</td></tr>
+          <tr><td>Board Examination Result</td><td>${escapeHtml(data.boardResult || '')}</td></tr>
+          <tr><td>Fee Status</td><td>${escapeHtml(data.feeStatus || '')}</td></tr>
+          <tr><td>General Conduct</td><td>${escapeHtml(data.conduct || '')}</td></tr>
+          <tr><td>Date of Application</td><td>${escapeHtml(data.applicationDate || '')}</td></tr>
+          <tr><td>Date of Issue</td><td>${escapeHtml(data.issueDate || '')}</td></tr>
+          <tr><td>Reason for Leaving</td><td>${escapeHtml(data.leavingReason || '')}</td></tr>
+          <tr><td>Remarks</td><td>${escapeHtml(data.remarks || '-')}</td></tr>
+        </table>
+        ` : `
+        <p class="declaration">
+          This is to certify that <strong>${escapeHtml(data.studentName || '')}</strong>,
+          Son/Daughter of <strong>${escapeHtml(data.fatherName || '')}</strong> and
+          <strong>${escapeHtml(data.motherName || '')}</strong>,
+          is a bonafide student of this institution, studying in Class
+          <strong>${escapeHtml(data.class || '')}-${escapeHtml(data.section || '')}</strong>
+          during the Academic Year <strong>${escapeHtml(data.academicYear || '')}</strong>.
+        </p>
+        <table class="student-grid">
+          <tr><td>Admission Number</td><td>${escapeHtml(data.admissionNumber || '')}</td></tr>
+          <tr><td>Date of Birth</td><td>${escapeHtml(data.dob || '')}${data.dobWords ? ` (${escapeHtml(data.dobWords)})` : ''}</td></tr>
+          <tr><td>Nationality</td><td>${escapeHtml(data.nationality || '')}</td></tr>
+          <tr><td>Category</td><td>${escapeHtml(data.category || '')}</td></tr>
+          <tr><td>SR / GR Number</td><td>${escapeHtml(data.srNumber || '-')}</td></tr>
+          <tr><td>Purpose</td><td>${escapeHtml(data.purpose || 'general purpose')}</td></tr>
+        </table>
+        ${data.remarks ? `<p><strong>Remarks:</strong> ${escapeHtml(data.remarks)}</p>` : ''}
+        `}
+
+        <div class="signatures">
+          <div class="sig-block">
+            <p>_________________________</p>
+            <p>Class Teacher</p>
+          </div>
+          <div class="sig-block">
+            <p>_________________________</p>
+            <p>Principal</p>
+          </div>
+        </div>
+
+        <p style="text-align: center; margin-top: 30px; font-size: 10pt; color: #666;">
+          Place: ${escapeHtml(data.place || '')}
+        </p>
+      </body>
+      </html>
+    `;
+
+    const docxBuffer = await HTMLtoDOCX(html, null, {
+      table: { row: { cantSplit: true } },
+      footer: true,
+      pageNumber: true,
+    });
+
+    const filename = `${cert.type}_${cert.certificateNumber.replace(/\//g, '-')}.docx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', docxBuffer.length);
+    res.end(docxBuffer);
+
+  } catch (error) {
+    console.error('Word download error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Error generating Word document', error: error.message });
+    }
+  }
+};
+
+// HTML escape helper for Word generation
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 exports.deleteCertificate = async(req, res) => {
   try {

@@ -352,7 +352,7 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                             </div>
                             <div style={{ textAlign: 'center', width: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 {d.principalSignature && (
-                                    <img src={d.principalSignature} alt="Principal Signature" style={{ maxHeight: 52, maxWidth: 120, objectFit: 'contain', marginBottom: 3 }} />
+                                    <img src={d.principalSignature} alt="Principal Signature" style={{ maxHeight: 80, maxWidth: 160, objectFit: 'contain', marginBottom: 3 }} />
                                 )}
                                 <div style={{ width: 85, height: 1, background: '#9ca3af', marginBottom: 3 }} />
                                 <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.8 }}>Principal</div>
