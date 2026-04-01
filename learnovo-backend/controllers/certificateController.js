@@ -9,6 +9,9 @@ const AcademicSession = require('../models/AcademicSession');
 const pdfService = require('../services/pdfService');
 const { format } = require('date-fns');
 const HTMLtoDOCX = require('html-to-docx');
+const axios = require('axios');
+const fs = require('fs');
+const nodePath = require('path');
 
 // Helper to convert date to words (e.g., "15 March 2025" → "Fifteenth March, Two Thousand Twenty-Five")
 const dateToWords = (dateStr) => {
@@ -490,109 +493,21 @@ exports.downloadCertificateWord = async(req, res) => {
     const data = cert.contentSnapshot || {};
     const isTC = cert.type === 'TC';
 
-    // Build a clean HTML document for Word conversion
-    const html = `
-      <html>
-      <head>
-        <style>
-          body { font-family: 'Times New Roman', serif; font-size: 13pt; color: #000; margin: 40px; }
-          h1 { text-align: center; font-size: 18pt; margin-bottom: 4px; }
-          h2 { text-align: center; font-size: 14pt; font-weight: normal; margin-top: 0; color: #333; }
-          h3 { text-align: center; font-size: 15pt; text-decoration: underline; margin-top: 20px; margin-bottom: 20px; }
-          .header { text-align: center; margin-bottom: 10px; }
-          .header p { margin: 2px 0; font-size: 11pt; color: #444; }
-          .cert-number { display: flex; justify-content: space-between; margin: 15px 0; font-size: 11pt; }
-          table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-          td { padding: 6px 10px; vertical-align: top; font-size: 12pt; }
-          td:first-child { width: 45%; font-weight: bold; }
-          .signatures { display: flex; justify-content: space-between; margin-top: 60px; }
-          .sig-block { text-align: center; }
-          .declaration { text-align: justify; line-height: 1.8; margin: 20px 0; font-size: 12pt; }
-          .student-grid { margin: 15px 0; }
-          .student-grid td { padding: 4px 10px; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>${escapeHtml(data.schoolName || '')}</h1>
-          <p>${escapeHtml(data.schoolAddress || '')}</p>
-          ${data.schoolPhone ? `<p>Phone: ${escapeHtml(data.schoolPhone)}${data.schoolEmail ? ` | Email: ${escapeHtml(data.schoolEmail)}` : ''}</p>` : ''}
-          ${data.affiliationNumber ? `<p>Affiliation No: ${escapeHtml(data.affiliationNumber)} | Board: ${escapeHtml(data.schoolBoard || '')} | UDISE: ${escapeHtml(data.udiseCode || '')}</p>` : ''}
-        </div>
+    // Fetch logo and signature as base64 data URIs for embedding in Word
+    const [logoDataUri, signatureDataUri] = await Promise.all([
+      fetchImageAsBase64(data.schoolLogo),
+      fetchImageAsBase64(data.principalSignature)
+    ]);
 
-        <h3>${isTC ? 'TRANSFER / LEAVING CERTIFICATE' : 'BONAFIDE CERTIFICATE'}</h3>
-
-        <div class="cert-number">
-          <span>Certificate No: <strong>${escapeHtml(cert.certificateNumber || '')}</strong></span>
-          <span>Date: <strong>${escapeHtml(data.issueDate || '')}</strong></span>
-        </div>
-
-        ${isTC ? `
-        <table>
-          <tr><td>Name of the Student</td><td>${escapeHtml(data.studentName || '')}</td></tr>
-          <tr><td>Father's Name</td><td>${escapeHtml(data.fatherName || '')}</td></tr>
-          <tr><td>Mother's Name</td><td>${escapeHtml(data.motherName || '')}</td></tr>
-          <tr><td>Date of Birth</td><td>${escapeHtml(data.dob || '')}${data.dobWords ? ` (${escapeHtml(data.dobWords)})` : ''}</td></tr>
-          <tr><td>Nationality</td><td>${escapeHtml(data.nationality || '')}</td></tr>
-          <tr><td>Category</td><td>${escapeHtml(data.categoryOverride || data.category || '')}</td></tr>
-          <tr><td>Admission Number</td><td>${escapeHtml(data.admissionNumber || '')}</td></tr>
-          <tr><td>PEN Number</td><td>${escapeHtml(data.penNumber || '-')}</td></tr>
-          <tr><td>SR / GR Number</td><td>${escapeHtml(data.srNumber || '-')}</td></tr>
-          <tr><td>Date of Admission</td><td>${escapeHtml(data.admissionDate || '')}</td></tr>
-          <tr><td>Class in which last studied</td><td>${escapeHtml(data.classOverride || data.class || '')} - ${escapeHtml(data.section || '')}</td></tr>
-          <tr><td>Academic Year</td><td>${escapeHtml(data.academicYear || '')}</td></tr>
-          <tr><td>Subjects Studied</td><td>${escapeHtml(data.subjects || '')}</td></tr>
-          <tr><td>Whether qualified for Promotion</td><td>${escapeHtml(data.promotionStatus || '')}</td></tr>
-          <tr><td>Board Examination Result</td><td>${escapeHtml(data.boardResult || '')}</td></tr>
-          <tr><td>Fee Status</td><td>${escapeHtml(data.feeStatus || '')}</td></tr>
-          <tr><td>General Conduct</td><td>${escapeHtml(data.conduct || '')}</td></tr>
-          <tr><td>Date of Application</td><td>${escapeHtml(data.applicationDate || '')}</td></tr>
-          <tr><td>Date of Issue</td><td>${escapeHtml(data.issueDate || '')}</td></tr>
-          <tr><td>Reason for Leaving</td><td>${escapeHtml(data.leavingReason || '')}</td></tr>
-          <tr><td>Remarks</td><td>${escapeHtml(data.remarks || '-')}</td></tr>
-        </table>
-        ` : `
-        <p class="declaration">
-          This is to certify that <strong>${escapeHtml(data.studentName || '')}</strong>,
-          Son/Daughter of <strong>${escapeHtml(data.fatherName || '')}</strong> and
-          <strong>${escapeHtml(data.motherName || '')}</strong>,
-          is a bonafide student of this institution, studying in Class
-          <strong>${escapeHtml(data.class || '')}-${escapeHtml(data.section || '')}</strong>
-          during the Academic Year <strong>${escapeHtml(data.academicYear || '')}</strong>.
-        </p>
-        <table class="student-grid">
-          <tr><td>Admission Number</td><td>${escapeHtml(data.admissionNumber || '')}</td></tr>
-          <tr><td>Date of Birth</td><td>${escapeHtml(data.dob || '')}${data.dobWords ? ` (${escapeHtml(data.dobWords)})` : ''}</td></tr>
-          <tr><td>Nationality</td><td>${escapeHtml(data.nationality || '')}</td></tr>
-          <tr><td>Category</td><td>${escapeHtml(data.category || '')}</td></tr>
-          <tr><td>SR / GR Number</td><td>${escapeHtml(data.srNumber || '-')}</td></tr>
-          <tr><td>Purpose</td><td>${escapeHtml(data.purpose || 'general purpose')}</td></tr>
-        </table>
-        ${data.remarks ? `<p><strong>Remarks:</strong> ${escapeHtml(data.remarks)}</p>` : ''}
-        `}
-
-        <div class="signatures">
-          <div class="sig-block">
-            <p>_________________________</p>
-            <p>Class Teacher</p>
-          </div>
-          <div class="sig-block">
-            <p>_________________________</p>
-            <p>Principal</p>
-          </div>
-        </div>
-
-        <p style="text-align: center; margin-top: 30px; font-size: 10pt; color: #666;">
-          Place: ${escapeHtml(data.place || '')}
-        </p>
-      </body>
-      </html>
-    `;
+    // Build HTML matching the tc-minimal / bonafide-minimal template design
+    const html = isTC
+      ? buildTCWordHtml(data, cert, logoDataUri, signatureDataUri)
+      : buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri);
 
     const docxBuffer = await HTMLtoDOCX(html, null, {
       table: { row: { cantSplit: true } },
       footer: true,
-      pageNumber: true,
+      pageNumber: true
     });
 
     const filename = `${cert.type}_${cert.certificateNumber.replace(/\//g, '-')}.docx`;
@@ -609,6 +524,33 @@ exports.downloadCertificateWord = async(req, res) => {
   }
 };
 
+// Fetch an image (URL or local path) and return a base64 data URI, or null on failure
+async function fetchImageAsBase64(imagePath) {
+  if (!imagePath) return null;
+  try {
+    let imageBuffer;
+    if (imagePath.startsWith('http')) {
+      const response = await axios.get(imagePath, { responseType: 'arraybuffer', timeout: 5000 });
+      imageBuffer = Buffer.from(response.data);
+    } else {
+      let localPath = imagePath;
+      if (localPath.startsWith('/')) localPath = nodePath.join(process.cwd(), localPath);
+      if (!fs.existsSync(localPath)) localPath = nodePath.resolve(process.cwd(), imagePath);
+      if (!fs.existsSync(localPath)) localPath = nodePath.join(process.cwd(), 'uploads', nodePath.basename(imagePath));
+      if (!fs.existsSync(localPath)) return null;
+      imageBuffer = fs.readFileSync(localPath);
+    }
+    const ext = nodePath.extname(imagePath).toLowerCase();
+    let mimeType = 'image/png';
+    if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+    else if (ext === '.svg') mimeType = 'image/svg+xml';
+    else if (ext === '.webp') mimeType = 'image/webp';
+    return `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
+  } catch {
+    return null;
+  }
+}
+
 // HTML escape helper for Word generation
 function escapeHtml(str) {
   if (!str) return '';
@@ -617,6 +559,342 @@ function escapeHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * Build TC Word HTML matching tc-minimal.html design.
+ * Uses table-based layout for Word compatibility (no flexbox/grid/border-radius).
+ */
+function buildTCWordHtml(data, cert, logoDataUri, signatureDataUri) {
+  const e = escapeHtml;
+  const schoolName = e(data.schoolName || '');
+  const schoolAddr = e(data.schoolAddress || '');
+  const schoolPhone = e(data.schoolPhone || '');
+  const schoolEmail = e(data.schoolEmail || '');
+  const affNo = e(data.affiliationNumber || '');
+  const schoolCode = e(data.schoolCode || '');
+  const udise = e(data.udiseCode || '');
+  const certNum = e(cert.certificateNumber || '');
+  const admNo = e(data.admissionNumber || '');
+
+  const rows = [
+    { num: '01', label: 'Name of the Student', val: e(data.studentName || ''), bold: true },
+    { num: '02', label: 'Father\'s / Guardian\'s Name', val: e(data.fatherName || '') },
+    { num: '03', label: 'Mother\'s Name', val: e(data.motherName || '') },
+    { num: '04', label: 'Nationality', val: e(data.nationality || '') },
+    { num: '05', label: 'Category (Gen / SC / ST / OBC)', val: e(data.categoryOverride || data.category || '') },
+    { num: '06', label: 'Date of Birth', val: `${e(data.dob || '')}${data.dobWords ? ` (${e(data.dobWords)})` : ''}`, bold: true },
+    { num: '07', label: 'PEN Number', val: e(data.penNumber || '-') },
+    { num: '08', label: 'Date of First Admission in School', val: e(data.admissionDate || '') },
+    { num: '09', label: 'Class in which Last Studied', val: `${e(data.classOverride || data.class || '')} - ${e(data.section || '')}`, bold: true },
+    { num: '10', label: 'Board Examination Last Taken', val: e(data.boardResult || '') },
+    { num: '11', label: 'Whether Qualified for Promotion', val: e(data.promotionStatus || '') },
+    { num: '12', label: 'Subjects Studied', val: e(data.subjects || '') },
+    { num: '13', label: 'Month up to which Fees Paid', val: e(data.feeStatus || '') },
+    { num: '14', label: 'General Conduct', val: e(data.conduct || '') },
+    { num: '15', label: 'Date of Application for Certificate', val: e(data.applicationDate || '') },
+    { num: '16', label: 'Date of Issue of Certificate', val: e(data.issueDate || '') },
+    { num: '17', label: 'Reason for Leaving the School', val: e(data.leavingReason || ''), bold: true },
+    { num: '18', label: 'Any Other Remarks', val: e(data.remarks || '-') }
+  ];
+
+  const tableRows = rows.map((r, i) => {
+    const bg = i % 2 === 0 ? '#f0fdfa' : '#ffffff';
+    const valWeight = r.bold ? 'font-weight:700;color:#111827;' : 'font-weight:500;color:#374151;';
+    return `<tr style="background:${bg};">
+      <td style="width:30px;text-align:center;font-size:9pt;font-weight:600;color:#4b5563;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:4px 4px;">${r.num}</td>
+      <td style="width:42%;font-size:10pt;font-weight:600;color:#1f2937;border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:4px 10px;">${r.label}</td>
+      <td style="font-size:10pt;${valWeight}border-bottom:1px solid #e5e7eb;padding:4px 10px;">${r.val}</td>
+    </tr>`;
+  }).join('\n');
+
+  return `<html>
+<head>
+<style>
+  @page { size: A4 portrait; margin: 15mm 12mm; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111827; margin: 0; padding: 0; }
+  table { border-collapse: collapse; }
+</style>
+</head>
+<body>
+  <!-- HEADER -->
+  <table style="width:100%;margin-bottom:6px;">
+    <tr>
+      ${logoDataUri ? `<td style="width:90px;vertical-align:top;padding:4px 10px 0 0;">
+        <img src="${logoDataUri}" alt="School Logo" style="width:85px;height:85px;object-fit:contain;" />
+      </td>` : ''}
+      <td style="text-align:center;vertical-align:top;">
+        <p style="font-family:Georgia,'Times New Roman',serif;font-size:22pt;font-weight:800;color:#1F6F6D;letter-spacing:2px;text-transform:uppercase;margin:0;line-height:1.1;">${schoolName}</p>
+        <p style="font-size:9pt;color:#4b5563;font-weight:500;margin:3px 0 0;">${schoolAddr}</p>
+        ${schoolPhone || schoolEmail ? `<p style="font-size:9pt;color:#4b5563;font-weight:500;margin:2px 0 0;">${schoolPhone ? `Phone: ${schoolPhone}` : ''}${schoolPhone && schoolEmail ? ' &nbsp;|&nbsp; ' : ''}${schoolEmail ? `Email: ${schoolEmail}` : ''}</p>` : ''}
+        <p style="font-size:8pt;color:#4b5563;font-weight:500;margin:5px 0 0;">
+          ${affNo ? `Affiliation No: <b style="color:#111827;">${affNo}</b>` : ''}
+          ${affNo && schoolCode ? ' &nbsp;&nbsp;&nbsp; ' : ''}
+          ${schoolCode ? `School Code: <b style="color:#111827;">${schoolCode}</b>` : ''}
+          ${(affNo || schoolCode) && udise ? ' &nbsp;&nbsp;&nbsp; ' : ''}
+          ${udise ? `UDISE: <b style="color:#111827;">${udise}</b>` : ''}
+        </p>
+      </td>
+    </tr>
+  </table>
+
+  <!-- DIVIDER -->
+  <hr style="border:none;height:1px;background:#e5e7eb;margin:0 0 6px;" />
+
+  <!-- TITLE -->
+  <table style="width:100%;margin-bottom:6px;">
+    <tr>
+      <td style="text-align:center;padding:12px 0;">
+        <table style="margin:0 auto;background:#edf9f7;padding:8px 24px 10px;border-radius:10px;">
+          <tr>
+            <td style="text-align:center;">
+              <p style="font-family:Arial,Helvetica,sans-serif;font-size:13pt;font-weight:700;color:#0a5c56;letter-spacing:4px;text-transform:uppercase;margin:0;">SCHOOL LEAVING CERTIFICATE</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- META ROW -->
+  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;">
+    <tr>
+      <td style="padding:7px 20px;font-size:10pt;font-weight:600;color:#111827;">
+        <span style="color:#3EC4B1;font-weight:700;">#</span> ${certNum}
+      </td>
+      <td style="padding:7px 20px;font-size:10pt;color:#374151;font-weight:500;text-align:right;">
+        Admission No: <b style="color:#111827;">${admNo}</b>
+      </td>
+    </tr>
+  </table>
+
+  <!-- FIELDS TABLE -->
+  <table style="width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;">
+    ${tableRows}
+  </table>
+
+  <!-- NOTE BOX -->
+  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;">
+    <tr>
+      <td style="padding:6px 12px;">
+        <p style="font-size:8pt;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin:0;">Important Note</p>
+        <p style="font-size:8.5pt;font-weight:500;color:#4b5563;line-height:1.5;margin:2px 0 0;">This certificate is issued based on school records. No alteration shall be made on this certificate. Erasing or overwriting renders it invalid.</p>
+      </td>
+    </tr>
+  </table>
+
+  <!-- CERTIFICATION -->
+  <p style="font-size:8pt;color:#4b5563;font-weight:500;font-style:italic;line-height:1.45;margin:0 0 3px;">Certified that the above information is in accordance with school records. This certificate does not entitle the holder to any benefits unless countersigned by competent authority.</p>
+  <p style="font-size:9pt;color:#111827;font-weight:600;margin:0 0 8px;">Place: ${e(data.place || '')}</p>
+
+  <!-- SIGNATURES -->
+  <table style="width:100%;margin-top:40px;">
+    <tr>
+      <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:50px;">
+        <hr style="width:110px;border:none;height:1px;background:#9ca3af;margin:0 auto 4px;" />
+        <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Class Teacher</p>
+      </td>
+      <td style="width:34%;text-align:center;vertical-align:bottom;">
+        <div style="width:90px;height:90px;border:2px dashed #d1d5db;border-radius:50%;margin:0 auto;">&nbsp;</div>
+      </td>
+      <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:10px;">
+        ${signatureDataUri ? `<img src="${signatureDataUri}" alt="Principal Signature" style="max-height:70px;max-width:150px;display:block;margin:0 auto 4px;object-fit:contain;" />` : ''}
+        <hr style="width:110px;border:none;height:1px;background:#9ca3af;margin:0 auto 4px;" />
+        <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Principal</p>
+      </td>
+    </tr>
+  </table>
+
+  <!-- FOOTER -->
+  <hr style="border:none;height:1px;background:#e5e7eb;margin:16px 0 6px;" />
+  <p style="text-align:center;font-size:7pt;color:#4b5563;font-weight:500;text-transform:uppercase;letter-spacing:1.5px;margin:0;">
+    Powered by <span style="font-weight:600;color:#0f766e;">Learnovo</span> &mdash; School Management System
+  </p>
+</body>
+</html>`;
+}
+
+/**
+ * Build Bonafide Word HTML matching bonafide-minimal.html design.
+ */
+function buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri) {
+  const e = escapeHtml;
+  const schoolName = e(data.schoolName || '');
+  const schoolAddr = e(data.schoolAddress || '');
+  const schoolPhone = e(data.schoolPhone || '');
+  const schoolEmail = e(data.schoolEmail || '');
+  const affNo = e(data.affiliationNumber || '');
+  const schoolCode = e(data.schoolCode || '');
+  const udise = e(data.udiseCode || '');
+  const schoolBoard = e(data.schoolBoard || '');
+  const certNum = e(cert.certificateNumber || '');
+  const issueDate = e(data.issueDate || '');
+  const studentName = e(data.studentName || '');
+  const fatherName = e(data.fatherName || '');
+  const motherName = e(data.motherName || '');
+  const className = e(data.class || '');
+  const section = e(data.section || '');
+  const academicYear = e(data.academicYear || '');
+  const dob = e(data.dob || '');
+  const admNo = e(data.admissionNumber || '');
+  const purpose = e(data.purpose || 'general purpose');
+
+  return `<html>
+<head>
+<style>
+  @page { size: A4 portrait; margin: 15mm 12mm; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #111827; margin: 0; padding: 0; }
+  table { border-collapse: collapse; }
+</style>
+</head>
+<body>
+  <!-- HEADER -->
+  <table style="width:100%;margin-bottom:6px;">
+    <tr>
+      ${logoDataUri ? `<td style="width:90px;vertical-align:top;padding:4px 10px 0 0;">
+        <img src="${logoDataUri}" alt="School Logo" style="width:85px;height:85px;object-fit:contain;" />
+      </td>` : ''}
+      <td style="text-align:center;vertical-align:top;">
+        <p style="font-family:Georgia,'Times New Roman',serif;font-size:22pt;font-weight:800;color:#1F6F6D;letter-spacing:2px;text-transform:uppercase;margin:0;line-height:1.1;">${schoolName}</p>
+        <p style="font-size:9pt;color:#4b5563;font-weight:500;margin:3px 0 0;">${schoolAddr}</p>
+        ${schoolPhone || schoolEmail ? `<p style="font-size:9pt;color:#4b5563;font-weight:500;margin:2px 0 0;">${schoolPhone ? `Phone: ${schoolPhone}` : ''}${schoolPhone && schoolEmail ? ' &nbsp;|&nbsp; ' : ''}${schoolEmail ? `Email: ${schoolEmail}` : ''}</p>` : ''}
+        <p style="font-size:8pt;color:#4b5563;font-weight:500;margin:5px 0 0;">
+          ${affNo ? `Affiliation No: <b style="color:#111827;">${affNo}</b>` : ''}
+          ${affNo && schoolCode ? ' &nbsp;&nbsp;&nbsp; ' : ''}
+          ${schoolCode ? `School Code: <b style="color:#111827;">${schoolCode}</b>` : ''}
+          ${(affNo || schoolCode) && udise ? ' &nbsp;&nbsp;&nbsp; ' : ''}
+          ${udise ? `UDISE: <b style="color:#111827;">${udise}</b>` : ''}
+        </p>
+      </td>
+    </tr>
+  </table>
+
+  <!-- DIVIDER -->
+  <hr style="border:none;height:1px;background:#e5e7eb;margin:0 0 6px;" />
+
+  <!-- TITLE -->
+  <table style="width:100%;margin-bottom:6px;">
+    <tr>
+      <td style="text-align:center;padding:12px 0;">
+        <table style="margin:0 auto;background:#edf9f7;padding:8px 24px 10px;border-radius:10px;">
+          <tr>
+            <td style="text-align:center;">
+              <p style="font-family:Arial,Helvetica,sans-serif;font-size:13pt;font-weight:700;color:#0a5c56;letter-spacing:4px;text-transform:uppercase;margin:0;">BONAFIDE CERTIFICATE</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- META ROW -->
+  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:14px;">
+    <tr>
+      <td style="padding:7px 20px;font-size:10pt;font-weight:600;color:#111827;">
+        <span style="color:#3EC4B1;font-weight:700;">#</span> ${certNum}
+      </td>
+      <td style="padding:7px 20px;font-size:10pt;color:#374151;font-weight:500;text-align:right;">
+        Date of Issue: <b style="color:#111827;">${issueDate}</b>
+      </td>
+    </tr>
+  </table>
+
+  <!-- TO WHOM IT MAY CONCERN -->
+  <p style="font-family:Georgia,'Times New Roman',serif;font-size:12pt;font-weight:600;color:#0a5c56;text-align:center;letter-spacing:2px;text-transform:uppercase;margin:0 0 4px;">To Whom It May Concern</p>
+  <hr style="width:50px;border:none;height:2px;background:#3EC4B1;margin:0 auto 16px;" />
+
+  <!-- DECLARATION -->
+  <p style="font-size:11pt;line-height:2;color:#374151;font-weight:500;text-align:justify;margin:0 0 16px;">
+    This is to certify that <b style="color:#111827;border-bottom:1.5px solid rgba(62,196,177,0.35);">${studentName}</b>,
+    Son/Daughter of Shri <b style="color:#111827;border-bottom:1.5px solid rgba(62,196,177,0.35);">${fatherName}</b>
+    and Smt. <b style="color:#111827;border-bottom:1.5px solid rgba(62,196,177,0.35);">${motherName}</b>,
+    is a bonafide student of this institution. He/She is currently studying in
+    Class <b style="color:#111827;border-bottom:1.5px solid rgba(62,196,177,0.35);">${className} (${section})</b>
+    for the Academic Session <b style="color:#111827;border-bottom:1.5px solid rgba(62,196,177,0.35);">${academicYear}</b>.
+    His/Her date of birth as per our school records is
+    <b style="color:#111827;border-bottom:1.5px solid rgba(62,196,177,0.35);">${dob}</b>.
+  </p>
+
+  <!-- DETAILS GRID -->
+  <table style="width:100%;background:#f0fdfa;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:14px;">
+    <tr>
+      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+        <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Student Name</p>
+        <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${studentName}</p>
+      </td>
+      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+        <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Admission Number</p>
+        <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${admNo}</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+        <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Father's Name</p>
+        <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${fatherName}</p>
+      </td>
+      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+        <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Mother's Name</p>
+        <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${motherName}</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+        <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Class &amp; Section</p>
+        <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${className} - ${section}</p>
+      </td>
+      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+        <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Date of Birth</p>
+        <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${dob}</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+        <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Academic Session</p>
+        <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${academicYear}</p>
+      </td>
+      <td style="width:50%;padding:10px 16px;vertical-align:top;">
+        <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Board / Affiliation</p>
+        <p style="font-size:10pt;font-weight:700;color:#111827;margin:2px 0 0;">${schoolBoard}</p>
+      </td>
+    </tr>
+  </table>
+
+  <!-- PURPOSE -->
+  <p style="font-size:10pt;color:#4b5563;font-weight:500;line-height:1.8;text-align:justify;margin:0 0 10px;">
+    This certificate is issued on the request of the student/parent for the purpose of
+    <b style="color:#111827;">${purpose}</b>.
+    No fees are due from the student at the time of issue of this certificate.
+  </p>
+  ${data.remarks ? `<p style="font-size:10pt;margin:0 0 10px;"><b>Remarks:</b> ${e(data.remarks)}</p>` : ''}
+
+  <!-- PLACE -->
+  <p style="font-size:9pt;color:#111827;font-weight:600;margin:0 0 8px;">Place: ${e(data.place || '')}</p>
+
+  <!-- SIGNATURES -->
+  <table style="width:100%;margin-top:40px;">
+    <tr>
+      <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:50px;">
+        <hr style="width:110px;border:none;height:1px;background:#9ca3af;margin:0 auto 4px;" />
+        <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Class Teacher</p>
+      </td>
+      <td style="width:34%;text-align:center;vertical-align:bottom;">
+        <div style="width:90px;height:90px;border:2px dashed #d1d5db;border-radius:50%;margin:0 auto;">&nbsp;</div>
+      </td>
+      <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:10px;">
+        ${signatureDataUri ? `<img src="${signatureDataUri}" alt="Principal Signature" style="max-height:70px;max-width:150px;display:block;margin:0 auto 4px;object-fit:contain;" />` : ''}
+        <hr style="width:110px;border:none;height:1px;background:#9ca3af;margin:0 auto 4px;" />
+        <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Principal</p>
+      </td>
+    </tr>
+  </table>
+
+  <!-- FOOTER -->
+  <hr style="border:none;height:1px;background:#e5e7eb;margin:16px 0 6px;" />
+  <p style="text-align:center;font-size:7pt;color:#4b5563;font-weight:500;text-transform:uppercase;letter-spacing:1.5px;margin:0;">
+    Powered by <span style="font-weight:600;color:#0f766e;">Learnovo</span> &mdash; School Management System
+  </p>
+</body>
+</html>`;
 }
 
 exports.deleteCertificate = async(req, res) => {

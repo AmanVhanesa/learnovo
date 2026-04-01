@@ -57,7 +57,6 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
             maxWidth: 595,
             minHeight: 842,
             position: 'relative',
-            overflow: 'hidden',
             background: '#f9fafb',
             fontFamily: "'Helvetica Neue', Arial, 'Noto Sans', sans-serif",
             color: '#111827',
@@ -66,14 +65,14 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
         }}>
             {/* White card */}
             <div style={{
-                position: 'absolute',
-                top: 10, left: 10, right: 10, bottom: 10,
+                margin: 10,
                 background: '#ffffff',
                 borderRadius: 14,
                 boxShadow: '0 2px 24px rgba(0,0,0,0.07)',
-                overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
+                position: 'relative',
+                minHeight: 822,
             }}>
                 {/* Decorative background shapes — matches backend tc-minimal.html proportionally */}
                 <div style={{ position: 'absolute', top: 0, right: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0, overflow: 'hidden', borderRadius: 14 }}>
