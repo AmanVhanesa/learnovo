@@ -54,6 +54,10 @@ const SuperAdminLayout = lazy(() => import('./components/superadmin/SuperAdminLa
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Students = lazy(() => import('./pages/Students'))
 const BulkPromotion = lazy(() => import('./pages/BulkPromotion'))
+const PromotionDashboard = lazy(() => import('./pages/PromotionDashboard'))
+const SectionManagement = lazy(() => import('./pages/SectionManagement'))
+const YearRollover = lazy(() => import('./pages/YearRollover'))
+const TransitionHistory = lazy(() => import('./pages/TransitionHistory'))
 const StudentDetail = lazy(() => import('./pages/StudentDetail'))
 const StudentLists = lazy(() => import('./pages/StudentLists'))
 const Employees = lazy(() => import('./pages/Employees'))
@@ -236,6 +240,26 @@ function App() {
                       <Route path="students/bulk-promote" element={
                         <ProtectedRoute allowedRoles={['admin']}>
                           <BulkPromotion />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="academic/promotion" element={
+                        <ProtectedRoute allowedRoles={['admin', 'principal']}>
+                          <PromotionDashboard />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="academic/sections" element={
+                        <ProtectedRoute allowedRoles={['admin', 'principal']}>
+                          <SectionManagement />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="academic/year-rollover" element={
+                        <ProtectedRoute allowedRoles={['admin', 'principal']}>
+                          <YearRollover />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="academic/history" element={
+                        <ProtectedRoute allowedRoles={['admin', 'principal']}>
+                          <TransitionHistory />
                         </ProtectedRoute>
                       } />
                       <Route path="students/:id" element={

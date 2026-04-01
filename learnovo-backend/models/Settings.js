@@ -154,7 +154,22 @@ const settingsSchema = new mongoose.Schema({
       name: { type: String, required: true },
       code: { type: String, required: true },
       isActive: { type: Boolean, default: true }
-    }]
+    }],
+    // Class hierarchy for promotion ordering (Nursery -> LKG -> UKG -> 1 -> ... -> 12)
+    classHierarchy: [{
+      name: { type: String, required: true, trim: true },
+      order: { type: Number, required: true },
+      isPrePrimary: { type: Boolean, default: false },
+      isTerminal: { type: Boolean, default: false } // highest class — students graduate from here
+    }],
+    // Promotion rules for year-end rollover
+    promotionRules: {
+      autoPromotePassingStudents: { type: Boolean, default: true },
+      passThreshold: { type: Number, default: 40, min: 0, max: 100 },
+      requireFeesClear: { type: Boolean, default: false },
+      excludeTCIssued: { type: Boolean, default: true },
+      allowMidYearPromotion: { type: Boolean, default: true }
+    }
   },
   // Fee Settings
   fees: {

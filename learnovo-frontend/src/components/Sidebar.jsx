@@ -31,7 +31,11 @@ import {
   CalendarClock,
   LayoutGrid,
   CircleDollarSign,
-  PieChart
+  PieChart,
+  TrendingUp,
+  ArrowRightLeft,
+  History,
+  Merge
 } from 'lucide-react'
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -75,6 +79,10 @@ const Sidebar = ({ isOpen, onClose }) => {
     // ── Academics ─────────────────────────────────────────────────
     const academicItems = [
       { name: 'Academics', href: '/app/academics', icon: School, roles: ['admin', 'teacher'] },
+      { name: 'Promotion', href: '/app/academic/promotion', icon: TrendingUp, roles: ['admin', 'principal'] },
+      { name: 'Sections', href: '/app/academic/sections', icon: ArrowRightLeft, roles: ['admin', 'principal'] },
+      { name: 'Year Rollover', href: '/app/academic/year-rollover', icon: CalendarClock, roles: ['admin', 'principal'] },
+      { name: 'Transition History', href: '/app/academic/history', icon: History, roles: ['admin', 'principal'] },
       { name: 'Attendance', href: '/app/attendance', icon: Calendar, roles: ['admin', 'teacher', 'parent', 'student'] },
       { name: 'Homework', href: '/app/homework', icon: BookCheck, roles: ['admin', 'teacher', 'student'] },
       { name: 'Assignments', href: '/app/assignments', icon: BookOpen, roles: ['admin', 'teacher', 'student'] },

@@ -249,6 +249,7 @@ app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/sub-departments', require('./routes/subDepartments'));
 app.use('/api/certificates', require('./routes/certificates'));
+app.use('/api/transitions', require('./routes/transitions'));
 app.use('/api/files', require('./routes/files')); // Cloudinary file operations
 app.use('/api/test', require('./routes/test')); // Test endpoints (remove in production)
 

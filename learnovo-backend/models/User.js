@@ -239,6 +239,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  admissionClass: {
+    type: String,
+    trim: true
+  },
+  admissionSection: {
+    type: String,
+    trim: true
+  },
   gender: {
     type: String,
     trim: true
