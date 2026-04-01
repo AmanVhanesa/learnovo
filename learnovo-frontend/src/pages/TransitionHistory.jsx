@@ -6,6 +6,7 @@ import {
   Filter, X
 } from 'lucide-react'
 import { transitionsService } from '../services/transitionsService'
+import AcademicTransitionNav from '../components/AcademicTransitionNav'
 
 const TYPE_LABELS = {
   promotion: { label: 'Promotion', color: 'teal' },
@@ -71,6 +72,9 @@ export default function TransitionHistory() {
 
   return (
     <div className="space-y-6">
+      {/* Sub-nav */}
+      <AcademicTransitionNav />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

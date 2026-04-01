@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, GraduationCap, TrendingUp, Pause, Users
 } from 'lucide-react'
 import { transitionsService } from '../services/transitionsService'
+import AcademicTransitionNav from '../components/AcademicTransitionNav'
 
 export default function YearRollover() {
   const queryClient = useQueryClient()
@@ -165,6 +166,9 @@ export default function YearRollover() {
 
   return (
     <div className="space-y-6">
+      {/* Sub-nav */}
+      <AcademicTransitionNav />
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">

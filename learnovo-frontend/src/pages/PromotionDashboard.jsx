@@ -6,6 +6,7 @@ import {
   CheckSquare, Square, AlertTriangle, GraduationCap, Loader2, ArrowRightLeft
 } from 'lucide-react'
 import { transitionsService } from '../services/transitionsService'
+import AcademicTransitionNav from '../components/AcademicTransitionNav'
 import { studentsService } from '../services/studentsService'
 import { sortClasses, getNextClass, getPreviousClass } from '../utils/classOrder'
 
@@ -190,14 +191,17 @@ export default function PromotionDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Sub-nav */}
+      <AcademicTransitionNav />
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Promotion Dashboard</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Promote, demote, or manage student transitions</p>
+        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Promote, demote, or manage student transitions</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-0">
+      <div className="flex gap-2 border-b border-gray-200 dark:border-[#38383A] pb-0">
         {[
           { key: 'promote', label: 'Bulk Promote', icon: TrendingUp },
           { key: 'demote', label: 'Bulk Demote', icon: TrendingDown },
@@ -209,7 +213,7 @@ export default function PromotionDashboard() {
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
               activeTab === tab.key
                 ? 'border-teal-500 text-teal-600 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-900/20'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-[#8E8E93]'
             }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -219,7 +223,7 @@ export default function PromotionDashboard() {
       </div>
 
       {/* Configuration Panel */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-6">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           {activeTab === 'individual' ? 'Find Student' : activeTab === 'promote' ? 'Promotion Configuration' : 'Demotion Configuration'}
         </h2>
@@ -227,11 +231,11 @@ export default function PromotionDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Source Class */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Class</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Source Class</label>
             <select
               value={sourceClass}
               onChange={e => { setSourceClass(e.target.value); setSourceSection(''); setExcludedStudents(new Set()); setResults(null) }}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               <option value="">Select class</option>
               {classes.map(c => <option key={c} value={c}>{c}</option>)}
@@ -240,11 +244,11 @@ export default function PromotionDashboard() {
 
           {/* Source Section */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Section</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Source Section</label>
             <select
               value={sourceSection}
               onChange={e => { setSourceSection(e.target.value); setExcludedStudents(new Set()) }}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               disabled={!sourceClass}
             >
               <option value="">All sections</option>
@@ -255,11 +259,11 @@ export default function PromotionDashboard() {
           {/* Target Class */}
           {activeTab !== 'individual' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Class</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Target Class</label>
               <select
                 value={targetClass}
                 onChange={e => setTargetClass(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               >
                 {activeTab === 'promote' ? (
                   <>
@@ -280,11 +284,11 @@ export default function PromotionDashboard() {
           {/* Target Section */}
           {activeTab !== 'individual' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Section</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Target Section</label>
               <select
                 value={targetSection}
                 onChange={e => setTargetSection(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               >
                 <option value="">Keep current section</option>
                 {targetSections.map(s => <option key={s} value={s}>{s}</option>)}
@@ -294,19 +298,19 @@ export default function PromotionDashboard() {
 
           {/* Academic Year */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Academic Year</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Academic Year</label>
             <input
               type="text"
               value={academicYear}
               onChange={e => setAcademicYear(e.target.value)}
               placeholder="2026-2027"
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
 
           {/* Remarks / Reason */}
           <div className={activeTab === 'demote' ? '' : 'md:col-span-2'}>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
               {activeTab === 'demote' ? 'Reason (required)' : 'Remarks'}
             </label>
             <input
@@ -314,13 +318,13 @@ export default function PromotionDashboard() {
               value={remarks}
               onChange={e => setRemarks(e.target.value)}
               placeholder={activeTab === 'demote' ? 'Reason for demotion (required)' : 'Optional remarks'}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
           </div>
 
           {/* Force Override */}
           <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300">
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-[#8E8E93]">
               <input
                 type="checkbox"
                 checked={forceOverride}
@@ -335,8 +339,8 @@ export default function PromotionDashboard() {
 
       {/* Student List */}
       {sourceClass && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A]">
+          <div className="p-4 border-b border-gray-200 dark:border-[#38383A] flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
               Students in {sourceClass}{sourceSection ? `-${sourceSection}` : ''}
               <span className="ml-2 text-gray-500 font-normal">({filteredStudents.length} found)</span>
@@ -348,7 +352,7 @@ export default function PromotionDashboard() {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search students..."
-                className="pl-9 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="pl-9 pr-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -363,7 +367,7 @@ export default function PromotionDashboard() {
           ) : (
             <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-700/50 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <thead className="sticky top-0 bg-gray-50 dark:bg-[#2C2C2E] text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">
                   <tr>
                     <th className="px-4 py-3">Adm. No</th>
                     <th className="px-4 py-3">Name</th>
@@ -372,16 +376,16 @@ export default function PromotionDashboard() {
                     <th className="px-4 py-3 w-28">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
                   {filteredStudents.map(student => {
                     const isExcluded = excludedStudents.has(student._id)
                     const displayName = student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || '-'
                     return (
-                      <tr key={student._id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/30 ${isExcluded ? 'opacity-50 bg-red-50/50 dark:bg-red-900/10' : ''}`}>
-                        <td className="px-4 py-2.5 font-mono text-xs text-gray-600 dark:text-gray-400">{student.admissionNumber || '-'}</td>
+                      <tr key={student._id} className={`hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/50 ${isExcluded ? 'opacity-50 bg-red-50/50 dark:bg-red-900/10' : ''}`}>
+                        <td className="px-4 py-2.5 font-mono text-xs text-gray-600 dark:text-[#8E8E93]">{student.admissionNumber || '-'}</td>
                         <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">{displayName}</td>
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{student.rollNumber || '-'}</td>
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{student.section || '-'}</td>
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-[#8E8E93]">{student.rollNumber || '-'}</td>
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-[#8E8E93]">{student.section || '-'}</td>
                         <td className="px-4 py-2.5">
                           {activeTab === 'individual' ? (
                             <div className="flex gap-1">
@@ -395,7 +399,7 @@ export default function PromotionDashboard() {
                           ) : (
                             <button
                               onClick={() => toggleExclude(student._id)}
-                              className={`text-xs px-2 py-1 rounded ${isExcluded ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300'}`}
+                              className={`text-xs px-2 py-1 rounded ${isExcluded ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-[#3A3A3C] dark:text-[#8E8E93]'}`}
                             >
                               {isExcluded ? 'Excluded' : 'Exclude'}
                             </button>
@@ -411,8 +415,8 @@ export default function PromotionDashboard() {
 
           {/* Bulk Action Bar */}
           {activeTab !== 'individual' && filteredStudents.length > 0 && (
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-700/30 rounded-b-xl">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
+            <div className="p-4 border-t border-gray-200 dark:border-[#38383A] flex items-center justify-between bg-gray-50 dark:bg-[#2C2C2E]/50 rounded-b-xl">
+              <div className="text-sm text-gray-600 dark:text-[#8E8E93]">
                 <span className="font-semibold text-gray-900 dark:text-white">{promotionCount}</span> of {filteredStudents.length} students will be {activeTab === 'promote' ? 'promoted' : 'demoted'}
                 {excludedStudents.size > 0 && <span className="text-amber-600 ml-1">({excludedStudents.size} excluded)</span>}
                 {targetClass && <span> to <span className="font-medium">{targetClass === 'GRADUATED' ? 'Graduated' : targetClass}</span></span>}
@@ -433,12 +437,12 @@ export default function PromotionDashboard() {
       {/* Confirmation Dialog */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowConfirm(false)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Confirm Bulk {activeTab === 'promote' ? 'Promotion' : 'Demotion'}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                <p className="text-sm text-gray-600 dark:text-[#8E8E93] mt-2">
                   This will {activeTab} <strong>{promotionCount}</strong> students from{' '}
                   <strong>{sourceClass}{sourceSection ? `-${sourceSection}` : ''}</strong> to{' '}
                   <strong>{targetClass || 'next class'}</strong> for academic year <strong>{academicYear}</strong>.
@@ -447,7 +451,7 @@ export default function PromotionDashboard() {
               </div>
             </div>
             <div className="flex gap-3 mt-6 justify-end">
-              <button onClick={() => setShowConfirm(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+              <button onClick={() => setShowConfirm(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">Cancel</button>
               <button
                 onClick={handleBulkAction}
                 disabled={bulkPromoteMutation.isPending}
@@ -464,11 +468,11 @@ export default function PromotionDashboard() {
       {/* Individual Action Modal */}
       {individualStudent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setIndividualStudent(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
               {individualAction === 'promote' ? 'Promote' : individualAction === 'demote' ? 'Demote' : 'Shift Section'} Student
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            <p className="text-sm text-gray-500 dark:text-[#8E8E93] mb-4">
               {individualStudent.name || `${individualStudent.firstName || ''} ${individualStudent.lastName || ''}`.trim()}{' '}
               ({individualStudent.admissionNumber}) — {individualStudent.class}-{individualStudent.section}
             </p>
@@ -480,7 +484,7 @@ export default function PromotionDashboard() {
                   <button
                     key={a}
                     onClick={() => { setIndividualAction(a); setIndividualTargetClass(''); setIndividualTargetSection('') }}
-                    className={`px-3 py-1.5 text-xs rounded-lg border ${individualAction === a ? 'border-teal-500 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400'}`}
+                    className={`px-3 py-1.5 text-xs rounded-lg border ${individualAction === a ? 'border-teal-500 bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' : 'border-gray-300 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93]'}`}
                   >
                     {a === 'promote' ? 'Promote' : a === 'demote' ? 'Demote' : 'Shift Section'}
                   </button>
@@ -489,11 +493,11 @@ export default function PromotionDashboard() {
 
               {individualAction !== 'shift' && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Target Class</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Target Class</label>
                   <select
                     value={individualTargetClass}
                     onChange={e => setIndividualTargetClass(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
                   >
                     {individualAction === 'promote' ? (
                       <>
@@ -512,13 +516,13 @@ export default function PromotionDashboard() {
               )}
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
                   {individualAction === 'shift' ? 'Target Section' : 'Target Section (optional)'}
                 </label>
                 <select
                   value={individualTargetSection}
                   onChange={e => setIndividualTargetSection(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
                 >
                   <option value="">{individualAction === 'shift' ? 'Select section' : 'Keep current'}</option>
                   {sourceSections.filter(s => s !== individualStudent.section).map(s => <option key={s} value={s}>{s}</option>)}
@@ -527,20 +531,20 @@ export default function PromotionDashboard() {
 
               {(individualAction === 'demote' || individualAction === 'shift') && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Reason (required)</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Reason (required)</label>
                   <input
                     type="text"
                     value={individualReason}
                     onChange={e => setIndividualReason(e.target.value)}
                     placeholder="Reason for this action"
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
                   />
                 </div>
               )}
             </div>
 
             <div className="flex gap-3 mt-6 justify-end">
-              <button onClick={() => setIndividualStudent(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+              <button onClick={() => setIndividualStudent(null)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">Cancel</button>
               <button
                 onClick={handleIndividualAction}
                 disabled={
@@ -562,7 +566,7 @@ export default function PromotionDashboard() {
 
       {/* Results Summary */}
       {results && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <GraduationCap className="w-5 h-5 text-teal-500" />
             Results
@@ -570,37 +574,37 @@ export default function PromotionDashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800">
               <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">{results.promoted || 0}</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Promoted</p>
+              <p className="text-xs text-gray-600 dark:text-[#8E8E93]">Promoted</p>
             </div>
             <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{results.graduated || 0}</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Graduated</p>
+              <p className="text-xs text-gray-600 dark:text-[#8E8E93]">Graduated</p>
             </div>
             <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
               <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{results.skipped || 0}</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Skipped</p>
+              <p className="text-xs text-gray-600 dark:text-[#8E8E93]">Skipped</p>
             </div>
             <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
               <p className="text-2xl font-bold text-red-600 dark:text-red-400">{results.failed || 0}</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Failed</p>
+              <p className="text-xs text-gray-600 dark:text-[#8E8E93]">Failed</p>
             </div>
           </div>
 
           {results.details?.length > 0 && (
             <details className="mt-4">
-              <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-teal-600">
+              <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-[#8E8E93] hover:text-teal-600">
                 View detailed results ({results.details.length} entries)
               </summary>
               <div className="mt-2 max-h-60 overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50 dark:bg-gray-700/50">
+                  <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
                     <tr>
                       <th className="px-3 py-2 text-left">Student</th>
                       <th className="px-3 py-2 text-left">Status</th>
                       <th className="px-3 py-2 text-left">Details</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
                     {results.details.map((d, i) => (
                       <tr key={i}>
                         <td className="px-3 py-1.5 text-gray-900 dark:text-white">{d.name || d.studentId}</td>
