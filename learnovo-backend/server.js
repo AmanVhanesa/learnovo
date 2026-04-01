@@ -301,40 +301,46 @@ app.use(errorHandler);
 // 404 handler
 app.use('*', notFoundHandler);
 
-// Start background jobs
-try {
-  const reconciliationJob = require('./jobs/reconciliationJob');
-  reconciliationJob.startJob();
-} catch (e) {
-  console.error('Failed to start reconciliation job:', e);
-}
+// Start background jobs — only on PM2 cluster instance 0 to prevent duplicates
+const isPrimaryInstance = !process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === '0';
 
-try {
-  const backupJob = require('./jobs/backupJob');
-  backupJob.startJob();
-} catch (e) {
-  console.error('Failed to start backup job:', e);
-}
+if (isPrimaryInstance) {
+  try {
+    const reconciliationJob = require('./jobs/reconciliationJob');
+    reconciliationJob.startJob();
+  } catch (e) {
+    console.error('Failed to start reconciliation job:', e);
+  }
 
-try {
-  const homeworkStatusUpdater = require('./jobs/homeworkStatusUpdater');
-  homeworkStatusUpdater.startJob();
-} catch (e) {
-  console.error('Failed to start homework status updater:', e);
-}
+  try {
+    const backupJob = require('./jobs/backupJob');
+    backupJob.startJob();
+  } catch (e) {
+    console.error('Failed to start backup job:', e);
+  }
 
-try {
-  const examStatusUpdater = require('./jobs/examStatusUpdater');
-  examStatusUpdater.startJob();
-} catch (e) {
-  console.error('Failed to start exam status updater:', e);
-}
+  try {
+    const homeworkStatusUpdater = require('./jobs/homeworkStatusUpdater');
+    homeworkStatusUpdater.startJob();
+  } catch (e) {
+    console.error('Failed to start homework status updater:', e);
+  }
 
-try {
-  const announcementExpiry = require('./jobs/announcementExpiry');
-  announcementExpiry.startJob();
-} catch (e) {
-  console.error('Failed to start announcement expiry job:', e);
+  try {
+    const examStatusUpdater = require('./jobs/examStatusUpdater');
+    examStatusUpdater.startJob();
+  } catch (e) {
+    console.error('Failed to start exam status updater:', e);
+  }
+
+  try {
+    const announcementExpiry = require('./jobs/announcementExpiry');
+    announcementExpiry.startJob();
+  } catch (e) {
+    console.error('Failed to start announcement expiry job:', e);
+  }
+} else {
+  console.log(`Skipping cron jobs on PM2 instance ${process.env.NODE_APP_INSTANCE}`);
 }
 
 // ── Memory monitoring ───────────────────────────────────────────────

@@ -118,7 +118,7 @@ function startJob() {
     '*/5 * * * *',
     runExamStatusUpdate,
     null,
-    true,
+    false,
     'Asia/Kolkata'
   );
 

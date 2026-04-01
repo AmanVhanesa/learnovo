@@ -41,7 +41,7 @@ function startJob() {
     '*/15 * * * *',
     runAnnouncementExpiry,
     null,
-    true,
+    false,
     'Asia/Kolkata'
   );
 

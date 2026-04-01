@@ -80,7 +80,7 @@ function startJob() {
     '*/10 * * * *',
     runHomeworkStatusUpdate,
     null,
-    true,
+    false,
     'Asia/Kolkata'
   );
 
