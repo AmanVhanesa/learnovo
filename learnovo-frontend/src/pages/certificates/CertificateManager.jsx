@@ -487,17 +487,17 @@ const CertificateManager = () => {
                 <div className="modal-overlay" onClick={() => setPreviewCert(null)} style={{ zIndex: 50 }}>
                     <div className="flex flex-col items-center max-h-[95vh] w-full max-w-3xl mx-4" onClick={e => e.stopPropagation()}>
                         {/* Modal header */}
-                        <div className="w-full flex items-center justify-between bg-[#1C1C1E] px-5 py-3 rounded-t-2xl">
-                            <h3 className="text-white font-semibold text-sm">
+                        <div className="w-full flex items-center justify-between bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-5 py-3 rounded-t-2xl">
+                            <h3 className="text-gray-900 dark:text-white font-semibold text-sm">
                                 Certificate Preview — {previewCert.certificateNumber}
                             </h3>
-                            <button onClick={() => setPreviewCert(null)} className="text-gray-400 hover:text-white">
+                            <button onClick={() => setPreviewCert(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
 
                         {/* A4 Paper area */}
-                        <div className="w-full flex-1 min-h-0 overflow-y-auto bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
+                        <div className="w-full flex-1 min-h-0 overflow-y-auto bg-gray-100 dark:bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
                             <CertificatePreviewContent
                                 type={previewCert.type}
                                 data={previewCert.contentSnapshot}
@@ -507,7 +507,7 @@ const CertificateManager = () => {
                         </div>
 
                         {/* Modal footer */}
-                        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-[#1C1C1E] px-5 py-4 rounded-b-2xl">
+                        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-white dark:bg-[#1C1C1E] border-t border-gray-200 dark:border-[#38383A] px-5 py-4 rounded-b-2xl">
                             <button
                                 onClick={() => { handlePrint(previewCert); }}
                                 className="btn btn-primary gap-2 w-full sm:w-auto text-sm"
@@ -517,21 +517,21 @@ const CertificateManager = () => {
                             </button>
                             <button
                                 onClick={() => { setPreviewCert(null); handleDownload(previewCert); }}
-                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
+                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm"
                             >
                                 <Download className="h-4 w-4" />
                                 Export as PDF
                             </button>
                             <button
                                 onClick={() => { setPreviewCert(null); handleDownloadWord(previewCert); }}
-                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
+                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm"
                             >
                                 <FileDown className="h-4 w-4" />
                                 Export as Word
                             </button>
                             <button
                                 onClick={() => setPreviewCert(null)}
-                                className="btn btn-outline w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
+                                className="btn btn-outline w-full sm:w-auto text-sm"
                             >
                                 Close
                             </button>

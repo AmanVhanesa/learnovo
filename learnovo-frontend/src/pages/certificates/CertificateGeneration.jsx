@@ -541,15 +541,15 @@ const CertificateGeneration = () => {
                 <div className="modal-overlay" onClick={() => setShowPreviewModal(false)} style={{ zIndex: 50 }}>
                     <div className="flex flex-col items-center max-h-[95vh] w-full max-w-3xl mx-4" onClick={e => e.stopPropagation()}>
                         {/* Modal header */}
-                        <div className="w-full flex items-center justify-between bg-[#1C1C1E] px-5 py-3 rounded-t-2xl">
-                            <h3 className="text-white font-semibold text-sm">Certificate Preview</h3>
-                            <button onClick={() => setShowPreviewModal(false)} className="text-gray-400 hover:text-white">
+                        <div className="w-full flex items-center justify-between bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-5 py-3 rounded-t-2xl">
+                            <h3 className="text-gray-900 dark:text-white font-semibold text-sm">Certificate Preview</h3>
+                            <button onClick={() => setShowPreviewModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
 
-                        {/* A4 Paper area with dark background */}
-                        <div className="w-full flex-1 min-h-0 overflow-y-auto bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
+                        {/* A4 Paper area */}
+                        <div className="w-full flex-1 min-h-0 overflow-y-auto bg-gray-100 dark:bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
                             <CertificatePreviewContent
                                 type={certType}
                                 data={getMergedData()}
@@ -559,7 +559,7 @@ const CertificateGeneration = () => {
                         </div>
 
                         {/* Modal footer with action buttons */}
-                        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-[#1C1C1E] px-5 py-4 rounded-b-2xl">
+                        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-white dark:bg-[#1C1C1E] border-t border-gray-200 dark:border-[#38383A] px-5 py-4 rounded-b-2xl">
                             <button
                                 onClick={handlePrintPreview}
                                 className="btn btn-primary gap-2 w-full sm:w-auto text-sm"
@@ -570,14 +570,14 @@ const CertificateGeneration = () => {
                             <button
                                 onClick={() => { setShowPreviewModal(false); handleGenerate(); }}
                                 disabled={generating}
-                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
+                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm"
                             >
                                 <Download className="h-4 w-4" />
                                 Export as PDF
                             </button>
                             <button
                                 onClick={() => setShowPreviewModal(false)}
-                                className="btn btn-outline w-full sm:w-auto text-sm border-gray-500 text-gray-300 hover:text-white hover:border-gray-300"
+                                className="btn btn-outline w-full sm:w-auto text-sm"
                             >
                                 Close
                             </button>
