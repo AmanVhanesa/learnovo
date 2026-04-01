@@ -689,10 +689,13 @@ const AcademicsManagement = () => {
             {showSubjectForm && (
                 <SubjectFormModal
                     subject={editingSubject}
+                    classes={classes}
+                    activeSession={activeSession}
                     onClose={() => setShowSubjectForm(false)}
                     onSuccess={() => {
                         setShowSubjectForm(false)
                         queryClient.invalidateQueries({ queryKey: ['academic-subjects'] })
+                        queryClient.invalidateQueries({ queryKey: ['class-subjects'] })
                     }}
                 />
             )}
@@ -1034,7 +1037,7 @@ const ClassFormModal = ({ classData, teachers, onClose, onSuccess }) => {
 }
 
 // Subject Form Modal
-const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
+const SubjectFormModal = ({ subject, classes = [], activeSession, onClose, onSuccess }) => {
     const [form, setForm] = useState({
         name: subject?.name || '',
         subjectCode: subject?.subjectCode || '',
@@ -1044,6 +1047,7 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
         description: subject?.description || '',
         isOptional: subject?.isOptional || false
     })
+    const [selectedClassIds, setSelectedClassIds] = useState([])
     const [isSaving, setIsSaving] = useState(false)
 
     const handleSubmit = async (e) => {
@@ -1061,12 +1065,33 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
         try {
             setIsSaving(true)
 
+            let savedSubject
             if (subject) {
                 await subjectsService.update(subject._id, form)
+                savedSubject = subject
                 toast.success('Subject updated successfully')
             } else {
-                await subjectsService.create(form)
+                const res = await subjectsService.create(form)
+                savedSubject = res.data
                 toast.success('Subject created successfully')
+            }
+
+            // Assign subject to selected classes
+            if (!subject && selectedClassIds.length > 0 && activeSession && savedSubject?._id) {
+                try {
+                    for (const classId of selectedClassIds) {
+                        await classSubjectsService.assign({
+                            classId,
+                            subjectId: savedSubject._id,
+                            academicSessionId: activeSession._id,
+                            maxMarks: form.maxMarks,
+                            passingMarks: form.passingMarks
+                        })
+                    }
+                } catch (assignErr) {
+                    console.error('Error assigning subject to classes:', assignErr)
+                    toast.error('Subject created but some class assignments failed')
+                }
             }
 
             onSuccess()
@@ -1125,6 +1150,35 @@ const SubjectFormModal = ({ subject, onClose, onSuccess }) => {
                                 <option value="Both">Both</option>
                             </select>
                         </div>
+
+                        {/* Class assignment — only shown when creating a new subject */}
+                        {!subject && classes.length > 0 && activeSession && (
+                            <div>
+                                <label className="label">Assign to Classes</label>
+                                <div className="max-h-40 overflow-y-auto border border-gray-200 dark:border-[#38383A] rounded-xl p-2 space-y-1">
+                                    {classes.map(cls => (
+                                        <label key={cls._id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                                                checked={selectedClassIds.includes(cls._id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setSelectedClassIds(prev => [...prev, cls._id])
+                                                    } else {
+                                                        setSelectedClassIds(prev => prev.filter(id => id !== cls._id))
+                                                    }
+                                                }}
+                                            />
+                                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                                                {cls.name || `Class ${formatGrade(cls.grade)}`}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Select the classes this subject will be taught in</p>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>

@@ -4,6 +4,8 @@ const User = require('../models/User');
 const Settings = require('../models/Settings');
 const Fee = require('../models/Fee');
 const Counter = require('../models/Counter');
+const ClassSubject = require('../models/ClassSubject');
+const AcademicSession = require('../models/AcademicSession');
 const pdfService = require('../services/pdfService');
 const { format } = require('date-fns');
 
@@ -155,6 +157,39 @@ exports.previewCertificate = async(req, res) => {
       }
     }
 
+    // --- Fetch subjects studied from class-subject assignments ---
+    let subjectsStudied = '';
+    try {
+      if (student.classId) {
+        const activeSession = await AcademicSession.findOne({ tenantId, isActive: true });
+        const query = { tenantId, classId: student.classId, isActive: true };
+        if (activeSession) query.academicSessionId = activeSession._id;
+
+        const classSubjects = await ClassSubject.find(query).populate('subjectId', 'name');
+        const subjectNames = classSubjects
+          .filter(cs => cs.subjectId && cs.subjectId.name)
+          .map(cs => cs.subjectId.name);
+
+        if (subjectNames.length > 0) {
+          subjectsStudied = subjectNames.join(', ');
+        }
+      }
+
+      // Fallback: if no class-subject assignments found, fetch all active subjects for the tenant
+      if (!subjectsStudied) {
+        const Subject = require('../models/Subject');
+        const allSubjects = await Subject.find({ tenantId, isActive: true }).select('name');
+        if (allSubjects.length > 0) {
+          subjectsStudied = allSubjects.map(s => s.name).join(', ');
+        } else {
+          subjectsStudied = '-';
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching subjects for TC:', err.message);
+      subjectsStudied = '-';
+    }
+
     // --- Prepare Data ---
     // Format dates
     const dob = student.dateOfBirth ? format(new Date(student.dateOfBirth), 'dd MMM yyyy') : '';
@@ -204,7 +239,7 @@ exports.previewCertificate = async(req, res) => {
       admissionDate: student.admissionDate ? format(new Date(student.admissionDate), 'dd MMM yyyy') : '-',
       boardResult: 'Passed', // TODO: Fetch from Exam Result model
       promotionStatus: 'Yes',
-      subjects: 'English, Hindi, Maths, Science, Social Science', // TODO: Fetch
+      subjects: subjectsStudied,
       feeStatus: 'Paid up to date',
       conduct: 'Good',
       leavingReason: 'Parent Request', // Allow override from frontend
