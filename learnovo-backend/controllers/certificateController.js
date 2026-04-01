@@ -504,18 +504,15 @@ exports.downloadCertificateWord = async(req, res) => {
       ? buildTCWordHtml(data, cert, logoDataUri, signatureDataUri)
       : buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri);
 
-    const docxResult = await HTMLtoDOCX(html, null, {
+    const docxBuffer = await HTMLtoDOCX(html, null, {
       table: { row: { cantSplit: true } },
       footer: true,
       pageNumber: true
     });
 
-    // html-to-docx may return Buffer, ArrayBuffer, or Blob — ensure Node Buffer
-    const docxBuffer = Buffer.isBuffer(docxResult)
-      ? docxResult
-      : Buffer.from(docxResult instanceof ArrayBuffer ? docxResult : await docxResult.arrayBuffer());
-
     const filename = `${cert.type}_${cert.certificateNumber.replace(/\//g, '-')}.docx`;
+    // Disable compression — DOCX is already a ZIP archive; gzipping it corrupts the file
+    res.setHeader('Content-Encoding', 'identity');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', docxBuffer.length);
