@@ -69,7 +69,8 @@ const CertificateManager = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (!response.ok) throw new Error('Download failed');
-            const blob = await response.blob();
+            const arrayBuffer = await response.arrayBuffer();
+            const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
