@@ -504,11 +504,16 @@ exports.downloadCertificateWord = async(req, res) => {
       ? buildTCWordHtml(data, cert, logoDataUri, signatureDataUri)
       : buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri);
 
-    const docxBuffer = await HTMLtoDOCX(html, null, {
+    const docxResult = await HTMLtoDOCX(html, null, {
       table: { row: { cantSplit: true } },
       footer: true,
       pageNumber: true
     });
+
+    // html-to-docx may return Buffer, ArrayBuffer, or Blob — ensure Node Buffer
+    const docxBuffer = Buffer.isBuffer(docxResult)
+      ? docxResult
+      : Buffer.from(docxResult instanceof ArrayBuffer ? docxResult : await docxResult.arrayBuffer());
 
     const filename = `${cert.type}_${cert.certificateNumber.replace(/\//g, '-')}.docx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
