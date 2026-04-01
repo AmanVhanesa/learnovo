@@ -66,7 +66,7 @@ function startJob() {
     '0 2 * * *',      // 2:00 AM daily
     runAutoBackup,
     null,
-    true,
+    false,
     'Asia/Kolkata'     // IST timezone
   );
 
