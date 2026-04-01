@@ -645,7 +645,7 @@ function buildTCWordHtml(data, cert, logoDataUri, signatureDataUri) {
   <table style="width:100%;margin-bottom:6px;">
     <tr>
       <td style="text-align:center;padding:12px 0;">
-        <table style="margin:0 auto;background:#edf9f7;padding:8px 24px 10px;border-radius:10px;">
+        <table style="margin:0 auto;background:#edf9f7;padding:8px 24px 10px;">
           <tr>
             <td style="text-align:center;">
               <p style="font-family:Arial,Helvetica,sans-serif;font-size:13pt;font-weight:700;color:#0a5c56;letter-spacing:4px;text-transform:uppercase;margin:0;">SCHOOL LEAVING CERTIFICATE</p>
@@ -657,7 +657,7 @@ function buildTCWordHtml(data, cert, logoDataUri, signatureDataUri) {
   </table>
 
   <!-- META ROW -->
-  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;">
+  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;margin-bottom:8px;">
     <tr>
       <td style="padding:7px 20px;font-size:10pt;font-weight:600;color:#111827;">
         <span style="color:#3EC4B1;font-weight:700;">#</span> ${certNum}
@@ -669,12 +669,12 @@ function buildTCWordHtml(data, cert, logoDataUri, signatureDataUri) {
   </table>
 
   <!-- FIELDS TABLE -->
-  <table style="width:100%;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;">
+  <table style="width:100%;border:1px solid #e5e7eb;margin-bottom:8px;">
     ${tableRows}
   </table>
 
   <!-- NOTE BOX -->
-  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;">
+  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;margin-bottom:6px;">
     <tr>
       <td style="padding:6px 12px;">
         <p style="font-size:8pt;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin:0;">Important Note</p>
@@ -695,7 +695,7 @@ function buildTCWordHtml(data, cert, logoDataUri, signatureDataUri) {
         <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Class Teacher</p>
       </td>
       <td style="width:34%;text-align:center;vertical-align:bottom;">
-        <div style="width:90px;height:90px;border:2px dashed #d1d5db;border-radius:50%;margin:0 auto;">&nbsp;</div>
+        <div style="width:90px;height:90px;border:2px dashed #d1d5db;margin:0 auto;">&nbsp;</div>
       </td>
       <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:10px;">
         ${signatureDataUri ? `<img src="${signatureDataUri}" alt="Principal Signature" style="max-height:70px;max-width:150px;display:block;margin:0 auto 4px;object-fit:contain;" />` : ''}
@@ -776,7 +776,7 @@ function buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri) {
   <table style="width:100%;margin-bottom:6px;">
     <tr>
       <td style="text-align:center;padding:12px 0;">
-        <table style="margin:0 auto;background:#edf9f7;padding:8px 24px 10px;border-radius:10px;">
+        <table style="margin:0 auto;background:#edf9f7;padding:8px 24px 10px;">
           <tr>
             <td style="text-align:center;">
               <p style="font-family:Arial,Helvetica,sans-serif;font-size:13pt;font-weight:700;color:#0a5c56;letter-spacing:4px;text-transform:uppercase;margin:0;">BONAFIDE CERTIFICATE</p>
@@ -788,7 +788,7 @@ function buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri) {
   </table>
 
   <!-- META ROW -->
-  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:14px;">
+  <table style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;margin-bottom:14px;">
     <tr>
       <td style="padding:7px 20px;font-size:10pt;font-weight:600;color:#111827;">
         <span style="color:#3EC4B1;font-weight:700;">#</span> ${certNum}
@@ -816,7 +816,7 @@ function buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri) {
   </p>
 
   <!-- DETAILS GRID -->
-  <table style="width:100%;background:#f0fdfa;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:14px;">
+  <table style="width:100%;background:#f0fdfa;border:1px solid #e5e7eb;margin-bottom:14px;">
     <tr>
       <td style="width:50%;padding:10px 16px;vertical-align:top;">
         <p style="font-size:7pt;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:1px;margin:0;">Student Name</p>
@@ -878,7 +878,7 @@ function buildBonafideWordHtml(data, cert, logoDataUri, signatureDataUri) {
         <p style="font-size:9pt;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px;margin:0;">Class Teacher</p>
       </td>
       <td style="width:34%;text-align:center;vertical-align:bottom;">
-        <div style="width:90px;height:90px;border:2px dashed #d1d5db;border-radius:50%;margin:0 auto;">&nbsp;</div>
+        <div style="width:90px;height:90px;border:2px dashed #d1d5db;margin:0 auto;">&nbsp;</div>
       </td>
       <td style="width:33%;text-align:center;vertical-align:bottom;padding-top:10px;">
         ${signatureDataUri ? `<img src="${signatureDataUri}" alt="Principal Signature" style="max-height:70px;max-width:150px;display:block;margin:0 auto 4px;object-fit:contain;" />` : ''}
