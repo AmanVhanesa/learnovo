@@ -44,7 +44,20 @@ const CertificateGeneration = () => {
         queryKey: ['student-search', debouncedSearch],
         queryFn: async () => {
             const response = await studentsService.list({ search: debouncedSearch, limit: 10 });
-            return response.data || [];
+            const results = response.data || [];
+            // Sort: admission number matches first, then name, then phone/other
+            const term = debouncedSearch.toLowerCase();
+            return results.sort((a, b) => {
+                const aAdm = a.admissionNumber && String(a.admissionNumber).toLowerCase().includes(term);
+                const bAdm = b.admissionNumber && String(b.admissionNumber).toLowerCase().includes(term);
+                if (aAdm && !bAdm) return -1;
+                if (!aAdm && bAdm) return 1;
+                const aName = (a.fullName || a.name || '').toLowerCase().includes(term);
+                const bName = (b.fullName || b.name || '').toLowerCase().includes(term);
+                if (aName && !bName) return -1;
+                if (!aName && bName) return 1;
+                return 0;
+            });
         },
         enabled: debouncedSearch.length >= 2,
     });
