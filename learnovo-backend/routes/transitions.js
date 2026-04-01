@@ -365,4 +365,19 @@ router.post('/recalculate-strengths', authorize('admin', 'principal'), async(req
   }
 });
 
+// ─── GET SECTIONS FOR A CLASS ────────────────────────────────────────────────
+
+// GET /api/transitions/sections/:className
+router.get('/sections/:className', async(req, res, next) => {
+  try {
+    const sections = await transitionService.getSectionsForClass(
+      req.user.tenantId,
+      req.params.className
+    );
+    res.json({ success: true, data: sections, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

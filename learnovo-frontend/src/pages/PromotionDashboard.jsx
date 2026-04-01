@@ -47,10 +47,10 @@ export default function PromotionDashboard() {
 
   const { data: studentsData, isLoading: loadingStudents } = useQuery({
     queryKey: ['students-for-promotion', sourceClass, sourceSection],
-    queryFn: () => studentsService.getStudents({
+    queryFn: () => studentsService.list({
       class: sourceClass,
       section: sourceSection || undefined,
-      isActive: true,
+      status: 'active',
       limit: 500
     }),
     enabled: !!sourceClass

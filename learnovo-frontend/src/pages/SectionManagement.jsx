@@ -17,7 +17,6 @@ export default function SectionManagement() {
   const [shiftFromSection, setShiftFromSection] = useState('')
   const [shiftToSection, setShiftToSection] = useState('')
   const [shiftStudentIds, setShiftStudentIds] = useState(new Set())
-  const [shiftMode, setShiftMode] = useState('individual') // individual | bulk
 
   // Merge state
   const [mergeSources, setMergeSources] = useState([])
@@ -29,29 +28,56 @@ export default function SectionManagement() {
   const [splitTargets, setSplitTargets] = useState([])
   const [splitDistribution, setSplitDistribution] = useState('even')
 
-  const [showConfirm, setShowConfirm] = useState(null) // 'merge' | 'split' | 'shift' | null
+  const [showConfirm, setShowConfirm] = useState(null)
   const [results, setResults] = useState(null)
 
-  // Queries
+  // Get class list from student filters
   const { data: filtersData } = useQuery({
     queryKey: ['student-filters'],
     queryFn: () => studentsService.getFilters()
   })
 
+  // Get sections for the selected class (per-class, per-tenant, with student counts)
+  const { data: sectionsData, isLoading: loadingSections } = useQuery({
+    queryKey: ['class-sections', selectedClass],
+    queryFn: () => transitionsService.getSectionsForClass(selectedClass),
+    enabled: !!selectedClass
+  })
+
+  // Get students for shift tab
   const { data: studentsData, isLoading: loadingStudents } = useQuery({
     queryKey: ['section-students', selectedClass, shiftFromSection],
-    queryFn: () => studentsService.getStudents({
+    queryFn: () => studentsService.list({
       class: selectedClass,
       section: shiftFromSection || undefined,
-      isActive: true,
+      status: 'active',
       limit: 500
     }),
-    enabled: !!selectedClass && (activeTab === 'shift' ? !!shiftFromSection : true)
+    enabled: !!selectedClass && activeTab === 'shift' && !!shiftFromSection
   })
 
   const classes = filtersData?.data?.classes || filtersData?.classes || []
-  const sections = filtersData?.data?.sections || filtersData?.sections || []
+  const classSections = sectionsData?.data || [] // [{name, studentCount, capacity, currentStrength}]
   const students = studentsData?.data || studentsData?.students || []
+
+  // Helper: get student count for a section name
+  const getStudentCount = (sectionName) => {
+    const sec = classSections.find(s => s.name === sectionName)
+    return sec?.studentCount ?? sec?.currentStrength ?? 0
+  }
+
+  // Reset section selections when class changes
+  const handleClassChange = (cls) => {
+    setSelectedClass(cls)
+    setShiftFromSection('')
+    setShiftToSection('')
+    setShiftStudentIds(new Set())
+    setMergeSources([])
+    setMergeTargets([])
+    setSplitSource('')
+    setSplitTargets([])
+    setResults(null)
+  }
 
   // Mutations
   const bulkShiftMutation = useMutation({
@@ -61,6 +87,7 @@ export default function SectionManagement() {
       setShowConfirm(null)
       setShiftStudentIds(new Set())
       queryClient.invalidateQueries({ queryKey: ['section-students'] })
+      queryClient.invalidateQueries({ queryKey: ['class-sections'] })
       toast.success(`Shift complete: ${data.data.shifted} students shifted`)
     },
     onError: (error) => toast.error(error.response?.data?.message || error.response?.data?.errors?.[0] || 'Shift failed')
@@ -72,6 +99,7 @@ export default function SectionManagement() {
       setResults(data.data)
       setShowConfirm(null)
       queryClient.invalidateQueries({ queryKey: ['section-students'] })
+      queryClient.invalidateQueries({ queryKey: ['class-sections'] })
       queryClient.invalidateQueries({ queryKey: ['student-filters'] })
       toast.success(`Merge complete: ${data.data.merged} students redistributed`)
     },
@@ -84,6 +112,7 @@ export default function SectionManagement() {
       setResults(data.data)
       setShowConfirm(null)
       queryClient.invalidateQueries({ queryKey: ['section-students'] })
+      queryClient.invalidateQueries({ queryKey: ['class-sections'] })
       toast.success(`Split complete: ${data.data.merged} students redistributed`)
     },
     onError: (error) => toast.error(error.response?.data?.message || error.response?.data?.errors?.[0] || 'Split failed')
@@ -91,7 +120,10 @@ export default function SectionManagement() {
 
   const recalcMutation = useMutation({
     mutationFn: () => transitionsService.recalculateStrengths(),
-    onSuccess: (data) => toast.success(data.message),
+    onSuccess: (data) => {
+      toast.success(data.message)
+      queryClient.invalidateQueries({ queryKey: ['class-sections'] })
+    },
     onError: (error) => toast.error(error.response?.data?.message || 'Recalculation failed')
   })
 
@@ -134,6 +166,9 @@ export default function SectionManagement() {
     else setArr([...arr, item])
   }
 
+  // Section names for dropdowns/buttons
+  const sectionNames = classSections.map(s => s.name)
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -174,14 +209,14 @@ export default function SectionManagement() {
         ))}
       </div>
 
-      {/* Class Selector */}
+      {/* Class Selector + Section Overview */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Class</label>
             <select
               value={selectedClass}
-              onChange={e => { setSelectedClass(e.target.value); setResults(null); setShiftStudentIds(new Set()) }}
+              onChange={e => handleClassChange(e.target.value)}
               className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
             >
               <option value="">Select class</option>
@@ -198,9 +233,12 @@ export default function SectionManagement() {
                   value={shiftFromSection}
                   onChange={e => { setShiftFromSection(e.target.value); setShiftStudentIds(new Set()) }}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                  disabled={!selectedClass || loadingSections}
                 >
                   <option value="">Select section</option>
-                  {sections.filter(s => s).map(s => <option key={s} value={s}>{s}</option>)}
+                  {sectionNames.map(s => (
+                    <option key={s} value={s}>{s} ({getStudentCount(s)} students)</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -209,9 +247,12 @@ export default function SectionManagement() {
                   value={shiftToSection}
                   onChange={e => setShiftToSection(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                  disabled={!selectedClass || loadingSections}
                 >
                   <option value="">Select target section</option>
-                  {sections.filter(s => s && s !== shiftFromSection).map(s => <option key={s} value={s}>{s}</option>)}
+                  {sectionNames.filter(s => s !== shiftFromSection).map(s => (
+                    <option key={s} value={s}>{s} ({getStudentCount(s)} students)</option>
+                  ))}
                 </select>
               </div>
             </>
@@ -221,50 +262,73 @@ export default function SectionManagement() {
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Source Sections (to dissolve)</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {sections.filter(s => s).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => toggleArrayItem(mergeSources, setMergeSources, s)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        mergeSources.includes(s)
-                          ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300'
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                {loadingSections ? (
+                  <div className="flex items-center gap-2 mt-2 text-sm text-gray-400"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
+                ) : sectionNames.length === 0 ? (
+                  <p className="text-xs text-gray-400 mt-2">{selectedClass ? 'No sections found for this class' : 'Select a class first'}</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {sectionNames.map(s => {
+                      const count = getStudentCount(s)
+                      const isTarget = mergeTargets.includes(s)
+                      const isEmpty = count === 0
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => !isTarget && toggleArrayItem(mergeSources, setMergeSources, s)}
+                          disabled={isTarget}
+                          className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                            mergeSources.includes(s)
+                              ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-900/30 dark:text-red-300'
+                              : isTarget
+                                ? 'border-gray-200 bg-gray-100 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed'
+                                : isEmpty
+                                  ? 'border-gray-200 bg-gray-50 text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500'
+                                  : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          {s} <span className="text-xs opacity-70">({count})</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Sections (absorb into)</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {sections.filter(s => s && !mergeSources.includes(s)).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => toggleArrayItem(mergeTargets, setMergeTargets, s)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        mergeTargets.includes(s)
-                          ? 'border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-2">
-                  <label className="text-xs text-gray-500 dark:text-gray-400">Distribution:</label>
-                  <select
-                    value={mergeDistribution}
-                    onChange={e => setMergeDistribution(e.target.value)}
-                    className="ml-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 text-xs"
-                  >
-                    <option value="even">Even</option>
-                    <option value="manual">Manual</option>
-                  </select>
-                </div>
+                {!loadingSections && sectionNames.length > 0 && (
+                  <>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {sectionNames.filter(s => !mergeSources.includes(s)).map(s => {
+                        const count = getStudentCount(s)
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => toggleArrayItem(mergeTargets, setMergeTargets, s)}
+                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                              mergeTargets.includes(s)
+                                ? 'border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
+                                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            {s} <span className="text-xs opacity-70">({count})</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-2">
+                      <label className="text-xs text-gray-500 dark:text-gray-400">Distribution:</label>
+                      <select
+                        value={mergeDistribution}
+                        onChange={e => setMergeDistribution(e.target.value)}
+                        className="ml-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 text-xs"
+                      >
+                        <option value="even">Even</option>
+                        <option value="manual">Manual</option>
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -277,43 +341,67 @@ export default function SectionManagement() {
                   value={splitSource}
                   onChange={e => setSplitSource(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                  disabled={!selectedClass || loadingSections}
                 >
                   <option value="">Select section</option>
-                  {sections.filter(s => s).map(s => <option key={s} value={s}>{s}</option>)}
+                  {sectionNames.map(s => (
+                    <option key={s} value={s}>{s} ({getStudentCount(s)} students)</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Sections</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {sections.filter(s => s).map(s => (
-                    <button
-                      key={s}
-                      onClick={() => toggleArrayItem(splitTargets, setSplitTargets, s)}
-                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                        splitTargets.includes(s)
-                          ? 'border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
-                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-2">
-                  <label className="text-xs text-gray-500 dark:text-gray-400">Distribution:</label>
-                  <select
-                    value={splitDistribution}
-                    onChange={e => setSplitDistribution(e.target.value)}
-                    className="ml-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 text-xs"
-                  >
-                    <option value="even">Even</option>
-                    <option value="manual">Manual</option>
-                  </select>
-                </div>
+                {!loadingSections && sectionNames.length > 0 ? (
+                  <>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {sectionNames.map(s => (
+                        <button
+                          key={s}
+                          onClick={() => toggleArrayItem(splitTargets, setSplitTargets, s)}
+                          className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                            splitTargets.includes(s)
+                              ? 'border-teal-300 bg-teal-50 text-teal-700 dark:border-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
+                              : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          {s} <span className="text-xs opacity-70">({getStudentCount(s)})</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-2">
+                      <label className="text-xs text-gray-500 dark:text-gray-400">Distribution:</label>
+                      <select
+                        value={splitDistribution}
+                        onChange={e => setSplitDistribution(e.target.value)}
+                        className="ml-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 text-xs"
+                      >
+                        <option value="even">Even</option>
+                        <option value="manual">Manual</option>
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-2">{selectedClass ? 'No sections found' : 'Select a class first'}</p>
+                )}
               </div>
             </>
           )}
         </div>
+
+        {/* Section Overview (when class selected) */}
+        {selectedClass && classSections.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Section Overview for {selectedClass}</p>
+            <div className="flex flex-wrap gap-2">
+              {classSections.map(s => (
+                <div key={s.name} className="px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-sm">
+                  <span className="font-medium text-gray-900 dark:text-white">{s.name}</span>
+                  <span className="text-gray-500 dark:text-gray-400 ml-1.5">{s.studentCount} / {s.capacity}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="mt-6 flex justify-end">
@@ -365,6 +453,8 @@ export default function SectionManagement() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-5 h-5 animate-spin text-teal-500" />
             </div>
+          ) : students.length === 0 ? (
+            <div className="py-8 text-center text-sm text-gray-500">No students found in this section</div>
           ) : (
             <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
               <table className="w-full text-sm">

@@ -1283,6 +1283,7 @@ async function updateSectionStrength(tenantId, className, sectionName, delta, se
 async function recalculateSectionStrengths(tenantId) {
   const sections = await Section.find({ tenantId, isActive: true }).populate('classId');
   let updated = 0;
+  const details = [];
 
   for (const section of sections) {
     if (!section.classId) continue;
@@ -1305,13 +1306,104 @@ async function recalculateSectionStrengths(tenantId) {
 
     const actualCount = Math.max(count, countByString);
     if (section.currentStrength !== actualCount) {
-      section.currentStrength = actualCount;
-      await section.save();
+      // Use updateOne to bypass pre-validate hook (strength may exceed capacity for existing data)
+      await Section.updateOne(
+        { _id: section._id },
+        { $set: { currentStrength: actualCount } }
+      );
       updated++;
+      details.push({
+        class: section.classId.grade,
+        section: section.name,
+        oldStrength: section.currentStrength,
+        newStrength: actualCount
+      });
     }
   }
 
-  return { updated, total: sections.length };
+  return { updated, total: sections.length, details };
+}
+
+/**
+ * Get sections for a specific class with student counts.
+ * Returns only sections that belong to this tenant's class.
+ */
+async function getSectionsForClass(tenantId, className) {
+  // Find the class document(s) for this grade
+  const classDocs = await Class.find({ tenantId, grade: className, isActive: true });
+  if (classDocs.length === 0) {
+    // Fallback: derive sections from student records
+    const studentSections = await User.distinct('section', {
+      tenantId,
+      role: 'student',
+      class: className,
+      isActive: true
+    });
+    return studentSections.filter(Boolean).sort().map(name => ({
+      name,
+      studentCount: 0, // will be populated below
+      capacity: 40,
+      currentStrength: 0
+    }));
+  }
+
+  const classIds = classDocs.map(c => c._id);
+  const sections = await Section.find({
+    tenantId,
+    classId: { $in: classIds },
+    isActive: true
+  }).sort({ name: 1 });
+
+  // Get student counts per section
+  const result = [];
+  for (const section of sections) {
+    const studentCount = await User.countDocuments({
+      tenantId,
+      role: 'student',
+      isActive: true,
+      $or: [
+        { classId: section.classId, sectionId: section._id },
+        { class: className, section: section.name }
+      ]
+    });
+
+    result.push({
+      _id: section._id,
+      name: section.name,
+      capacity: section.capacity,
+      currentStrength: section.currentStrength,
+      studentCount
+    });
+  }
+
+  // Also check for sections that exist only in student records (legacy data)
+  const sectionNames = new Set(sections.map(s => s.name));
+  const studentSections = await User.distinct('section', {
+    tenantId,
+    role: 'student',
+    class: className,
+    isActive: true
+  });
+  for (const secName of studentSections) {
+    if (secName && !sectionNames.has(secName.toUpperCase()) && !sectionNames.has(secName)) {
+      const count = await User.countDocuments({
+        tenantId,
+        role: 'student',
+        class: className,
+        section: secName,
+        isActive: true
+      });
+      result.push({
+        _id: null,
+        name: secName,
+        capacity: 40,
+        currentStrength: count,
+        studentCount: count
+      });
+    }
+  }
+
+  return result;
 }
 
 module.exports = {
@@ -1329,5 +1421,6 @@ module.exports = {
   yearRollover,
   undoTransition,
   getTransitionHistory,
-  recalculateSectionStrengths
+  recalculateSectionStrengths,
+  getSectionsForClass
 };

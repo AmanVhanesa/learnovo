@@ -80,6 +80,12 @@ export const transitionsService = {
   recalculateStrengths: async () => {
     const { data } = await api.post('/transitions/recalculate-strengths')
     return data
+  },
+
+  // Get sections for a specific class (with student counts)
+  getSectionsForClass: async (className) => {
+    const { data } = await api.get(`/transitions/sections/${encodeURIComponent(className)}`)
+    return data
   }
 }
 
