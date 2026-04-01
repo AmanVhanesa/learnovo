@@ -189,8 +189,11 @@ const Reports = () => {
           {[...Array(4)].map((_, i) => (<div key={i} className="skeleton p-5 h-24" />))}
         </div>
       ) : dashboardErrorMsg ? (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 flex gap-3 items-center text-red-700 dark:text-red-400">
-          <AlertCircle className="h-5 w-5 shrink-0" /><span className="text-sm">{dashboardErrorMsg}</span>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 text-red-700 dark:text-red-400">
+          <div className="flex gap-3 items-center">
+            <AlertCircle className="h-5 w-5 shrink-0" /><span className="text-sm">{dashboardErrorMsg}</span>
+          </div>
+          <button onClick={() => refetchDashboard()} className="mt-2 text-sm underline hover:text-red-800 dark:hover:text-red-300">Try again</button>
         </div>
       ) : dashboard && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

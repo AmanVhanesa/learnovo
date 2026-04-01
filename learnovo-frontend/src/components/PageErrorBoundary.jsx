@@ -1,5 +1,10 @@
 import React from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { QueryClient } from '@tanstack/react-query'
+
+// Shared reference — set by the provider wrapper so the boundary can clear cache on retry
+let _queryClient = null
+export function setPageErrorBoundaryQueryClient(qc) { _queryClient = qc }
 
 class PageErrorBoundary extends React.Component {
   constructor(props) {
@@ -22,6 +27,10 @@ class PageErrorBoundary extends React.Component {
   }
 
   handleRetry = () => {
+    // Clear all query caches so stale/error data doesn't cause the same crash
+    if (_queryClient) {
+      _queryClient.removeQueries()
+    }
     // Increment retryKey to force React to unmount and remount children,
     // which gives React Query a clean slate to refetch
     this.setState(prev => ({

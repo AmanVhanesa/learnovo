@@ -53,8 +53,8 @@ export const studentsService = {
     return res.data
   },
   // New methods
-  getFilters: async () => {
-    const res = await api.get('/students/filters')
+  getFilters: async (params = {}) => {
+    const res = await api.get('/students/filters', { params })
     return res.data
   },
   toggleStatus: async (id, data) => {

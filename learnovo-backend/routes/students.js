@@ -13,6 +13,7 @@ const { generateAdmissionNumber } = require('../utils/admissionUtils');
 const bcrypt = require('bcryptjs');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const Class = require('../models/Class');
+const Section = require('../models/Section');
 const Driver = require('../models/Driver');
 const { logger } = require('../middleware/errorHandler');
 const planGate = require('../middleware/planGate');
@@ -1400,10 +1401,17 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
   try {
     const tenantId = req.user.tenantId;
 
-    // Aggregation to get distinct values efficiently
+    // Build section query — optionally filter by selected class
+    const sectionQuery = { tenantId };
+    if (req.query.class) {
+      const classDoc = await Class.findOne({ tenantId, name: req.query.class });
+      if (classDoc) sectionQuery.classId = classDoc._id;
+    }
+
+    // Fetch filter options from actual tenant-created data
     const [classes, sections, academicYears, drivers] = await Promise.all([
       User.distinct('class', { role: 'student', tenantId }),
-      User.distinct('section', { role: 'student', tenantId }),
+      Section.distinct('name', sectionQuery),
       User.distinct('academicYear', { role: 'student', tenantId }),
       Driver.find({ tenantId, isActive: true }).select('_id name').sort({ name: 1 })
     ]);

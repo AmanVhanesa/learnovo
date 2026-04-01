@@ -39,8 +39,16 @@ class ErrorBoundary extends React.Component {
               </p>
               <div className="space-y-3">
                 <button
-                  onClick={() => window.location.href = '/app/dashboard'}
+                  onClick={() => {
+                    this.setState({ hasError: false, error: null, errorInfo: null })
+                  }}
                   className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => window.location.href = '/app/dashboard'}
+                  className="w-full bg-gray-200 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-[#38383A] transition-colors"
                 >
                   Go to Dashboard
                 </button>

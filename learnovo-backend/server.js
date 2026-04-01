@@ -206,13 +206,27 @@ if (process.env.NODE_ENV !== 'production') {
 // ── Request timeout middleware ───────────────────────────────────────
 app.use((req, res, next) => {
   // Long-running routes get a generous timeout (3 min)
-  const longRunningPaths = ['/api/invoices/generate-bulk', '/api/invoices/bulk', '/api/report-cards/bulk-download'];
+  const longRunningPaths = [
+    '/api/invoices/generate-bulk', '/api/invoices/bulk', '/api/report-cards/bulk-download',
+    '/api/students/import', '/api/employees/import',
+    '/api/transitions/year-rollover',
+    '/api/fees/allocations/generate',
+  ];
+  // Medium-timeout routes (60s) — heavier queries that may exceed 30s
+  const mediumPaths = [
+    '/api/students/export', '/api/employees/export',
+    '/api/fees/defaulters', '/api/fees/dashboard', '/api/fees/statistics',
+    '/api/finance/dashboard', '/api/finance/report',
+    '/api/reports', '/api/attendance',
+    '/api/exams', '/api/payroll',
+  ];
   const isLongRunning = longRunningPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p));
-  const timeout = isLongRunning ? 180000 : 30000;
+  const isMedium = !isLongRunning && mediumPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p));
+  const timeout = isLongRunning ? 180000 : isMedium ? 60000 : 30000;
 
   req.setTimeout(timeout, () => {
     if (!res.headersSent) {
-      res.status(408).json({ success: false, message: 'Request timed out' });
+      res.status(408).json({ success: false, message: 'Request timed out. Please try again.' });
     }
   });
   next();

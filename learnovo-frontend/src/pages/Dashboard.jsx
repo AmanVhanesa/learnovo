@@ -15,7 +15,8 @@ import {
   Bell,
   UserPlus,
   ClipboardList,
-  School
+  School,
+  RefreshCw
 } from 'lucide-react'
 import { Line, Doughnut } from 'react-chartjs-2'
 import KpiCard from '../components/KpiCard'
@@ -385,6 +386,13 @@ const Dashboard = () => {
             <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 flex-shrink-0" />
             <p className="text-sm text-red-700 dark:text-red-400">{error.response?.data?.message || 'Failed to load dashboard data. Please check your connection and try again.'}</p>
           </div>
+          <button
+            onClick={() => refetch()}
+            className="mt-2 inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Try again
+          </button>
         </div>
       )}
 

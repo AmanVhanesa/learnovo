@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Eye, Edit2, Trash2, FileText, Plus, Download, Wallet, ArrowUpRight,
     IndianRupee, Users, CheckCircle, Clock, ChevronDown, FileSpreadsheet,
-    Building2, Search
+    Building2, Search, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import payrollService from '../services/payrollService';
@@ -64,7 +64,7 @@ const Payroll = () => {
     }, []);
 
     // ─── Queries ──────────────────────────────────────────────
-    const { data: payrollData, isLoading: payrollLoading, isRefetching: payrollRefetching } = useQuery({
+    const { data: payrollData, isLoading: payrollLoading, isRefetching: payrollRefetching, error: payrollError, refetch: refetchPayroll } = useQuery({
         queryKey: ['payroll-records', filters],
         queryFn: () => payrollService.getPayrollRecords(filters),
         enabled: activeTab === 'payroll',
@@ -484,6 +484,20 @@ const Payroll = () => {
                     </button>
                 </div>
             </div>
+
+            {/* ═══ Error ═══ */}
+            {payrollError && (
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200/60 dark:border-red-500/20 rounded-2xl p-4 animate-fade-in">
+                    <div className="flex items-center">
+                        <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 flex-shrink-0" />
+                        <p className="text-sm text-red-700 dark:text-red-400">{payrollError.response?.data?.message || 'Failed to load payroll data. Please try again.'}</p>
+                    </div>
+                    <button onClick={() => refetchPayroll()} className="mt-2 inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline">
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Try again
+                    </button>
+                </div>
+            )}
 
             {/* ═══ Payroll Records Tab ═══ */}
             {activeTab === 'payroll' && (

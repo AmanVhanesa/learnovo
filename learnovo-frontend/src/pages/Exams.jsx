@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Plus, Search, Calendar, Trash2, X, ClipboardList, Edit,
     Clock, BookOpen, User, MapPin, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, FileText,
-    Award, BarChart3, TrendingUp, Download
+    Award, BarChart3, TrendingUp, Download, RefreshCw, AlertTriangle
 } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
@@ -159,7 +159,7 @@ const Exams = () => {
     };
 
     /* ── Data fetching with React Query ── */
-    const { data: exams = [], isLoading: loading } = useQuery({
+    const { data: exams = [], isLoading: loading, error: examsError, refetch: refetchExams } = useQuery({
         queryKey: ['exams'],
         queryFn: async () => {
             const res = await examsService.list();
@@ -682,6 +682,23 @@ const Exams = () => {
                     </button>
                 )}
             </div>
+
+            {/* ── Error ── */}
+            {examsError && (
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200/60 dark:border-red-500/20 rounded-2xl p-4 animate-fade-in">
+                    <div className="flex items-center">
+                        <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 flex-shrink-0" />
+                        <p className="text-sm text-red-700 dark:text-red-400">{examsError.response?.data?.message || 'Failed to load exams. Please check your connection and try again.'}</p>
+                    </div>
+                    <button
+                        onClick={() => refetchExams()}
+                        className="mt-2 inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline"
+                    >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Try again
+                    </button>
+                </div>
+            )}
 
             {/* ── Filters ── */}
             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">

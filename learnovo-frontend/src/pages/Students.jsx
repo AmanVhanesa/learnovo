@@ -119,11 +119,18 @@ const Students = () => {
     setSelectedStudents([]) // clear selection on filter change
   }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter])
 
+  // Reset section filter when class changes (available sections depend on class)
+  useEffect(() => {
+    setSectionFilter('')
+  }, [classFilter])
+
   // Fetch filter options once on mount
   const { data: filterOptions = { classes: [], sections: [], academicYears: [], drivers: [] } } = useQuery({
-    queryKey: ['students-filters'],
+    queryKey: ['students-filters', classFilter],
     queryFn: async () => {
-      const response = await studentsService.getFilters()
+      const params = {}
+      if (classFilter) params.class = classFilter
+      const response = await studentsService.getFilters(params)
       if (response.success) return response.data
       return { classes: [], sections: [], academicYears: [], drivers: [] }
     },

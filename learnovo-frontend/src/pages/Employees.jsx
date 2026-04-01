@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Download, Eye, Power, PowerOff, Edit, Key, Users } from 'lucide-react'
+import { Plus, Search, Download, Eye, Power, PowerOff, Edit, Key, Users, AlertTriangle, RefreshCw } from 'lucide-react'
 import { employeesService } from '../services/employeesService'
 import { exportCSV } from '../utils/exportHelpers'
 import { formatDate } from '../utils/formatDate'
@@ -80,7 +80,7 @@ const Employees = () => {
     })
 
     // Fetch employees
-    const { data: employeesResponse, isLoading } = useQuery({
+    const { data: employeesResponse, isLoading, error: employeesError, refetch: refetchEmployees } = useQuery({
         queryKey: ['employees', debouncedSearchQuery, roleFilter, departmentFilter, statusFilter, currentPage, perPage],
         queryFn: async () => {
             const filters = {
@@ -284,6 +284,20 @@ const Employees = () => {
                     )}
                 </div>
             </div>
+
+            {/* Error Message */}
+            {employeesError && (
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200/60 dark:border-red-500/20 rounded-2xl p-4 animate-fade-in">
+                    <div className="flex items-center">
+                        <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 flex-shrink-0" />
+                        <p className="text-sm text-red-700 dark:text-red-400">{employeesError.response?.data?.message || 'Failed to load employees. Please try again.'}</p>
+                    </div>
+                    <button onClick={() => refetchEmployees()} className="mt-2 inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 underline">
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Try again
+                    </button>
+                </div>
+            )}
 
             {/* Filters */}
             <div className="card p-3 sm:p-4">
