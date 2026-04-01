@@ -228,8 +228,8 @@ const CertificateManager = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="stat-card">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-xl bg-primary-50 dark:bg-primary-900/20 ring-1 ring-primary-100 dark:ring-primary-500/20">
-                            <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                        <div className="p-2.5 rounded-xl bg-teal-50 dark:bg-teal-900/20 ring-1 ring-teal-100 dark:ring-teal-500/20">
+                            <FileText className="h-5 w-5 text-teal-600 dark:text-teal-400" />
                         </div>
                         <div>
                             <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Total Issued</p>
