@@ -157,10 +157,12 @@ const CertificateManager = () => {
         openPrintWindow(html);
     };
 
-    const filteredHistory = history.filter(cert =>
-        cert.student?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cert.certificateNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredHistory = history.filter(cert => {
+        const term = searchTerm.toLowerCase();
+        return cert.student?.fullName?.toLowerCase().includes(term) ||
+            cert.certificateNumber?.toLowerCase().includes(term) ||
+            cert.student?.admissionNumber?.toLowerCase().includes(term);
+    });
 
     const tcCerts = filteredHistory.filter(c => c.type === 'TC');
     const bonafideCerts = filteredHistory.filter(c => c.type === 'BONAFIDE');
@@ -267,7 +269,7 @@ const CertificateManager = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
                 <input
                     type="text"
-                    placeholder="Search student or certificate number..."
+                    placeholder="Search by student name, admission number, or certificate number..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="input pl-10"
