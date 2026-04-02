@@ -25,12 +25,12 @@ async function getBrowser() {
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--font-render-hinting=medium',
-        '--force-device-scale-factor=2',
+        '--font-render-hinting=none',
+        '--force-device-scale-factor=3',
         '--no-first-run',
         '--no-zygote',
-        '--disable-extensions'
+        '--disable-extensions',
+        '--force-color-profile=srgb'
       ]
     });
   }
@@ -517,16 +517,20 @@ const pdfService = {
       // Set high-DPI viewport for sharper rendering
       await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 3 });
 
-      // No external fonts — system fonts load instantly, so 'load' is safe and fast
+      // Wait for Google Fonts (Playfair Display) to fully load
       await page.setContent(html, {
-        waitUntil: 'load',
+        waitUntil: 'networkidle0',
         timeout: 15000
       });
+
+      // Ensure all fonts are rendered before generating PDF
+      await page.evaluateHandle('document.fonts.ready');
 
       const pdfUint8 = await page.pdf({
         format: 'A4',
         printBackground: true,
-        preferCSSPageSize: true
+        preferCSSPageSize: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 }
       });
 
       // Puppeteer 24.x returns Uint8Array — convert to Node Buffer for Express compat

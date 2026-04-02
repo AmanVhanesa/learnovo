@@ -354,8 +354,9 @@ const CertificateGeneration = () => {
         try {
             const filename = certType === 'TC' ? 'Transfer-Certificate' : 'Bonafide-Certificate';
             await highQualityPrint(certPrintRef.current, filename, {
-                scale: 3, format: 'a4', orientation: 'portrait', margin: 10,
+                scale: 4, format: 'a4', orientation: 'portrait', margin: 0,
             });
+            toast.success('PDF downloaded — open it and print for best quality', { duration: 4000 });
         } catch (error) {
             console.error('Print failed:', error);
             toast.error('Failed to prepare print. Please try again.');

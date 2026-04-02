@@ -111,27 +111,16 @@ export async function highQualityPrint(element, filename = 'document', options =
     );
   }
 
-  // 4. Open PDF in new tab and trigger print
+  // 4. Download PDF for best print quality via system's native PDF viewer
   const pdfBlob = pdf.output('blob');
   const pdfUrl = URL.createObjectURL(pdfBlob);
-  const printWindow = window.open(pdfUrl, '_blank');
 
-  if (printWindow) {
-    printWindow.addEventListener('load', () => {
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-      }, 500);
-    });
-  } else {
-    // Popup blocked — fallback to download
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = `${filename}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
+  const link = document.createElement('a');
+  link.href = pdfUrl;
+  link.download = `${filename}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 
   // 5. Cleanup
   setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
@@ -139,15 +128,17 @@ export async function highQualityPrint(element, filename = 'document', options =
 
 /**
  * Print an existing certificate by fetching its PDF from the backend
- * and opening it in a new browser tab with the print dialog.
+ * and downloading it so the user can open it in their system's native
+ * PDF viewer (e.g. Preview on macOS) for the best print quality.
  *
  * This bypasses html2canvas entirely — the backend Puppeteer-rendered
  * PDF is the source of truth, so output is pixel-perfect.
  *
  * @param {string} certId - Certificate ID
+ * @param {string} [filename='certificate.pdf'] - Download filename
  * @returns {Promise<void>}
  */
-export async function printCertificatePdf(certId) {
+export async function printCertificatePdf(certId, filename = 'certificate.pdf') {
   const token = localStorage.getItem('token');
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -161,24 +152,15 @@ export async function printCertificatePdf(certId) {
 
   const blob = await response.blob();
   const pdfUrl = URL.createObjectURL(blob);
-  const printWindow = window.open(pdfUrl, '_blank');
 
-  if (printWindow) {
-    printWindow.addEventListener('load', () => {
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-      }, 500);
-    });
-  } else {
-    // Popup blocked — fallback to download
-    const link = document.createElement('a');
-    link.href = pdfUrl;
-    link.download = 'certificate.pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
+  // Download the PDF so the user can open it in their system's native
+  // PDF viewer which provides the highest quality print output.
+  const link = document.createElement('a');
+  link.href = pdfUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 
   setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
 }

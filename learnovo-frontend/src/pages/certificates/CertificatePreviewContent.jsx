@@ -81,10 +81,10 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
             }}>
                 {/* Decorative background shapes — matches backend deco-shapes */}
                 <div style={{ position: 'absolute', top: 0, right: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0, overflow: 'hidden', borderRadius: 14 }}>
-                    <div style={{ position: 'absolute', top: -60, right: -40, width: 320, height: 320, background: 'rgba(62,196,177,0.06)', borderRadius: '50%' }} />
-                    <div style={{ position: 'absolute', top: 80, right: -80, width: 240, height: 450, background: 'rgba(62,196,177,0.04)', transform: 'rotate(-25deg)', borderRadius: 80 }} />
-                    <div style={{ position: 'absolute', bottom: -50, left: -60, width: 260, height: 260, background: 'rgba(62,196,177,0.05)', borderRadius: '50%' }} />
-                    <div style={{ position: 'absolute', bottom: 120, left: 40, width: 160, height: 300, background: 'rgba(62,196,177,0.03)', transform: 'rotate(20deg)', borderRadius: 60 }} />
+                    <div style={{ position: 'absolute', top: -60, right: -40, width: 320, height: 320, background: '#eef9f7', borderRadius: '50%' }} />
+                    <div style={{ position: 'absolute', top: 80, right: -80, width: 240, height: 450, background: '#f2faf9', transform: 'rotate(-25deg)', borderRadius: 80 }} />
+                    <div style={{ position: 'absolute', bottom: -50, left: -60, width: 260, height: 260, background: '#f0faf8', borderRadius: '50%' }} />
+                    <div style={{ position: 'absolute', bottom: 120, left: 40, width: 160, height: 300, background: '#f4fbfa', transform: 'rotate(20deg)', borderRadius: 60 }} />
                 </div>
 
                 {/* Watermark */}
@@ -111,17 +111,17 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                         {d.schoolLogo && (
                             <div style={{
                                 position: 'absolute', left: 26, top: 10,
-                                width: 100, height: 100, minWidth: 100,
+                                width: 120, height: 120, minWidth: 120,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 borderRadius: 8, overflow: 'hidden',
                             }}>
-                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 100, height: 100, objectFit: 'contain' }} />
+                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 120, height: 120, objectFit: 'contain' }} />
                             </div>
                         )}
                         <div style={{ textAlign: 'center' }}>
                             <div style={{
                                 fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
-                                fontSize: 26, fontWeight: 800, color: '#1F6F6D',
+                                fontSize: 30, fontWeight: 800, color: '#1F6F6D',
                                 letterSpacing: 1.5, lineHeight: 1.15, textTransform: 'uppercase',
                             }}>
                                 {d.schoolName || 'School Name'}
