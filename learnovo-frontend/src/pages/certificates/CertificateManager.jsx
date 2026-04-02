@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -10,7 +10,7 @@ import { toast } from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
 import CertificatePreviewContent from './CertificatePreviewContent';
-import { openPrintWindow, buildCertificatePrintHTML } from '../../utils/printHelper';
+import { highQualityPrint } from '../../utils/highQualityPrint';
 
 const CertificateManager = () => {
     const navigate = useNavigate();
@@ -19,6 +19,8 @@ const CertificateManager = () => {
     const [editingCert, setEditingCert] = useState(null);
     const [editForm, setEditForm] = useState({});
     const [previewCert, setPreviewCert] = useState(null);
+    const [isPrintLoading, setIsPrintLoading] = useState(false);
+    const certPrintRef = useRef(null);
 
     const { data: history = [], isLoading: loading } = useQuery({
         queryKey: ['certificate-history'],
@@ -148,13 +150,41 @@ const CertificateManager = () => {
         });
     };
 
-    const handlePrint = (cert) => {
-        const html = buildCertificatePrintHTML({
-            type: cert.type,
-            data: cert.contentSnapshot,
-            certificateNumber: cert.certificateNumber,
-        });
-        openPrintWindow(html);
+    const handlePrint = async (cert) => {
+        // If preview modal is open, use the rendered content directly
+        if (certPrintRef.current) {
+            setIsPrintLoading(true);
+            try {
+                const filename = cert.type === 'TC' ? 'Transfer-Certificate' : 'Bonafide-Certificate';
+                await highQualityPrint(certPrintRef.current, filename, {
+                    scale: 3, format: 'a4', orientation: 'portrait', margin: 10,
+                });
+            } catch (error) {
+                console.error('Print failed:', error);
+                toast.error('Failed to prepare print. Please try again.');
+            } finally {
+                setIsPrintLoading(false);
+            }
+            return;
+        }
+        // If no preview open, open the preview first then print
+        setPreviewCert(cert);
+        // Use a short delay to let the modal render, then print
+        setTimeout(async () => {
+            if (!certPrintRef.current) return;
+            setIsPrintLoading(true);
+            try {
+                const filename = cert.type === 'TC' ? 'Transfer-Certificate' : 'Bonafide-Certificate';
+                await highQualityPrint(certPrintRef.current, filename, {
+                    scale: 3, format: 'a4', orientation: 'portrait', margin: 10,
+                });
+            } catch (error) {
+                console.error('Print failed:', error);
+                toast.error('Failed to prepare print. Please try again.');
+            } finally {
+                setIsPrintLoading(false);
+            }
+        }, 500);
     };
 
     const filteredHistory = history.filter(cert => {
@@ -501,22 +531,25 @@ const CertificateManager = () => {
 
                         {/* A4 Paper area */}
                         <div className="w-full flex-1 min-h-0 overflow-y-auto bg-gray-100 dark:bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
-                            <CertificatePreviewContent
-                                type={previewCert.type}
-                                data={previewCert.contentSnapshot}
-                                certificateNumber={previewCert.certificateNumber}
-                                showPreviewWatermark={true}
-                            />
+                            <div ref={certPrintRef}>
+                                <CertificatePreviewContent
+                                    type={previewCert.type}
+                                    data={previewCert.contentSnapshot}
+                                    certificateNumber={previewCert.certificateNumber}
+                                    showPreviewWatermark={false}
+                                />
+                            </div>
                         </div>
 
                         {/* Modal footer */}
                         <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-white dark:bg-[#1C1C1E] border-t border-gray-200 dark:border-[#38383A] px-5 py-4 rounded-b-2xl">
                             <button
                                 onClick={() => { handlePrint(previewCert); }}
+                                disabled={isPrintLoading}
                                 className="btn btn-primary gap-2 w-full sm:w-auto text-sm"
                             >
                                 <Printer className="h-4 w-4" />
-                                Print
+                                {isPrintLoading ? 'Preparing High Quality Print...' : 'Print'}
                             </button>
                             <button
                                 onClick={() => { setPreviewCert(null); handleDownload(previewCert); }}

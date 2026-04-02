@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, List, Plus, Tags, BarChart3,
@@ -10,6 +10,7 @@ import { incomeService, incomeReportsService, incomeCategoriesService } from '..
 import { formatCurrency } from '../utils/formatCurrency'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
+import { highQualityPrint } from '../utils/highQualityPrint'
 
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
@@ -44,6 +45,8 @@ const Income = () => {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [isPrintLoading, setIsPrintLoading] = useState(false)
+  const printRef = useRef(null)
 
   // List
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
@@ -636,7 +639,7 @@ const Income = () => {
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" ref={printRef}>
         {/* Month selector */}
         <div className="stat-card !p-4 flex flex-wrap items-center gap-3">
           <select value={reportMonth} onChange={(e) => setReportMonth(parseInt(e.target.value))} className="input w-auto">
@@ -646,7 +649,7 @@ const Income = () => {
             {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <div className="flex-1" />
-          <button onClick={() => window.print()} className="btn btn-sm btn-outline"><Printer className="h-3.5 w-3.5 mr-1.5" />Print</button>
+          <button onClick={async () => { if (!printRef.current) return; setIsPrintLoading(true); try { await highQualityPrint(printRef.current, 'Income-Report', { scale: 2, format: 'a4', orientation: 'portrait', margin: 10 }); } catch (e) { console.error('Print failed:', e); toast.error('Failed to prepare print.'); } finally { setIsPrintLoading(false); } }} disabled={isPrintLoading} className="btn btn-sm btn-outline"><Printer className="h-3.5 w-3.5 mr-1.5" />{isPrintLoading ? 'Preparing...' : 'Print'}</button>
           <button onClick={handleExport} className="btn btn-sm btn-outline"><Download className="h-3.5 w-3.5 mr-1.5" />Export CSV</button>
         </div>
 

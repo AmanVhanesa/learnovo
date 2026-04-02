@@ -4,6 +4,8 @@
  * All templates use @page { margin: 0 } to suppress browser headers/footers.
  */
 
+import { CERT_COLORS as C } from './certificateColors';
+
 export function openPrintWindow(html) {
   // Use document.write instead of blob URL to avoid "about:blank" / "blob:..." in print headers
   const win = window.open('', '_blank', 'width=900,height=700');
@@ -58,14 +60,14 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
   ];
 
   const tcTableRows = tcRows.map(([label, value, bold], i) => {
-    const bg = i % 2 === 0 ? '#f0fdfa' : '#ffffff';
-    const border = i < tcRows.length - 1 ? 'border-bottom:1px solid #e5e7eb;' : '';
-    const valColor = bold ? '#111827' : '#374151';
+    const bg = i % 2 === 0 ? C.tableRowAlt : C.tableRowWhite;
+    const border = i < tcRows.length - 1 ? `border-bottom:1px solid ${C.tableBorder};` : '';
+    const valColor = bold ? C.valueTextBold : C.valueText;
     const valWeight = bold ? 700 : 500;
     const subjectStyle = label === 'Subjects Studied' ? 'font-size:8px;line-height:1.5;' : '';
     return `<tr style="background:${bg};-webkit-print-color-adjust:exact;print-color-adjust:exact">
-      <td style="width:22px;padding:4px 8px;${border}border-right:1px solid #e5e7eb;font-weight:600;color:#4b5563;text-align:center;font-size:9px;vertical-align:middle;line-height:1.3">${String(i + 1).padStart(2, '0')}</td>
-      <td style="width:42%;padding:4px 10px;${border}border-right:1px solid #e5e7eb;font-weight:600;color:#1f2937;font-size:10px;vertical-align:middle;line-height:1.3">${label}</td>
+      <td style="width:22px;padding:4px 8px;${border}border-right:1px solid ${C.tableBorder};font-weight:600;color:${C.tableNumberCol};text-align:center;font-size:9px;vertical-align:middle;line-height:1.3">${String(i + 1).padStart(2, '0')}</td>
+      <td style="width:42%;padding:4px 10px;${border}border-right:1px solid ${C.tableBorder};font-weight:600;color:${C.tableLabelText};font-size:10px;vertical-align:middle;line-height:1.3">${label}</td>
       <td style="padding:4px 10px;${border}color:${valColor};font-weight:${valWeight};font-size:10px;vertical-align:middle;line-height:1.3;${subjectStyle}">${value || '-'}</td>
     </tr>`;
   }).join('');
@@ -84,14 +86,14 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
 
   const bonafideGrid = bonafideDetails.map(([label, value]) =>
     `<div style="display:flex;flex-direction:column;gap:2px">
-      <span style="font-size:7px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.8px">${label}</span>
-      <span style="font-size:10px;font-weight:700;color:#111827">${value || '-'}</span>
+      <span style="font-size:7px;font-weight:600;color:${C.bonafideDetailLabel};text-transform:uppercase;letter-spacing:0.8px">${label}</span>
+      <span style="font-size:10px;font-weight:700;color:${C.valueTextBold}">${value || '-'}</span>
     </div>`
   ).join('');
 
-  const hl = (text) => `<span style="font-weight:700;color:#111827;border-bottom:1.5px solid rgba(62,196,177,0.35)">${text || '-'}</span>`;
+  const hl = (text) => `<span style="font-weight:700;color:${C.valueTextBold};border-bottom:1.5px solid ${C.highlightUnderline}">${text || '-'}</span>`;
 
-  // School header — matches backend tc-minimal.html template
+  // School header
   const phoneEmail = [
     d.schoolPhone ? `Phone: ${d.schoolPhone}` : '',
     d.schoolEmail ? `Email: ${d.schoolEmail}` : '',
@@ -107,35 +109,35 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
 
   const affiliationRow = (d.affiliationNumber || d.schoolCode || d.udiseCode)
     ? `<div style="display:flex;justify-content:center;gap:15px;margin-top:5px;flex-wrap:wrap">
-        ${d.affiliationNumber ? `<span style="font-size:8px;color:#4b5563;font-weight:500;line-height:1.7">Affiliation No: <strong style="font-weight:700;color:#111827">${d.affiliationNumber}</strong></span>` : ''}
-        ${d.schoolCode ? `<span style="font-size:8px;color:#4b5563;font-weight:500;line-height:1.7">School Code: <strong style="font-weight:700;color:#111827">${d.schoolCode}</strong></span>` : ''}
-        ${d.udiseCode ? `<span style="font-size:8px;color:#4b5563;font-weight:500;line-height:1.7">UDISE: <strong style="font-weight:700;color:#111827">${d.udiseCode}</strong></span>` : ''}
+        ${d.affiliationNumber ? `<span style="font-size:8px;color:${C.secondaryText};font-weight:500;line-height:1.7">Affiliation No: <strong style="font-weight:700;color:${C.valueTextBold}">${d.affiliationNumber}</strong></span>` : ''}
+        ${d.schoolCode ? `<span style="font-size:8px;color:${C.secondaryText};font-weight:500;line-height:1.7">School Code: <strong style="font-weight:700;color:${C.valueTextBold}">${d.schoolCode}</strong></span>` : ''}
+        ${d.udiseCode ? `<span style="font-size:8px;color:${C.secondaryText};font-weight:500;line-height:1.7">UDISE: <strong style="font-weight:700;color:${C.valueTextBold}">${d.udiseCode}</strong></span>` : ''}
       </div>` : '';
 
-  // TC content — matches CertificatePreviewContent exactly
+  // TC content
   const tcContent = `
-    <div style="margin:6px 14px 0;border-radius:6px;overflow:hidden;border:1px solid #e5e7eb;flex-shrink:0">
+    <div style="margin:6px 14px 0;border-radius:6px;overflow:hidden;border:1px solid ${C.tableBorder};flex-shrink:0">
       <table style="width:100%;border-collapse:separate;border-spacing:0;font-size:10px"><tbody>${tcTableRows}</tbody></table>
     </div>
     <div style="margin:5px 14px 0;flex-shrink:0">
-      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:5px;padding:5px 10px">
-        <div style="font-size:8px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px">Important Note</div>
-        <p style="font-size:8px;font-weight:500;color:#4b5563;line-height:1.5;margin-top:1px">This certificate is issued based on school records. No alteration shall be made on this certificate. Erasing or overwriting renders it invalid.</p>
+      <div style="background:${C.noteBg};border:1px solid ${C.noteBorder};border-radius:5px;padding:5px 10px">
+        <div style="font-size:8px;font-weight:700;color:${C.noteTitle};text-transform:uppercase;letter-spacing:0.5px">Important Note</div>
+        <p style="font-size:8px;font-weight:500;color:${C.noteText};line-height:1.5;margin-top:1px">This certificate is issued based on school records. No alteration shall be made on this certificate. Erasing or overwriting renders it invalid.</p>
       </div>
     </div>
     <div style="padding:6px 20px 0;flex-shrink:0">
-      <p style="font-size:8px;color:#4b5563;font-weight:500;font-style:italic;line-height:1.45;max-width:100%">Certified that the above information is in accordance with school records. This certificate does not entitle the holder to any benefits unless countersigned by competent authority.</p>
-      <div style="font-size:9px;color:#111827;font-weight:600;margin-top:3px">Place: ${d.place || d.schoolAddress?.split(',').pop()?.trim() || '-'}</div>
+      <p style="font-size:8px;color:${C.certText};font-weight:500;font-style:italic;line-height:1.45;max-width:100%">Certified that the above information is in accordance with school records. This certificate does not entitle the holder to any benefits unless countersigned by competent authority.</p>
+      <div style="font-size:9px;color:${C.valueTextBold};font-weight:600;margin-top:3px">Place: ${d.place || d.schoolAddress?.split(',').pop()?.trim() || '-'}</div>
     </div>`;
 
-  // Bonafide content — matches CertificatePreviewContent exactly
+  // Bonafide content
   const bonafideContent = `
     <div style="padding:16px 22px 0;flex-shrink:0">
-      <div style="font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:600;color:#0a5c56;text-align:center;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;position:relative">
+      <div style="font-family:Georgia,'Times New Roman',serif;font-size:12px;font-weight:600;color:${C.bonafideSubheading};text-align:center;letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;position:relative">
         To Whom It May Concern
-        <div style="width:40px;height:2px;margin:6px auto 0;background:linear-gradient(90deg,transparent,#3EC4B1,transparent);border-radius:2px"></div>
+        <div style="width:40px;height:2px;margin:6px auto 0;background:${C.accentGradient};border-radius:2px"></div>
       </div>
-      <p style="font-size:11px;line-height:2;color:#374151;font-weight:500;text-align:justify">
+      <p style="font-size:11px;line-height:2;color:${C.valueText};font-weight:500;text-align:justify">
         This is to certify that ${hl(d.studentName)},
         Son/Daughter of Shri ${hl(d.fatherName)}
         and Smt. ${hl(d.motherName)},
@@ -144,18 +146,18 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
         for the Academic Session ${hl(d.academicYear)}.
         His/Her date of birth as per our school records is ${hl(d.dob)}.
       </p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;margin-top:16px;padding:14px 18px;background:#f0fdfa;border-radius:8px;border:1px solid #e5e7eb">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;margin-top:16px;padding:14px 18px;background:${C.bonafideDetailBg};border-radius:8px;border:1px solid ${C.bonafideDetailBorder}">
         ${bonafideGrid}
       </div>
     </div>
     <div style="padding:12px 22px 0;flex-shrink:0">
-      <p style="font-size:10px;color:#4b5563;font-weight:500;line-height:1.8;text-align:justify">
-        This certificate is issued on the request of the student/parent for the purpose of <span style="font-weight:700;color:#111827">${d.purpose || '-'}</span>.
+      <p style="font-size:10px;color:${C.secondaryText};font-weight:500;line-height:1.8;text-align:justify">
+        This certificate is issued on the request of the student/parent for the purpose of <span style="font-weight:700;color:${C.valueTextBold}">${d.purpose || '-'}</span>.
         No fees are due from the student at the time of issue of this certificate.
       </p>
     </div>
     <div style="padding:10px 22px 0;flex-shrink:0">
-      <div style="font-size:9px;color:#111827;font-weight:600">Place: ${d.place || d.schoolAddress?.split(',').pop()?.trim() || '-'}</div>
+      <div style="font-size:9px;color:${C.valueTextBold};font-weight:600">Place: ${d.place || d.schoolAddress?.split(',').pop()?.trim() || '-'}</div>
     </div>`;
 
   return `<!DOCTYPE html>
@@ -165,31 +167,32 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
 <title>${title} ${certificateNumber ? '\u2014 ' + certificateNumber : ''}</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-  *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
   @page{size:A4 portrait;margin:0}
-  body{font-family:'Helvetica Neue',Arial,'Noto Sans',sans-serif;background:#e5e7eb;color:#111827;font-size:13px;-webkit-font-smoothing:antialiased}
-  /* Outer container — matches CertificatePreviewContent outer div */
+  body{font-family:'Helvetica Neue',Arial,'Noto Sans',sans-serif;background:#e5e7eb;color:${C.labelText};font-size:13px;-webkit-font-smoothing:antialiased}
+  /* Outer container */
   .page{width:595px;min-height:842px;position:relative;overflow:hidden;background:#f9fafb;margin:0 auto}
-  /* White card — matches CertificatePreviewContent .card */
+  /* White card */
   .card{position:absolute;top:10px;left:10px;right:10px;bottom:10px;background:#fff;border-radius:14px;box-shadow:0 2px 24px rgba(0,0,0,0.07);overflow:hidden;display:flex;flex-direction:column}
   /* Decorative shapes */
   .deco{position:absolute;top:0;right:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden;border-radius:14px}
-  .deco .c1{position:absolute;top:-60px;right:-40px;width:240px;height:240px;background:rgba(62,196,177,0.06);border-radius:50%}
-  .deco .c2{position:absolute;top:60px;right:-60px;width:180px;height:340px;background:rgba(62,196,177,0.04);transform:rotate(-25deg);border-radius:60px}
-  .deco .c3{position:absolute;bottom:-40px;left:-45px;width:195px;height:195px;background:rgba(62,196,177,0.05);border-radius:50%}
-  .deco .c4{position:absolute;bottom:90px;left:30px;width:120px;height:225px;background:rgba(62,196,177,0.03);transform:rotate(20deg);border-radius:45px}
+  .deco .c1{position:absolute;top:-60px;right:-40px;width:240px;height:240px;background:${C.decoCircle1};border-radius:50%}
+  .deco .c2{position:absolute;top:60px;right:-60px;width:180px;height:340px;background:${C.decoCircle4};transform:rotate(-25deg);border-radius:60px}
+  .deco .c3{position:absolute;bottom:-40px;left:-45px;width:195px;height:195px;background:${C.decoCircle3};border-radius:50%}
+  .deco .c4{position:absolute;bottom:90px;left:30px;width:120px;height:225px;background:${C.decoCircle2};transform:rotate(20deg);border-radius:45px}
   /* Watermark */
-  .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:Georgia,'Times New Roman',serif;font-size:${isTC ? 44 : 54}px;font-weight:700;color:rgba(62,196,177,0.04);letter-spacing:${isTC ? 10 : 14}px;white-space:nowrap;z-index:0;pointer-events:none;text-transform:uppercase}
+  .watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:Georgia,'Times New Roman',serif;font-size:${isTC ? 44 : 54}px;font-weight:700;color:${C.watermarkColor};letter-spacing:${isTC ? 10 : 14}px;white-space:nowrap;z-index:0;pointer-events:none;text-transform:uppercase}
   .content{position:relative;z-index:1;display:flex;flex-direction:column;flex:1}
   /* Toolbar */
   .toolbar{position:fixed;top:0;left:0;right:0;background:#1C1C1E;color:#fff;padding:10px 24px;display:flex;gap:10px;align-items:center;z-index:999;font-family:'Helvetica Neue',Arial,sans-serif}
   .toolbar-title{flex:1;font-size:13px;font-weight:500}
   .tbtn{padding:7px 18px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;transition:opacity .15s}
   .tbtn:hover{opacity:.85}
-  .tbtn-print{background:#3EC4B1;color:#fff}
+  .tbtn-print{background:${C.headerBg};color:#fff}
   .tbtn-close{background:#38383A;color:#8E8E93}
   .page-body{padding-top:54px;display:flex;justify-content:center;padding-bottom:40px}
   @media print{
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
     .toolbar{display:none!important}
     .page-body{padding:0!important}
     body{background:#fff}
@@ -209,52 +212,52 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
     <div class="deco"><div class="c1"></div><div class="c2"></div><div class="c3"></div><div class="c4"></div></div>
     <div class="watermark">${watermark}</div>
     <div class="content">
-      <!-- Header — matches backend tc-minimal.html -->
+      <!-- Header -->
       <div style="position:relative;padding:16px 20px 8px;text-align:center;flex-shrink:0">
         ${logoHtml}
-        <div style="font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:21px;font-weight:800;color:#1F6F6D;letter-spacing:2px;line-height:1.1;text-transform:uppercase;white-space:nowrap">${d.schoolName || 'School Name'}</div>
-        <div style="font-size:9px;color:#4b5563;font-weight:500;margin-top:3px">${d.schoolAddress || ''}</div>
-        ${phoneEmail ? `<div style="font-size:9px;color:#4b5563;font-weight:500;margin-top:2px">${phoneEmail}</div>` : ''}
+        <div style="font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:21px;font-weight:800;color:${C.schoolNameText};letter-spacing:2px;line-height:1.1;text-transform:uppercase;white-space:nowrap">${d.schoolName || 'School Name'}</div>
+        <div style="font-size:9px;color:${C.secondaryText};font-weight:500;margin-top:3px">${d.schoolAddress || ''}</div>
+        ${phoneEmail ? `<div style="font-size:9px;color:${C.secondaryText};font-weight:500;margin-top:2px">${phoneEmail}</div>` : ''}
         ${affiliationRow}
       </div>
       <!-- Divider -->
-      <div style="height:1px;background:#e5e7eb;margin:0 20px;flex-shrink:0"></div>
-      <!-- Title badge -->
+      <div style="height:1px;background:${C.borderColor};margin:0 20px;flex-shrink:0"></div>
+      <!-- Title badge — dark solid background -->
       <div style="padding:14px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;flex-shrink:0">
-        <div style="background:#edf9f7;border-radius:10px;padding:8px 22px 10px;display:inline-flex;flex-direction:column;align-items:center">
-          <div style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;font-weight:700;color:#0a5c56;letter-spacing:3.5px;text-transform:uppercase;line-height:1">${title}</div>
-          <div style="width:45px;height:2px;margin-top:6px;background:linear-gradient(90deg,transparent,#3EC4B1,transparent);border-radius:2px"></div>
+        <div style="background:${C.titleBadgeBg};border-radius:10px;padding:10px 24px 12px;display:inline-flex;flex-direction:column;align-items:center">
+          <div style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;font-weight:700;color:${C.titleBadgeText};letter-spacing:3.5px;text-transform:uppercase;line-height:1">${title}</div>
+          <div style="width:45px;height:2px;margin-top:6px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);border-radius:2px"></div>
         </div>
       </div>
       <!-- Meta row -->
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 20px;background:#f9fafb;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;flex-shrink:0">
-        <div style="font-size:10px;font-weight:600;color:#111827"><span style="color:#3EC4B1">#</span> ${certificateNumber || 'To be assigned'}</div>
-        <div style="font-size:10px;color:#374151;font-weight:500">${isTC ? 'Admission No' : 'Date of Issue'}: <strong style="font-weight:700;color:#111827">${isTC ? (d.admissionNumber || '-') : (d.issueDate || '-')}</strong></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 20px;background:${C.metaBg};border-top:1px solid ${C.metaBorder};border-bottom:1px solid ${C.metaBorder};flex-shrink:0">
+        <div style="font-size:10px;font-weight:700;color:${C.labelText}"><span style="color:${C.accentColor}">#</span> ${certificateNumber || 'To be assigned'}</div>
+        <div style="font-size:10px;color:${C.valueText};font-weight:500">${isTC ? 'Admission No' : 'Date of Issue'}: <strong style="font-weight:700;color:${C.labelText}">${isTC ? (d.admissionNumber || '-') : (d.issueDate || '-')}</strong></div>
       </div>
       <!-- Document content -->
       ${isTC ? tcContent : bonafideContent}
       <!-- Spacer -->
       <div style="flex:1;min-height:6px"></div>
-      <!-- Signatures — matches backend tc-minimal.html -->
+      <!-- Signatures -->
       <div style="padding:0 20px 10px;flex-shrink:0">
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;height:75px">
           <div style="text-align:center;width:130px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
-            <div style="width:85px;height:1px;background:#9ca3af;margin-bottom:3px"></div>
-            <div style="font-size:9px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px">Class Teacher</div>
+            <div style="width:85px;height:1.5px;background:${C.signatureLine};margin-bottom:3px"></div>
+            <div style="font-size:9px;font-weight:700;color:${C.sigLabelText};text-transform:uppercase;letter-spacing:0.8px">Class Teacher</div>
           </div>
           <div style="text-align:center;width:85px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
-            <div style="width:82px;height:82px;border:2px dashed #d1d5db;border-radius:50%"></div>
+            <div style="width:82px;height:82px;border:2px dashed ${C.borderLight};border-radius:50%"></div>
           </div>
           <div style="text-align:center;width:130px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
             ${principalSigHtml}
-            <div style="width:85px;height:1px;background:#9ca3af;margin-bottom:3px"></div>
-            <div style="font-size:9px;font-weight:600;color:#374151;text-transform:uppercase;letter-spacing:0.8px">Principal</div>
+            <div style="width:85px;height:1.5px;background:${C.signatureLine};margin-bottom:3px"></div>
+            <div style="font-size:9px;font-weight:700;color:${C.sigLabelText};text-transform:uppercase;letter-spacing:0.8px">Principal</div>
           </div>
         </div>
       </div>
       <!-- Footer -->
-      <div style="padding:6px 20px;border-top:1px solid #e5e7eb;text-align:center;flex-shrink:0">
-        <span style="font-size:7px;color:#4b5563;font-weight:500;text-transform:uppercase;letter-spacing:1.5px">Powered by <span style="font-weight:600;color:#0f766e">Learnovo</span> \u2014 School Management System</span>
+      <div style="padding:6px 20px;border-top:1px solid ${C.footerBorder};text-align:center;flex-shrink:0">
+        <span style="font-size:7px;color:${C.footerText};font-weight:500;text-transform:uppercase;letter-spacing:1.5px">Powered by <span style="font-weight:600;color:${C.footerAccent}">Learnovo</span> \u2014 School Management System</span>
       </div>
     </div>
   </div>

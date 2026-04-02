@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -9,6 +9,7 @@ import {
 import { financeDashboardService } from '../services/financeDashboardService'
 import { formatCurrency } from '../utils/formatCurrency'
 import toast from 'react-hot-toast'
+import { highQualityPrint } from '../utils/highQualityPrint'
 
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
@@ -28,6 +29,8 @@ const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
 const FinanceDashboard = () => {
   const navigate = useNavigate()
   const [reportRange, setReportRange] = useState('6')
+  const [isPrintLoading, setIsPrintLoading] = useState(false)
+  const printRef = useRef(null)
 
   // Dashboard data
   const { data: dashData, isLoading: dashLoading } = useQuery({
@@ -144,7 +147,7 @@ const FinanceDashboard = () => {
   const netYear = dashData?.netBalanceYear || 0
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in" ref={printRef}>
       {/* Header */}
       <div className="page-header mb-6">
         <div>
@@ -152,7 +155,7 @@ const FinanceDashboard = () => {
           <p className="page-subtitle">Overview of income, expenses, and net balance</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => window.print()} className="btn btn-outline"><Printer className="h-4 w-4 mr-2" />Print</button>
+          <button onClick={async () => { if (!printRef.current) return; setIsPrintLoading(true); try { await highQualityPrint(printRef.current, 'Finance-Dashboard', { scale: 2, format: 'a4', orientation: 'landscape', margin: 10 }); } catch (e) { console.error('Print failed:', e); toast.error('Failed to prepare print.'); } finally { setIsPrintLoading(false); } }} disabled={isPrintLoading} className="btn btn-outline"><Printer className="h-4 w-4 mr-2" />{isPrintLoading ? 'Preparing...' : 'Print'}</button>
           <button onClick={handleExportCsv} className="btn btn-primary"><Download className="h-4 w-4 mr-2" />Export Report</button>
         </div>
       </div>

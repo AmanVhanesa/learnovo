@@ -621,7 +621,35 @@ input, select, textarea {
 /* ── Print styles ───────────────────────────────────────────── */
 
 @media print {
-  .sidebar, nav, .xl\\:hidden, .bottom-nav, [class*="BottomNav"] {
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  img {
+    image-rendering: high-quality !important;
+    image-rendering: -webkit-optimize-contrast !important;
+  }
+
+  .no-print,
+  .modal-close,
+  .modal-backdrop,
+  .modal-footer,
+  .sidebar,
+  nav,
+  .xl\\:hidden,
+  .bottom-nav,
+  [class*="BottomNav"],
+  header:not(.print-header),
+  footer:not(.print-footer) {
     display: none !important;
   }
 

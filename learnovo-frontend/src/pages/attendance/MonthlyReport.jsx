@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Download, Printer, BarChart3 } from 'lucide-react'
 import Select from '../../components/ui/Select'
 import { useAuth } from '../../contexts/AuthContext'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
+import { highQualityPrint } from '../../utils/highQualityPrint'
 
 const statusCodes = {
   present: { code: 'P', color: 'text-green-600' },
@@ -24,6 +25,8 @@ const MonthlyReport = () => {
   const [year, setYear] = useState(now.getFullYear())
   const [reportData, setReportData] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isPrintLoading, setIsPrintLoading] = useState(false)
+  const printRef = useRef(null)
 
   useEffect(() => {
     fetchClasses()
@@ -74,8 +77,19 @@ const MonthlyReport = () => {
     }
   }
 
-  const handlePrint = () => {
-    window.print()
+  const handlePrint = async () => {
+    if (!printRef.current) return
+    setIsPrintLoading(true)
+    try {
+      await highQualityPrint(printRef.current, 'Monthly-Attendance-Report', {
+        scale: 2, format: 'a4', orientation: 'landscape', margin: 10,
+      })
+    } catch (error) {
+      console.error('Print failed:', error)
+      toast.error('Failed to prepare print.')
+    } finally {
+      setIsPrintLoading(false)
+    }
   }
 
   const months = [
@@ -86,7 +100,7 @@ const MonthlyReport = () => {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={printRef}>
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Monthly Attendance Report</h1>
         <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Class-wise attendance register</p>
@@ -145,8 +159,8 @@ const MonthlyReport = () => {
               <button onClick={handleExportCSV} className="btn btn-outline btn-sm">
                 <Download className="h-4 w-4 mr-1" /> CSV
               </button>
-              <button onClick={handlePrint} className="btn btn-outline btn-sm">
-                <Printer className="h-4 w-4 mr-1" /> Print
+              <button onClick={handlePrint} disabled={isPrintLoading} className="btn btn-outline btn-sm">
+                <Printer className="h-4 w-4 mr-1" /> {isPrintLoading ? 'Preparing...' : 'Print'}
               </button>
             </div>
           </div>

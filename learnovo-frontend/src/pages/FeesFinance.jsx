@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../utils/formatCurrency'
 import { formatDate } from '../utils/formatDate'
 import { sortByRelevance } from '../utils/searchRelevance'
-import { buildReceiptHtml, downloadReceiptAsPdf } from '../utils/receiptHelpers'
+import { printReceiptHighQuality, downloadReceiptAsPdf } from '../utils/receiptHelpers'
 import toast from 'react-hot-toast'
 
 // Shared UI
@@ -225,20 +225,14 @@ const FeesFinance = () => {
 
   const handlePrintReceipt = async (paymentId) => {
     try {
-      const toastId = toast.loading('Generating receipt...')
+      const toastId = toast.loading('Preparing high quality receipt...')
       const response = await paymentsService.getReceipt(paymentId)
       const { payment, school } = response.data; toast.dismiss(toastId)
-      const html = buildReceiptHtml(payment, school)
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const win = window.open(url, '_blank')
-      if (!win) {
-        const a = document.createElement('a'); a.href = url; a.download = `Receipt-${payment.receiptNumber}.html`
-        document.body.appendChild(a); a.click(); document.body.removeChild(a)
-        toast.success('Receipt downloaded!')
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 120000)
-    } catch { toast.error('Failed to load receipt') }
+      await printReceiptHighQuality(payment, school)
+    } catch {
+      toast.dismiss()
+      toast.error('Failed to load receipt')
+    }
   }
 
   // ── Early returns ──

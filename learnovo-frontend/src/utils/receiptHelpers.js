@@ -1,5 +1,6 @@
 import { SERVER_URL } from '../constants/config'
 import jsPDF from 'jspdf'
+import { highQualityPrint } from './highQualityPrint'
 
 function getLogoUrl(url) {
   if (!url) return null
@@ -255,6 +256,47 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
   </div>
 </body>
 </html>`
+}
+
+/**
+ * High-quality print for fee receipts.
+ * Renders the receipt HTML into a hidden container, captures via highQualityPrint, then cleans up.
+ */
+export async function printReceiptHighQuality(rawPayment, rawSchool, opts = {}) {
+  const school = normalizeSchool(rawSchool)
+  const payment = normalizePayment(rawPayment)
+  const logoSrc = opts.logoDataUrl || getLogoUrl(school.logo)
+  const signatureSrc = opts.signatureDataUrl || getLogoUrl(school.principalSignature)
+  const receiptBlock = buildReceiptBlock(payment, school, logoSrc, signatureSrc)
+
+  // Create a temporary hidden container with proper styles
+  const container = document.createElement('div')
+  container.style.position = 'fixed'
+  container.style.left = '-9999px'
+  container.style.top = '0'
+  container.style.width = '480px'
+  container.style.background = '#ffffff'
+  container.style.zIndex = '-1'
+
+  container.innerHTML = `
+    <style>${RECEIPT_STYLES}</style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+    <div class="container" style="width:480px;margin:0;padding:0;background:#fff;">${receiptBlock}</div>
+  `
+  document.body.appendChild(container)
+
+  // Wait a moment for fonts to load
+  await new Promise(resolve => setTimeout(resolve, 300))
+
+  try {
+    const printTarget = container.querySelector('.container')
+    await highQualityPrint(printTarget, `Receipt-${payment.receiptNumber || 'Fee-Receipt'}`, {
+      scale: 3, format: 'a4', orientation: 'portrait', margin: 10,
+    })
+  } finally {
+    document.body.removeChild(container)
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════

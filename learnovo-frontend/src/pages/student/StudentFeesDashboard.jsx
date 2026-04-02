@@ -5,8 +5,7 @@ import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, Ex
 import toast from 'react-hot-toast';
 import { studentFeesService } from '../../services/studentFeesService';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { buildReceiptHtml, downloadReceiptAsPdf } from '../../utils/receiptHelpers';
-import { openPrintWindow } from '../../utils/printHelper';
+import { printReceiptHighQuality, downloadReceiptAsPdf } from '../../utils/receiptHelpers';
 import { useSettings } from '../../contexts/SettingsContext';
 
 // Format date
@@ -376,16 +375,16 @@ const StudentFeesDashboard = () => {
 
     const handlePrintReceipt = async (attempt) => {
         try {
-            toast.loading('Preparing receipt...', { id: 'receipt-print' });
+            toast.loading('Preparing high quality receipt...', { id: 'receipt-print' });
             const res = await studentFeesService.getReceipt(attempt._id);
             const payment = res.data?.data || res.data;
             if (!payment) { toast.error('Receipt data not available', { id: 'receipt-print' }); return; }
             const school = schoolSettings || {};
             toast.dismiss('receipt-print');
-            const html = buildReceiptHtml(payment, school);
-            openPrintWindow(html);
+            await printReceiptHighQuality(payment, school);
         } catch (e) {
-            toast.error('Receipt unavailable', { id: 'receipt-print' });
+            toast.dismiss('receipt-print');
+            toast.error('Receipt unavailable');
         }
     }
 

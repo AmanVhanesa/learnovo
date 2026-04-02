@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import studentsService from '../../services/studentsService';
 import { reportsService } from '../../services/reportsService';
 import { toast } from 'react-hot-toast';
 import CertificatePreviewContent from './CertificatePreviewContent';
-import { openPrintWindow, buildCertificatePrintHTML } from '../../utils/printHelper';
+import { highQualityPrint } from '../../utils/highQualityPrint';
 
 const Loader2 = ({ className }) => <svg className={`w-5 h-5 ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>;
 
@@ -27,6 +27,8 @@ const CertificateGeneration = () => {
     const [customCategory, setCustomCategory] = useState(false);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [showFeesModal, setShowFeesModal] = useState(false);
+    const [isPrintLoading, setIsPrintLoading] = useState(false);
+    const certPrintRef = useRef(null);
     const [feesSkipped, setFeesSkipped] = useState(false);
 
     // Debounce the search term
@@ -234,13 +236,20 @@ const CertificateGeneration = () => {
         });
     };
 
-    const handlePrintPreview = () => {
-        const html = buildCertificatePrintHTML({
-            type: certType,
-            data: getMergedData(),
-            certificateNumber: 'To be assigned',
-        });
-        openPrintWindow(html);
+    const handlePrintPreview = async () => {
+        if (!certPrintRef.current) return;
+        setIsPrintLoading(true);
+        try {
+            const filename = certType === 'TC' ? 'Transfer-Certificate' : 'Bonafide-Certificate';
+            await highQualityPrint(certPrintRef.current, filename, {
+                scale: 3, format: 'a4', orientation: 'portrait', margin: 10,
+            });
+        } catch (error) {
+            console.error('Print failed:', error);
+            toast.error('Failed to prepare print. Please try again.');
+        } finally {
+            setIsPrintLoading(false);
+        }
     };
 
     return (
@@ -555,22 +564,25 @@ const CertificateGeneration = () => {
 
                         {/* A4 Paper area */}
                         <div className="w-full flex-1 min-h-0 overflow-y-auto bg-gray-100 dark:bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
-                            <CertificatePreviewContent
-                                type={certType}
-                                data={getMergedData()}
-                                certificateNumber="To be assigned"
-                                showPreviewWatermark={true}
-                            />
+                            <div ref={certPrintRef}>
+                                <CertificatePreviewContent
+                                    type={certType}
+                                    data={getMergedData()}
+                                    certificateNumber="To be assigned"
+                                    showPreviewWatermark={false}
+                                />
+                            </div>
                         </div>
 
                         {/* Modal footer with action buttons */}
                         <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-2 bg-white dark:bg-[#1C1C1E] border-t border-gray-200 dark:border-[#38383A] px-5 py-4 rounded-b-2xl">
                             <button
                                 onClick={handlePrintPreview}
+                                disabled={isPrintLoading}
                                 className="btn btn-primary gap-2 w-full sm:w-auto text-sm"
                             >
                                 <Printer className="h-4 w-4" />
-                                Print
+                                {isPrintLoading ? 'Preparing High Quality Print...' : 'Print'}
                             </button>
                             <button
                                 onClick={() => { setShowPreviewModal(false); handleGenerate(); }}
