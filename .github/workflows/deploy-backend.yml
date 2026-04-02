@@ -8,6 +8,10 @@ on:
 
   workflow_dispatch:
 
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy Backend
@@ -30,13 +34,27 @@ jobs:
             echo "Deploying Learnovo Backend..."
             echo "========================================="
             cd /var/www/learnovo/frontend-repo
+
+            # Acquire deploy lock to prevent concurrent deploys
+            LOCKFILE="/tmp/learnovo-deploy.lock"
+            exec 200>"$LOCKFILE"
+            flock -n 200 || { echo "Another deploy is running. Waiting..."; flock 200; }
+
+            echo "Commit before deploy: $(git rev-parse HEAD)"
             git fetch origin main
             git reset --hard origin/main
+            echo "Commit after deploy: $(git rev-parse HEAD)"
+
             cd learnovo-backend
             echo "Installing dependencies..."
             npm ci --omit=dev
             echo "Restarting PM2..."
             pm2 restart learnovo-backend || pm2 start server.js --name learnovo-backend
+
+            # Verify the process is running
+            sleep 3
+            pm2 pid learnovo-backend | grep -q '[0-9]' || { echo "ERROR: Backend failed to start!"; pm2 logs learnovo-backend --lines 20 --nostream; exit 1; }
+
             echo "========================================="
             echo "Backend deployed successfully!"
             echo "========================================="

@@ -191,12 +191,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     steps:
-      - name: Deploy via SSH
+      - name: Deploy Status
         run: |
-          echo "🚀 Deploying to Hostinger VPS..."
-          # SSH deploy is handled manually or via a deploy hook:
-          #   ssh root@<VPS_IP> "cd /var/www/learnovo/learnovo-backend && git pull && npm install --production && pm2 restart learnovo-backend"
-          echo "ℹ️ Deploy backend manually: ssh into VPS, git pull, pm2 restart"
+          echo "✅ CI checks passed. Deployment handled by deploy-backend.yml and deploy-frontend.yml workflows."
 
   notify:
     name: Notify Status

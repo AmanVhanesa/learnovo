@@ -8,3 +8,9 @@ uploads/
 
 # Debug/check scripts (may contain hardcoded credentials)
 check-*.js
+
+# Test/preview files
+test-*.docx
+*-preview*.html
+*_Preview*
+cumulative-preview.html
