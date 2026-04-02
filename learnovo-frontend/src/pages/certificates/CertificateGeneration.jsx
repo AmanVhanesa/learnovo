@@ -77,6 +77,7 @@ const CertificateGeneration = () => {
     const [isPrintLoading, setIsPrintLoading] = useState(false);
     const certPrintRef = useRef(null);
     const [feesSkipped, setFeesSkipped] = useState(false);
+    const [cancelInvoices, setCancelInvoices] = useState(false);
     const [customRemarks, setCustomRemarks] = useState(getCustomRemarks);
     const [newCustomRemark, setNewCustomRemark] = useState('');
 
@@ -162,7 +163,8 @@ const CertificateGeneration = () => {
             previewData,
             autoDeactivate,
             undefined, undefined, undefined,
-            certType === 'TC' ? feesSkipped : undefined
+            certType === 'TC' ? feesSkipped : undefined,
+            certType === 'TC' ? cancelInvoices : undefined
         ),
         onSuccess: async (response) => {
             // Verify we got a valid PDF blob (not a JSON error wrapped as blob)
@@ -235,8 +237,17 @@ const CertificateGeneration = () => {
 
     const handleSkipFees = () => {
         setFeesSkipped(true);
+        setCancelInvoices(false);
         setShowFeesModal(false);
         // Proceed with generation after marking fees as skipped
+        generateMutation.mutate();
+    };
+
+    const handleCancelInvoicesAndGenerate = () => {
+        setFeesSkipped(true);
+        setCancelInvoices(true);
+        setShowFeesModal(false);
+        // Proceed with generation — backend will cancel all pending invoices
         generateMutation.mutate();
     };
 
@@ -789,43 +800,78 @@ const CertificateGeneration = () => {
                 document.body
             )}
 
-            {/* ── Pending Fees Warning Modal ── */}
+            {/* ── Pending Fees / Outstanding Dues Modal ── */}
             {showFeesModal && previewData?.pendingFeesInfo && createPortal(
                 <div className="modal-overlay" onClick={() => setShowFeesModal(false)}>
                     <div
-                        className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-md w-full mx-4 animate-scale-in"
+                        className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] max-w-lg w-full mx-4 animate-scale-in"
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Header */}
                         <div className="p-6 pb-0">
                             <div className="flex items-center gap-3 mb-1">
-                                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
                                 </div>
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Pending Fees Found</h3>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Outstanding Dues</h3>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93]">This student has pending fees that need attention</p>
+                                </div>
                             </div>
                         </div>
 
                         {/* Body */}
                         <div className="p-6 space-y-4">
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-500 dark:text-[#8E8E93]">Student</span>
-                                <span className="font-semibold text-gray-900 dark:text-white">{selectedStudent?.fullName || selectedStudent?.name}</span>
-                            </div>
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-500 dark:text-[#8E8E93]">Total Pending</span>
-                                <span className="font-bold text-red-600 dark:text-red-400 text-lg">
-                                    {'\u20B9'}{previewData.pendingFeesInfo.totalAmount?.toLocaleString('en-IN')}
-                                </span>
+                            {/* Student & Total Due */}
+                            <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm text-gray-600 dark:text-gray-400">Student</span>
+                                    <span className="font-semibold text-sm text-gray-900 dark:text-white">{selectedStudent?.fullName || selectedStudent?.name}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-600 dark:text-gray-400">Total Due Amount</span>
+                                    <span className="font-bold text-red-600 dark:text-red-400 text-xl">
+                                        {'\u20B9'}{previewData.pendingFeesInfo.totalAmount?.toLocaleString('en-IN')}
+                                    </span>
+                                </div>
                             </div>
 
-                            {/* Fee Breakdown */}
+                            {/* Invoice Breakdown */}
+                            {previewData.pendingFeesInfo.invoices?.length > 0 && (
+                                <div className="border border-gray-100 dark:border-[#38383A] rounded-xl overflow-hidden">
+                                    <div className="px-3 py-2 bg-gray-50 dark:bg-[#2C2C2E] text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider flex items-center justify-between">
+                                        <span>Pending Invoices ({previewData.pendingFeesInfo.invoices.length})</span>
+                                        <span>Balance</span>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-[#38383A]">
+                                        {previewData.pendingFeesInfo.invoices.map((inv, i) => (
+                                            <div key={inv.id || i} className="px-3 py-2.5 flex items-center justify-between text-sm">
+                                                <div className="min-w-0 flex-1 mr-3">
+                                                    <p className="text-gray-800 dark:text-gray-200 font-medium truncate">{inv.description}</p>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className="text-xs text-gray-400 dark:text-[#636366]">{inv.invoiceNumber}</span>
+                                                        {inv.periodLabel && <span className="text-xs text-gray-400 dark:text-[#636366]">&middot; {inv.periodLabel}</span>}
+                                                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                                            inv.status === 'Overdue' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                            inv.status === 'Partial' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                        }`}>{inv.status}</span>
+                                                    </div>
+                                                </div>
+                                                <span className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">{'\u20B9'}{inv.balance?.toLocaleString('en-IN')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Legacy Fee Breakdown (if any) */}
                             {previewData.pendingFeesInfo.breakdown?.length > 0 && (
                                 <div className="border border-gray-100 dark:border-[#38383A] rounded-xl overflow-hidden">
                                     <div className="px-3 py-2 bg-gray-50 dark:bg-[#2C2C2E] text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">
-                                        Fee Breakdown ({previewData.pendingFeesInfo.count} items)
+                                        Other Pending Fees ({previewData.pendingFeesInfo.breakdown.length})
                                     </div>
-                                    <div className="max-h-40 overflow-y-auto divide-y divide-gray-100 dark:divide-[#38383A]">
+                                    <div className="max-h-32 overflow-y-auto divide-y divide-gray-100 dark:divide-[#38383A]">
                                         {previewData.pendingFeesInfo.breakdown.map((fee, i) => (
                                             <div key={fee.id || i} className="px-3 py-2 flex items-center justify-between text-sm">
                                                 <div>
@@ -840,37 +886,56 @@ const CertificateGeneration = () => {
                             )}
 
                             <p className="text-xs text-gray-400 dark:text-[#636366] leading-relaxed">
-                                This student has outstanding fees. You can pay them first or skip and proceed with TC generation. Skipping will be recorded in the certificate audit.
+                                Choose how to handle the outstanding dues before issuing the Leaving Certificate. All actions will be recorded in the certificate audit.
                             </p>
                         </div>
 
                         {/* Actions */}
-                        <div className="p-6 pt-0 flex flex-col gap-2">
+                        <div className="p-6 pt-2 space-y-2">
+                            {/* Option 1: Collect fees first */}
                             <button
                                 onClick={() => {
                                     setShowFeesModal(false);
-                                    navigate(`/fees?student=${selectedStudent._id}`);
+                                    navigate(`/app/fees?student=${selectedStudent._id}`);
                                 }}
-                                className="btn btn-primary w-full gap-2"
+                                className="btn btn-primary w-full gap-2 justify-center"
                             >
-                                Pay Fees Now
+                                <span className="text-sm">Collect Fees First</span>
                             </button>
+
+                            {/* Option 2: Cancel invoices & issue TC */}
+                            {previewData.pendingFeesInfo.invoices?.length > 0 && (
+                                <button
+                                    onClick={handleCancelInvoicesAndGenerate}
+                                    disabled={generating}
+                                    className="btn w-full gap-2 justify-center bg-red-500 hover:bg-red-600 text-white text-sm"
+                                >
+                                    {generating ? (
+                                        <><Loader2 className="animate-spin" /> Generating...</>
+                                    ) : (
+                                        `Cancel All Invoices & Issue TC`
+                                    )}
+                                </button>
+                            )}
+
+                            {/* Option 3: Skip fees and issue */}
                             <button
                                 onClick={handleSkipFees}
                                 disabled={generating}
-                                className="btn w-full gap-2 bg-amber-500 hover:bg-amber-600 text-white"
+                                className="btn w-full gap-2 justify-center bg-amber-500 hover:bg-amber-600 text-white text-sm"
                             >
                                 {generating ? (
                                     <><Loader2 className="animate-spin" /> Generating...</>
                                 ) : (
-                                    'Skip & Issue TC'
+                                    'Skip & Issue TC (Keep Dues Pending)'
                                 )}
                             </button>
+
                             <button
                                 onClick={() => setShowFeesModal(false)}
-                                className="btn btn-outline w-full"
+                                className="btn btn-outline w-full text-sm"
                             >
-                                Cancel
+                                Go Back
                             </button>
                         </div>
                     </div>

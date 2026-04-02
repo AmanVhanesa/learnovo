@@ -3,6 +3,10 @@ const GeneratedCertificate = require('../models/GeneratedCertificate');
 const User = require('../models/User');
 const Settings = require('../models/Settings');
 const Fee = require('../models/Fee');
+const FeeInvoice = require('../models/FeeInvoice');
+const StudentBalance = require('../models/StudentBalance');
+const FeeAuditLog = require('../models/FeeAuditLog');
+const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
 const Counter = require('../models/Counter');
 const ClassSubject = require('../models/ClassSubject');
 const AcademicSession = require('../models/AcademicSession');
@@ -133,20 +137,44 @@ exports.previewCertificate = async(req, res) => {
       });
     }
 
-    // --- Check pending fees for TC (warning, not blocking) ---
+    // --- Check pending fees/invoices for TC (warning, not blocking) ---
     let pendingFeesInfo = null;
     if (type === 'TC') {
+      // Fetch outstanding invoices from FeeInvoice (primary fee system)
+      const pendingInvoices = await FeeInvoice.find({
+        tenantId,
+        studentId,
+        status: { $in: ['Pending', 'Partial', 'Overdue'] }
+      }).sort({ dueDate: 1 });
+
+      // Also check legacy Fee model for backward compatibility
       const pendingFees = await Fee.find({
         student: studentId,
         status: { $in: ['pending', 'overdue', 'partially_paid'] }
       });
 
-      if (pendingFees.length > 0) {
-        const totalPending = pendingFees.reduce((sum, f) => sum + (f.balance > 0 ? f.balance : f.amount - (f.paidAmount || 0)), 0);
+      const invoiceTotal = pendingInvoices.reduce((sum, inv) => sum + (inv.balanceAmount || 0), 0);
+      const legacyTotal = pendingFees.reduce((sum, f) => sum + (f.balance > 0 ? f.balance : f.amount - (f.paidAmount || 0)), 0);
+      const totalPending = invoiceTotal + legacyTotal;
+
+      if (totalPending > 0) {
         pendingFeesInfo = {
           hasPending: true,
           totalAmount: totalPending,
-          count: pendingFees.length,
+          invoiceTotal,
+          legacyTotal,
+          count: pendingInvoices.length + pendingFees.length,
+          invoices: pendingInvoices.map(inv => ({
+            id: inv._id,
+            invoiceNumber: inv.invoiceNumber,
+            description: inv.items?.map(i => i.feeHeadName).join(', ') || 'Fee Invoice',
+            periodLabel: inv.periodLabel || '',
+            totalAmount: inv.totalAmount,
+            paidAmount: inv.paidAmount || 0,
+            balance: inv.balanceAmount || 0,
+            status: inv.status,
+            dueDate: inv.dueDate
+          })),
           breakdown: pendingFees.map(f => ({
             id: f._id,
             description: f.description,
@@ -270,7 +298,7 @@ exports.previewCertificate = async(req, res) => {
  */
 exports.generateCertificate = async(req, res) => {
   try {
-    const { studentId, type, specificData, autoDeactivate, categoryOverride, classOverride, penOverride, feesSkipped } = req.body;
+    const { studentId, type, specificData, autoDeactivate, categoryOverride, classOverride, penOverride, feesSkipped, cancelInvoices } = req.body;
     const tenantId = req.user.tenantId;
 
     // 1. Re-validate (similar to preview)
@@ -370,6 +398,70 @@ exports.generateCertificate = async(req, res) => {
           }
         }
       );
+    }
+
+    // 4.2. Cancel pending invoices if requested (e.g., student promoted, leaving school)
+    if (type === 'TC' && cancelInvoices) {
+      try {
+        const invoicesToCancel = await FeeInvoice.find({
+          tenantId,
+          studentId,
+          status: { $in: ['Pending', 'Partial', 'Overdue'] }
+        });
+
+        if (invoicesToCancel.length > 0) {
+          const cancelledInvoiceNumbers = [];
+          for (const invoice of invoicesToCancel) {
+            invoice.status = 'Cancelled';
+            invoice.balanceAmount = 0;
+            invoice.cancelledAt = new Date();
+            invoice.cancelledBy = req.user._id;
+            invoice.cancellationReason = `Cancelled on TC/LC generation (${certNumber})`;
+            await invoice.save();
+            cancelledInvoiceNumbers.push(invoice.invoiceNumber);
+
+            // Update student balance for each academic session
+            try {
+              await StudentBalance.updateBalance(tenantId, studentId, invoice.academicSessionId);
+            } catch (e) { /* non-fatal */ }
+
+            // Update allocation if linked
+            if (invoice.annualAllocationId) {
+              try {
+                await AnnualFeeAllocation.recalculateFromInvoices(invoice.annualAllocationId);
+              } catch (e) { /* non-fatal */ }
+            }
+          }
+
+          // Audit log
+          try {
+            await FeeAuditLog.logAction({
+              tenantId,
+              action: 'INVOICES_CANCELLED_ON_TC',
+              entityType: 'GeneratedCertificate',
+              entityId: newCert._id,
+              userId: req.user._id,
+              userName: req.user.name || req.user.fullName,
+              userRole: req.user.role,
+              details: {
+                certificateNumber: certNumber,
+                studentId,
+                cancelledInvoices: cancelledInvoiceNumbers,
+                count: cancelledInvoiceNumbers.length
+              },
+              ipAddress: req.ip
+            });
+          } catch (e) { /* non-fatal */ }
+
+          // Store in content snapshot
+          newCert.contentSnapshot.invoicesCancelledAtTC = true;
+          newCert.contentSnapshot.cancelledInvoiceCount = cancelledInvoiceNumbers.length;
+          newCert.contentSnapshot.cancelledInvoiceNumbers = cancelledInvoiceNumbers;
+          await newCert.save();
+        }
+      } catch (cancelErr) {
+        console.error('Invoice cancellation during TC failed (non-fatal):', cancelErr.message);
+      }
     }
 
     // 5. Get Template
