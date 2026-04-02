@@ -571,16 +571,17 @@ const pdfService = {
     html = injectRemarksSection(html, data.summary?.teacher_remarks || data.summary?.teacherRemarks);
 
     // 5. Render to PDF via Puppeteer
-    const browser = await getBrowser();
-    const page = await browser.newPage();
-
+    let browser, page;
     try {
+      browser = await getBrowser();
+      page = await browser.newPage();
+
       await page.setContent(html, {
         waitUntil: 'domcontentloaded',
         timeout: 30000
       });
 
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 300));
 
       const pdfUint8 = await page.pdf({
         format: 'A4',
@@ -590,8 +591,18 @@ const pdfService = {
       });
 
       return Buffer.from(pdfUint8);
+    } catch (err) {
+      // If Puppeteer crashed, reset the browser instance so next call gets a fresh one
+      if (err.message && (err.message.includes('Target closed') || err.message.includes('Protocol error') || err.message.includes('Session closed'))) {
+        console.error('[pdfService] Browser crashed, resetting instance');
+        browserInstance = null;
+        activePages = 0;
+      }
+      throw err;
     } finally {
-      await page.close();
+      if (page) {
+        try { await page.close(); } catch { /* ignore */ }
+      }
       releaseBrowser();
     }
   },
@@ -654,11 +665,12 @@ const pdfService = {
       '<div class="result-banner pass" style="display:none">'
     );
 
-    const browser = await getBrowser();
-    const page = await browser.newPage();
+    let browser, page;
     try {
+      browser = await getBrowser();
+      page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 300));
       const pdfUint8 = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -666,8 +678,15 @@ const pdfService = {
         margin: { top: 0, right: 0, bottom: 0, left: 0 }
       });
       return Buffer.from(pdfUint8);
+    } catch (err) {
+      if (err.message && (err.message.includes('Target closed') || err.message.includes('Protocol error') || err.message.includes('Session closed'))) {
+        console.error('[pdfService] Browser crashed, resetting instance');
+        browserInstance = null;
+        activePages = 0;
+      }
+      throw err;
     } finally {
-      await page.close();
+      if (page) { try { await page.close(); } catch { /* ignore */ } }
       releaseBrowser();
     }
   },
@@ -699,11 +718,12 @@ const pdfService = {
     html = injectAttendanceSection(html, data.attendance);
     html = injectRemarksSection(html, null);
 
-    const browser = await getBrowser();
-    const page = await browser.newPage();
+    let browser, page;
     try {
+      browser = await getBrowser();
+      page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 300));
       const pdfUint8 = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -711,8 +731,15 @@ const pdfService = {
         margin: { top: 0, right: 0, bottom: 0, left: 0 }
       });
       return Buffer.from(pdfUint8);
+    } catch (err) {
+      if (err.message && (err.message.includes('Target closed') || err.message.includes('Protocol error') || err.message.includes('Session closed'))) {
+        console.error('[pdfService] Browser crashed, resetting instance');
+        browserInstance = null;
+        activePages = 0;
+      }
+      throw err;
     } finally {
-      await page.close();
+      if (page) { try { await page.close(); } catch { /* ignore */ } }
       releaseBrowser();
     }
   },

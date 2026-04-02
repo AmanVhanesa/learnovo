@@ -551,8 +551,11 @@ router.get('/result-card/:studentId/pdf', protect, examPlanGates, async(req, res
 
     res.send(pdfBuffer);
   } catch (error) {
-    console.error('Generate report card PDF error:', error);
-    res.status(500).json({ success: false, message: 'Failed to generate report card PDF' });
+    console.error('Generate report card PDF error:', error.message, error.stack);
+    const msg = error.message?.includes('timed out') || error.message?.includes('Target closed')
+      ? 'PDF generation timed out. The server may be under heavy load — please try again.'
+      : 'Failed to generate report card PDF';
+    res.status(500).json({ success: false, message: msg });
   }
 });
 

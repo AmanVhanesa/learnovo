@@ -89,8 +89,15 @@ const bulkPdfService = {
     };
     writeJob(job);
 
-    // Fire and forget — runs in background
-    this._processJob(jobId, tenantId, students, options).catch(err => {
+    // Fire and forget — runs in background with global timeout (5 min max)
+    const JOB_TIMEOUT = 5 * 60 * 1000;
+    Promise.race([
+      this._processJob(jobId, tenantId, students, options),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Job timed out after 5 minutes')), JOB_TIMEOUT)
+      )
+    ]).catch(err => {
+      console.error(`[bulk-pdf] Job ${jobId} fatal error:`, err.message);
       const j = readJob(jobId);
       if (j) {
         j.status = 'failed';
@@ -126,43 +133,58 @@ const bulkPdfService = {
       archive.on('error', reject);
     });
 
+    let hasAtLeastOneSuccess = false;
+    const PER_STUDENT_TIMEOUT = 60000; // 60s per student max
+
     for (const student of students) {
+      const studentId = student._id.toString();
+      const studentName = (student.fullName || student.name || 'Student').replace(/[^a-zA-Z0-9 ]/g, '').trim();
+      const rollNo = student.rollNumber || '';
+
       try {
-        await queue.add(async() => {
-          let pdfBuffer;
-          const studentId = student._id.toString();
-          const studentName = (student.fullName || student.name || 'Student').replace(/[^a-zA-Z0-9 ]/g, '').trim();
-          const rollNo = student.rollNumber || '';
+        // Wrap each student in a timeout to prevent infinite hangs
+        const pdfBuffer = await Promise.race([
+          queue.add(async() => {
+            let buf;
+            if (type === 'blank') {
+              const data = await reportCardService.getBlankReportCardData(tenantId, studentId, { examSeries, className });
+              if (!data) throw new Error(`No data for student ${studentName}`);
+              buf = await pdfService.generateBlankReportCard(data);
+            } else if (type === 'final') {
+              const data = await reportCardService.getFinalReportCardData(tenantId, studentId, sessionId);
+              if (!data) throw new Error(`No exam results found for ${studentName}`);
+              buf = await pdfService.generateFinalReportCard(data);
+            } else {
+              const data = await reportCardService.getReportCardData(tenantId, studentId, { examSeries, className });
+              if (!data) throw new Error(`No results for student ${studentName}`);
+              buf = await pdfService.generateReportCard(data);
+            }
+            return buf;
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('PDF generation timed out (60s)')), PER_STUDENT_TIMEOUT)
+          )
+        ]);
 
-          if (type === 'blank') {
-            const data = await reportCardService.getBlankReportCardData(tenantId, studentId, { examSeries, className });
-            if (!data) throw new Error(`No data for student ${studentName}`);
-            pdfBuffer = await pdfService.generateBlankReportCard(data);
-          } else if (type === 'final') {
-            const data = await reportCardService.getFinalReportCardData(tenantId, studentId, sessionId);
-            if (!data) throw new Error(`No exam results found for ${studentName} in any exam`);
-            pdfBuffer = await pdfService.generateFinalReportCard(data);
-          } else {
-            const data = await reportCardService.getReportCardData(tenantId, studentId, { examSeries, className });
-            if (!data) throw new Error(`No results for student ${studentName}`);
-            pdfBuffer = await pdfService.generateReportCard(data);
-          }
-
-          const filename = `${rollNo ? `${rollNo}_` : ''}${studentName}.pdf`.replace(/\s+/g, '_');
-          archive.append(pdfBuffer, { name: filename });
-        });
-
+        const filename = `${rollNo ? `${rollNo}_` : ''}${studentName}.pdf`.replace(/\s+/g, '_');
+        archive.append(pdfBuffer, { name: filename });
         job.completed++;
+        hasAtLeastOneSuccess = true;
       } catch (err) {
         job.failed++;
-        const name = student.fullName || student.name || student._id;
-        job.errors.push(`${name}: ${err.message}`);
+        job.errors.push(`${studentName}: ${err.message}`);
+        console.error(`[bulk-pdf] Failed for ${studentName}:`, err.message);
       }
 
-      // Write progress to disk periodically (every 5 students or on last)
-      if (job.completed % 5 === 0 || (job.completed + job.failed) === job.total) {
+      // Write progress to disk periodically (every 3 students or on last)
+      if ((job.completed + job.failed) % 3 === 0 || (job.completed + job.failed) === job.total) {
         writeJob(job);
       }
+    }
+
+    // If no PDFs generated, add a placeholder text file
+    if (!hasAtLeastOneSuccess) {
+      archive.append('No report cards could be generated. Check server logs for errors.', { name: 'ERROR.txt' });
     }
 
     // Finalize archive and wait for file to be fully written

@@ -349,21 +349,31 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
             <div className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg w-full max-w-4xl sm:mx-4 h-full sm:h-auto sm:max-h-[92vh] flex flex-col">
 
                 {/* ── Modal Header ── */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-[#38383A] shrink-0 gap-2">
-                    <div className="flex items-center gap-2.5">
-                        <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400 shrink-0" />
-                        <div>
-                            <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white leading-tight">Student Report Card</h3>
-                            {(student?.fullName || student?.name || studentName) && (
-                                <p className="text-xs text-gray-400 dark:text-[#636366] mt-0.5 truncate">{student?.fullName || student?.name || studentName}</p>
-                            )}
+                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-[#38383A] shrink-0 space-y-3">
+                    {/* Top row: Title + Close */}
+                    <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2.5">
+                            <FileText className="h-5 w-5 text-primary-600 dark:text-primary-400 shrink-0" />
+                            <div>
+                                <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white leading-tight">Student Report Card</h3>
+                                {(student?.fullName || student?.name || studentName) && (
+                                    <p className="text-xs text-gray-400 dark:text-[#636366] mt-0.5 truncate">{student?.fullName || student?.name || studentName}</p>
+                                )}
+                            </div>
                         </div>
+                        <button
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors shrink-0"
+                            onClick={onClose}
+                        >
+                            <X className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
+                        </button>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {/* Bottom row: Filter + Action buttons */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-1.5">
                             <label className="text-xs text-gray-500 dark:text-[#8E8E93] font-medium whitespace-nowrap">Exam Series:</label>
                             <select
-                                className="input w-32 text-sm h-9"
+                                className="input w-36 text-sm h-9"
                                 value={filterSeries}
                                 onChange={e => setFilterSeries(e.target.value)}
                             >
@@ -371,37 +381,33 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 {SERIES_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
-                        <button
-                            className="btn btn-sm gap-1.5 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
-                            onClick={handleDownloadPDF}
-                            disabled={loading || !subjects.length || downloading}
-                        >
-                            <Download className="h-4 w-4" />
-                            {downloading ? 'Downloading\u2026' : 'Download PDF'}
-                        </button>
-                        <button
-                            className="btn btn-sm gap-1.5 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
-                            onClick={handleDownloadBlank}
-                            disabled={loading || downloadingBlank}
-                            title="Download blank report card (no marks filled)"
-                        >
-                            <FileText className="h-4 w-4" />
-                            {downloadingBlank ? 'Downloading\u2026' : 'Blank PDF'}
-                        </button>
-                        <button
-                            className="btn btn-primary btn-sm gap-1.5"
-                            onClick={handlePrint}
-                            disabled={loading || !subjects.length || printing}
-                        >
-                            <Printer className="h-4 w-4" />
-                            {printing ? 'Preparing High Quality Print\u2026' : 'Print'}
-                        </button>
-                        <button
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
-                            onClick={onClose}
-                        >
-                            <X className="h-5 w-5 text-gray-500 dark:text-[#8E8E93]" />
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                className="btn btn-sm gap-1.5 bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#38383A] border border-gray-200 dark:border-[#38383A]"
+                                onClick={handleDownloadBlank}
+                                disabled={loading || downloadingBlank}
+                                title="Download blank report card (no marks filled)"
+                            >
+                                <FileText className="h-4 w-4" />
+                                {downloadingBlank ? 'Downloading\u2026' : 'Blank PDF'}
+                            </button>
+                            <button
+                                className="btn btn-sm gap-1.5 bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#38383A] border border-gray-200 dark:border-[#38383A]"
+                                onClick={handleDownloadPDF}
+                                disabled={loading || !subjects.length || downloading}
+                            >
+                                <Download className="h-4 w-4" />
+                                {downloading ? 'Downloading\u2026' : 'Download PDF'}
+                            </button>
+                            <button
+                                className="btn btn-primary btn-sm gap-1.5"
+                                onClick={handlePrint}
+                                disabled={loading || !subjects.length || printing}
+                            >
+                                <Printer className="h-4 w-4" />
+                                {printing ? 'Preparing\u2026' : 'Print'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 

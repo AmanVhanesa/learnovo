@@ -51,7 +51,11 @@ router.get('/:studentId/blank/pdf', protect, examPlanGates, authorize('admin', '
 
     res.send(pdfBuffer);
   } catch (error) {
-    next(error);
+    console.error('Blank report card PDF error:', error.message);
+    const msg = error.message?.includes('timed out') || error.message?.includes('Target closed')
+      ? 'PDF generation timed out. Please try again.'
+      : 'Failed to generate blank report card PDF';
+    res.status(500).json({ success: false, message: msg });
   }
 });
 
