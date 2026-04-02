@@ -46,13 +46,13 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
         const examDate = s.date ? new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
         const detail = [s.examName, examDate].filter(Boolean).join(' \u00B7 ');
         return `
-      <tr style="background:${i % 2 === 0 ? '#fff' : '#f5f5f5'};-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important">
+      <tr style="background:${i % 2 === 0 ? '#fff' : '#F3F4F6'};-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important">
         <td class="subj">${s.subject}<span class="exam-detail">${detail}</span></td>
         <td class="num">${s.totalMarks}</td>
         <td class="num" style="font-weight:600">${s.marksObtained}</td>
         <td class="ctr"><span class="grade-display"><span class="grade-dot" style="background:${dotColor}"></span> ${s.grade}</span></td>
         <td class="ctr"><span style="color:${s.isPassed ? '#059669' : '#DC2626'};font-weight:700;font-size:13px">${s.isPassed ? 'Pass' : 'Fail'}</span></td>
-        <td style="font-size:12px;color:#333333">${s.remarks || '\u2014'}</td>
+        <td style="font-size:12px;color:#374151">${s.remarks || '\u2014'}</td>
       </tr>`;
     }).join('');
 
@@ -72,9 +72,9 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   @page{size:A4;margin:0}
-  body{font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;color:#1a1a1a}
+  body{font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Helvetica,Arial,sans-serif;background:#fff;color:#111827}
   .page{width:210mm;min-height:297mm;padding:20mm;margin:0 auto}
   /* Header */
   .header{position:relative;text-align:center;padding:0 0 12px;margin-bottom:0}
@@ -83,58 +83,58 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   .school-logo img{width:100%;height:100%;object-fit:contain}
   .school-logo-fb{width:105px;height:105px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:28px;letter-spacing:-0.02em;flex-shrink:0}
   .school-info{text-align:center}
-  .school-name{font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:28px;font-weight:800;color:#0a5c56;letter-spacing:2px;line-height:1.1;text-transform:uppercase;white-space:nowrap}
-  .school-addr{font-size:14px;color:#1a1a1a;font-weight:500;margin-top:4px;line-height:1.5}
-  .school-contact{font-size:14px;color:#1a1a1a;font-weight:500;margin-top:2px}
+  .school-name{font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:28px;font-weight:800;color:#1F6F6D;letter-spacing:2px;line-height:1.1;text-transform:uppercase;white-space:nowrap}
+  .school-addr{font-size:14px;color:#1f2937;font-weight:500;margin-top:4px;line-height:1.5}
+  .school-contact{font-size:14px;color:#1f2937;font-weight:500;margin-top:2px}
   .aff-row{display:flex;justify-content:center;gap:20px;margin-top:6px;flex-wrap:wrap}
-  .aff-line{font-size:13px;color:#1a1a1a;font-weight:500;line-height:1.7}
+  .aff-line{font-size:13px;color:#1f2937;font-weight:500;line-height:1.7}
   .aff-line b{font-weight:700;color:#111827}
-  .accent-line{height:1.5px;background:#888888;margin:12px 0 16px;border:none}
+  .accent-line{height:1.5px;background:#9ca3af;margin:12px 0 16px;border:none}
   .title-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px}
   .report-title{font-size:16px;font-weight:700;color:${brandColor};text-transform:uppercase;letter-spacing:0.1em}
-  .report-meta{font-size:13px;color:#333333;text-align:right;line-height:1.6}
-  .report-meta .exam-type{font-weight:700;color:#1a1a1a;display:block}
+  .report-meta{font-size:13px;color:#374151;text-align:right;line-height:1.6}
+  .report-meta .exam-type{font-weight:700;color:#111827;display:block}
   /* Student card */
-  .stu-card{background:#F3F4F6;border-radius:10px;padding:20px 24px;margin-bottom:28px;border:1px solid #999999}
+  .stu-card{background:#F3F4F6;border-radius:10px;padding:20px 24px;margin-bottom:28px;border:1px solid #D1D5DB}
   .stu-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 32px}
-  .info-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#333333;margin-bottom:3px}
-  .info-value{font-size:15px;font-weight:600;color:#1a1a1a}
+  .info-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#374151;margin-bottom:3px}
+  .info-value{font-size:15px;font-weight:600;color:#111827}
   /* Section label */
-  .sec-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#333333;margin-bottom:12px}
+  .sec-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#374151;margin-bottom:12px}
   /* Table */
   table{width:100%;border-collapse:collapse;margin-bottom:28px}
-  thead th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#1a1a1a;padding:10px 12px;text-align:left;border-bottom:2px solid #555555}
+  thead th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#111827;padding:10px 12px;text-align:left;border-bottom:2px solid #6B7280}
   thead th.num{text-align:right}
   thead th.ctr{text-align:center}
-  tbody td{font-size:14px;color:#1a1a1a;padding:14px 12px;border-bottom:1px solid #999999;font-weight:400}
+  tbody td{font-size:14px;color:#111827;padding:14px 12px;border-bottom:1px solid #D1D5DB;font-weight:400}
   tbody td.num{text-align:right;font-variant-numeric:tabular-nums}
   tbody td.ctr{text-align:center}
   tbody td.subj{font-weight:600}
-  .exam-detail{display:block;font-size:11px;color:#333333;font-weight:400;margin-top:2px}
+  .exam-detail{display:block;font-size:11px;color:#374151;font-weight:400;margin-top:2px}
   .grade-display{display:inline-flex;align-items:center;gap:6px;font-weight:700}
   .grade-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-  tfoot td{font-size:14px;font-weight:700;color:#1a1a1a;padding:14px 12px;border-top:2px solid ${brandColor};background:#e0e0e0}
+  tfoot td{font-size:14px;font-weight:700;color:#111827;padding:14px 12px;border-top:2px solid ${brandColor};background:${brandColor}0A}
   tfoot td.num{text-align:right;font-variant-numeric:tabular-nums}
   tfoot td.ctr{text-align:center}
   /* Result banner */
-  .result-banner{border-radius:0 8px 8px 0;padding:18px 24px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;border-left:4px solid ${isPassed ? '#059669' : '#DC2626'};background:${isPassed ? 'rgba(5,150,105,0.10)' : 'rgba(220,38,38,0.10)'}}
+  .result-banner{border-radius:0 8px 8px 0;padding:18px 24px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;border-left:4px solid ${isPassed ? '#059669' : '#DC2626'};background:${isPassed ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.08)'}}
   .result-dot{width:10px;height:10px;border-radius:50%;background:${isPassed ? '#059669' : '#DC2626'}}
   .result-label{font-size:18px;font-weight:800;letter-spacing:0.04em;color:${isPassed ? '#059669' : '#DC2626'}}
   .result-status{display:flex;align-items:center;gap:10px}
   .result-details{text-align:right}
-  .result-perf{font-size:13px;color:#1a1a1a;font-weight:500;margin-bottom:2px}
-  .result-stats{font-size:12px;color:#333333}
+  .result-perf{font-size:13px;color:#1f2937;font-weight:500;margin-bottom:2px}
+  .result-stats{font-size:12px;color:#374151}
   /* Signatures */
   .sigs{display:flex;justify-content:space-between;margin-bottom:32px;padding-top:8px}
   .sig-block{text-align:center;width:160px}
-  .sig-line{width:100%;height:1.5px;background:#555555;margin-bottom:8px;margin-top:50px;position:relative}
+  .sig-line{width:100%;height:1.5px;background:#9CA3AF;margin-bottom:8px;margin-top:50px;position:relative}
   .sig-img{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);max-height:70px;max-width:150px;object-fit:contain}
-  .sig-label{font-size:12px;font-weight:700;color:#1a1a1a}
-  .sig-sub{font-size:10px;color:#333333;margin-top:2px}
+  .sig-label{font-size:12px;font-weight:700;color:#111827}
+  .sig-sub{font-size:10px;color:#374151;margin-top:2px}
   /* Footer */
-  .footer{text-align:center;padding-top:16px;border-top:1px solid #888888}
-  .footer-text{font-size:10px;color:#333333;letter-spacing:0.02em;font-style:italic}
-  @media print{*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}body{background:#fff}.page{padding:20mm}}
+  .footer{text-align:center;padding-top:16px;border-top:1px solid #9CA3AF}
+  .footer-text{font-size:10px;color:#374151;letter-spacing:0.02em;font-style:italic}
+  @media print{body{background:#fff}.page{padding:20mm}}
 </style>
 </head>
 <body>
@@ -442,7 +442,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                         }
                                     </div>
                                     <div className="text-center">
-                                        <h1 className="text-[28px] font-extrabold text-[#0a5c56] uppercase whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif", letterSpacing: '2px', lineHeight: 1.1 }}>{schoolInfo.name}</h1>
+                                        <h1 className="text-[28px] font-extrabold text-[#1F6F6D] uppercase whitespace-nowrap" style={{ fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif", letterSpacing: '2px', lineHeight: 1.1 }}>{schoolInfo.name}</h1>
                                         {schoolInfo.address && (
                                             <p className="text-[13px] text-gray-600 dark:text-[#8E8E93] mt-1 font-medium leading-relaxed">{schoolInfo.address}</p>
                                         )}
@@ -462,7 +462,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 </div>
 
                                 {/* ── Accent Line ── */}
-                                <div className="dark:bg-[#38383A] my-3 mb-4" style={{ height: '1.5px', background: '#888888' }} />
+                                <div className="h-px bg-gray-200 dark:bg-[#38383A] my-3 mb-4" />
 
                                 {/* ── Title Row ── */}
                                 <div className="flex justify-between items-baseline mb-7">
@@ -485,7 +485,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                             { label: 'Parent / Guardian', value: '\u2014' },
                                         ].map(f => (
                                             <div key={f.label}>
-                                                <p className="text-[9.5px] font-bold uppercase text-gray-600 dark:text-[#636366] mb-0.5" style={{ letterSpacing: '0.12em' }}>{f.label}</p>
+                                                <p className="text-[9.5px] font-semibold uppercase text-gray-400 dark:text-[#636366] mb-0.5" style={{ letterSpacing: '0.12em' }}>{f.label}</p>
                                                 <p className="text-sm font-semibold text-gray-900 dark:text-white">{f.value}</p>
                                             </div>
                                         ))}
@@ -493,7 +493,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 </div>
 
                                 {/* ── Academic Performance ── */}
-                                <p className="text-[11px] font-bold uppercase text-gray-600 dark:text-[#636366] mb-3" style={{ letterSpacing: '0.14em' }}>Academic Performance</p>
+                                <p className="text-[11px] font-semibold uppercase text-gray-400 dark:text-[#636366] mb-3" style={{ letterSpacing: '0.14em' }}>Academic Performance</p>
                                 <div className="overflow-x-auto mb-7">
                                     <table className="w-full" style={{ borderCollapse: 'collapse' }}>
                                         <thead>
@@ -506,49 +506,49 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                                     { label: 'Result', cls: 'text-center', w: '12%' },
                                                     { label: 'Remarks', cls: 'text-left', w: '18%' },
                                                 ].map(h => (
-                                                    <th key={h.label} className={`px-3 py-2.5 text-[10px] font-bold uppercase text-gray-700 dark:text-[#8E8E93] ${h.cls}`} style={{ letterSpacing: '0.08em', borderBottom: '2px solid #555555', width: h.w }}>{h.label}</th>
+                                                    <th key={h.label} className={`px-3 py-2.5 text-[10px] font-semibold uppercase text-gray-500 dark:text-[#8E8E93] ${h.cls}`} style={{ letterSpacing: '0.08em', borderBottom: '1.5px solid #E5E7EB', width: h.w }}>{h.label}</th>
                                                 ))}
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {subjects.map((s, i) => (
-                                                <tr key={s.examId || i} style={{ background: i % 2 === 1 ? '#f5f5f5' : 'transparent' }}>
-                                                    <td className="px-3 py-3.5 text-[12.5px] font-semibold text-gray-900 dark:text-white" style={{ borderBottom: '1px solid #999999' }}>
+                                                <tr key={s.examId || i} style={{ background: i % 2 === 1 ? 'rgba(249,250,251,0.5)' : 'transparent' }}>
+                                                    <td className="px-3 py-3.5 text-[12.5px] font-medium text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
                                                         {s.subject}
                                                         <span className="block text-[10px] text-gray-600 dark:text-[#8E8E93] font-normal mt-0.5">
                                                             {[s.examName, s.date ? new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : ''].filter(Boolean).join(' \u00B7 ')}
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-3.5 text-[12.5px] text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '1px solid #999999' }}>{s.totalMarks}</td>
-                                                    <td className="px-3 py-3.5 text-[12.5px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '1px solid #999999' }}>{s.marksObtained}</td>
-                                                    <td className="px-3 py-3.5 text-center" style={{ borderBottom: '1px solid #999999' }}>
+                                                    <td className="px-3 py-3.5 text-[12.5px] text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.totalMarks}</td>
+                                                    <td className="px-3 py-3.5 text-[12.5px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.marksObtained}</td>
+                                                    <td className="px-3 py-3.5 text-center" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
                                                         <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-gray-900 dark:text-white">
                                                             <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: GRADE_DOT_COLOR(s.grade) }} />
                                                             {s.grade}
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-3.5 text-center text-[12px] font-bold" style={{ borderBottom: '1px solid #999999', color: s.isPassed ? '#059669' : '#DC2626' }}>
+                                                    <td className="px-3 py-3.5 text-center text-[12px] font-medium" style={{ borderBottom: '0.5px solid #F3F4F6', color: s.isPassed ? '#059669' : '#DC2626' }}>
                                                         {s.isPassed ? 'Pass' : 'Fail'}
                                                     </td>
-                                                    <td className="px-3 py-3.5 text-[11px] text-gray-500 dark:text-[#636366]" style={{ borderBottom: '1px solid #999999' }}>{s.remarks || '\u2014'}</td>
+                                                    <td className="px-3 py-3.5 text-[11px] text-gray-400 dark:text-[#636366]" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{s.remarks || '\u2014'}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                         <tfoot>
                                             <tr>
-                                                <td className="px-3 py-3.5 text-[13px] font-bold text-gray-900 dark:text-white" style={{ borderTop: `2px solid ${brandColor}`, background: '#e0e0e0' }}>Grand Total</td>
-                                                <td className="px-3 py-3.5 text-[13px] font-bold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `2px solid ${brandColor}`, background: '#e0e0e0' }}>{summary.grandTotal}</td>
-                                                <td className="px-3 py-3.5 text-[13px] font-bold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `2px solid ${brandColor}`, background: '#e0e0e0' }}>{summary.grandObtained}</td>
-                                                <td className="px-3 py-3.5 text-center" style={{ borderTop: `2px solid ${brandColor}`, background: '#e0e0e0' }}>
-                                                    <span className="inline-flex items-center gap-1.5 text-[13px] font-bold text-gray-900 dark:text-white">
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>Grand Total</td>
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.grandTotal}</td>
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.grandObtained}</td>
+                                                <td className="px-3 py-3.5 text-center" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>
+                                                    <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-gray-900 dark:text-white">
                                                         <span className="w-[7px] h-[7px] rounded-full inline-block" style={{ background: GRADE_DOT_COLOR(summary.overallGrade) }} />
                                                         {summary.overallGrade}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-3.5 text-center text-[13px] font-bold" style={{ borderTop: `2px solid ${brandColor}`, background: '#e0e0e0', color: summary.overallPassed ? '#059669' : '#DC2626', letterSpacing: '0.04em' }}>
+                                                <td className="px-3 py-3.5 text-center text-[13px] font-semibold" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A`, color: summary.overallPassed ? '#059669' : '#DC2626', letterSpacing: '0.04em' }}>
                                                     {summary.overallPassed ? 'PASS' : 'FAIL'}
                                                 </td>
-                                                <td className="px-3 py-3.5 text-[13px] font-bold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `2px solid ${brandColor}`, background: '#e0e0e0' }}>{summary.overallPercentage}%</td>
+                                                <td className="px-3 py-3.5 text-[13px] font-semibold text-gray-900 dark:text-white text-right tabular-nums" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary.overallPercentage}%</td>
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -556,8 +556,8 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
 
                                 {/* ── Result Banner ── */}
                                 <div className="mb-7 flex items-center justify-between px-6 py-4.5" style={{
-                                    borderLeft: `4px solid ${summary.overallPassed ? '#059669' : '#DC2626'}`,
-                                    background: summary.overallPassed ? 'rgba(5,150,105,0.10)' : 'rgba(220,38,38,0.10)',
+                                    borderLeft: `3px solid ${summary.overallPassed ? '#059669' : '#DC2626'}`,
+                                    background: summary.overallPassed ? 'rgba(5,150,105,0.04)' : 'rgba(220,38,38,0.04)',
                                     borderRadius: '0 8px 8px 0',
                                 }}>
                                     <div className="flex items-center gap-2.5">
@@ -582,17 +582,17 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                         <div key={s.label} className="text-center w-[160px]">
                                             <div className="relative mt-12 mb-2">
                                                 {s.sig && <img src={getSignatureUrl(s.sig)} alt={s.label} className="absolute bottom-1 left-1/2 -translate-x-1/2 max-h-[70px] max-w-[150px] object-contain" />}
-                                                <div className="dark:bg-[#38383A]" style={{ height: '1.5px', background: '#555555' }} />
+                                                <div className="h-px bg-gray-200 dark:bg-[#38383A]" />
                                             </div>
-                                            <p className="text-[11px] font-bold text-gray-700 dark:text-[#8E8E93]">{s.label}</p>
-                                            <p className="text-[9px] text-gray-500 dark:text-[#636366] mt-0.5">{s.sub}</p>
+                                            <p className="text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93]">{s.label}</p>
+                                            <p className="text-[9px] text-gray-400 dark:text-[#636366] mt-0.5">{s.sub}</p>
                                         </div>
                                     ))}
                                 </div>
 
                                 {/* ── Footer ── */}
-                                <div className="text-center pt-4" style={{ borderTop: '1px solid #888888' }}>
-                                    <p className="text-[9px] text-gray-500 dark:text-[#636366] italic" style={{ letterSpacing: '0.02em' }}>
+                                <div className="text-center pt-4" style={{ borderTop: '0.5px solid #F3F4F6' }}>
+                                    <p className="text-[9px] text-gray-400 dark:text-[#636366] italic" style={{ letterSpacing: '0.02em' }}>
                                         This is a computer-generated report card issued by {schoolInfo.name} &middot; Powered by Learnovo
                                     </p>
                                 </div>
