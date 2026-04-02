@@ -1,15 +1,46 @@
-import React from 'react'
-import { Building2 } from 'lucide-react'
+import React, { useState } from 'react'
+import { Building2, AlertTriangle } from 'lucide-react'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 const SERVER_URL = API_URL.replace(/\/api\/?$/, '')
 
 const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSignatureUpload }) => {
+    const [logoWarning, setLogoWarning] = useState(null)
+
     // Helper to get safe logo URL
     const getLogoUrl = (path) => {
         if (!path) return null
         if (path.startsWith('http')) return path
         return encodeURI(`${SERVER_URL}${path}`)
+    }
+
+    // Wrap logo upload to validate dimensions and file size
+    const onLogoUpload = (e) => {
+        const file = e.target.files[0]
+        if (!file) return
+
+        // Check file size (max 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            setLogoWarning('File size exceeds 2MB. Please upload a smaller image.')
+            e.target.value = ''
+            return
+        }
+
+        // Check dimensions (non-blocking warning)
+        const img = new window.Image()
+        img.onload = () => {
+            URL.revokeObjectURL(img.src)
+            if (img.width < 400 || img.height < 400) {
+                setLogoWarning(`Your image is ${img.width}x${img.height}px. It may appear blurry on printed documents. We recommend at least 800x800px.`)
+            } else {
+                setLogoWarning(null)
+            }
+        }
+        img.onerror = () => URL.revokeObjectURL(img.src)
+        img.src = URL.createObjectURL(file)
+
+        // Proceed with upload immediately (don't wait for dimension check)
+        handleLogoUpload(e)
     }
 
     return (
@@ -218,8 +249,8 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                                     type="file"
                                     id="logo-upload"
                                     className="hidden"
-                                    accept="image/*"
-                                    onChange={handleLogoUpload}
+                                    accept="image/png,image/jpeg"
+                                    onChange={onLogoUpload}
                                 />
                                 <label
                                     htmlFor="logo-upload"
@@ -227,7 +258,14 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                                 >
                                     Change Logo
                                 </label>
-                                <p className="text-xs text-gray-500">Recommended: 200x200px PNG/JPG</p>
+                                <p className="text-xs text-gray-500">Recommended: 800x800px PNG with transparent background (min 400x400px)</p>
+                                <p className="text-xs text-gray-400">Max file size: 2MB</p>
+                                {logoWarning && (
+                                    <div className="flex items-start gap-1.5 mt-1">
+                                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs text-amber-600">{logoWarning}</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

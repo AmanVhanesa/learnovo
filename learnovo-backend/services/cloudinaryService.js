@@ -320,8 +320,8 @@ class CloudinaryService {
       folder: 'school',
       subPath: 'logos',
       transformation: {
-        width: 300,
-        height: 300,
+        width: 800,
+        height: 800,
         crop: 'fit',
         quality: 'auto:best'
       }
