@@ -333,7 +333,7 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                     <div style={{ padding: '0 26px 14px', flexShrink: 0 }}>
                         <div style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
-                            marginTop: 8, height: 120,
+                            marginTop: 8, height: 160,
                         }}>
                             <div style={{ textAlign: 'center', width: 170, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 <div style={{ width: 110, height: 1, background: '#9ca3af', margin: '0 auto 4px' }} />
@@ -347,7 +347,7 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                             </div>
                             <div style={{ textAlign: 'center', width: 170, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 {d.principalSignature && (
-                                    <img src={d.principalSignature} alt="Principal Signature" style={{ maxHeight: 120, maxWidth: 200, objectFit: 'contain', margin: '0 auto 4px', display: 'block' }} />
+                                    <img src={d.principalSignature} alt="Principal Signature" style={{ maxHeight: 150, maxWidth: 220, objectFit: 'contain', margin: '0 auto 4px', display: 'block' }} />
                                 )}
                                 <div style={{ width: 110, height: 1, background: '#9ca3af', margin: '0 auto 4px' }} />
                                 <div style={{ fontSize: 11, fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.8 }}>Principal</div>
