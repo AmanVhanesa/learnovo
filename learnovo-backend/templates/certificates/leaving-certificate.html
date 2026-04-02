@@ -101,7 +101,6 @@
   .header-band {
     width: 100%; min-height: 140px;
     background: linear-gradient(135deg, #0F1F3D 0%, #1A2E5A 55%, #243F7A 100%);
-    display: flex; align-items: center;
     padding: 14px 34px 10px 34px;
     position: relative; flex-shrink: 0;
     border-radius: 8px 8px 0 0;
@@ -119,16 +118,21 @@
   }
 
   .school-logo-wrap {
+    position: absolute;
+    left: 34px;
+    top: 50%;
+    transform: translateY(-50%);
     width: 120px; height: 120px; border-radius: 50%;
-    border: 3px solid rgba(201,168,76,0.6); overflow: hidden; flex-shrink: 0;
+    border: 3px solid rgba(201,168,76,0.6); overflow: hidden;
     background: rgba(255,255,255,0.12); display: flex;
     align-items: center; justify-content: center;
     box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    z-index: 1;
   }
 
   .school-logo-wrap img { width: 108px; height: 108px; object-fit: contain; border-radius: 50%; }
 
-  .school-info { flex: 1; text-align: center; padding: 0 14px; }
+  .school-info { text-align: center; padding: 0 14px; }
 
   .school-name {
     font-family: 'Georgia', 'Times New Roman', serif; font-size: 28px; font-weight: 700;

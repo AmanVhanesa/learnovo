@@ -101,18 +101,19 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
 
                     {/* Header — matches backend tc-minimal.html with logo */}
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '14px 20px 10px', flexShrink: 0, gap: 14 }}>
-                        {/* School Logo */}
+                    <div style={{ position: 'relative', padding: '14px 20px 10px', flexShrink: 0, minHeight: 100 }}>
+                        {/* School Logo — absolutely positioned so school info centers on full width */}
                         {d.schoolLogo && (
                             <div style={{
-                                width: 82, height: 82, minWidth: 82,
+                                position: 'absolute', left: 20, top: 14,
+                                width: 100, height: 100, minWidth: 100,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                borderRadius: 6, overflow: 'hidden', flexShrink: 0,
+                                borderRadius: 6, overflow: 'hidden',
                             }}>
-                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 82, height: 82, objectFit: 'contain' }} />
+                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 100, height: 100, objectFit: 'contain' }} />
                             </div>
                         )}
-                        <div style={{ flex: 1, textAlign: 'center' }}>
+                        <div style={{ textAlign: 'center' }}>
                             <div style={{
                                 fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
                                 fontSize: 19, fontWeight: 800, color: '#1F6F6D',

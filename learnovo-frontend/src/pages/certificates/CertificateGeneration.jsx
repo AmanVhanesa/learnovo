@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Search, Check, FileText, Printer, AlertCircle, AlertTriangle, Edit3, Eye, Download, X } from 'lucide-react';
+import { ArrowLeft, Search, Check, FileText, Printer, AlertCircle, AlertTriangle, Edit3, Eye, Download, X, Plus, Tag } from 'lucide-react';
 import certificateService from '../../services/certificateService';
 import studentsService from '../../services/studentsService';
 import { reportsService } from '../../services/reportsService';
@@ -11,6 +11,53 @@ import CertificatePreviewContent from './CertificatePreviewContent';
 import { highQualityPrint } from '../../utils/highQualityPrint';
 
 const Loader2 = ({ className }) => <svg className={`w-5 h-5 ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>;
+
+const ModifiedBadge = () => (
+    <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full font-medium">Modified</span>
+);
+
+const EditableField = ({ label, field, placeholder = '', value, modified, onChange }) => (
+    <div>
+        <label className="label mb-1.5 flex items-center gap-2">
+            {label}
+            {modified && <ModifiedBadge />}
+        </label>
+        <input type="text" className="input" placeholder={placeholder} value={value || ''} onChange={(e) => onChange(field, e.target.value)} />
+    </div>
+);
+
+const SelectField = ({ label, field, options, value, modified, onChange }) => (
+    <div>
+        <label className="label mb-1.5 flex items-center gap-2">
+            {label}
+            {modified && <ModifiedBadge />}
+        </label>
+        <select className="input" value={value || options[0]} onChange={(e) => onChange(field, e.target.value)}>
+            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+    </div>
+);
+
+const DEFAULT_TC_REMARKS = [
+    'No dues pending against the student.',
+    'The student has been regular in attendance.',
+    'The student bears a good moral character.',
+    'The student is promoted to the next class.',
+    'The student has participated in extracurricular activities.',
+    'No disciplinary action has been taken against the student.',
+];
+
+const CUSTOM_REMARKS_KEY = 'learnovo_custom_tc_remarks';
+
+const getCustomRemarks = () => {
+    try {
+        return JSON.parse(localStorage.getItem(CUSTOM_REMARKS_KEY) || '[]');
+    } catch { return []; }
+};
+
+const saveCustomRemarks = (remarks) => {
+    localStorage.setItem(CUSTOM_REMARKS_KEY, JSON.stringify(remarks));
+};
 
 const CertificateGeneration = () => {
     const navigate = useNavigate();
@@ -30,6 +77,8 @@ const CertificateGeneration = () => {
     const [isPrintLoading, setIsPrintLoading] = useState(false);
     const certPrintRef = useRef(null);
     const [feesSkipped, setFeesSkipped] = useState(false);
+    const [customRemarks, setCustomRemarks] = useState(getCustomRemarks);
+    const [newCustomRemark, setNewCustomRemark] = useState('');
 
     // Debounce the search term
     useEffect(() => {
@@ -200,31 +249,38 @@ const CertificateGeneration = () => {
     // Helpers for the editable form
     const isModified = (field) => originalData && previewData && previewData[field] !== originalData[field];
 
-    const ModifiedBadge = () => (
-        <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full font-medium">Modified</span>
-    );
+    const handleFieldChange = useCallback((field, value) => {
+        setPreviewData(prev => ({ ...prev, [field]: value }));
+    }, []);
 
-    const EditableField = ({ label, field, placeholder = '' }) => (
-        <div>
-            <label className="label mb-1.5 flex items-center gap-2">
-                {label}
-                {isModified(field) && <ModifiedBadge />}
-            </label>
-            <input type="text" className="input" placeholder={placeholder} value={previewData[field] || ''} onChange={(e) => setPreviewData(prev => ({ ...prev, [field]: e.target.value }))} />
-        </div>
-    );
+    const addCustomRemark = () => {
+        const trimmed = newCustomRemark.trim();
+        if (!trimmed) return;
+        if ([...DEFAULT_TC_REMARKS, ...customRemarks].includes(trimmed)) {
+            toast.error('This remark already exists');
+            return;
+        }
+        const updated = [...customRemarks, trimmed];
+        setCustomRemarks(updated);
+        saveCustomRemarks(updated);
+        setNewCustomRemark('');
+        toast.success('Custom remark saved');
+    };
 
-    const SelectField = ({ label, field, options }) => (
-        <div>
-            <label className="label mb-1.5 flex items-center gap-2">
-                {label}
-                {isModified(field) && <ModifiedBadge />}
-            </label>
-            <select className="input" value={previewData[field] || options[0]} onChange={(e) => setPreviewData(prev => ({ ...prev, [field]: e.target.value }))}>
-                {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-        </div>
-    );
+    const removeCustomRemark = (remark) => {
+        const updated = customRemarks.filter(r => r !== remark);
+        setCustomRemarks(updated);
+        saveCustomRemarks(updated);
+    };
+
+    const appendRemark = (remark) => {
+        setPreviewData(prev => {
+            const current = (prev.remarks || '').trim();
+            if (current.includes(remark)) return prev;
+            const separator = current ? '\n' : '';
+            return { ...prev, remarks: current + separator + remark };
+        });
+    };
 
     const handleOpenPreview = () => {
         setShowPreviewModal(true);
@@ -388,12 +444,12 @@ const CertificateGeneration = () => {
                         <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
                             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Student Details</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-                                <EditableField label="Student Name" field="studentName" />
-                                <EditableField label="Father's Name" field="fatherName" />
-                                <EditableField label="Mother's Name" field="motherName" />
-                                <EditableField label="Date of Birth" field="dob" placeholder="e.g. 15 Mar 2015" />
-                                {certType === 'TC' && <EditableField label="Date of Birth (in Words)" field="dobWords" placeholder="e.g. Fifteenth March, Two Thousand Fifteen" />}
-                                <EditableField label="Nationality" field="nationality" />
+                                <EditableField label="Student Name" field="studentName" value={previewData.studentName} modified={isModified('studentName')} onChange={handleFieldChange} />
+                                <EditableField label="Father's Name" field="fatherName" value={previewData.fatherName} modified={isModified('fatherName')} onChange={handleFieldChange} />
+                                <EditableField label="Mother's Name" field="motherName" value={previewData.motherName} modified={isModified('motherName')} onChange={handleFieldChange} />
+                                <EditableField label="Date of Birth" field="dob" placeholder="e.g. 15 Mar 2015" value={previewData.dob} modified={isModified('dob')} onChange={handleFieldChange} />
+                                {certType === 'TC' && <EditableField label="Date of Birth (in Words)" field="dobWords" placeholder="e.g. Fifteenth March, Two Thousand Fifteen" value={previewData.dobWords} modified={isModified('dobWords')} onChange={handleFieldChange} />}
+                                <EditableField label="Nationality" field="nationality" value={previewData.nationality} modified={isModified('nationality')} onChange={handleFieldChange} />
                                 {/* Category — hybrid dropdown + custom */}
                                 <div>
                                     <label className="label mb-1.5 flex items-center gap-2">
@@ -449,15 +505,15 @@ const CertificateGeneration = () => {
                         <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
                             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Academic Details</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-                                <EditableField label="Admission Number" field="admissionNumber" />
-                                <EditableField label="Date of Admission" field="admissionDate" />
-                                <EditableField label={certType === 'TC' ? 'Class in which Last Studied' : 'Class'} field="class" placeholder="e.g. Nursery, LKG, Class 5" />
-                                {certType === 'BONAFIDE' && <EditableField label="Section" field="section" />}
-                                {certType === 'BONAFIDE' && <EditableField label="Academic Year" field="academicYear" />}
-                                {certType === 'TC' && <EditableField label="PEN Number" field="penNumber" />}
-                                {certType === 'TC' && <EditableField label="Subjects Studied" field="subjects" />}
-                                {certType === 'TC' && <SelectField label="Board Exam Result" field="boardResult" options={['Passed', 'Failed', 'Appeared', 'Not Appeared']} />}
-                                {certType === 'TC' && <SelectField label="Qualified for Promotion" field="promotionStatus" options={['Yes', 'No']} />}
+                                <EditableField label="Admission Number" field="admissionNumber" value={previewData.admissionNumber} modified={isModified('admissionNumber')} onChange={handleFieldChange} />
+                                <EditableField label="Date of Admission" field="admissionDate" value={previewData.admissionDate} modified={isModified('admissionDate')} onChange={handleFieldChange} />
+                                <EditableField label={certType === 'TC' ? 'Class in which Last Studied' : 'Class'} field="class" placeholder="e.g. Nursery, LKG, Class 5" value={previewData.class} modified={isModified('class')} onChange={handleFieldChange} />
+                                {certType === 'BONAFIDE' && <EditableField label="Section" field="section" value={previewData.section} modified={isModified('section')} onChange={handleFieldChange} />}
+                                {certType === 'BONAFIDE' && <EditableField label="Academic Year" field="academicYear" value={previewData.academicYear} modified={isModified('academicYear')} onChange={handleFieldChange} />}
+                                {certType === 'TC' && <EditableField label="PEN Number" field="penNumber" value={previewData.penNumber} modified={isModified('penNumber')} onChange={handleFieldChange} />}
+                                {certType === 'TC' && <EditableField label="Subjects Studied" field="subjects" value={previewData.subjects} modified={isModified('subjects')} onChange={handleFieldChange} />}
+                                {certType === 'TC' && <SelectField label="Board Exam Result" field="boardResult" options={['Passed', 'Failed', 'Appeared', 'Not Appeared']} value={previewData.boardResult} modified={isModified('boardResult')} onChange={handleFieldChange} />}
+                                {certType === 'TC' && <SelectField label="Qualified for Promotion" field="promotionStatus" options={['Yes', 'No']} value={previewData.promotionStatus} modified={isModified('promotionStatus')} onChange={handleFieldChange} />}
                             </div>
                         </div>
 
@@ -492,10 +548,10 @@ const CertificateGeneration = () => {
                                             )}
                                         </div>
                                     </div>
-                                    <SelectField label="General Conduct" field="conduct" options={['Good', 'Very Good', 'Excellent', 'Satisfactory', 'Needs Improvement']} />
-                                    <SelectField label="Fee Status" field="feeStatus" options={['Paid up to date', 'Pending', 'Partially Paid']} />
-                                    <EditableField label="Date of Application" field="applicationDate" />
-                                    <EditableField label="Date of Issue" field="issueDate" />
+                                    <SelectField label="General Conduct" field="conduct" options={['Good', 'Very Good', 'Excellent', 'Satisfactory', 'Needs Improvement']} value={previewData.conduct} modified={isModified('conduct')} onChange={handleFieldChange} />
+                                    <SelectField label="Fee Status" field="feeStatus" options={['Paid up to date', 'Pending', 'Partially Paid']} value={previewData.feeStatus} modified={isModified('feeStatus')} onChange={handleFieldChange} />
+                                    <EditableField label="Date of Application" field="applicationDate" value={previewData.applicationDate} modified={isModified('applicationDate')} onChange={handleFieldChange} />
+                                    <EditableField label="Date of Issue" field="issueDate" value={previewData.issueDate} modified={isModified('issueDate')} onChange={handleFieldChange} />
                                 </div>
                             </div>
                         )}
@@ -505,8 +561,8 @@ const CertificateGeneration = () => {
                             <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
                                 <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Certificate Details</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-                                    <EditableField label="Purpose" field="purpose" placeholder="e.g. For school admission" />
-                                    <EditableField label="Date of Issue" field="issueDate" />
+                                    <EditableField label="Purpose" field="purpose" placeholder="e.g. For school admission" value={previewData.purpose} modified={isModified('purpose')} onChange={handleFieldChange} />
+                                    <EditableField label="Date of Issue" field="issueDate" value={previewData.issueDate} modified={isModified('issueDate')} onChange={handleFieldChange} />
                                 </div>
                             </div>
                         )}
@@ -515,7 +571,79 @@ const CertificateGeneration = () => {
                         <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
                             <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Additional Information</h3>
                             <div className="grid grid-cols-1 gap-y-5">
-                                <EditableField label="Remarks" field="remarks" />
+                                {/* Remarks with preset selection */}
+                                <div>
+                                    <label className="label mb-1.5 flex items-center gap-2">
+                                        Remarks
+                                        {isModified('remarks') && <ModifiedBadge />}
+                                    </label>
+                                    <textarea
+                                        className="input min-h-[80px] resize-y"
+                                        placeholder="Type remarks or select from presets below..."
+                                        value={previewData.remarks || ''}
+                                        onChange={(e) => handleFieldChange('remarks', e.target.value)}
+                                        rows={3}
+                                    />
+
+                                    {/* Quick-select remark chips */}
+                                    {certType === 'TC' && (
+                                        <div className="mt-3 space-y-3">
+                                            <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93]">Quick add remarks (click to append):</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {[...DEFAULT_TC_REMARKS, ...customRemarks].map((remark) => {
+                                                    const isActive = (previewData.remarks || '').includes(remark);
+                                                    const isCustom = customRemarks.includes(remark);
+                                                    return (
+                                                        <button
+                                                            key={remark}
+                                                            type="button"
+                                                            onClick={() => appendRemark(remark)}
+                                                            className={`group relative inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-all duration-150 ${
+                                                                isActive
+                                                                    ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-300 dark:border-primary-700 text-primary-700 dark:text-primary-400'
+                                                                    : 'bg-white dark:bg-[#1C1C1E] border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:border-primary-300 dark:hover:border-primary-700 hover:text-primary-600'
+                                                            }`}
+                                                        >
+                                                            <Tag className="h-3 w-3 shrink-0" />
+                                                            <span className="max-w-[200px] truncate">{remark}</span>
+                                                            {isActive && <Check className="h-3 w-3 shrink-0 text-primary-500" />}
+                                                            {isCustom && !isActive && (
+                                                                <span
+                                                                    onClick={(e) => { e.stopPropagation(); removeCustomRemark(remark); }}
+                                                                    className="hidden group-hover:inline-flex ml-0.5 text-red-400 hover:text-red-600"
+                                                                    title="Remove custom remark"
+                                                                >
+                                                                    <X className="h-3 w-3" />
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            {/* Add custom remark */}
+                                            <div className="flex gap-2 items-center">
+                                                <input
+                                                    type="text"
+                                                    className="input text-sm flex-1"
+                                                    placeholder="Add a custom remark template..."
+                                                    value={newCustomRemark}
+                                                    onChange={(e) => setNewCustomRemark(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomRemark(); } }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={addCustomRemark}
+                                                    disabled={!newCustomRemark.trim()}
+                                                    className="btn btn-outline text-sm gap-1.5 px-3 py-2 shrink-0"
+                                                >
+                                                    <Plus className="h-3.5 w-3.5" />
+                                                    Save
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                                 {certType === 'TC' && selectedStudent?.isActive !== false && (
                                     <div>
                                         <label className="flex items-center gap-3 cursor-pointer p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-400">

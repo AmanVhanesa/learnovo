@@ -78,10 +78,10 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   .page{width:210mm;min-height:297mm;padding:20mm;margin:0 auto}
   /* Header */
   .header{position:relative;text-align:center;padding:0 0 12px;margin-bottom:0}
-  .logo-wrap{position:absolute;left:0;top:0;width:105px;height:105px;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden}
-  .school-logo{width:105px;height:105px;border-radius:8px;overflow:hidden;flex-shrink:0}
+  .logo-wrap{position:absolute;left:0;top:0;width:110px;height:110px;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden}
+  .school-logo{width:110px;height:110px;border-radius:8px;overflow:hidden;flex-shrink:0}
   .school-logo img{width:100%;height:100%;object-fit:contain}
-  .school-logo-fb{width:105px;height:105px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:28px;letter-spacing:-0.02em;flex-shrink:0}
+  .school-logo-fb{width:110px;height:110px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:28px;letter-spacing:-0.02em;flex-shrink:0}
   .school-info{text-align:center}
   .school-name{font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:28px;font-weight:800;color:#1F6F6D;letter-spacing:2px;line-height:1.1;text-transform:uppercase;white-space:nowrap}
   .school-addr{font-size:14px;color:#1f2937;font-weight:500;margin-top:4px;line-height:1.5}
@@ -435,10 +435,10 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
 
                                 {/* ── Header ── */}
                                 <div className="relative text-center pb-3 mb-0">
-                                    <div className="absolute left-0 top-0 w-[105px] h-[105px] flex items-center justify-center rounded-lg overflow-hidden">
+                                    <div className="absolute left-0 top-0 w-[110px] h-[110px] flex items-center justify-center rounded-lg overflow-hidden">
                                         {schoolInfo.logo
-                                            ? <img src={schoolInfo.logo} alt="Logo" className="w-[105px] h-[105px] object-contain" />
-                                            : <div className="w-[105px] h-[105px] rounded-lg flex items-center justify-center text-white font-bold text-[28px]" style={{ background: brandColor, letterSpacing: '-0.02em' }}>{(schoolInfo.name || 'S')[0]}</div>
+                                            ? <img src={schoolInfo.logo} alt="Logo" className="w-[110px] h-[110px] object-contain" />
+                                            : <div className="w-[110px] h-[110px] rounded-lg flex items-center justify-center text-white font-bold text-[28px]" style={{ background: brandColor, letterSpacing: '-0.02em' }}>{(schoolInfo.name || 'S')[0]}</div>
                                         }
                                     </div>
                                     <div className="text-center">

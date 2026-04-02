@@ -83,17 +83,17 @@
 
   /* ═══════════ HEADER ═══════════ */
   .header {
-    display: grid;
-    grid-template-columns: 70px 1fr auto;
-    align-items: center;
-    gap: 14px;
+    position: relative;
     padding: 14px 16px;
+    min-height: 100px;
   }
 
   .header .logo {
-    width: 70px; height: 70px;
+    position: absolute;
+    left: 16px;
+    top: 14px;
+    width: 80px; height: 80px;
     object-fit: contain;
-    justify-self: center;
   }
 
   .header .school-center {
@@ -120,6 +120,9 @@
   }
 
   .header .affiliation {
+    position: absolute;
+    right: 16px;
+    top: 14px;
     text-align: right;
     line-height: 1.6;
   }
