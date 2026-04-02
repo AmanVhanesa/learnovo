@@ -23,11 +23,8 @@ const CertificateGeneration = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    // TC override fields — ephemeral, only used for this certificate generation
-    const [categoryOverride, setCategoryOverride] = useState('');
-    const [classOverride, setClassOverride] = useState('');
-    const [penOverride, setPenOverride] = useState('');
-    const [customCategory, setCustomCategory] = useState(false); // true when admin types a custom category
+    const [originalData, setOriginalData] = useState(null); // snapshot for "modified" indicators
+    const [customCategory, setCustomCategory] = useState(false);
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [showFeesModal, setShowFeesModal] = useState(false);
     const [feesSkipped, setFeesSkipped] = useState(false);
@@ -90,11 +87,8 @@ const CertificateGeneration = () => {
     const previewMutation = useMutation({
         mutationFn: () => certificateService.previewCertificate(selectedStudent._id, certType),
         onSuccess: (data) => {
-            setPreviewData(data);
-            // Pre-fill TC override fields from DB values
-            setCategoryOverride(data.category || '');
-            setClassOverride(data.class || '');
-            setPenOverride(data.penNumber || '');
+            setPreviewData({ ...data });
+            setOriginalData({ ...data }); // snapshot for "modified" indicators
             setCustomCategory(!['General', 'SC', 'ST', 'OBC'].includes(data.category));
             setStep(2);
         },
@@ -116,10 +110,7 @@ const CertificateGeneration = () => {
             certType,
             previewData,
             autoDeactivate,
-            // Pass TC overrides (only effective for TC type)
-            certType === 'TC' ? categoryOverride : undefined,
-            certType === 'TC' ? classOverride : undefined,
-            certType === 'TC' ? penOverride : undefined,
+            undefined, undefined, undefined,
             certType === 'TC' ? feesSkipped : undefined
         ),
         onSuccess: async (response) => {
@@ -198,15 +189,40 @@ const CertificateGeneration = () => {
 
     const generating = generateMutation.isPending;
 
-    // Build the merged data for preview/export (includes TC overrides)
+    // Build the merged data for preview/export
     const getMergedData = () => {
         if (!previewData) return {};
-        return {
-            ...previewData,
-            ...(certType === 'TC' ? { category: categoryOverride || previewData.category, class: classOverride || previewData.class, penNumber: penOverride || previewData.penNumber } : {}),
-        };
+        return { ...previewData };
     };
 
+    // Helpers for the editable form
+    const isModified = (field) => originalData && previewData && previewData[field] !== originalData[field];
+
+    const ModifiedBadge = () => (
+        <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full font-medium">Modified</span>
+    );
+
+    const EditableField = ({ label, field, placeholder = '' }) => (
+        <div>
+            <label className="label mb-1.5 flex items-center gap-2">
+                {label}
+                {isModified(field) && <ModifiedBadge />}
+            </label>
+            <input type="text" className="input" placeholder={placeholder} value={previewData[field] || ''} onChange={(e) => setPreviewData(prev => ({ ...prev, [field]: e.target.value }))} />
+        </div>
+    );
+
+    const SelectField = ({ label, field, options }) => (
+        <div>
+            <label className="label mb-1.5 flex items-center gap-2">
+                {label}
+                {isModified(field) && <ModifiedBadge />}
+            </label>
+            <select className="input" value={previewData[field] || options[0]} onChange={(e) => setPreviewData(prev => ({ ...prev, [field]: e.target.value }))}>
+                {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+        </div>
+    );
 
     const handleOpenPreview = () => {
         setShowPreviewModal(true);
@@ -349,141 +365,111 @@ const CertificateGeneration = () => {
                     </div>
                 )}
 
-                {/* STEP 2 */}
+                {/* STEP 2 — Unified Editable Form */}
                 {step === 2 && previewData && (
                     <div className="space-y-6">
 
-                        {/* Read-only confirmation fields */}
-                        <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
-                            <div className="flex items-center gap-2 mb-4 text-gray-700 dark:text-[#8E8E93] font-semibold border-b border-gray-200 dark:border-[#38383A] pb-3">
-                                <FileText className="h-5 w-5" />
-                                Certificate Preview Data
-                            </div>
+                        {/* Info banner */}
+                        <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/10 text-blue-800 dark:text-blue-400 rounded-xl text-sm border border-blue-200 dark:border-blue-800">
+                            <Edit3 className="h-5 w-5 shrink-0 mt-0.5" />
+                            <p>All fields below are editable. Overrides apply <strong>only to this certificate</strong> — the student&apos;s master record will not be changed.</p>
+                        </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Student Name:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.studentName}</span></div>
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Father's Name:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.fatherName}</span></div>
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Mother's Name:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.motherName}</span></div>
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Date of Birth:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.dob}</span></div>
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Admission No:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.admissionNumber}</span></div>
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Date of Issue:</span> <span className="font-medium text-gray-900 dark:text-white ml-2">{previewData.issueDate}</span></div>
-                                <div><span className="text-gray-500 dark:text-[#8E8E93]">Fees Status:</span> <span className={`font-medium ml-2 ${previewData.feeStatus?.toLowerCase()?.includes('paid') || previewData.feeStatus?.toLowerCase() === 'clear' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{previewData.feeStatus}</span></div>
+                        {/* Student Details */}
+                        <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
+                            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Student Details</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                                <EditableField label="Student Name" field="studentName" />
+                                <EditableField label="Father's Name" field="fatherName" />
+                                <EditableField label="Mother's Name" field="motherName" />
+                                <EditableField label="Date of Birth" field="dob" placeholder="e.g. 15 Mar 2015" />
+                                {certType === 'TC' && <EditableField label="Date of Birth (in Words)" field="dobWords" placeholder="e.g. Fifteenth March, Two Thousand Fifteen" />}
+                                <EditableField label="Nationality" field="nationality" />
+                                {/* Category — hybrid dropdown + custom */}
+                                <div>
+                                    <label className="label mb-1.5 flex items-center gap-2">
+                                        Category / Caste
+                                        {isModified('category') && <ModifiedBadge />}
+                                    </label>
+                                    {!customCategory ? (
+                                        <select
+                                            className="input"
+                                            value={['General', 'SC', 'ST', 'OBC'].includes(previewData.category) ? previewData.category : '__custom__'}
+                                            onChange={(e) => {
+                                                if (e.target.value === '__custom__') {
+                                                    setCustomCategory(true);
+                                                    setPreviewData(prev => ({ ...prev, category: '' }));
+                                                } else {
+                                                    setPreviewData(prev => ({ ...prev, category: e.target.value }));
+                                                }
+                                            }}
+                                        >
+                                            <option value="General">General</option>
+                                            <option value="SC">SC</option>
+                                            <option value="ST">ST</option>
+                                            <option value="OBC">OBC</option>
+                                            <option value="__custom__">Enter custom...</option>
+                                        </select>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. Gupta, Rajput, Brahmin..."
+                                                className="input flex-1"
+                                                value={previewData.category || ''}
+                                                onChange={(e) => setPreviewData(prev => ({ ...prev, category: e.target.value }))}
+                                                autoFocus
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setCustomCategory(false);
+                                                    setPreviewData(prev => ({ ...prev, category: originalData?.category || 'General' }));
+                                                }}
+                                                className="text-xs text-gray-500 hover:text-gray-700 dark:text-[#8E8E93] dark:hover:text-white underline whitespace-nowrap"
+                                            >
+                                                Use dropdown
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        {/* TC-specific: Override / Confirm Details section */}
-                        {certType === 'TC' && (
-                            <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
-                                <div className="flex items-center gap-2 mb-4 text-gray-700 dark:text-[#8E8E93] font-semibold border-b border-gray-200 dark:border-[#38383A] pb-3">
-                                    <Edit3 className="h-5 w-5" />
-                                    Override / Confirm Details
-                                </div>
-                                <p className="text-xs text-gray-500 dark:text-[#636366] mb-5">These overrides apply only to this certificate. The student's master record will not be changed.</p>
-
-                                {/* Warning if category or class was empty in DB */}
-                                {(!previewData.category || previewData.category === '-') && (
-                                    <div className="flex items-start gap-2 p-3 mb-4 bg-amber-50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-400 rounded-lg text-xs border border-amber-200 dark:border-amber-800">
-                                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                                        <span>Category was not set in the student record. Please confirm or enter the correct value below.</span>
-                                    </div>
-                                )}
-                                {(!previewData.class || previewData.class === '-') && (
-                                    <div className="flex items-start gap-2 p-3 mb-4 bg-amber-50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-400 rounded-lg text-xs border border-amber-200 dark:border-amber-800">
-                                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                                        <span>Class was not set in the student record. Please confirm or enter the correct value below.</span>
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-                                    {/* Category / Caste — hybrid dropdown + custom */}
-                                    <div>
-                                        <label className="label mb-1.5 block">Category / Caste</label>
-                                        {!customCategory ? (
-                                            <select
-                                                className="input"
-                                                value={['General', 'SC', 'ST', 'OBC'].includes(categoryOverride) ? categoryOverride : '__custom__'}
-                                                onChange={(e) => {
-                                                    if (e.target.value === '__custom__') {
-                                                        setCustomCategory(true);
-                                                        setCategoryOverride('');
-                                                    } else {
-                                                        setCategoryOverride(e.target.value);
-                                                    }
-                                                }}
-                                            >
-                                                <option value="General">General</option>
-                                                <option value="SC">SC</option>
-                                                <option value="ST">ST</option>
-                                                <option value="OBC">OBC</option>
-                                                <option value="__custom__">Enter custom...</option>
-                                            </select>
-                                        ) : (
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. Gupta, Rajput, Brahmin..."
-                                                    className="input flex-1"
-                                                    value={categoryOverride}
-                                                    onChange={(e) => setCategoryOverride(e.target.value)}
-                                                    autoFocus
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setCustomCategory(false);
-                                                        setCategoryOverride(previewData.category || 'General');
-                                                    }}
-                                                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-[#8E8E93] dark:hover:text-white underline whitespace-nowrap"
-                                                >
-                                                    Use dropdown
-                                                </button>
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">DB value: {previewData.category || '-'}</p>
-                                    </div>
-
-                                    {/* Class in which Last Studied — free text */}
-                                    <div>
-                                        <label className="label mb-1.5 block">Class in which Last Studied</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. Nursery, LKG, UKG, Class 1..."
-                                            className="input"
-                                            value={classOverride}
-                                            onChange={(e) => setClassOverride(e.target.value)}
-                                        />
-                                        <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">DB value: {previewData.class || '-'}</p>
-                                    </div>
-
-                                    {/* PEN Number — free text */}
-                                    <div>
-                                        <label className="label mb-1.5 block">PEN Number</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Enter PEN Number..."
-                                            className="input"
-                                            value={penOverride}
-                                            onChange={(e) => setPenOverride(e.target.value)}
-                                        />
-                                        <p className="text-xs text-gray-400 dark:text-[#636366] mt-1">DB value: {previewData.penNumber || '-'}</p>
-                                    </div>
-                                </div>
+                        {/* Academic Details */}
+                        <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
+                            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Academic Details</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                                <EditableField label="Admission Number" field="admissionNumber" />
+                                <EditableField label="Date of Admission" field="admissionDate" />
+                                <EditableField label={certType === 'TC' ? 'Class in which Last Studied' : 'Class'} field="class" placeholder="e.g. Nursery, LKG, Class 5" />
+                                {certType === 'BONAFIDE' && <EditableField label="Section" field="section" />}
+                                {certType === 'BONAFIDE' && <EditableField label="Academic Year" field="academicYear" />}
+                                {certType === 'TC' && <EditableField label="PEN Number" field="penNumber" />}
+                                {certType === 'TC' && <EditableField label="Subjects Studied" field="subjects" />}
+                                {certType === 'TC' && <SelectField label="Board Exam Result" field="boardResult" options={['Passed', 'Failed', 'Appeared', 'Not Appeared']} />}
+                                {certType === 'TC' && <SelectField label="Qualified for Promotion" field="promotionStatus" options={['Yes', 'No']} />}
                             </div>
-                        )}
+                        </div>
 
-                        {/* TC-specific: Leaving Reason, Remarks, Auto-deactivate */}
+                        {/* Leaving Details — TC only */}
                         {certType === 'TC' && (
                             <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
-                                <div className="grid grid-cols-1 gap-y-5">
+                                <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Leaving Details</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                                    {/* Reason for Leaving — dropdown + custom */}
                                     <div>
-                                        <label className="label mb-1.5 block">Reason for Leaving</label>
+                                        <label className="label mb-1.5 flex items-center gap-2">
+                                            Reason for Leaving
+                                            {isModified('leavingReason') && <ModifiedBadge />}
+                                        </label>
                                         <div className="space-y-2">
                                             <select
                                                 className="input"
                                                 value={['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(previewData.leavingReason) ? previewData.leavingReason : 'Other'}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
-                                                    setPreviewData({ ...previewData, leavingReason: val === 'Other' ? '' : val });
+                                                    setPreviewData(prev => ({ ...prev, leavingReason: val === 'Other' ? '' : val }));
                                                 }}
                                             >
                                                 <option value="Parent Request">Parent Request</option>
@@ -493,25 +479,44 @@ const CertificateGeneration = () => {
                                                 <option value="Other">Other (Custom)</option>
                                             </select>
                                             {!['Parent Request', 'Completed Studies', 'Transfer', 'Medical Grounds'].includes(previewData.leavingReason) && (
-                                                <input type="text" placeholder="Enter custom reason..." className="input bg-gray-50 dark:bg-[#1C1C1E]" value={previewData.leavingReason} onChange={(e) => setPreviewData({ ...previewData, leavingReason: e.target.value })} />
+                                                <input type="text" placeholder="Enter custom reason..." className="input" value={previewData.leavingReason || ''} onChange={(e) => setPreviewData(prev => ({ ...prev, leavingReason: e.target.value }))} />
                                             )}
                                         </div>
                                     </div>
-                                    <div>
-                                        <label className="label mb-1.5 block">Remarks</label>
-                                        <input type="text" className="input" value={previewData.remarks} onChange={(e) => setPreviewData({ ...previewData, remarks: e.target.value })} />
-                                    </div>
-                                    {selectedStudent?.isActive !== false && (
+                                    <SelectField label="General Conduct" field="conduct" options={['Good', 'Very Good', 'Excellent', 'Satisfactory', 'Needs Improvement']} />
+                                    <SelectField label="Fee Status" field="feeStatus" options={['Paid up to date', 'Pending', 'Partially Paid']} />
+                                    <EditableField label="Date of Application" field="applicationDate" />
+                                    <EditableField label="Date of Issue" field="issueDate" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Certificate Details — Bonafide only */}
+                        {certType === 'BONAFIDE' && (
+                            <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
+                                <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Certificate Details</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                                    <EditableField label="Purpose" field="purpose" placeholder="e.g. For school admission" />
+                                    <EditableField label="Date of Issue" field="issueDate" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Additional Information */}
+                        <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
+                            <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Additional Information</h3>
+                            <div className="grid grid-cols-1 gap-y-5">
+                                <EditableField label="Remarks" field="remarks" />
+                                {certType === 'TC' && selectedStudent?.isActive !== false && (
                                     <div>
                                         <label className="flex items-center gap-3 cursor-pointer p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-xl text-red-800 dark:text-red-400">
                                             <input type="checkbox" className="w-4 h-4 text-red-600 rounded border-red-300 focus:ring-red-500" checked={autoDeactivate} onChange={(e) => setAutoDeactivate(e.target.checked)} />
                                             <span className="font-medium text-sm">Automatically deactivate student profile upon generation</span>
                                         </label>
                                     </div>
-                                    )}
-                                </div>
+                                )}
                             </div>
-                        )}
+                        </div>
 
                         <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-400 rounded-xl text-sm border border-amber-200 dark:border-amber-800">
                             <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
