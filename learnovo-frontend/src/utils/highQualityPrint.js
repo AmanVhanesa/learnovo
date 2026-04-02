@@ -31,18 +31,27 @@ export async function highQualityPrint(element, filename = 'document', options =
   const canvas = await html2canvas(element, {
     scale,
     useCORS: true,
-    allowTaint: false,
-    backgroundColor: '#ffffff',
+    allowTaint: true,
+    backgroundColor: '#f9fafb',
     logging: false,
+    width: element.scrollWidth,
+    height: element.scrollHeight,
     windowWidth: element.scrollWidth,
     windowHeight: element.scrollHeight,
     onclone: (_clonedDoc, clonedEl) => {
+      // Ensure print colors are preserved
       clonedEl.style.webkitPrintColorAdjust = 'exact';
       clonedEl.style.printColorAdjust = 'exact';
       clonedEl.style.overflow = 'visible';
       clonedEl.style.height = 'auto';
       clonedEl.style.maxHeight = 'none';
       clonedEl.style.position = 'relative';
+      // Force all images to render
+      const images = clonedEl.querySelectorAll('img');
+      images.forEach(img => {
+        img.crossOrigin = 'anonymous';
+        img.style.imageRendering = 'high-quality';
+      });
     },
   });
 
@@ -125,5 +134,51 @@ export async function highQualityPrint(element, filename = 'document', options =
   }
 
   // 5. Cleanup
+  setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+}
+
+/**
+ * Print an existing certificate by fetching its PDF from the backend
+ * and opening it in a new browser tab with the print dialog.
+ *
+ * This bypasses html2canvas entirely — the backend Puppeteer-rendered
+ * PDF is the source of truth, so output is pixel-perfect.
+ *
+ * @param {string} certId - Certificate ID
+ * @returns {Promise<void>}
+ */
+export async function printCertificatePdf(certId) {
+  const token = localStorage.getItem('token');
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+  const response = await fetch(`${API_URL}/certificates/${certId}/download`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch certificate PDF');
+  }
+
+  const blob = await response.blob();
+  const pdfUrl = URL.createObjectURL(blob);
+  const printWindow = window.open(pdfUrl, '_blank');
+
+  if (printWindow) {
+    printWindow.addEventListener('load', () => {
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 500);
+    });
+  } else {
+    // Popup blocked — fallback to download
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = 'certificate.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
 }

@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award, Eye, X, Printer, FileDown } from 'lucide-react';
+import { FileText, Plus, Settings, Search, Download, Trash2, Edit, Award, Eye, X, Printer } from 'lucide-react';
 import certificateService from '../../services/certificateService';
 import { formatDate } from '../../utils/formatDate';
 import { reportsService } from '../../services/reportsService';
@@ -10,7 +10,7 @@ import { toast } from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import EmptyState from '../../components/EmptyState';
 import CertificatePreviewContent from './CertificatePreviewContent';
-import { highQualityPrint } from '../../utils/highQualityPrint';
+import { printCertificatePdf } from '../../utils/highQualityPrint';
 
 const CertificateManager = () => {
     const navigate = useNavigate();
@@ -20,7 +20,6 @@ const CertificateManager = () => {
     const [editForm, setEditForm] = useState({});
     const [previewCert, setPreviewCert] = useState(null);
     const [isPrintLoading, setIsPrintLoading] = useState(false);
-    const certPrintRef = useRef(null);
 
     const { data: history = [], isLoading: loading } = useQuery({
         queryKey: ['certificate-history'],
@@ -60,31 +59,6 @@ const CertificateManager = () => {
     const handleDelete = (id) => {
         if (!window.confirm('Are you sure you want to delete this certificate? This action cannot be undone.')) return;
         deleteMutation.mutate(id);
-    };
-
-    const handleDownloadWord = async (cert) => {
-        try {
-            const studentName = (cert.student?.fullName || cert.student?.name || 'certificate').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
-            const token = localStorage.getItem('token');
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-            const response = await fetch(`${API_URL}/certificates/${cert._id}/download-word`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Download failed');
-            const arrayBuffer = await response.arrayBuffer();
-            const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `${cert.type}_${studentName}.docx`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-            toast.success('Word document downloaded');
-        } catch (error) {
-            toast.error('Word download failed');
-        }
     };
 
     const openEditModal = (cert) => {
@@ -151,40 +125,15 @@ const CertificateManager = () => {
     };
 
     const handlePrint = async (cert) => {
-        // If preview modal is open, use the rendered content directly
-        if (certPrintRef.current) {
-            setIsPrintLoading(true);
-            try {
-                const filename = cert.type === 'TC' ? 'Transfer-Certificate' : 'Bonafide-Certificate';
-                await highQualityPrint(certPrintRef.current, filename, {
-                    scale: 3, format: 'a4', orientation: 'portrait', margin: 10,
-                });
-            } catch (error) {
-                console.error('Print failed:', error);
-                toast.error('Failed to prepare print. Please try again.');
-            } finally {
-                setIsPrintLoading(false);
-            }
-            return;
+        setIsPrintLoading(true);
+        try {
+            await printCertificatePdf(cert._id);
+        } catch (error) {
+            console.error('Print failed:', error);
+            toast.error('Failed to prepare print. Please try again.');
+        } finally {
+            setIsPrintLoading(false);
         }
-        // If no preview open, open the preview first then print
-        setPreviewCert(cert);
-        // Use a short delay to let the modal render, then print
-        setTimeout(async () => {
-            if (!certPrintRef.current) return;
-            setIsPrintLoading(true);
-            try {
-                const filename = cert.type === 'TC' ? 'Transfer-Certificate' : 'Bonafide-Certificate';
-                await highQualityPrint(certPrintRef.current, filename, {
-                    scale: 3, format: 'a4', orientation: 'portrait', margin: 10,
-                });
-            } catch (error) {
-                console.error('Print failed:', error);
-                toast.error('Failed to prepare print. Please try again.');
-            } finally {
-                setIsPrintLoading(false);
-            }
-        }, 500);
     };
 
     const filteredHistory = history.filter(cert => {
@@ -222,7 +171,6 @@ const CertificateManager = () => {
                                         <button onClick={() => handlePreviewCert(cert)} className="btn-icon" title="Preview"><Eye className="h-4 w-4" /></button>
                                         <button onClick={() => handlePrint(cert)} className="btn-icon" title="Print"><Printer className="h-4 w-4" /></button>
                                         <button onClick={() => handleDownload(cert)} className="btn-icon" title="Download PDF"><Download className="h-4 w-4" /></button>
-                                        <button onClick={() => handleDownloadWord(cert)} className="btn-icon" title="Download Word"><FileDown className="h-4 w-4" /></button>
                                         <button onClick={() => openEditModal(cert)} className="btn-icon" title="Edit"><Edit className="h-4 w-4" /></button>
                                         <button onClick={() => handleDelete(cert._id)} className="btn-icon hover:!text-red-500 hover:!bg-red-50 dark:hover:!bg-red-900/20" title="Delete"><Trash2 className="h-4 w-4" /></button>
                                     </div>
@@ -531,7 +479,7 @@ const CertificateManager = () => {
 
                         {/* A4 Paper area */}
                         <div className="w-full flex-1 min-h-0 overflow-y-auto bg-gray-100 dark:bg-[#2C2C2E] p-6 sm:p-10 flex justify-center">
-                            <div ref={certPrintRef}>
+                            <div>
                                 <CertificatePreviewContent
                                     type={previewCert.type}
                                     data={previewCert.contentSnapshot}
@@ -557,13 +505,6 @@ const CertificateManager = () => {
                             >
                                 <Download className="h-4 w-4" />
                                 Export as PDF
-                            </button>
-                            <button
-                                onClick={() => { setPreviewCert(null); handleDownloadWord(previewCert); }}
-                                className="btn btn-outline gap-2 w-full sm:w-auto text-sm"
-                            >
-                                <FileDown className="h-4 w-4" />
-                                Export as Word
                             </button>
                             <button
                                 onClick={() => setPreviewCert(null)}
