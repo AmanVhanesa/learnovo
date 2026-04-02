@@ -176,7 +176,7 @@ paymentSchema.index({ tenantId: 1, isConfirmed: 1 });
 // Static method to generate receipt number
 paymentSchema.statics.generateReceiptNumber = async function(tenantId) {
   const year = new Date().getFullYear();
-  const counter = await Counter.getNextSequence(`receipt_${tenantId}_${year}`);
+  const counter = await Counter.getNextSequence('receipt', String(year), tenantId);
   return `RCP-${year}-${String(counter).padStart(5, '0')}`;
 };
 

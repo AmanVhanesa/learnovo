@@ -290,7 +290,7 @@ router.post('/generate', protect, authorize('admin', 'accountant'), [
     try {
       const year = new Date().getFullYear();
       const Counter = require('../models/Counter');
-      await Counter.rollbackByName(`invoice_${req.user.tenantId}_${year}`);
+      await Counter.rollbackSequence('invoice', String(year), req.user.tenantId);
     } catch (rollbackErr) {
       console.error('Invoice counter rollback failed:', rollbackErr);
     }

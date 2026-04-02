@@ -302,7 +302,7 @@ feeInvoiceSchema.pre('save', function(next) {
 // Static method to generate invoice number
 feeInvoiceSchema.statics.generateInvoiceNumber = async function(tenantId) {
   const year = new Date().getFullYear();
-  const counter = await Counter.getNextSequence(`invoice_${tenantId}_${year}`);
+  const counter = await Counter.getNextSequence('invoice', String(year), tenantId);
   return `INV-${year}-${String(counter).padStart(5, '0')}`;
 };
 

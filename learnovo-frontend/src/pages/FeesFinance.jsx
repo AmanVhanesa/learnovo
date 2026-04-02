@@ -36,19 +36,41 @@ import AnnualAllocationsTab from '../components/fees/AnnualAllocationsTab'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
-const TABS = [
-  { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
-  { id: 'allocations', label: 'Annual Allocations', icon: Calendar },
-  { id: 'allInvoices', label: 'All Invoices', icon: List },
-  { id: 'feeStructure', label: 'Fee Structure', icon: Settings },
-  { id: 'invoices', label: 'Generate Invoices', icon: Receipt },
-  { id: 'collect', label: 'Collect Payment', icon: DollarSign },
-  { id: 'defaulters', label: 'Defaulters', icon: AlertCircle },
-  { id: 'receipts', label: 'Receipts', icon: FileText },
-  { id: 'refunds', label: 'Refunds', icon: RotateCcw },
-  { id: 'disputes', label: 'Disputes & Alerts', icon: AlertTriangle },
-  { id: 'reports', label: 'Reports', icon: History },
+const TAB_GROUPS = [
+  {
+    label: 'Daily',
+    tabs: [
+      { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
+      { id: 'collect', label: 'Collect Payment', icon: DollarSign },
+      { id: 'receipts', label: 'Receipts', icon: FileText },
+      { id: 'defaulters', label: 'Defaulters', icon: AlertCircle },
+    ],
+  },
+  {
+    label: 'Invoices',
+    tabs: [
+      { id: 'allInvoices', label: 'All Invoices', icon: List },
+      { id: 'invoices', label: 'Generate Invoices', icon: Receipt },
+    ],
+  },
+  {
+    label: 'Setup',
+    tabs: [
+      { id: 'feeStructure', label: 'Fee Structure', icon: Settings },
+      { id: 'allocations', label: 'Annual Allocations', icon: Calendar },
+    ],
+  },
+  {
+    label: 'Reports & Issues',
+    tabs: [
+      { id: 'reports', label: 'Reports', icon: History },
+      { id: 'disputes', label: 'Disputes', icon: AlertTriangle },
+      { id: 'refunds', label: 'Refunds', icon: RotateCcw },
+    ],
+  },
 ]
+
+const TABS = TAB_GROUPS.flatMap(g => g.tabs)
 
 const FeesFinance = () => {
   const { user } = useAuth()
@@ -246,25 +268,35 @@ const FeesFinance = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Fees & Finance</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Fee Collection</h1>
           <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Academic Session: {activeSession.name}</p>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — grouped by workflow */}
       <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto scrollbar-none">
-        <nav className="-mb-px flex space-x-1 sm:space-x-2 whitespace-nowrap px-1">
-          {TABS.map((tab) => {
-            const Icon = tab.icon
-            const isActive = activeTab === tab.id
-            return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`py-3 px-3 border-b-2 font-medium text-sm flex items-center gap-1.5 transition-all whitespace-nowrap rounded-t-lg ${isActive ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50/50 dark:bg-primary-900/10' : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300 dark:hover:border-[#38383A]'}`}>
-                <Icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            )
-          })}
+        <nav className="-mb-px flex whitespace-nowrap px-1">
+          {TAB_GROUPS.map((group, gIdx) => (
+            <div key={group.label} className="flex items-end">
+              {gIdx > 0 && <div className="w-px h-6 bg-gray-200 dark:bg-[#38383A] mx-1 sm:mx-2 mb-2 flex-shrink-0" />}
+              <div className="flex flex-col items-start">
+                <span className="text-[9px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wider px-2 mb-0.5 hidden sm:block">{group.label}</span>
+                <div className="flex space-x-0.5 sm:space-x-1">
+                  {group.tabs.map((tab) => {
+                    const Icon = tab.icon
+                    const isActive = activeTab === tab.id
+                    return (
+                      <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                        className={`py-3 px-2.5 sm:px-3 border-b-2 font-medium text-sm flex items-center gap-1.5 transition-all whitespace-nowrap rounded-t-lg ${isActive ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50/50 dark:bg-primary-900/10' : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300 dark:hover:border-[#38383A]'}`}>
+                        <Icon className="h-4 w-4" />
+                        <span className="hidden sm:inline">{tab.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
         </nav>
       </div>
 

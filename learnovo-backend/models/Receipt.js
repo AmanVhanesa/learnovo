@@ -80,7 +80,7 @@ const receiptSchema = new mongoose.Schema({
 // Static method to generate receipt number
 receiptSchema.statics.generateReceiptNumber = async function(tenantId) {
   const year = new Date().getFullYear();
-  const counter = await Counter.getNextSequence(`student_receipt_${tenantId}_${year}`);
+  const counter = await Counter.getNextSequence('student_receipt', String(year), tenantId);
   return `RCP-STU-${year}-${String(counter).padStart(5, '0')}`;
 };
 
