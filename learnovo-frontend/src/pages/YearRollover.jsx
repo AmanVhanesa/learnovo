@@ -15,7 +15,6 @@ export default function YearRollover() {
   const [currentYear, setCurrentYear] = useState(() => {
     const y = new Date().getFullYear()
     const m = new Date().getMonth()
-    // If before April (Indian academic year), current year started last year
     return m < 3 ? `${y - 1}-${y}` : `${y}-${y + 1}`
   })
   const [newYear, setNewYear] = useState(() => {
@@ -40,8 +39,6 @@ export default function YearRollover() {
   })
 
   const hierarchy = hierarchyData?.data || []
-
-  // Auto-detect highest class
   const terminalClass = hierarchy.find(h => h.isTerminal)?.name || hierarchy[hierarchy.length - 1]?.name || ''
 
   const previewMutation = useMutation({
@@ -117,14 +114,14 @@ export default function YearRollover() {
         <div key={className} className="border border-gray-200 dark:border-[#38383A] rounded-lg overflow-hidden">
           <button
             onClick={() => toggleClassExpand(className)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-[#2C2C2E] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] text-left"
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-[#2C2C2E] hover:bg-gray-100 dark:hover:bg-[#3A3A3C] text-left transition-colors"
           >
             <div className="flex items-center gap-3">
               <span className="font-medium text-gray-900 dark:text-white">{className}</span>
               <div className="flex gap-2 text-xs">
-                {data.promoted > 0 && <span className="px-2 py-0.5 rounded bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">{data.promoted} promoted</span>}
-                {data.detained > 0 && <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">{data.detained} detained</span>}
-                {data.graduated > 0 && <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">{data.graduated} graduated</span>}
+                {data.promoted > 0 && <span className="px-2 py-0.5 rounded-md bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300">{data.promoted} promoted</span>}
+                {data.detained > 0 && <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">{data.detained} detained</span>}
+                {data.graduated > 0 && <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">{data.graduated} graduated</span>}
               </div>
             </div>
             {expandedClasses.has(className) ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
@@ -135,14 +132,14 @@ export default function YearRollover() {
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 dark:bg-[#2C2C2E]/50">
                   <tr>
-                    <th className="px-4 py-2 text-left text-gray-500">Student</th>
-                    <th className="px-4 py-2 text-left text-gray-500">Status</th>
-                    <th className="px-4 py-2 text-left text-gray-500">Details</th>
+                    <th className="px-4 py-2 text-left text-gray-500 dark:text-[#8E8E93]">Student</th>
+                    <th className="px-4 py-2 text-left text-gray-500 dark:text-[#8E8E93]">Status</th>
+                    <th className="px-4 py-2 text-left text-gray-500 dark:text-[#8E8E93]">Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-[#38383A]">
                   {data.details.map((d, i) => (
-                    <tr key={i}>
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/50">
                       <td className="px-4 py-2 text-gray-900 dark:text-white">{d.name}</td>
                       <td className="px-4 py-2">
                         <span className={`px-1.5 py-0.5 rounded font-medium ${
@@ -152,7 +149,7 @@ export default function YearRollover() {
                           'bg-gray-100 text-gray-700 dark:bg-[#2C2C2E] dark:text-[#8E8E93]'
                         }`}>{d.status}</span>
                       </td>
-                      <td className="px-4 py-2 text-gray-500">{d.toClass ? `→ ${d.toClass}` : d.reason || ''}</td>
+                      <td className="px-4 py-2 text-gray-500 dark:text-[#8E8E93]">{d.toClass ? `→ ${d.toClass}` : d.reason || ''}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -164,41 +161,44 @@ export default function YearRollover() {
     </div>
   )
 
+  const stepLabels = ['Configure', 'Preview', 'Execute', 'Results']
+
   return (
     <div className="space-y-6">
-      {/* Sub-nav */}
       <AcademicTransitionNav />
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <CalendarClock className="w-7 h-7 text-teal-500" />
-          Year-End Rollover
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Transition the entire school to a new academic year</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <CalendarClock className="w-6 h-6 text-teal-500" />
+            Year-End Rollover
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Transition the entire school to a new academic year</p>
+        </div>
       </div>
 
       {/* Progress Steps */}
-      <div className="flex items-center gap-2">
-        {['Configure', 'Preview', 'Execute', 'Results'].map((label, i) => (
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {stepLabels.map((label, i) => (
           <div key={label} className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 transition-colors ${
               step > i + 1 ? 'bg-teal-500 text-white' :
               step === i + 1 ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 ring-2 ring-teal-500' :
-              'bg-gray-100 text-gray-400 dark:bg-[#2C2C2E]'
+              'bg-gray-100 text-gray-400 dark:bg-[#2C2C2E] dark:text-[#636366]'
             }`}>
               {step > i + 1 ? <CheckCircle2 className="w-5 h-5" /> : i + 1}
             </div>
-            <span className={`text-sm ${step === i + 1 ? 'font-medium text-gray-900 dark:text-white' : 'text-gray-400'}`}>{label}</span>
-            {i < 3 && <div className={`w-8 h-0.5 ${step > i + 1 ? 'bg-teal-500' : 'bg-gray-200 dark:bg-[#2C2C2E]'}`} />}
+            <span className={`text-sm whitespace-nowrap ${step === i + 1 ? 'font-medium text-gray-900 dark:text-white' : 'text-gray-400 dark:text-[#636366]'}`}>{label}</span>
+            {i < 3 && <div className={`w-8 h-0.5 flex-shrink-0 ${step > i + 1 ? 'bg-teal-500' : 'bg-gray-200 dark:bg-[#2C2C2E]'}`} />}
           </div>
         ))}
       </div>
 
       {/* Step 1: Configure */}
       {step === 1 && (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-6 space-y-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Rollover Configuration</h2>
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-5 sm:p-6 space-y-6">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Rollover Configuration</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -208,7 +208,7 @@ export default function YearRollover() {
                 value={currentYear}
                 onChange={e => setCurrentYear(e.target.value)}
                 placeholder="2025-2026"
-                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -218,7 +218,7 @@ export default function YearRollover() {
                 value={newYear}
                 onChange={e => setNewYear(e.target.value)}
                 placeholder="2026-2027"
-                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -226,7 +226,7 @@ export default function YearRollover() {
               <select
                 value={highestClass}
                 onChange={e => setHighestClass(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               >
                 <option value="">{terminalClass ? `Auto (${terminalClass})` : 'Select class'}</option>
                 {hierarchy.map(h => <option key={h.name} value={h.name}>{h.name}</option>)}
@@ -240,46 +240,34 @@ export default function YearRollover() {
                 onChange={e => setPromotionRules({ ...promotionRules, passThreshold: parseInt(e.target.value) || 0 })}
                 min={0}
                 max={100}
-                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
           </div>
 
           <div className="space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-[#8E8E93]">
-              <input
-                type="checkbox"
-                checked={promotionRules.autoPromotePassingStudents}
-                onChange={e => setPromotionRules({ ...promotionRules, autoPromotePassingStudents: e.target.checked })}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-              />
-              Auto-promote all passing students
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-[#8E8E93]">
-              <input
-                type="checkbox"
-                checked={promotionRules.requireFeesClear}
-                onChange={e => setPromotionRules({ ...promotionRules, requireFeesClear: e.target.checked })}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-              />
-              Require all fees cleared before promotion
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-[#8E8E93]">
-              <input
-                type="checkbox"
-                checked={promotionRules.excludeTCIssued}
-                onChange={e => setPromotionRules({ ...promotionRules, excludeTCIssued: e.target.checked })}
-                className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-              />
-              Exclude TC-issued / transferred students
-            </label>
+            {[
+              { key: 'autoPromotePassingStudents', label: 'Auto-promote all passing students' },
+              { key: 'requireFeesClear', label: 'Require all fees cleared before promotion' },
+              { key: 'excludeTCIssued', label: 'Exclude TC-issued / transferred students' }
+            ].map(rule => (
+              <label key={rule.key} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 dark:text-[#8E8E93]">
+                <input
+                  type="checkbox"
+                  checked={promotionRules[rule.key]}
+                  onChange={e => setPromotionRules({ ...promotionRules, [rule.key]: e.target.checked })}
+                  className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+                {rule.label}
+              </label>
+            ))}
           </div>
 
           <div className="flex justify-end">
             <button
               onClick={handlePreview}
               disabled={!currentYear || !newYear || previewMutation.isPending}
-              className="px-6 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
             >
               {previewMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
               Preview Rollover
@@ -291,16 +279,14 @@ export default function YearRollover() {
       {/* Step 2: Preview */}
       {step === 2 && previewData && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-6">
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-5 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Rollover Preview</h2>
-              <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">DRY RUN — No changes made</span>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">Rollover Preview</h2>
+              <span className="text-xs px-2 py-1 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-medium">DRY RUN — No changes made</span>
             </div>
-
             <p className="text-sm text-gray-600 dark:text-[#8E8E93] mb-4">
               Transitioning from <strong>{currentYear}</strong> to <strong>{newYear}</strong>
             </p>
-
             {renderSummaryCards(previewData.summary)}
             {previewData.byClass && renderByClass(previewData.byClass)}
           </div>
@@ -308,13 +294,13 @@ export default function YearRollover() {
           <div className="flex gap-3 justify-end">
             <button
               onClick={() => setStep(1)}
-              className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
             >
               Back to Configure
             </button>
             <button
               onClick={() => setStep(3)}
-              className="px-6 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 flex items-center gap-2"
+              className="px-5 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 flex items-center gap-2 transition-colors"
             >
               <Play className="w-4 h-4" />
               Proceed to Execute
@@ -325,11 +311,13 @@ export default function YearRollover() {
 
       {/* Step 3: Execute */}
       {step === 3 && (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-6">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-5 sm:p-6">
           <div className="flex items-start gap-4">
-            <AlertTriangle className="w-8 h-8 text-amber-500 flex-shrink-0" />
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+            </div>
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Execute Year-End Rollover</h2>
+              <h2 className="text-base font-semibold text-gray-900 dark:text-white">Execute Year-End Rollover</h2>
               <p className="text-sm text-gray-600 dark:text-[#8E8E93] mt-2">
                 This will permanently transition <strong>{previewData?.summary?.totalStudents || 0}</strong> students from{' '}
                 <strong>{currentYear}</strong> to <strong>{newYear}</strong>.
@@ -345,13 +333,13 @@ export default function YearRollover() {
           </div>
 
           <div className="flex gap-3 mt-6 justify-end">
-            <button onClick={() => setStep(2)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
+            <button onClick={() => setStep(2)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
               Back to Preview
             </button>
             <button
               onClick={handleExecute}
               disabled={executeMutation.isPending}
-              className="px-6 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
             >
               {executeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
               {executeMutation.isPending ? 'Processing...' : 'Execute Rollover'}
@@ -364,15 +352,15 @@ export default function YearRollover() {
       {step === 4 && finalResults && (
         <div className="space-y-4">
           <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl p-4 flex items-center gap-3">
-            <CheckCircle2 className="w-6 h-6 text-teal-500" />
+            <CheckCircle2 className="w-6 h-6 text-teal-500 flex-shrink-0" />
             <div>
               <p className="font-medium text-teal-800 dark:text-teal-300">Year-end rollover completed successfully</p>
               <p className="text-sm text-teal-600 dark:text-teal-400">{currentYear} → {newYear}</p>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Final Results</h2>
+          <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-5 sm:p-6">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">Final Results</h2>
             {renderSummaryCards(finalResults.summary)}
             {finalResults.byClass && renderByClass(finalResults.byClass)}
           </div>
@@ -380,7 +368,7 @@ export default function YearRollover() {
           <div className="flex justify-end">
             <button
               onClick={() => { setStep(1); setPreviewData(null); setFinalResults(null) }}
-              className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
             >
               Done
             </button>

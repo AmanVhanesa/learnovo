@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { TrendingUp, ArrowRightLeft, CalendarClock, History } from 'lucide-react'
+import { TrendingUp, ArrowRightLeft, CalendarClock, History, Users } from 'lucide-react'
 
 const links = [
   { to: '/app/academic/promotion', label: 'Promotion', icon: TrendingUp },
@@ -10,13 +10,13 @@ const links = [
 
 export default function AcademicTransitionNav() {
   return (
-    <nav className="flex gap-1 p-1 bg-gray-100 dark:bg-[#2C2C2E] rounded-xl w-fit">
+    <nav className="flex gap-1 p-1 bg-gray-100 dark:bg-[#2C2C2E] rounded-xl w-fit overflow-x-auto">
       {links.map(link => (
         <NavLink
           key={link.to}
           to={link.to}
           className={({ isActive }) =>
-            `flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+            `flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
               isActive
                 ? 'bg-white dark:bg-[#3A3A3C] text-teal-600 dark:text-teal-400 shadow-sm'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import {
-  History, Search, RotateCcw, Loader2, ChevronLeft, ChevronRight,
-  Filter, X
+  History, RotateCcw, Loader2, ChevronLeft, ChevronRight,
+  Filter, X, Download
 } from 'lucide-react'
 import { transitionsService } from '../services/transitionsService'
 import AcademicTransitionNav from '../components/AcademicTransitionNav'
@@ -72,14 +72,13 @@ export default function TransitionHistory() {
 
   return (
     <div className="space-y-6">
-      {/* Sub-nav */}
       <AcademicTransitionNav />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <History className="w-7 h-7 text-teal-500" />
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <History className="w-6 h-6 text-teal-500" />
             Transition History
           </h1>
           <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">View and manage all student transitions</p>
@@ -100,7 +99,7 @@ export default function TransitionHistory() {
 
       {/* Filters */}
       {showFilters && (
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-xl shadow-sm border border-gray-200 dark:border-[#38383A] p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Filters</h3>
             {hasActiveFilters && (
@@ -115,7 +114,7 @@ export default function TransitionHistory() {
               <select
                 value={filters.type}
                 onChange={e => handleFilterChange('type', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               >
                 <option value="">All types</option>
                 {Object.entries(TYPE_LABELS).map(([key, val]) => (
@@ -129,7 +128,7 @@ export default function TransitionHistory() {
                 type="date"
                 value={filters.fromDate}
                 onChange={e => handleFilterChange('fromDate', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -138,7 +137,7 @@ export default function TransitionHistory() {
                 type="date"
                 value={filters.toDate}
                 onChange={e => handleFilterChange('toDate', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -146,12 +145,27 @@ export default function TransitionHistory() {
               <select
                 value={filters.limit}
                 onChange={e => handleFilterChange('limit', parseInt(e.target.value))}
-                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
               >
                 {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Summary Stats */}
+      {!isLoading && pagination.total > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {Object.entries(TYPE_LABELS).slice(0, 4).map(([key, val]) => {
+            const count = logs.filter(l => l.type === key).length
+            return (
+              <div key={key} className={`p-3 rounded-xl bg-${val.color}-50 dark:bg-${val.color}-900/20 border border-${val.color}-200 dark:border-${val.color}-800`}>
+                <p className={`text-lg font-bold text-${val.color}-600 dark:text-${val.color}-400`}>{count}</p>
+                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{val.label}s (this page)</p>
+              </div>
+            )
+          })}
         </div>
       )}
 
@@ -166,6 +180,9 @@ export default function TransitionHistory() {
           <div className="py-16 text-center">
             <History className="w-10 h-10 text-gray-300 dark:text-[#636366] mx-auto mb-3" />
             <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No transition records found</p>
+            {hasActiveFilters && (
+              <button onClick={clearFilters} className="mt-2 text-xs text-teal-600 hover:underline">Clear filters</button>
+            )}
           </div>
         ) : (
           <>
@@ -193,10 +210,10 @@ export default function TransitionHistory() {
                     const performerName = log.performedBy?.name || log.performedBy?.email || '-'
 
                     return (
-                      <tr key={log._id} className={`hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/50 ${log.reversedAt ? 'opacity-50 line-through decoration-red-400' : ''}`}>
+                      <tr key={log._id} className={`hover:bg-gray-50 dark:hover:bg-[#2C2C2E]/50 transition-colors ${log.reversedAt ? 'opacity-50' : ''}`}>
                         <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-[#8E8E93] whitespace-nowrap">{formatDate(log.createdAt)}</td>
                         <td className="px-4 py-2.5">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium bg-${typeInfo.color}-100 text-${typeInfo.color}-700 dark:bg-${typeInfo.color}-900/30 dark:text-${typeInfo.color}-300`}>
+                          <span className={`px-2 py-0.5 rounded-md text-xs font-medium bg-${typeInfo.color}-100 text-${typeInfo.color}-700 dark:bg-${typeInfo.color}-900/30 dark:text-${typeInfo.color}-300`}>
                             {typeInfo.label}
                           </span>
                         </td>
@@ -217,14 +234,14 @@ export default function TransitionHistory() {
                             <button
                               onClick={() => undoMutation.mutate(log._id)}
                               disabled={undoMutation.isPending}
-                              className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                               title="Undo this transition"
                             >
                               <RotateCcw className="w-4 h-4" />
                             </button>
                           )}
                           {log.reversedAt && (
-                            <span className="text-xs text-red-500">Reversed</span>
+                            <span className="text-xs text-red-500 font-medium">Reversed</span>
                           )}
                         </td>
                       </tr>
@@ -237,13 +254,13 @@ export default function TransitionHistory() {
             {/* Pagination */}
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E]/50">
               <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
-                Showing {(pagination.page - 1) * pagination.limit + 1}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+                Showing {Math.min((pagination.page - 1) * pagination.limit + 1, pagination.total)}–{Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
               </p>
-              <div className="flex gap-1">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
                   disabled={pagination.page <= 1}
-                  className="p-1.5 rounded border border-gray-300 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#3A3A3C] disabled:opacity-50"
+                  className="p-1.5 rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#3A3A3C] disabled:opacity-50 transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -253,7 +270,7 @@ export default function TransitionHistory() {
                 <button
                   onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
                   disabled={pagination.page >= pagination.pages}
-                  className="p-1.5 rounded border border-gray-300 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#3A3A3C] disabled:opacity-50"
+                  className="p-1.5 rounded-lg border border-gray-300 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-100 dark:hover:bg-[#3A3A3C] disabled:opacity-50 transition-colors"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
