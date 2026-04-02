@@ -1,4 +1,5 @@
 import React from 'react';
+import { CERT_COLORS as C } from '../../utils/certificateColors';
 
 /**
  * Shared certificate preview component that matches the backend minimal PDF template.
@@ -48,7 +49,7 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
     ];
 
     const hl = (text) => (
-        <span style={{ fontWeight: 700, color: '#111827', borderBottom: '1.5px solid rgba(62,196,177,0.35)' }}>{text}</span>
+        <span style={{ fontWeight: 700, color: C.valueTextBold, borderBottom: `1.5px solid ${C.highlightUnderline}` }}>{text}</span>
     );
 
     return (
@@ -59,9 +60,11 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
             position: 'relative',
             background: '#f9fafb',
             fontFamily: "'Helvetica Neue', Arial, 'Noto Sans', sans-serif",
-            color: '#111827',
+            color: C.labelText,
             fontSize: 13,
             WebkitFontSmoothing: 'antialiased',
+            WebkitPrintColorAdjust: 'exact',
+            printColorAdjust: 'exact',
         }}>
             {/* White card */}
             <div style={{
@@ -74,12 +77,12 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                 position: 'relative',
                 minHeight: 822,
             }}>
-                {/* Decorative background shapes — matches backend tc-minimal.html proportionally */}
+                {/* Decorative background shapes */}
                 <div style={{ position: 'absolute', top: 0, right: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0, overflow: 'hidden', borderRadius: 14 }}>
-                    <div style={{ position: 'absolute', top: -45, right: -30, width: 240, height: 240, background: 'rgba(62,196,177,0.06)', borderRadius: '50%' }} />
-                    <div style={{ position: 'absolute', top: 60, right: -60, width: 180, height: 340, background: 'rgba(62,196,177,0.04)', transform: 'rotate(-25deg)', borderRadius: 60 }} />
-                    <div style={{ position: 'absolute', bottom: -38, left: -45, width: 195, height: 195, background: 'rgba(62,196,177,0.05)', borderRadius: '50%' }} />
-                    <div style={{ position: 'absolute', bottom: 90, left: 30, width: 120, height: 225, background: 'rgba(62,196,177,0.03)', transform: 'rotate(20deg)', borderRadius: 45 }} />
+                    <div style={{ position: 'absolute', top: -45, right: -30, width: 240, height: 240, background: C.decoCircle1, borderRadius: '50%' }} />
+                    <div style={{ position: 'absolute', top: 60, right: -60, width: 180, height: 340, background: C.decoCircle4, transform: 'rotate(-25deg)', borderRadius: 60 }} />
+                    <div style={{ position: 'absolute', bottom: -38, left: -45, width: 195, height: 195, background: C.decoCircle3, borderRadius: '50%' }} />
+                    <div style={{ position: 'absolute', bottom: 90, left: 30, width: 120, height: 225, background: C.decoCircle2, transform: 'rotate(20deg)', borderRadius: 45 }} />
                 </div>
 
                 {/* Watermark */}
@@ -89,7 +92,7 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                     fontFamily: "'Georgia', 'Times New Roman', serif",
                     fontSize: type === 'TC' ? 44 : 54,
                     fontWeight: 700,
-                    color: showPreviewWatermark ? 'rgba(62,196,177,0.08)' : 'rgba(62,196,177,0.04)',
+                    color: showPreviewWatermark ? C.watermarkPreview : C.watermarkColor,
                     letterSpacing: type === 'TC' ? 10 : 14,
                     whiteSpace: 'nowrap', zIndex: 0, pointerEvents: 'none',
                     textTransform: 'uppercase',
@@ -100,31 +103,32 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                 {/* All content above deco shapes */}
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
 
-                    {/* Header — matches backend tc-minimal.html with logo */}
+                    {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', padding: '14px 20px 10px', flexShrink: 0, gap: 14 }}>
                         {/* School Logo */}
                         {d.schoolLogo && (
                             <div style={{
-                                width: 82, height: 82, minWidth: 82,
+                                width: 96, height: 96, minWidth: 96,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 borderRadius: 6, overflow: 'hidden', flexShrink: 0,
+                                marginLeft: 6,
                             }}>
-                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 82, height: 82, objectFit: 'contain' }} />
+                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 96, height: 96, objectFit: 'contain' }} />
                             </div>
                         )}
                         <div style={{ flex: 1, textAlign: 'center' }}>
                             <div style={{
                                 fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
-                                fontSize: 19, fontWeight: 800, color: '#1F6F6D',
+                                fontSize: 19, fontWeight: 800, color: C.schoolNameText,
                                 letterSpacing: 1.5, lineHeight: 1.15, textTransform: 'uppercase',
                             }}>
                                 {d.schoolName || 'School Name'}
                             </div>
-                            <div style={{ fontSize: 9, color: '#4b5563', fontWeight: 500, marginTop: 3 }}>
+                            <div style={{ fontSize: 9, color: C.secondaryText, fontWeight: 500, marginTop: 3 }}>
                                 {d.schoolAddress}
                             </div>
                             {(d.schoolPhone || d.schoolEmail) && (
-                                <div style={{ fontSize: 9, color: '#4b5563', fontWeight: 500, marginTop: 2 }}>
+                                <div style={{ fontSize: 9, color: C.secondaryText, fontWeight: 500, marginTop: 2 }}>
                                     {d.schoolPhone && `Phone: ${d.schoolPhone}`}
                                     {d.schoolPhone && d.schoolEmail && ' | '}
                                     {d.schoolEmail && `Email: ${d.schoolEmail}`}
@@ -133,18 +137,18 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                             {(d.affiliationNumber || d.schoolCode || d.udiseCode) && (
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: 15, marginTop: 4, flexWrap: 'wrap' }}>
                                     {d.affiliationNumber && (
-                                        <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
-                                            Affiliation No: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.affiliationNumber}</strong>
+                                        <span style={{ fontSize: 8, color: C.secondaryText, fontWeight: 500, lineHeight: 1.7 }}>
+                                            Affiliation No: <strong style={{ fontWeight: 700, color: C.valueTextBold }}>{d.affiliationNumber}</strong>
                                         </span>
                                     )}
                                     {d.schoolCode && (
-                                        <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
-                                            School Code: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.schoolCode}</strong>
+                                        <span style={{ fontSize: 8, color: C.secondaryText, fontWeight: 500, lineHeight: 1.7 }}>
+                                            School Code: <strong style={{ fontWeight: 700, color: C.valueTextBold }}>{d.schoolCode}</strong>
                                         </span>
                                     )}
                                     {d.udiseCode && (
-                                        <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
-                                            UDISE: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.udiseCode}</strong>
+                                        <span style={{ fontSize: 8, color: C.secondaryText, fontWeight: 500, lineHeight: 1.7 }}>
+                                            UDISE: <strong style={{ fontWeight: 700, color: C.valueTextBold }}>{d.udiseCode}</strong>
                                         </span>
                                     )}
                                 </div>
@@ -152,22 +156,22 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                         </div>
                     </div>
 
-                    {/* Title badge */}
+                    {/* Title badge — dark solid background */}
                     <div style={{ padding: '14px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                         <div style={{
-                            background: '#edf9f7', borderRadius: 10, padding: '8px 22px 10px',
+                            background: C.titleBadgeBg, borderRadius: 10, padding: '10px 24px 12px',
                             display: 'inline-flex', flexDirection: 'column', alignItems: 'center',
                         }}>
                             <div style={{
                                 fontFamily: "'Helvetica Neue', Arial, sans-serif",
-                                fontSize: 13, fontWeight: 700, color: '#0a5c56',
+                                fontSize: 13, fontWeight: 700, color: C.titleBadgeText,
                                 letterSpacing: 3.5, textTransform: 'uppercase', lineHeight: 1,
                             }}>
                                 {type === 'TC' ? 'School Leaving Certificate' : 'Bonafide Certificate'}
                             </div>
                             <div style={{
                                 width: 45, height: 2, marginTop: 6,
-                                background: 'linear-gradient(90deg, transparent, #3EC4B1, transparent)',
+                                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
                                 borderRadius: 2,
                             }} />
                         </div>
@@ -176,15 +180,15 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                     {/* Meta row */}
                     <div style={{
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        padding: '8px 20px', background: '#f9fafb',
-                        borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb',
+                        padding: '8px 20px', background: C.metaBg,
+                        borderTop: `1px solid ${C.metaBorder}`, borderBottom: `1px solid ${C.metaBorder}`,
                         flexShrink: 0,
                     }}>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: '#111827' }}>
-                            <span style={{ color: '#3EC4B1' }}>#</span> {certificateNumber || 'To be assigned'}
+                        <div style={{ fontSize: 10, fontWeight: 700, color: C.labelText }}>
+                            <span style={{ color: C.accentColor }}>#</span> {certificateNumber || 'To be assigned'}
                         </div>
-                        <div style={{ fontSize: 10, color: '#374151', fontWeight: 500 }}>
-                            {type === 'TC' ? 'Admission No' : 'Date of Issue'}: <strong style={{ fontWeight: 700, color: '#111827' }}>
+                        <div style={{ fontSize: 10, color: C.valueText, fontWeight: 500 }}>
+                            {type === 'TC' ? 'Admission No' : 'Date of Issue'}: <strong style={{ fontWeight: 700, color: C.labelText }}>
                                 {type === 'TC' ? (d.admissionNumber || '-') : (d.issueDate || '-')}
                             </strong>
                         </div>
@@ -194,36 +198,36 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                     {type === 'TC' && (
                         <>
                             {/* Table */}
-                            <div style={{ margin: '6px 14px 0', borderRadius: 6, overflow: 'hidden', border: '1px solid #e5e7eb', flexShrink: 0 }}>
+                            <div style={{ margin: '6px 14px 0', borderRadius: 6, overflow: 'hidden', border: `1px solid ${C.tableBorder}`, flexShrink: 0 }}>
                                 <table style={{
                                     width: '100%', borderCollapse: 'separate', borderSpacing: 0,
                                     fontSize: 10,
                                 }}>
                                     <tbody>
                                         {tcRows.map(([label, value, bold], i) => (
-                                            <tr key={i} style={{ background: i % 2 === 0 ? '#f0fdfa' : '#ffffff' }}>
+                                            <tr key={i} style={{ background: i % 2 === 0 ? C.tableRowAlt : C.tableRowWhite }}>
                                                 <td style={{
                                                     width: 22, padding: '4px 8px',
-                                                    borderBottom: i < tcRows.length - 1 ? '1px solid #e5e7eb' : 'none',
-                                                    borderRight: '1px solid #e5e7eb',
-                                                    fontWeight: 600, color: '#4b5563', textAlign: 'center', fontSize: 9,
+                                                    borderBottom: i < tcRows.length - 1 ? `1px solid ${C.tableBorder}` : 'none',
+                                                    borderRight: `1px solid ${C.tableBorder}`,
+                                                    fontWeight: 600, color: C.tableNumberCol, textAlign: 'center', fontSize: 9,
                                                     verticalAlign: 'middle', lineHeight: 1.3,
                                                 }}>
                                                     {String(i + 1).padStart(2, '0')}
                                                 </td>
                                                 <td style={{
                                                     width: '42%', padding: '4px 10px',
-                                                    borderBottom: i < tcRows.length - 1 ? '1px solid #e5e7eb' : 'none',
-                                                    borderRight: '1px solid #e5e7eb',
-                                                    fontWeight: 600, color: '#1f2937', fontSize: 10,
+                                                    borderBottom: i < tcRows.length - 1 ? `1px solid ${C.tableBorder}` : 'none',
+                                                    borderRight: `1px solid ${C.tableBorder}`,
+                                                    fontWeight: 600, color: C.tableLabelText, fontSize: 10,
                                                     verticalAlign: 'middle', lineHeight: 1.3,
                                                 }}>
                                                     {label}
                                                 </td>
                                                 <td style={{
                                                     padding: '4px 10px',
-                                                    borderBottom: i < tcRows.length - 1 ? '1px solid #e5e7eb' : 'none',
-                                                    color: bold ? '#111827' : '#374151',
+                                                    borderBottom: i < tcRows.length - 1 ? `1px solid ${C.tableBorder}` : 'none',
+                                                    color: bold ? C.valueTextBold : C.valueText,
                                                     fontWeight: bold ? 700 : 500,
                                                     fontSize: 10,
                                                     verticalAlign: 'middle', lineHeight: 1.3,
@@ -240,13 +244,13 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                             {/* Note box */}
                             <div style={{ margin: '5px 14px 0', flexShrink: 0 }}>
                                 <div style={{
-                                    background: '#f9fafb', border: '1px solid #e5e7eb',
+                                    background: C.noteBg, border: `1px solid ${C.noteBorder}`,
                                     borderRadius: 5, padding: '5px 10px',
                                 }}>
-                                    <div style={{ fontSize: 8, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                    <div style={{ fontSize: 8, fontWeight: 700, color: C.noteTitle, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                         Important Note
                                     </div>
-                                    <p style={{ fontSize: 8, fontWeight: 500, color: '#4b5563', lineHeight: 1.5, marginTop: 1 }}>
+                                    <p style={{ fontSize: 8, fontWeight: 500, color: C.noteText, lineHeight: 1.5, marginTop: 1 }}>
                                         This certificate is issued based on school records. No alteration shall be made on this certificate. Erasing or overwriting renders it invalid.
                                     </p>
                                 </div>
@@ -254,10 +258,10 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
 
                             {/* Certification text */}
                             <div style={{ padding: '6px 20px 0', flexShrink: 0 }}>
-                                <p style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, fontStyle: 'italic', lineHeight: 1.45, maxWidth: '100%' }}>
+                                <p style={{ fontSize: 8, color: C.certText, fontWeight: 500, fontStyle: 'italic', lineHeight: 1.45, maxWidth: '100%' }}>
                                     Certified that the above information is in accordance with school records. This certificate does not entitle the holder to any benefits unless countersigned by competent authority.
                                 </p>
-                                <div style={{ fontSize: 9, color: '#111827', fontWeight: 600, marginTop: 3 }}>
+                                <div style={{ fontSize: 9, color: C.valueTextBold, fontWeight: 600, marginTop: 3 }}>
                                     Place: {d.place || d.schoolAddress?.split(',').pop()?.trim() || '-'}
                                 </div>
                             </div>
@@ -271,20 +275,20 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                                 {/* To Whom It May Concern */}
                                 <div style={{
                                     fontFamily: "'Georgia', 'Times New Roman', serif",
-                                    fontSize: 12, fontWeight: 600, color: '#0a5c56',
+                                    fontSize: 12, fontWeight: 600, color: C.bonafideSubheading,
                                     textAlign: 'center', letterSpacing: 2,
                                     textTransform: 'uppercase', marginBottom: 14, position: 'relative',
                                 }}>
                                     To Whom It May Concern
                                     <div style={{
                                         width: 40, height: 2, margin: '6px auto 0',
-                                        background: 'linear-gradient(90deg, transparent, #3EC4B1, transparent)',
+                                        background: C.accentGradient,
                                         borderRadius: 2,
                                     }} />
                                 </div>
 
                                 {/* Declaration paragraph */}
-                                <p style={{ fontSize: 11, lineHeight: 2, color: '#374151', fontWeight: 500, textAlign: 'justify' }}>
+                                <p style={{ fontSize: 11, lineHeight: 2, color: C.valueText, fontWeight: 500, textAlign: 'justify' }}>
                                     This is to certify that {hl(d.studentName)},
                                     Son/Daughter of Shri {hl(d.fatherName)}
                                     {' '}and Smt. {hl(d.motherName)},
@@ -298,12 +302,12 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                                 <div style={{
                                     display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 22px',
                                     marginTop: 16, padding: '14px 18px',
-                                    background: '#f0fdfa', borderRadius: 8, border: '1px solid #e5e7eb',
+                                    background: C.bonafideDetailBg, borderRadius: 8, border: `1px solid ${C.bonafideDetailBorder}`,
                                 }}>
                                     {bonafideDetails.map(([label, value], i) => (
                                         <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                            <span style={{ fontSize: 7, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.8 }}>{label}</span>
-                                            <span style={{ fontSize: 10, fontWeight: 700, color: '#111827' }}>{value || '-'}</span>
+                                            <span style={{ fontSize: 7, fontWeight: 600, color: C.bonafideDetailLabel, textTransform: 'uppercase', letterSpacing: 0.8 }}>{label}</span>
+                                            <span style={{ fontSize: 10, fontWeight: 700, color: C.valueTextBold }}>{value || '-'}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -311,16 +315,16 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
 
                             {/* Purpose */}
                             <div style={{ padding: '12px 22px 0', flexShrink: 0 }}>
-                                <p style={{ fontSize: 10, color: '#4b5563', fontWeight: 500, lineHeight: 1.8, textAlign: 'justify' }}>
+                                <p style={{ fontSize: 10, color: C.secondaryText, fontWeight: 500, lineHeight: 1.8, textAlign: 'justify' }}>
                                     This certificate is issued on the request of the student/parent for the purpose of{' '}
-                                    <span style={{ fontWeight: 700, color: '#111827' }}>{d.purpose || '-'}</span>.
+                                    <span style={{ fontWeight: 700, color: C.valueTextBold }}>{d.purpose || '-'}</span>.
                                     No fees are due from the student at the time of issue of this certificate.
                                 </p>
                             </div>
 
                             {/* Certification */}
                             <div style={{ padding: '10px 22px 0', flexShrink: 0 }}>
-                                <div style={{ fontSize: 9, color: '#111827', fontWeight: 600 }}>
+                                <div style={{ fontSize: 9, color: C.valueTextBold, fontWeight: 600 }}>
                                     Place: {d.place || d.schoolAddress?.split(',').pop()?.trim() || '-'}
                                 </div>
                             </div>
@@ -330,19 +334,19 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                     {/* Spacer */}
                     <div style={{ flex: 1, minHeight: 6 }} />
 
-                    {/* Signatures — matches backend tc-minimal.html */}
+                    {/* Signatures */}
                     <div style={{ padding: '0 20px 10px', flexShrink: 0 }}>
                         <div style={{
                             display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end',
                             marginTop: 6, height: 75,
                         }}>
                             <div style={{ textAlign: 'center', width: 130, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
-                                <div style={{ width: 85, height: 1, background: '#9ca3af', marginBottom: 3 }} />
-                                <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.8 }}>Class Teacher</div>
+                                <div style={{ width: 85, height: 1.5, background: C.signatureLine, marginBottom: 3 }} />
+                                <div style={{ fontSize: 9, fontWeight: 700, color: C.sigLabelText, textTransform: 'uppercase', letterSpacing: 0.8 }}>Class Teacher</div>
                             </div>
                             <div style={{ textAlign: 'center', width: 85, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 <div style={{
-                                    width: 82, height: 82, border: '2px dashed #d1d5db',
+                                    width: 82, height: 82, border: `2px dashed ${C.borderLight}`,
                                     borderRadius: '50%',
                                 }} />
                             </div>
@@ -350,22 +354,22 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                                 {d.principalSignature && (
                                     <img src={d.principalSignature} alt="Principal Signature" style={{ maxHeight: 80, maxWidth: 160, objectFit: 'contain', marginBottom: 3 }} />
                                 )}
-                                <div style={{ width: 85, height: 1, background: '#9ca3af', marginBottom: 3 }} />
-                                <div style={{ fontSize: 9, fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.8 }}>Principal</div>
+                                <div style={{ width: 85, height: 1.5, background: C.signatureLine, marginBottom: 3 }} />
+                                <div style={{ fontSize: 9, fontWeight: 700, color: C.sigLabelText, textTransform: 'uppercase', letterSpacing: 0.8 }}>Principal</div>
                             </div>
                         </div>
                     </div>
 
                     {/* Footer */}
                     <div style={{
-                        padding: '6px 20px', borderTop: '1px solid #e5e7eb',
+                        padding: '6px 20px', borderTop: `1px solid ${C.footerBorder}`,
                         textAlign: 'center', flexShrink: 0,
                     }}>
                         <span style={{
-                            fontSize: 7, color: '#4b5563', fontWeight: 500,
+                            fontSize: 7, color: C.footerText, fontWeight: 500,
                             textTransform: 'uppercase', letterSpacing: 1.5,
                         }}>
-                            Powered by <span style={{ fontWeight: 600, color: '#0f766e' }}>Learnovo</span> — School Management System
+                            Powered by <span style={{ fontWeight: 600, color: C.footerAccent }}>Learnovo</span> — School Management System
                         </span>
                     </div>
                 </div>
