@@ -458,7 +458,7 @@ router.post('/upload-signature', protect, authorize('admin'), upload.single('sig
       subPath: 'signatures',
       transformation: {
         width: 900,
-        height: 300,
+        height: 500,
         crop: 'fit',
         quality: 'auto:best'
       }
