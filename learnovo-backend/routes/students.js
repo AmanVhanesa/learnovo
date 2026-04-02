@@ -24,6 +24,67 @@ const AcademicSession = require('../models/AcademicSession');
 
 const router = express.Router();
 
+// @desc    Search guardian info from existing students (for sibling quick-fill)
+// @route   GET /api/students/guardian-search
+// @access  Private (Admin)
+router.get('/guardian-search', protect, authorize('admin'), [
+  query('q').trim().notEmpty().withMessage('Search query is required'),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const searchTerm = req.query.q.trim();
+
+    if (searchTerm.length < 2) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const regex = new RegExp(searchTerm, 'i');
+
+    // Search students whose guardians match or whose address matches
+    const students = await User.find({
+      tenantId,
+      role: 'student',
+      isActive: true,
+      $or: [
+        { 'guardians.name': regex },
+        { 'guardians.phone': regex },
+        { name: regex },
+        { fullName: regex }
+      ]
+    })
+      .select('name fullName guardians address admissionNumber class section')
+      .sort({ name: 1 })
+      .limit(10)
+      .lean();
+
+    // Deduplicate by primary guardian phone to avoid showing same family multiple times
+    const seen = new Set();
+    const results = [];
+    for (const s of students) {
+      const primaryGuardian = s.guardians?.find(g => g.isPrimary) || s.guardians?.[0];
+      const key = primaryGuardian?.phone || s._id.toString();
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push({
+          studentId: s._id,
+          studentName: s.fullName || s.name,
+          admissionNumber: s.admissionNumber,
+          class: s.class,
+          section: s.section,
+          guardians: s.guardians || [],
+          address: s.address || ''
+        });
+      }
+    }
+
+    res.json({ success: true, data: results });
+  } catch (error) {
+    logger.error('GET /students/guardian-search error', error, { requestId: req.requestId });
+    res.status(500).json({ success: false, message: 'Failed to search guardians', requestId: req.requestId });
+  }
+});
+
 // @desc    Get all students
 // @route   GET /api/students
 // @access  Private (Admin, Teacher)

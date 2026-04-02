@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2, Loader2 } from 'lucide-react'
+import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2, Loader2, Search, UserCheck } from 'lucide-react'
 import api from '../../services/authService'
 import transportService from '../../services/transportService'
 import { SERVER_URL } from '../../constants/config'
@@ -201,6 +201,69 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     }
 
     const [formErrors, setFormErrors] = useState({})
+
+    // Guardian quick-fill from sibling search
+    const [guardianSearch, setGuardianSearch] = useState('')
+    const [guardianResults, setGuardianResults] = useState([])
+    const [guardianSearching, setGuardianSearching] = useState(false)
+    const [showGuardianDropdown, setShowGuardianDropdown] = useState(false)
+    const guardianSearchRef = useRef(null)
+    const guardianDropdownRef = useRef(null)
+    const searchTimeoutRef = useRef(null)
+
+    const searchGuardians = useCallback(async (query) => {
+        if (!query || query.length < 2) {
+            setGuardianResults([])
+            setShowGuardianDropdown(false)
+            return
+        }
+        try {
+            setGuardianSearching(true)
+            const response = await api.get(`/students/guardian-search?q=${encodeURIComponent(query)}`)
+            if (response.data.success) {
+                setGuardianResults(response.data.data)
+                setShowGuardianDropdown(response.data.data.length > 0)
+            }
+        } catch {
+            setGuardianResults([])
+        } finally {
+            setGuardianSearching(false)
+        }
+    }, [])
+
+    const handleGuardianSearchChange = (e) => {
+        const value = e.target.value
+        setGuardianSearch(value)
+        if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+        searchTimeoutRef.current = setTimeout(() => searchGuardians(value), 300)
+    }
+
+    const applyGuardianFromSibling = (result) => {
+        setForm(prev => ({
+            ...prev,
+            guardians: result.guardians.length > 0
+                ? result.guardians.map(g => ({ ...g }))
+                : prev.guardians,
+            address: result.address || prev.address
+        }))
+        setGuardianSearch('')
+        setShowGuardianDropdown(false)
+        setGuardianResults([])
+    }
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (
+                guardianDropdownRef.current && !guardianDropdownRef.current.contains(e.target) &&
+                guardianSearchRef.current && !guardianSearchRef.current.contains(e.target)
+            ) {
+                setShowGuardianDropdown(false)
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
 
     const validateForm = () => {
         const errors = {}
@@ -852,6 +915,69 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                         {/* Section 3: Guardian Info */}
                         {activeSection === 3 && (
                             <div className="space-y-6">
+                                {/* Quick Fill from Existing Sibling */}
+                                {!student && (
+                                    <div className="relative">
+                                        <label className="label flex items-center gap-1.5 mb-1">
+                                            <UserCheck className="h-3.5 w-3.5" />
+                                            Quick Fill from Sibling
+                                        </label>
+                                        <div className="relative" ref={guardianSearchRef}>
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <input
+                                                className="input pl-9"
+                                                placeholder="Search by student name, guardian name, or phone..."
+                                                value={guardianSearch}
+                                                onChange={handleGuardianSearchChange}
+                                                onFocus={() => guardianResults.length > 0 && setShowGuardianDropdown(true)}
+                                            />
+                                            {guardianSearching && (
+                                                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                                            )}
+                                        </div>
+                                        {showGuardianDropdown && (
+                                            <div
+                                                ref={guardianDropdownRef}
+                                                className="absolute z-50 w-full mt-1 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                                            >
+                                                {guardianResults.map((result) => {
+                                                    const primary = result.guardians.find(g => g.isPrimary) || result.guardians[0]
+                                                    return (
+                                                        <button
+                                                            key={result.studentId}
+                                                            type="button"
+                                                            onClick={() => applyGuardianFromSibling(result)}
+                                                            className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A] last:border-0 transition-colors"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                                                    {result.studentName}
+                                                                </span>
+                                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                    {result.class} {result.section && `- ${result.section}`}
+                                                                </span>
+                                                            </div>
+                                                            {primary && (
+                                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                                    {primary.relation}: {primary.name} {primary.phone && `• ${primary.phone}`}
+                                                                </div>
+                                                            )}
+                                                            {result.address && (
+                                                                <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                                                                    {result.address}
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                            Type a sibling's name or guardian's name/phone to auto-fill guardian details & address
+                                        </p>
+                                    </div>
+                                )}
+
                                 {form.guardians.map((guardian, index) => (
                                     <div key={index} className="border border-gray-200 dark:border-[#38383A] rounded-lg p-4">
                                         <div className="flex items-center justify-between mb-4">
