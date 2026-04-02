@@ -580,7 +580,7 @@ function buildHeaderParagraphs(data, logoBuffer) {
     children.push(new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 60 },
-      children: [new ImageRun({ data: logoBuffer, transformation: { width: 80, height: 80 } })]
+      children: [new ImageRun({ data: logoBuffer, transformation: { width: 130, height: 130 } })]
     }));
   }
 
