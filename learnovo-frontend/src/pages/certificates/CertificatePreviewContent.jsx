@@ -110,7 +110,7 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                         {/* School Logo — matches backend .logo-wrap */}
                         {d.schoolLogo && (
                             <div style={{
-                                position: 'absolute', left: 26, top: 10,
+                                position: 'absolute', left: 14, top: 10,
                                 width: 120, height: 120, minWidth: 120,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 borderRadius: 8, overflow: 'hidden',
