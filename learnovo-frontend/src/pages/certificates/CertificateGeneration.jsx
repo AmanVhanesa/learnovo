@@ -183,6 +183,8 @@ const CertificateGeneration = () => {
             link.remove();
             window.URL.revokeObjectURL(url);
             toast.success('Certificate generated successfully!');
+            // Sync any modified student details back to the student profile
+            await syncModifiedFieldsToProfile();
             const certLabel = certType === 'TC' ? 'Leaving Certificate' : 'Bonafide Certificate';
             reportsService.logActivity({
                 type: 'certificate', action: 'pdf_export',
@@ -252,6 +254,60 @@ const CertificateGeneration = () => {
     const handleFieldChange = useCallback((field, value) => {
         setPreviewData(prev => ({ ...prev, [field]: value }));
     }, []);
+
+    // Fields that map certificate preview → student profile
+    const PROFILE_FIELD_MAP = {
+        studentName: 'fullName',
+        fatherName: 'fatherOrHusbandName',
+        motherName: 'motherName', // updated via guardians array on backend
+        dob: 'dateOfBirth',
+        nationality: 'nationality',
+        category: 'category',
+    };
+
+    const syncModifiedFieldsToProfile = async () => {
+        if (!originalData || !previewData || !selectedStudent?._id) return;
+        const updates = {};
+        for (const [certField, userField] of Object.entries(PROFILE_FIELD_MAP)) {
+            if (previewData[certField] !== originalData[certField] && previewData[certField]) {
+                updates[userField] = previewData[certField];
+            }
+        }
+        if (Object.keys(updates).length === 0) return;
+
+        // Handle special guardian-based fields
+        const guardianUpdates = [];
+        if (updates.fatherOrHusbandName) {
+            guardianUpdates.push({ relation: 'Father', name: updates.fatherOrHusbandName });
+        }
+        if (updates.motherName) {
+            guardianUpdates.push({ relation: 'Mother', name: updates.motherName });
+            delete updates.motherName;
+        }
+
+        try {
+            const payload = { ...updates };
+            if (guardianUpdates.length > 0) {
+                // Merge with existing guardians
+                const existingGuardians = selectedStudent.guardians || [];
+                const mergedGuardians = [...existingGuardians];
+                for (const gu of guardianUpdates) {
+                    const idx = mergedGuardians.findIndex(g => g.relation === gu.relation);
+                    if (idx >= 0) {
+                        mergedGuardians[idx] = { ...mergedGuardians[idx], ...gu };
+                    } else {
+                        mergedGuardians.push(gu);
+                    }
+                }
+                payload.guardians = mergedGuardians;
+                delete payload.fatherOrHusbandName;
+            }
+            await studentsService.update(selectedStudent._id, payload);
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+        } catch {
+            // Silent fail — certificate was already generated successfully
+        }
+    };
 
     const addCustomRemark = () => {
         const trimmed = newCustomRemark.trim();
@@ -437,7 +493,7 @@ const CertificateGeneration = () => {
                         {/* Info banner */}
                         <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/10 text-blue-800 dark:text-blue-400 rounded-xl text-sm border border-blue-200 dark:border-blue-800">
                             <Edit3 className="h-5 w-5 shrink-0 mt-0.5" />
-                            <p>All fields below are editable. Overrides apply <strong>only to this certificate</strong> — the student&apos;s master record will not be changed.</p>
+                            <p>All fields below are editable. Changes to <strong>student name, parents&apos; names, date of birth, nationality, and category</strong> will also update the student&apos;s profile. Other overrides apply only to this certificate.</p>
                         </div>
 
                         {/* Student Details */}
