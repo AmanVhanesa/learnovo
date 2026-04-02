@@ -101,59 +101,56 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1 }}>
 
                     {/* Header — matches backend tc-minimal.html with logo */}
-                    <div style={{ position: 'relative', padding: '16px 20px 8px', textAlign: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '14px 20px 10px', flexShrink: 0, gap: 14 }}>
                         {/* School Logo */}
                         {d.schoolLogo && (
                             <div style={{
-                                position: 'absolute', left: 20, top: 10,
-                                width: 78, height: 78,
+                                width: 82, height: 82, minWidth: 82,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                borderRadius: 6, overflow: 'hidden',
+                                borderRadius: 6, overflow: 'hidden', flexShrink: 0,
                             }}>
-                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 78, height: 78, objectFit: 'contain' }} />
+                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 82, height: 82, objectFit: 'contain' }} />
                             </div>
                         )}
-                        <div style={{
-                            fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
-                            fontSize: 21, fontWeight: 800, color: '#1F6F6D',
-                            letterSpacing: 2, lineHeight: 1.1, textTransform: 'uppercase',
-                            whiteSpace: 'nowrap',
-                        }}>
-                            {d.schoolName || 'School Name'}
+                        <div style={{ flex: 1, textAlign: 'center' }}>
+                            <div style={{
+                                fontFamily: "'Playfair Display', Georgia, 'Times New Roman', serif",
+                                fontSize: 19, fontWeight: 800, color: '#1F6F6D',
+                                letterSpacing: 1.5, lineHeight: 1.15, textTransform: 'uppercase',
+                            }}>
+                                {d.schoolName || 'School Name'}
+                            </div>
+                            <div style={{ fontSize: 9, color: '#4b5563', fontWeight: 500, marginTop: 3 }}>
+                                {d.schoolAddress}
+                            </div>
+                            {(d.schoolPhone || d.schoolEmail) && (
+                                <div style={{ fontSize: 9, color: '#4b5563', fontWeight: 500, marginTop: 2 }}>
+                                    {d.schoolPhone && `Phone: ${d.schoolPhone}`}
+                                    {d.schoolPhone && d.schoolEmail && ' | '}
+                                    {d.schoolEmail && `Email: ${d.schoolEmail}`}
+                                </div>
+                            )}
+                            {(d.affiliationNumber || d.schoolCode || d.udiseCode) && (
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: 15, marginTop: 4, flexWrap: 'wrap' }}>
+                                    {d.affiliationNumber && (
+                                        <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
+                                            Affiliation No: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.affiliationNumber}</strong>
+                                        </span>
+                                    )}
+                                    {d.schoolCode && (
+                                        <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
+                                            School Code: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.schoolCode}</strong>
+                                        </span>
+                                    )}
+                                    {d.udiseCode && (
+                                        <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
+                                            UDISE: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.udiseCode}</strong>
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <div style={{ fontSize: 9, color: '#4b5563', fontWeight: 500, marginTop: 3 }}>
-                            {d.schoolAddress}
-                        </div>
-                        {(d.schoolPhone || d.schoolEmail) && (
-                            <div style={{ fontSize: 9, color: '#4b5563', fontWeight: 500, marginTop: 2 }}>
-                                {d.schoolPhone && `Phone: ${d.schoolPhone}`}
-                                {d.schoolPhone && d.schoolEmail && ' | '}
-                                {d.schoolEmail && `Email: ${d.schoolEmail}`}
-                            </div>
-                        )}
-                        {(d.affiliationNumber || d.schoolCode || d.udiseCode) && (
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: 15, marginTop: 5, flexWrap: 'wrap' }}>
-                                {d.affiliationNumber && (
-                                    <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
-                                        Affiliation No: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.affiliationNumber}</strong>
-                                    </span>
-                                )}
-                                {d.schoolCode && (
-                                    <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
-                                        School Code: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.schoolCode}</strong>
-                                    </span>
-                                )}
-                                {d.udiseCode && (
-                                    <span style={{ fontSize: 8, color: '#4b5563', fontWeight: 500, lineHeight: 1.7 }}>
-                                        UDISE: <strong style={{ fontWeight: 700, color: '#111827' }}>{d.udiseCode}</strong>
-                                    </span>
-                                )}
-                            </div>
-                        )}
                     </div>
-
-                    {/* Header divider */}
-                    <div style={{ height: 1, background: '#e5e7eb', margin: '0 20px', flexShrink: 0 }} />
 
                     {/* Title badge */}
                     <div style={{ padding: '14px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>

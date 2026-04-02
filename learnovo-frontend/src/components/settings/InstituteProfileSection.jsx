@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 import { Building2, AlertTriangle } from 'lucide-react'
+import ImageCropModal from '../ImageCropModal'
 
 const InstitutionImage = ({ src, alt, fallbackText, className = '' }) => {
   const [failed, setFailed] = useState(false)
@@ -13,41 +14,91 @@ import { SERVER_URL } from '../../constants/config'
 
 const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSignatureUpload }) => {
     const [logoWarning, setLogoWarning] = useState(null)
+    const [signatureWarning, setSignatureWarning] = useState(null)
 
-    // Helper to get safe logo URL
+    // Crop modal state
+    const [cropModal, setCropModal] = useState({
+      isOpen: false,
+      imageSrc: null,
+      type: null, // 'logo' or 'signature'
+    })
+
+    const logoInputRef = useRef(null)
+    const signatureInputRef = useRef(null)
+
     const getLogoUrl = (path) => {
         if (!path) return null
         if (path.startsWith('http')) return path
         return encodeURI(`${SERVER_URL}${path}`)
     }
 
-    // Wrap logo upload to validate dimensions and file size
-    const onLogoUpload = (e) => {
+    const validateAndOpenCrop = (e, type) => {
         const file = e.target.files[0]
         if (!file) return
 
-        // Check file size (max 2MB)
-        if (file.size > 2 * 1024 * 1024) {
-            setLogoWarning('File size exceeds 2MB. Please upload a smaller image.')
-            e.target.value = ''
+        // Reset input so same file can be re-selected
+        e.target.value = ''
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            const setter = type === 'logo' ? setLogoWarning : setSignatureWarning
+            setter('Please select an image file (PNG or JPG).')
             return
         }
 
-        // Check dimensions (non-blocking warning)
-        const img = new window.Image()
-        img.onload = () => {
-            URL.revokeObjectURL(img.src)
-            if (img.width < 400 || img.height < 400) {
-                setLogoWarning(`Your image is ${img.width}x${img.height}px. It may appear blurry on printed documents. We recommend at least 800x800px.`)
-            } else {
-                setLogoWarning(null)
-            }
+        // Validate file size (2MB)
+        if (file.size > 2 * 1024 * 1024) {
+            const setter = type === 'logo' ? setLogoWarning : setSignatureWarning
+            setter('File size exceeds 2MB. Please upload a smaller image.')
+            return
         }
-        img.onerror = () => URL.revokeObjectURL(img.src)
-        img.src = URL.createObjectURL(file)
 
-        // Proceed with upload immediately (don't wait for dimension check)
-        handleLogoUpload(e)
+        // Read file and open crop modal
+        const reader = new FileReader()
+        reader.onload = () => {
+            // Check source image dimensions for warnings
+            const img = new window.Image()
+            img.onload = () => {
+                const minW = type === 'logo' ? 400 : 600
+                const minH = type === 'logo' ? 400 : 200
+                if (img.width < minW || img.height < minH) {
+                    const setter = type === 'logo' ? setLogoWarning : setSignatureWarning
+                    setter(`This image is ${img.width}x${img.height}px — it may be too small for print quality.`)
+                } else {
+                    const setter = type === 'logo' ? setLogoWarning : setSignatureWarning
+                    setter(null)
+                }
+                setCropModal({
+                    isOpen: true,
+                    imageSrc: reader.result,
+                    type,
+                })
+            }
+            img.src = reader.result
+        }
+        reader.readAsDataURL(file)
+    }
+
+    const handleCropComplete = async (blob) => {
+        const formData = new FormData()
+        const isLogo = cropModal.type === 'logo'
+        const fieldName = isLogo ? 'logo' : 'signature'
+        formData.append(fieldName, blob, `${fieldName}.png`)
+
+        // Create a synthetic event-like object for the existing handlers
+        const syntheticEvent = { target: { files: [new File([blob], `${fieldName}.png`, { type: 'image/png' })] } }
+
+        if (isLogo) {
+            await handleLogoUpload(syntheticEvent)
+            setLogoWarning(null)
+        } else {
+            await handleSignatureUpload(syntheticEvent)
+            setSignatureWarning(null)
+        }
+    }
+
+    const closeCropModal = () => {
+        setCropModal({ isOpen: false, imageSrc: null, type: null })
     }
 
     return (
@@ -106,7 +157,6 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                                 onChange={(e) => {
                                     const val = e.target.value;
                                     if (val === 'STATE') {
-                                        // If switching to State/Custom, clear it or set default placeholder
                                         updateField('institution.board', '');
                                     } else {
                                         updateField('institution.board', val);
@@ -120,7 +170,6 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                                 <option value="STATE">State Board / Other</option>
                             </select>
 
-                            {/* Show custom input if value is not one of the standard international boards */}
                             {!['CBSE', 'ICSE', 'IB', 'IGCSE'].includes(form.institution?.board) && (
                                 <input
                                     type="text"
@@ -249,11 +298,12 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                             </div>
                             <div className="flex flex-col gap-2">
                                 <input
+                                    ref={logoInputRef}
                                     type="file"
                                     id="logo-upload"
                                     className="hidden"
                                     accept="image/png,image/jpeg"
-                                    onChange={onLogoUpload}
+                                    onChange={(e) => validateAndOpenCrop(e, 'logo')}
                                 />
                                 <label
                                     htmlFor="logo-upload"
@@ -287,11 +337,12 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                             </div>
                             <div className="flex flex-col gap-2">
                                 <input
+                                    ref={signatureInputRef}
                                     type="file"
                                     id="signature-upload"
                                     className="hidden"
-                                    accept="image/*"
-                                    onChange={handleSignatureUpload}
+                                    accept="image/png,image/jpeg"
+                                    onChange={(e) => validateAndOpenCrop(e, 'signature')}
                                 />
                                 <label
                                     htmlFor="signature-upload"
@@ -299,13 +350,32 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                                 >
                                     Upload Signature
                                 </label>
-                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Recommended: 300x100px PNG with transparent background</p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Recommended: 900x300px PNG with transparent background (min 600x200px)</p>
+                                <p className="text-xs text-gray-400 dark:text-[#636366]">Max file size: 2MB</p>
                                 <p className="text-xs text-blue-600">Will appear on certificates and fee receipts</p>
+                                {signatureWarning && (
+                                    <div className="flex items-start gap-1.5 mt-1">
+                                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs text-amber-600 dark:text-amber-400">{signatureWarning}</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Crop Modal */}
+            <ImageCropModal
+                isOpen={cropModal.isOpen}
+                onClose={closeCropModal}
+                onCropComplete={handleCropComplete}
+                imageSrc={cropModal.imageSrc}
+                aspectRatio={cropModal.type === 'logo' ? 1 : 3}
+                title={cropModal.type === 'logo' ? 'Crop Institution Logo' : 'Crop Principal Signature'}
+                minWidth={cropModal.type === 'logo' ? 400 : 600}
+                minHeight={cropModal.type === 'logo' ? 400 : 200}
+            />
         </div>
     )
 }
