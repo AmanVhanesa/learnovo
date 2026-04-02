@@ -133,8 +133,21 @@ const bulkPdfService = {
       archive.on('error', reject);
     });
 
+    // Pre-warm: fetch the first student's data so logo/signature images get cached
+    // before the main loop starts. This prevents N sequential HTTP fetches.
+    try {
+      const firstId = students[0]._id.toString();
+      if (type === 'blank') {
+        await reportCardService.getBlankReportCardData(tenantId, firstId, { examSeries, className });
+      } else if (type === 'final') {
+        await reportCardService.getFinalReportCardData(tenantId, firstId, sessionId);
+      } else {
+        await reportCardService.getReportCardData(tenantId, firstId, { examSeries, className });
+      }
+    } catch { /* pre-warm failure is non-fatal */ }
+
     let hasAtLeastOneSuccess = false;
-    const PER_STUDENT_TIMEOUT = 60000; // 60s per student max
+    const PER_STUDENT_TIMEOUT = 30000; // 30s per student max (images are cached now)
 
     for (const student of students) {
       const studentId = student._id.toString();
@@ -162,7 +175,7 @@ const bulkPdfService = {
             return buf;
           }),
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('PDF generation timed out (60s)')), PER_STUDENT_TIMEOUT)
+            setTimeout(() => reject(new Error('PDF generation timed out (30s)')), PER_STUDENT_TIMEOUT)
           )
         ]);
 
@@ -176,8 +189,8 @@ const bulkPdfService = {
         console.error(`[bulk-pdf] Failed for ${studentName}:`, err.message);
       }
 
-      // Write progress to disk periodically (every 3 students or on last)
-      if ((job.completed + job.failed) % 3 === 0 || (job.completed + job.failed) === job.total) {
+      // Write progress to disk periodically (every 5 students or on last)
+      if ((job.completed + job.failed) % 5 === 0 || (job.completed + job.failed) === job.total) {
         writeJob(job);
       }
     }

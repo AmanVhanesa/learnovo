@@ -3,6 +3,37 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
+// ── Image cache — avoids re-fetching the same logo/signature from Cloudinary ──
+const imageCache = new Map();
+const IMAGE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// ── Template cache — avoids re-reading HTML from disk every call ──
+const templateCache = new Map();
+
+function getCachedTemplate(templatePath) {
+  try {
+    const stat = fs.statSync(templatePath);
+    const cached = templateCache.get(templatePath);
+    if (cached && cached.mtime === stat.mtimeMs) return cached.html;
+    const html = fs.readFileSync(templatePath, 'utf8');
+    templateCache.set(templatePath, { html, mtime: stat.mtimeMs });
+    return html;
+  } catch {
+    return fs.readFileSync(templatePath, 'utf8');
+  }
+}
+
+/**
+ * Strip external Google Fonts <link> and @import from HTML so Puppeteer
+ * doesn't make network requests per page (fonts fall back to system fonts).
+ * This is critical for bulk PDF performance.
+ */
+function stripExternalFonts(html) {
+  html = html.replace(/<link[^>]*fonts\.googleapis\.com[^>]*>/gi, '');
+  html = html.replace(/@import\s+url\(['"]?[^)]*fonts\.googleapis\.com[^)]*['"]?\)\s*;?/gi, '');
+  return html;
+}
+
 // ── Lazy browser instance — launches on demand, closes after idle ──
 let browserInstance = null;
 let activePages = 0;
@@ -147,10 +178,19 @@ function fillTemplate(html, placeholderMap) {
 }
 
 /**
- * Fetch an image (URL or local path) and return as base64 data URI
+ * Fetch an image (URL or local path) and return as base64 data URI.
+ * Results are cached for 5 minutes to avoid re-fetching the same
+ * school logo / signature on every student in a bulk job.
  */
 async function fetchImageAsDataUri(imagePath) {
   if (!imagePath) return null;
+
+  // Check cache first
+  const cached = imageCache.get(imagePath);
+  if (cached && Date.now() - cached.ts < IMAGE_CACHE_TTL) {
+    return cached.dataUri;
+  }
+
   try {
     let imageBuffer;
     if (imagePath.startsWith('http')) {
@@ -179,7 +219,12 @@ async function fetchImageAsDataUri(imagePath) {
     else if (ext === '.webp') mimeType = 'image/webp';
 
     const base64 = imageBuffer.toString('base64');
-    return `data:${mimeType};base64,${base64}`;
+    const dataUri = `data:${mimeType};base64,${base64}`;
+
+    // Cache the result
+    imageCache.set(imagePath, { dataUri, ts: Date.now() });
+
+    return dataUri;
   } catch (err) {
     console.warn(`Failed to load image from ${imagePath}:`, err.message);
     return null;
@@ -346,7 +391,7 @@ function buildSubjectRow(subject) {
         <td class="num" style="font-weight:600">${subject.marksObtained}</td>
         <td class="center"><span class="grade-display"><span class="grade-dot ${gradeClass}"></span> ${escapeHtml(subject.grade)}</span></td>
         <td class="center"><span class="${resultClass}">${resultText}</span></td>
-        <td style="font-size:9px; color: #555555">${escapeHtml(remarks)}</td>
+        <td style="font-size:11px; color: #374151">${escapeHtml(remarks)}</td>
     </tr>`;
 }
 
@@ -547,9 +592,9 @@ const pdfService = {
      * @returns {Promise<Buffer>} PDF buffer
      */
   generateReportCard: async(data) => {
-    // 1. Load HTML template
+    // 1. Load HTML template (cached)
     const templatePath = getTemplatePath('REPORT_CARD');
-    let html = fs.readFileSync(templatePath, 'utf8');
+    let html = getCachedTemplate(templatePath);
 
     // 2. Build and fill placeholders
     const placeholders = buildReportCardPlaceholders(data);
@@ -560,7 +605,7 @@ const pdfService = {
 
     html = fillTemplate(html, placeholders);
 
-    // 3. Inject images
+    // 3. Inject images (cached — same logo/sig reused across bulk jobs)
     const brandColor = data.school?.brand_color || data.school?.brandColor || '#1E3A5F';
     html = await injectReportCardLogo(html, data.school?.logo_url || data.school?.logo, brandColor);
     html = await injectSignature(html, '<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', data.signatures?.principal);
@@ -570,7 +615,10 @@ const pdfService = {
     html = injectAttendanceSection(html, data.attendance);
     html = injectRemarksSection(html, data.summary?.teacher_remarks || data.summary?.teacherRemarks);
 
-    // 5. Render to PDF via Puppeteer
+    // 5. Strip external font requests to avoid network calls per page
+    html = stripExternalFonts(html);
+
+    // 6. Render to PDF via Puppeteer
     let browser, page;
     try {
       browser = await getBrowser();
@@ -580,8 +628,6 @@ const pdfService = {
         waitUntil: 'domcontentloaded',
         timeout: 30000
       });
-
-      await new Promise(r => setTimeout(r, 300));
 
       const pdfUint8 = await page.pdf({
         format: 'A4',
@@ -613,7 +659,7 @@ const pdfService = {
    */
   generateBlankReportCard: async(data) => {
     const templatePath = getTemplatePath('REPORT_CARD');
-    let html = fs.readFileSync(templatePath, 'utf8');
+    let html = getCachedTemplate(templatePath);
 
     // Build blank subject rows
     const blankRowsHtml = (data.subjects || []).map(s => buildBlankSubjectRow(s)).join('\n');
@@ -651,7 +697,7 @@ const pdfService = {
 
     html = fillTemplate(html, placeholders);
 
-    // Inject images
+    // Inject images (cached)
     const brandColor = data.school?.brand_color || data.school?.brandColor || '#1E3A5F';
     html = await injectReportCardLogo(html, data.school?.logo_url || data.school?.logo, brandColor);
     html = await injectSignature(html, '<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', data.signatures?.principal);
@@ -665,12 +711,14 @@ const pdfService = {
       '<div class="result-banner pass" style="display:none">'
     );
 
+    // Strip external font requests for speed
+    html = stripExternalFonts(html);
+
     let browser, page;
     try {
       browser = await getBrowser();
       page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await new Promise(r => setTimeout(r, 300));
       const pdfUint8 = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -696,7 +744,7 @@ const pdfService = {
    */
   generateFinalReportCard: async(data) => {
     const templatePath = path.join(__dirname, '..', 'templates', 'report-cards', 'final-report-card.html');
-    let html = fs.readFileSync(templatePath, 'utf8');
+    let html = getCachedTemplate(templatePath);
 
     const placeholders = buildFinalReportCardPlaceholders(data);
 
@@ -710,7 +758,7 @@ const pdfService = {
 
     html = fillTemplate(html, placeholders);
 
-    // Inject images
+    // Inject images (cached)
     const brandColor = data.school?.brand_color || data.school?.brandColor || '#1E3A5F';
     html = await injectReportCardLogo(html, data.school?.logo_url || data.school?.logo, brandColor);
     html = await injectSignature(html, '<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', data.signatures?.principal);
@@ -718,12 +766,14 @@ const pdfService = {
     html = injectAttendanceSection(html, data.attendance);
     html = injectRemarksSection(html, null);
 
+    // Strip external font requests for speed
+    html = stripExternalFonts(html);
+
     let browser, page;
     try {
       browser = await getBrowser();
       page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await new Promise(r => setTimeout(r, 300));
       const pdfUint8 = await page.pdf({
         format: 'A4',
         printBackground: true,

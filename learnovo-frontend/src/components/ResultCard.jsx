@@ -89,7 +89,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   .aff-row{display:flex;justify-content:center;gap:20px;margin-top:6px;flex-wrap:wrap}
   .aff-line{font-size:13px;color:#1f2937;font-weight:500;line-height:1.7}
   .aff-line b{font-weight:700;color:#111827}
-  .accent-line{height:1.5px;background:#9ca3af;margin:12px 0 16px;border:none}
+  .accent-line{height:1.5px;background:#6B7280;margin:12px 0 16px;border:none}
   .title-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:28px}
   .report-title{font-size:16px;font-weight:700;color:${brandColor};text-transform:uppercase;letter-spacing:0.1em}
   .report-meta{font-size:13px;color:#374151;text-align:right;line-height:1.6}
@@ -97,7 +97,7 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   /* Student card */
   .stu-card{background:#F3F4F6;border-radius:10px;padding:20px 24px;margin-bottom:28px;border:1px solid #D1D5DB}
   .stu-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 32px}
-  .info-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#374151;margin-bottom:3px}
+  .info-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#4B5563;margin-bottom:3px}
   .info-value{font-size:15px;font-weight:600;color:#111827}
   /* Section label */
   .sec-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#374151;margin-bottom:12px}
@@ -127,12 +127,12 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
   /* Signatures */
   .sigs{display:flex;justify-content:space-between;margin-bottom:32px;padding-top:8px}
   .sig-block{text-align:center;width:160px}
-  .sig-line{width:100%;height:1.5px;background:#9CA3AF;margin-bottom:8px;margin-top:50px;position:relative}
+  .sig-line{width:100%;height:1.5px;background:#6B7280;margin-bottom:8px;margin-top:50px;position:relative}
   .sig-img{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);max-height:70px;max-width:150px;object-fit:contain}
   .sig-label{font-size:12px;font-weight:700;color:#111827}
   .sig-sub{font-size:10px;color:#374151;margin-top:2px}
   /* Footer */
-  .footer{text-align:center;padding-top:16px;border-top:1px solid #9CA3AF}
+  .footer{text-align:center;padding-top:16px;border-top:1px solid #6B7280}
   .footer-text{font-size:10px;color:#374151;letter-spacing:0.02em;font-style:italic}
   @media print{body{background:#fff}.page{padding:20mm}}
 </style>
