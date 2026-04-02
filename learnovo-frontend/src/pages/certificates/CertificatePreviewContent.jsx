@@ -110,12 +110,12 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                         {/* School Logo — matches backend .logo-wrap */}
                         {d.schoolLogo && (
                             <div style={{
-                                position: 'absolute', left: 26, top: 18,
-                                width: 110, height: 110, minWidth: 110,
+                                position: 'absolute', left: 26, top: 10,
+                                width: 100, height: 100, minWidth: 100,
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 borderRadius: 8, overflow: 'hidden',
                             }}>
-                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 110, height: 110, objectFit: 'contain' }} />
+                                <img src={d.schoolLogo} alt="School Logo" style={{ width: 100, height: 100, objectFit: 'contain' }} />
                             </div>
                         )}
                         <div style={{ textAlign: 'center' }}>
@@ -347,7 +347,7 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                             </div>
                             <div style={{ textAlign: 'center', width: 170, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 {d.principalSignature && (
-                                    <img src={d.principalSignature} alt="Principal Signature" style={{ maxHeight: 90, maxWidth: 180, objectFit: 'contain', margin: '0 auto 4px', display: 'block' }} />
+                                    <img src={d.principalSignature} alt="Principal Signature" style={{ maxHeight: 120, maxWidth: 200, objectFit: 'contain', margin: '0 auto 4px', display: 'block' }} />
                                 )}
                                 <div style={{ width: 110, height: 1, background: '#9ca3af', margin: '0 auto 4px' }} />
                                 <div style={{ fontSize: 11, fontWeight: 600, color: '#374151', textTransform: 'uppercase', letterSpacing: 0.8 }}>Principal</div>
