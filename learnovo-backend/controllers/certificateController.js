@@ -575,6 +575,15 @@ function textRun(text, opts = {}) {
 function buildHeaderParagraphs(data, logoBuffer) {
   const children = [];
 
+  // School logo
+  if (logoBuffer) {
+    children.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 60 },
+      children: [new ImageRun({ data: logoBuffer, transformation: { width: 80, height: 80 } })]
+    }));
+  }
+
   children.push(new Paragraph({
     alignment: AlignmentType.CENTER,
     spacing: { after: 40 },
@@ -653,16 +662,32 @@ function buildMetaRow(leftLabel, leftValue, rightLabel, rightValue) {
   });
 }
 
-function buildSignatureSection(signatureBuffer) {
+function buildSignatureSection(signatureBuffer, stampBuffer) {
+  // Principal signature column
   const sigChildren = [];
   if (signatureBuffer) {
     sigChildren.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new ImageRun({ data: signatureBuffer, transformation: { width: 120, height: 60 }, type: 'png' })]
+      spacing: { before: 200 },
+      children: [new ImageRun({ data: signatureBuffer, transformation: { width: 140, height: 70 } })]
     }));
+  } else {
+    sigChildren.push(new Paragraph({ spacing: { before: 600 }, children: [] }));
   }
   sigChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [textRun('________________________', { size: 18, color: '9CA3AF' })] }));
   sigChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [textRun('PRINCIPAL', { size: 18, bold: true, color: GRAY })] }));
+
+  // Stamp/seal column
+  const stampChildren = [];
+  if (stampBuffer) {
+    stampChildren.push(new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 200 },
+      children: [new ImageRun({ data: stampBuffer, transformation: { width: 90, height: 90 } })]
+    }));
+  } else {
+    stampChildren.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 300 }, children: [textRun('[ School Seal ]', { size: 16, color: '9CA3AF', italics: true })] }));
+  }
 
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -681,7 +706,7 @@ function buildSignatureSection(signatureBuffer) {
           new TableCell({
             width: { size: 34, type: WidthType.PERCENTAGE },
             borders: noBorders,
-            children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 400 }, children: [textRun('(Seal)', { size: 16, color: '9CA3AF', italics: true })] })]
+            children: stampChildren
           }),
           new TableCell({
             width: { size: 33, type: WidthType.PERCENTAGE },
@@ -752,7 +777,7 @@ function buildTCDocument(data, cert, logoBuffer, signatureBuffer) {
   sections.push(new Paragraph({ spacing: { before: 80, after: 40 }, children: [textRun('Certified that the above information is in accordance with school records. This certificate does not entitle the holder to any benefits unless countersigned by competent authority.', { size: 16, color: GRAY, italics: true })] }));
   sections.push(new Paragraph({ children: [textRun(`Place: ${data.place || ''}`, { size: 18, bold: true, color: DARK })] }));
   // Signatures
-  sections.push(buildSignatureSection(signatureBuffer));
+  sections.push(buildSignatureSection(signatureBuffer, null));
   // Footer
   sections.push(buildFooter());
 
@@ -817,7 +842,7 @@ function buildBonafideDocument(data, cert, logoBuffer, signatureBuffer) {
   // Place
   sections.push(new Paragraph({ children: [textRun(`Place: ${data.place || ''}`, { size: 18, bold: true, color: DARK })] }));
   // Signatures
-  sections.push(buildSignatureSection(signatureBuffer));
+  sections.push(buildSignatureSection(signatureBuffer, null));
   // Footer
   sections.push(buildFooter());
 
