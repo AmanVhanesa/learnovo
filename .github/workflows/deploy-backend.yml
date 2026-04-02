@@ -33,7 +33,7 @@ jobs:
             echo "========================================="
             echo "Deploying Learnovo Backend..."
             echo "========================================="
-            cd /var/www/learnovo/frontend-repo
+            cd /var/www/learnovo/repo
 
             # Acquire deploy lock to prevent concurrent deploys
             LOCKFILE="/tmp/learnovo-deploy.lock"
@@ -49,7 +49,7 @@ jobs:
             echo "Installing dependencies..."
             npm ci --omit=dev
             echo "Restarting PM2..."
-            pm2 restart learnovo-backend || pm2 start server.js --name learnovo-backend
+            pm2 restart learnovo-backend || pm2 start /var/www/learnovo/ecosystem.config.js
 
             # Verify the process is running
             sleep 3
