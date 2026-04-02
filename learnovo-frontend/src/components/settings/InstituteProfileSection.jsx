@@ -350,7 +350,7 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                                 >
                                     Upload Signature
                                 </label>
-                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Recommended: 900x300px PNG with transparent background (min 600x200px)</p>
+                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Recommended: 900x500px PNG with transparent background (min 600x330px)</p>
                                 <p className="text-xs text-gray-400 dark:text-[#636366]">Max file size: 2MB</p>
                                 <p className="text-xs text-blue-600">Will appear on certificates and fee receipts</p>
                                 {signatureWarning && (
@@ -371,10 +371,10 @@ const InstituteProfileSection = ({ form, updateField, handleLogoUpload, handleSi
                 onClose={closeCropModal}
                 onCropComplete={handleCropComplete}
                 imageSrc={cropModal.imageSrc}
-                aspectRatio={cropModal.type === 'logo' ? 1 : 3}
+                aspectRatio={cropModal.type === 'logo' ? 1 : 9/5}
                 title={cropModal.type === 'logo' ? 'Crop Institution Logo' : 'Crop Principal Signature'}
                 minWidth={cropModal.type === 'logo' ? 400 : 600}
-                minHeight={cropModal.type === 'logo' ? 400 : 200}
+                minHeight={cropModal.type === 'logo' ? 400 : 330}
             />
         </div>
     )
