@@ -98,6 +98,7 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
     const [history, setHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [historySearch, setHistorySearch] = useState('');
 
     const fetchHistory = useCallback(async () => {
         setHistoryLoading(true);
@@ -1307,18 +1308,53 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                     {/* ═══════════════════════════════════════════════════════════
                         GENERATED REPORT CARDS HISTORY
                     ═══════════════════════════════════════════════════════════ */}
-                    {history.length > 0 && (
-                        <div>
-                            <div className="flex items-center gap-2 mb-3">
-                                <span className="text-primary-600 dark:text-primary-400"><Layers className="h-4 w-4" /></span>
-                                <h4 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] uppercase tracking-wide">Generated Report Cards</h4>
-                                <span className="text-[10px] text-gray-400 dark:text-[#636366] bg-gray-100 dark:bg-[#2C2C2E] px-2 py-0.5 rounded-full">{history.length}</span>
+                    {history.length > 0 && (() => {
+                        const q = historySearch.toLowerCase().trim();
+                        const filtered = q
+                            ? history.filter(r =>
+                                (r.studentName || '').toLowerCase().includes(q)
+                                || (r.studentClass || '').toLowerCase().includes(q)
+                                || (r.examInfo || '').toLowerCase().includes(q)
+                                || (r.overallGrade || '').toLowerCase().includes(q)
+                            )
+                            : history;
+                        return (
+                        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                            <div className="px-4 py-3 border-b border-gray-100 dark:border-[#38383A]">
+                                <div className="flex items-center justify-between mb-2.5">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                        <Layers className="h-4 w-4 text-primary-500" />
+                                        Generated Report Cards
+                                        <span className="text-[10px] text-gray-400 dark:text-[#636366] bg-gray-100 dark:bg-[#2C2C2E] px-2 py-0.5 rounded-full font-medium">{history.length}</span>
+                                    </h4>
+                                </div>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366] pointer-events-none" />
+                                    <input
+                                        type="text"
+                                        className="input w-full pl-9 pr-8"
+                                        placeholder="Search by student name, class, exam..."
+                                        value={historySearch}
+                                        onChange={e => setHistorySearch(e.target.value)}
+                                    />
+                                    {historySearch && (
+                                        <button className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#38383A]" onClick={() => setHistorySearch('')}>
+                                            <X className="h-3.5 w-3.5 text-gray-400 dark:text-[#636366]" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                            <div className="space-y-2 max-h-64 overflow-y-auto">
-                                {history.map(record => {
+                            {filtered.length === 0 ? (
+                                <div className="flex flex-col items-center py-8 text-gray-400 dark:text-[#636366]">
+                                    <Search className="h-6 w-6 mb-2 opacity-30" />
+                                    <p className="text-xs">No report cards match "{historySearch}"</p>
+                                </div>
+                            ) : (
+                            <div className="divide-y divide-gray-50 dark:divide-[#38383A] max-h-64 overflow-y-auto">
+                                {filtered.map(record => {
                                     const grade = calcGrade(record.overallPercentage || 0);
                                     return (
-                                        <div key={record._id} className="bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl p-3 flex items-center justify-between gap-3 hover:shadow-sm transition-shadow">
+                                        <div key={record._id} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-primary-50/40 dark:hover:bg-primary-500/5 transition-colors">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <span className="font-medium text-sm text-gray-900 dark:text-white truncate">{record.studentName}</span>
@@ -1375,11 +1411,13 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                                     );
                                 })}
                             </div>
+                            )}
                             {historyLoading && (
                                 <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 text-gray-400 animate-spin" /></div>
                             )}
                         </div>
-                    )}
+                        );
+                    })()}
                 </div>
 
                 {/* ── Footer ── */}
