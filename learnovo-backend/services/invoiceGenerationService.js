@@ -299,7 +299,9 @@ async function generateInvoicesForStudent({
   academicYearName,
   generatedBy,
   admissionDate,
-  dueDay = 10
+  dueDay = 10,
+  concessionPercentage = 0,
+  concessionReason = null
 }) {
   // 1. Build applicable fee heads for this student
   const { recurringHeads, oneTimeHeads, allHeads } = await buildApplicableFeeHeads(
@@ -308,6 +310,26 @@ async function generateInvoicesForStudent({
 
   const includedRecurring = recurringHeads.filter(h => h.isIncluded);
   const includedOneTime = oneTimeHeads.filter(h => h.isIncluded);
+
+  // Apply concession (e.g., 50% for 3rd student) to annual amounts
+  const concessionMultiplier = concessionPercentage > 0 ? (100 - concessionPercentage) / 100 : 1;
+  if (concessionMultiplier < 1) {
+    for (const head of includedRecurring) {
+      head.originalAnnualAmount = head.annualAmount;
+      head.annualAmount = roundToRupee(head.annualAmount * concessionMultiplier);
+    }
+    for (const head of includedOneTime) {
+      head.originalAnnualAmount = head.annualAmount;
+      head.annualAmount = roundToRupee(head.annualAmount * concessionMultiplier);
+    }
+    // Also update allHeads for allocation snapshot
+    for (const head of allHeads) {
+      if (head.isIncluded) {
+        head.originalAnnualAmount = head.originalAnnualAmount || head.annualAmount;
+        head.annualAmount = roundToRupee((head.originalAnnualAmount || head.annualAmount) * concessionMultiplier);
+      }
+    }
+  }
 
   // 2. Calculate totals
   const totalRecurringAnnual = roundToRupee(sumMoney(includedRecurring.map(h => h.annualAmount)));
@@ -345,7 +367,7 @@ async function generateInvoicesForStudent({
   }
 
   // 5. Create allocation
-  const allocation = await AnnualFeeAllocation.create({
+  const allocationData = {
     tenantId,
     studentId: student._id,
     feeStructureId: feeStructure._id,
@@ -357,7 +379,12 @@ async function generateInvoicesForStudent({
     balance: totalAnnual,
     paymentPlan,
     generatedBy
-  });
+  };
+  if (concessionPercentage > 0) {
+    allocationData.concessionPercentage = concessionPercentage;
+    allocationData.concessionReason = concessionReason || `${concessionPercentage}% concession`;
+  }
+  const allocation = await AnnualFeeAllocation.create(allocationData);
 
   // 6. Generate invoices
   const invoices = [];
@@ -439,6 +466,7 @@ async function generateInvoicesForStudent({
       periodEnd: period.end,
       billingPeriod: period.billingPeriod,
       generatedBy,
+      ...(concessionPercentage > 0 && { remarks: concessionReason || `${concessionPercentage}% concession applied` }),
       _isLast: isLastPeriod // temp flag for rounding adjustment
     });
   }

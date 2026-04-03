@@ -21,6 +21,7 @@ const PAYMENT_METHODS = [
 
 const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDownloadReceipt, onClose, onSuccess }) => {
   const [activeTab, setActiveTab] = useState('collect')
+  const [selectedQuarter, setSelectedQuarter] = useState('all')
   const [selectedInvoice, setSelectedInvoice] = useState(null)
   const [form, setForm] = useState({
     amount: '',
@@ -37,6 +38,29 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
   const [discountForm, setDiscountForm] = useState({ type: '', amount: '', percentage: '', reason: '' })
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false)
 
+  // Extract unique periods/quarters from invoices for filtering
+  const periodOptions = useMemo(() => {
+    const periods = []
+    const seen = new Set()
+    invoices.forEach(inv => {
+      const label = inv.periodLabel || inv.billingPeriod?.displayText || ''
+      if (label && !seen.has(label)) {
+        seen.add(label)
+        periods.push({ value: label, label })
+      }
+    })
+    return periods
+  }, [invoices])
+
+  // Filter invoices by selected period
+  const filteredInvoices = useMemo(() => {
+    if (selectedQuarter === 'all') return invoices
+    return invoices.filter(inv => {
+      const label = inv.periodLabel || inv.billingPeriod?.displayText || ''
+      return label === selectedQuarter
+    })
+  }, [invoices, selectedQuarter])
+
   useEffect(() => {
     if (invoices.length === 0 && payments.length > 0) {
       setActiveTab('history')
@@ -46,6 +70,17 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
       setForm(f => ({ ...f, amount: invoices[0].balanceAmount || '' }))
     }
   }, [invoices, payments])
+
+  // When quarter filter changes, auto-select first filtered invoice
+  useEffect(() => {
+    if (filteredInvoices.length > 0) {
+      setSelectedInvoice(filteredInvoices[0])
+      setForm(f => ({ ...f, amount: filteredInvoices[0].balanceAmount || '' }))
+    } else {
+      setSelectedInvoice(null)
+      setForm(f => ({ ...f, amount: '' }))
+    }
+  }, [selectedQuarter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset discount when invoice changes
   useEffect(() => {
@@ -187,25 +222,73 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                 </div>
               </div>
 
+              {/* Quarter / Period filter */}
+              {periodOptions.length > 0 && (
+                <div>
+                  <label className="label mb-1.5 block">Select Quarter / Period</label>
+                  <div className="flex flex-wrap gap-2">
+                    {periodOptions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedQuarter('all')}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border-2 transition-all ${
+                          selectedQuarter === 'all'
+                            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-400'
+                            : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:border-gray-300 dark:hover:border-[#636366]'
+                        }`}
+                      >
+                        All ({invoices.length})
+                      </button>
+                    )}
+                    {periodOptions.map((period) => {
+                      const count = invoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === period.value).length
+                      return (
+                        <button
+                          key={period.value}
+                          type="button"
+                          onClick={() => setSelectedQuarter(period.value)}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-lg border-2 transition-all ${
+                            selectedQuarter === period.value
+                              ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-400'
+                              : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:border-gray-300 dark:hover:border-[#636366]'
+                          }`}
+                        >
+                          {period.label} ({count})
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Invoice selector */}
               <div>
                 <label className="label mb-1.5 block">Select Invoice *</label>
-                <select
-                  className="input"
-                  value={selectedInvoice?._id || ''}
-                  onChange={(e) => {
-                    const inv = invoices.find(i => i._id === e.target.value)
-                    setSelectedInvoice(inv)
-                    setForm(f => ({ ...f, amount: inv?.balanceAmount || '' }))
-                  }}
-                  required
-                >
-                  {invoices.map((inv) => (
-                    <option key={inv._id} value={inv._id}>
-                      {inv.invoiceNumber} — {formatCurrency(inv.balanceAmount)} ({inv.status})
-                    </option>
-                  ))}
-                </select>
+                {filteredInvoices.length === 0 ? (
+                  <div className="text-center py-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
+                    <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No pending invoices for this period</p>
+                  </div>
+                ) : (
+                  <select
+                    className="input"
+                    value={selectedInvoice?._id || ''}
+                    onChange={(e) => {
+                      const inv = filteredInvoices.find(i => i._id === e.target.value)
+                      setSelectedInvoice(inv)
+                      setForm(f => ({ ...f, amount: inv?.balanceAmount || '' }))
+                    }}
+                    required
+                  >
+                    {filteredInvoices.map((inv) => {
+                      const period = inv.periodLabel || inv.billingPeriod?.displayText || ''
+                      return (
+                        <option key={inv._id} value={inv._id}>
+                          {inv.invoiceNumber}{period ? ` — ${period}` : ''} — {formatCurrency(inv.balanceAmount)} ({inv.status})
+                        </option>
+                      )
+                    })}
+                  </select>
+                )}
               </div>
 
               {/* Selected invoice summary with progress */}
@@ -420,6 +503,84 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                     <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Partial payment</span>
                   )}
                 </div>
+
+                {/* Quick-fill buttons for partial payments (monthly splits from quarterly/annual invoices) */}
+                {selectedInvoice && selectedInvoice.balanceAmount > 0 && (() => {
+                  const balance = selectedInvoice.balanceAmount
+                  const period = selectedInvoice.periodLabel || selectedInvoice.billingPeriod?.displayText || ''
+                  const isQuarterly = /q[1-4]|quarter/i.test(period)
+                  const isHalfYearly = /h[1-2]|half/i.test(period)
+                  const isAnnual = /annual|year/i.test(period)
+
+                  const splits = []
+                  if (isQuarterly && balance > 0) {
+                    const monthly = Math.round(balance / 3)
+                    if (monthly > 0 && monthly < balance) {
+                      splits.push({ label: '1 Month', amount: monthly })
+                      splits.push({ label: '2 Months', amount: monthly * 2 })
+                    }
+                  } else if (isHalfYearly && balance > 0) {
+                    const monthly = Math.round(balance / 6)
+                    if (monthly > 0 && monthly < balance) {
+                      splits.push({ label: '1 Month', amount: monthly })
+                      splits.push({ label: '3 Months', amount: monthly * 3 })
+                    }
+                  } else if (isAnnual && balance > 0) {
+                    const quarterly = Math.round(balance / 4)
+                    const monthly = Math.round(balance / 12)
+                    if (monthly > 0 && monthly < balance) {
+                      splits.push({ label: '1 Month', amount: monthly })
+                    }
+                    if (quarterly > 0 && quarterly < balance) {
+                      splits.push({ label: '1 Quarter', amount: quarterly })
+                    }
+                  }
+
+                  if (splits.length === 0) return null
+
+                  return (
+                    <div className="mt-2">
+                      <p className="text-[10px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wide mb-1.5">Quick Fill (Partial Payment)</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {splits.map((s, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => setForm(f => ({ ...f, amount: s.amount }))}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                              parseFloat(form.amount) === s.amount
+                                ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-400'
+                                : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:border-gray-300'
+                            }`}
+                          >
+                            {s.label} — {formatCurrency(s.amount)}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, amount: balance }))}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                            parseFloat(form.amount) === balance
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-400'
+                              : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:border-gray-300'
+                          }`}
+                        >
+                          Full — {formatCurrency(balance)}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Remaining balance preview after partial payment */}
+                {selectedInvoice?.balanceAmount && parseFloat(form.amount) > 0 && parseFloat(form.amount) < selectedInvoice.balanceAmount && (
+                  <div className="mt-2 flex items-center justify-between px-3 py-2 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-800/30">
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Remaining after this payment</span>
+                    <span className="text-sm font-bold text-amber-700 dark:text-amber-300">
+                      {formatCurrency(selectedInvoice.balanceAmount - parseFloat(form.amount))}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Payment method with icons */}

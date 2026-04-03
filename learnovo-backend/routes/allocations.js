@@ -1400,7 +1400,7 @@ router.post('/generate-single', protect, authorize('admin'), [
   handleValidationErrors
 ], async(req, res) => {
   try {
-    const { studentId, academicSessionId, paymentPlan, dueDay } = req.body;
+    const { studentId, academicSessionId, paymentPlan, dueDay, concessionPercentage, concessionReason } = req.body;
     const tenantId = req.user.tenantId;
 
     // Verify student
@@ -1461,7 +1461,9 @@ router.post('/generate-single', protect, authorize('admin'), [
       academicSessionId,
       academicYearName: session.name,
       generatedBy: req.user._id,
-      dueDay: dueDay || 10
+      dueDay: dueDay || 10,
+      concessionPercentage: concessionPercentage || 0,
+      concessionReason: concessionReason || null
     });
 
     if (result.summary.skipped) {

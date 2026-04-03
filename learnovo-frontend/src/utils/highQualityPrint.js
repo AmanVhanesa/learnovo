@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf';
  * @param {string} [filename='document'] - PDF filename without extension
  * @param {Object} [options]
  * @param {number} [options.scale=3] - Canvas scale factor (3 ≈ 288 DPI)
- * @param {'a4'|'letter'} [options.format='a4'] - Page format
+ * @param {'a4'|'a5'|'letter'} [options.format='a5'] - Page format
  * @param {'portrait'|'landscape'} [options.orientation='portrait']
  * @param {number} [options.margin=10] - Page margin in mm
  * @returns {Promise<void>}
@@ -18,7 +18,7 @@ import { jsPDF } from 'jspdf';
 export async function highQualityPrint(element, filename = 'document', options = {}) {
   const {
     scale = 3,
-    format = 'a4',
+    format = 'a5',
     orientation = 'portrait',
     margin = 10,
   } = options;

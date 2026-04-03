@@ -2236,6 +2236,13 @@ router.put('/:id', protect, canAccessStudent, [
       delete updatePayload.password;
     }
 
+    // Keep name and fullName in sync (StudentForm sends 'name', but fullName is displayed)
+    if (updatePayload.name && !updatePayload.fullName) {
+      updatePayload.fullName = updatePayload.name;
+    } else if (updatePayload.fullName && !updatePayload.name) {
+      updatePayload.name = updatePayload.fullName;
+    }
+
     // Handle 'self' transport option
     if (updatePayload.driverId === 'self') {
       updatePayload.driverId = null;

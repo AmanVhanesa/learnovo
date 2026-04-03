@@ -13,9 +13,7 @@ const paymentAttemptSchema = new mongoose.Schema({
   // Idempotency key to prevent double charges
   idempotencyKey: {
     type: String,
-    required: true,
-    unique: true,
-    index: true
+    required: true
   },
 
   studentId: {

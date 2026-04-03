@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { FileText, AlertCircle, CheckCircle, Calendar } from 'lucide-react'
+import { FileText, AlertCircle, CheckCircle, Calendar, Percent } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { allocationsService } from '../../services/feesService'
 import { formatCurrency } from '../../utils/formatCurrency'
@@ -16,6 +16,7 @@ const PAYMENT_PLANS = [
 const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSuccess }) => {
   const [selectedStudent, setSelectedStudent] = useState(null)
   const [paymentPlan, setPaymentPlan] = useState('quarterly')
+  const [thirdStudentConcession, setThirdStudentConcession] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [result, setResult] = useState(null)
 
@@ -82,9 +83,13 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
   const oneTimeHeads = applicableFeeHeads.filter(h => h.type === 'one_time' && !h.isExcluded)
   const excludedHeads = applicableFeeHeads.filter(h => h.isExcluded)
 
-  const recurringTotal = recurringHeads.reduce((sum, h) => sum + h.annualAmount, 0)
-  const oneTimeTotal = oneTimeHeads.reduce((sum, h) => sum + h.annualAmount, 0)
+  const recurringTotalBase = recurringHeads.reduce((sum, h) => sum + h.annualAmount, 0)
+  const oneTimeTotalBase = oneTimeHeads.reduce((sum, h) => sum + h.annualAmount, 0)
+  const concessionMultiplier = thirdStudentConcession ? 0.5 : 1
+  const recurringTotal = Math.round(recurringTotalBase * concessionMultiplier)
+  const oneTimeTotal = Math.round(oneTimeTotalBase * concessionMultiplier)
   const totalAnnual = recurringTotal + oneTimeTotal
+  const totalBeforeConcession = recurringTotalBase + oneTimeTotalBase
 
   // Calculate invoice preview based on payment plan
   const invoicePreview = useMemo(() => {
@@ -128,6 +133,7 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
         studentId: selectedStudent._id,
         academicSessionId: activeSession._id,
         paymentPlan,
+        ...(thirdStudentConcession && { concessionPercentage: 50, concessionReason: '3rd Student Concession' }),
       })
       setResult(response.data)
       toast.success(response.message || 'Invoices generated successfully')
@@ -233,7 +239,15 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                 <span className="text-xs font-semibold text-gray-500 dark:text-[#636366] uppercase tracking-wide flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5" /> Annual Fee Breakdown
                 </span>
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(totalAnnual)}</span>
+                <div className="text-right">
+                  {thirdStudentConcession && (
+                    <span className="text-xs text-gray-400 dark:text-[#636366] line-through mr-2">{formatCurrency(totalBeforeConcession)}</span>
+                  )}
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">{formatCurrency(totalAnnual)}</span>
+                  {thirdStudentConcession && (
+                    <span className="ml-1.5 text-[10px] font-semibold text-green-600 dark:text-green-400">−50%</span>
+                  )}
+                </div>
               </div>
               <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
                 {recurringHeads.map((head, i) => (
@@ -244,7 +258,14 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                         Recurring
                       </span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(head.annualAmount)}/yr</span>
+                    <div className="text-right">
+                      {thirdStudentConcession && (
+                        <span className="text-xs text-gray-400 dark:text-[#636366] line-through mr-1.5">{formatCurrency(head.annualAmount)}</span>
+                      )}
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(Math.round(head.annualAmount * concessionMultiplier))}/yr
+                      </span>
+                    </div>
                   </div>
                 ))}
                 {oneTimeHeads.map((head, i) => (
@@ -255,7 +276,14 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                         One-Time
                       </span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(head.annualAmount)}</span>
+                    <div className="text-right">
+                      {thirdStudentConcession && (
+                        <span className="text-xs text-gray-400 dark:text-[#636366] line-through mr-1.5">{formatCurrency(head.annualAmount)}</span>
+                      )}
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(Math.round(head.annualAmount * concessionMultiplier))}
+                      </span>
+                    </div>
                   </div>
                 ))}
                 {excludedHeads.map((head, i) => (
@@ -267,6 +295,44 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* 3rd Student Concession */}
+          {matchingStructure && selectedStudent && (
+            <div
+              onClick={() => setThirdStudentConcession(!thirdStudentConcession)}
+              className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                thirdStudentConcession
+                  ? 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/15 ring-1 ring-green-400 dark:ring-green-600'
+                  : 'border-gray-200 dark:border-[#38383A] hover:border-gray-300 dark:hover:border-[#48484A]'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                thirdStudentConcession
+                  ? 'bg-green-500 text-white'
+                  : 'border-2 border-gray-300 dark:border-[#48484A]'
+              }`}>
+                {thirdStudentConcession && (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Percent className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">3rd Student Concession (50% Off)</p>
+                </div>
+                <p className="text-[11px] text-gray-500 dark:text-[#636366] mt-0.5">
+                  Apply 50% concession on all fee heads for 3rd sibling
+                </p>
+              </div>
+              {thirdStudentConcession && (
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
+                  −50%
+                </span>
+              )}
             </div>
           )}
 

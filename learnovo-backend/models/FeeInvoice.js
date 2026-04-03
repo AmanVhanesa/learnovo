@@ -299,9 +299,25 @@ feeInvoiceSchema.pre('save', function(next) {
   next();
 });
 
-// Static method to generate invoice number
+// Static method to generate invoice number (with collision recovery)
 feeInvoiceSchema.statics.generateInvoiceNumber = async function(tenantId) {
   const year = new Date().getFullYear();
+  const maxAttempts = 5;
+  for (let i = 0; i < maxAttempts; i++) {
+    const counter = await Counter.getNextSequence('invoice', String(year), tenantId);
+    const invoiceNumber = `INV-${year}-${String(counter).padStart(5, '0')}`;
+    const exists = await this.findOne({ invoiceNumber }).select('_id').lean();
+    if (!exists) return invoiceNumber;
+  }
+  // Fallback: sync counter with actual max, then generate
+  const last = await this.findOne({ tenantId, invoiceNumber: new RegExp(`^INV-${year}-`) })
+    .sort({ invoiceNumber: -1 }).select('invoiceNumber').lean();
+  const maxSeq = last ? parseInt(last.invoiceNumber.replace(`INV-${year}-`, ''), 10) : 0;
+  await Counter.findOneAndUpdate(
+    { name: 'invoice', year: String(year), tenantId },
+    { $set: { sequence: maxSeq } },
+    { upsert: true }
+  );
   const counter = await Counter.getNextSequence('invoice', String(year), tenantId);
   return `INV-${year}-${String(counter).padStart(5, '0')}`;
 };

@@ -559,8 +559,8 @@ const pdfService = {
     const page = await browser.newPage();
 
     try {
-      // Set high-DPI viewport for sharper rendering
-      await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 3 });
+      // Set high-DPI viewport for sharper rendering (A5: 559×794px)
+      await page.setViewport({ width: 559, height: 794, deviceScaleFactor: 3 });
 
       // Wait for Google Fonts (Playfair Display) to fully load
       await page.setContent(html, {
@@ -572,7 +572,7 @@ const pdfService = {
       await page.evaluateHandle('document.fonts.ready');
 
       const pdfUint8 = await page.pdf({
-        format: 'A4',
+        format: 'A5',
         printBackground: true,
         preferCSSPageSize: true,
         margin: { top: 0, right: 0, bottom: 0, left: 0 }

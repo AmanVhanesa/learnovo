@@ -20,11 +20,10 @@ const paymentSchema = new mongoose.Schema({
     index: true
   },
 
-  // Receipt Number (Auto-generated)
+  // Receipt Number (Auto-generated, unique per tenant via compound index)
   receiptNumber: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
 
   // Student & Invoice
@@ -173,9 +172,25 @@ paymentSchema.index({ tenantId: 1, invoiceId: 1 });
 paymentSchema.index({ tenantId: 1, paymentDate: 1 });
 paymentSchema.index({ tenantId: 1, isConfirmed: 1 });
 
-// Static method to generate receipt number
+// Static method to generate receipt number (with collision recovery)
 paymentSchema.statics.generateReceiptNumber = async function(tenantId) {
   const year = new Date().getFullYear();
+  const maxAttempts = 5;
+  for (let i = 0; i < maxAttempts; i++) {
+    const counter = await Counter.getNextSequence('receipt', String(year), tenantId);
+    const receiptNumber = `RCP-${year}-${String(counter).padStart(5, '0')}`;
+    const exists = await this.findOne({ receiptNumber }).select('_id').lean();
+    if (!exists) return receiptNumber;
+  }
+  // Fallback: sync counter with actual max, then generate
+  const last = await this.findOne({ tenantId, receiptNumber: new RegExp(`^RCP-${year}-`) })
+    .sort({ receiptNumber: -1 }).select('receiptNumber').lean();
+  const maxSeq = last ? parseInt(last.receiptNumber.replace(`RCP-${year}-`, ''), 10) : 0;
+  await Counter.findOneAndUpdate(
+    { name: 'receipt', year: String(year), tenantId },
+    { $set: { sequence: maxSeq } },
+    { upsert: true }
+  );
   const counter = await Counter.getNextSequence('receipt', String(year), tenantId);
   return `RCP-${year}-${String(counter).padStart(5, '0')}`;
 };

@@ -246,4 +246,173 @@ router.post('/final/bulk-download', protect, examPlanGates, authorize('admin', '
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CUSTOM / MANUAL REPORT CARD
+// ─────────────────────────────────────────────────────────────────────────────
+
+// @desc    Generate a custom report card PDF from manually provided data
+// @route   POST /api/report-cards/custom/pdf
+// @access  Private (admin, teacher)
+router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, res, next) => {
+  try {
+    const { student, exam, subjects, remarks } = req.body;
+
+    if (!student || !exam || !subjects || !Array.isArray(subjects) || subjects.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'student, exam, and subjects (non-empty array) are required'
+      });
+    }
+
+    // Validate each subject has required fields
+    for (let i = 0; i < subjects.length; i++) {
+      const s = subjects[i];
+      if (!s.name || s.totalMarks == null || s.marksObtained == null) {
+        return res.status(400).json({
+          success: false,
+          message: `Subject at index ${i} must have name, totalMarks, and marksObtained`
+        });
+      }
+    }
+
+    // Build the data payload matching the existing PDF template structure
+    const reportCardService = getReportCardService();
+    const Settings = require('../models/Settings');
+    const settings = await Settings.findOne({ tenantId: req.user.tenantId });
+
+    // If studentId is provided, optionally enrich from DB
+    let studentData = {
+      name: student.name || '',
+      admissionNumber: student.admissionNumber || '',
+      class: student.class || '',
+      section: student.section || '',
+      rollNumber: student.rollNumber || '',
+      dob: student.dob || '',
+      fatherOrHusbandName: student.fatherOrHusbandName || student.guardianName || ''
+    };
+
+    if (student.studentId) {
+      const User = require('../models/User');
+      const dbStudent = await User.findOne({ _id: student.studentId, tenantId: req.user.tenantId })
+        .select('name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName')
+        .lean();
+      if (dbStudent) {
+        // Merge: manual overrides take priority, DB fills blanks
+        studentData = {
+          name: student.name || dbStudent.fullName || dbStudent.name || '',
+          admissionNumber: student.admissionNumber || dbStudent.admissionNumber || '',
+          class: student.class || dbStudent.class || '',
+          section: student.section || dbStudent.section || '',
+          rollNumber: student.rollNumber || dbStudent.rollNumber || '',
+          dob: student.dob || dbStudent.dateOfBirth || '',
+          fatherOrHusbandName: student.fatherOrHusbandName || student.guardianName || dbStudent.fatherOrHusbandName || dbStudent.guardianName || ''
+        };
+      }
+    }
+
+    // Calculate grades and summary
+    const processedSubjects = subjects.map(s => {
+      const total = Number(s.totalMarks) || 0;
+      const obtained = Number(s.marksObtained) || 0;
+      const percentage = total > 0 ? Math.round((obtained / total) * 100 * 10) / 10 : 0;
+      const passingMarks = Number(s.passingMarks) || Math.ceil(total * 0.33);
+      const isPassed = obtained >= passingMarks;
+      let grade;
+      if (percentage >= 90) grade = 'A+';
+      else if (percentage >= 80) grade = 'A';
+      else if (percentage >= 70) grade = 'B';
+      else if (percentage >= 60) grade = 'C';
+      else if (percentage >= 50) grade = 'D';
+      else grade = 'F';
+
+      return {
+        name: s.name,
+        subject: s.name,
+        examName: exam.name || '',
+        date: exam.date || null,
+        totalMarks: total,
+        marksObtained: obtained,
+        percentage,
+        grade,
+        isPassed,
+        remarks: s.remarks || ''
+      };
+    });
+
+    const grandTotal = processedSubjects.reduce((acc, s) => acc + s.totalMarks, 0);
+    const grandObtained = processedSubjects.reduce((acc, s) => acc + s.marksObtained, 0);
+    const overallPercentage = grandTotal > 0
+      ? Math.round((grandObtained / grandTotal) * 100 * 10) / 10
+      : 0;
+    let overallGrade;
+    if (overallPercentage >= 90) overallGrade = 'A+';
+    else if (overallPercentage >= 80) overallGrade = 'A';
+    else if (overallPercentage >= 70) overallGrade = 'B';
+    else if (overallPercentage >= 60) overallGrade = 'C';
+    else if (overallPercentage >= 50) overallGrade = 'D';
+    else overallGrade = 'F';
+    const overallPassed = processedSubjects.every(s => s.isPassed);
+    const passCount = processedSubjects.filter(s => s.isPassed).length;
+
+    // Build school data from tenant settings
+    const inst = settings?.institution || {};
+    const addressParts = [inst.address?.street, inst.address?.city, inst.address?.state].filter(Boolean);
+
+    const pdfData = {
+      school: {
+        name: inst.name || 'School',
+        address: addressParts.join(', '),
+        phone: inst.contact?.phone || '',
+        email: inst.contact?.email || '',
+        board: inst.board || '',
+        affiliation: inst.affiliationNumber || '',
+        schoolCode: inst.schoolCode || '',
+        udise: inst.udiseCode || '',
+        logo: inst.logo || null,
+        brand_color: inst.brandColor || '#1E3A5F'
+      },
+      student: studentData,
+      exam: {
+        type: exam.examSeries || exam.type || 'Custom',
+        academicYear: exam.academicYear || settings?.academicYear || '',
+        date_issued: new Date().toISOString()
+      },
+      subjects: processedSubjects,
+      summary: {
+        grandTotal,
+        grandObtained,
+        overallPercentage,
+        overallGrade,
+        overallPassed,
+        passCount,
+        totalSubjects: processedSubjects.length,
+        teacherRemarks: remarks || ''
+      },
+      attendance: null,
+      signatures: {
+        principal: inst.principalSignature || null,
+        class_teacher: null
+      }
+    };
+
+    const pdfBuffer = await getPdfService().generateReportCard(pdfData);
+    const studentName = (studentData.name || 'Student').replace(/\s+/g, '_');
+    const filename = `Custom_Report_Card_${studentName}.pdf`;
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': pdfBuffer.length
+    });
+
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Custom report card PDF error:', error.message);
+    const msg = error.message?.includes('timed out') || error.message?.includes('Target closed')
+      ? 'PDF generation timed out. Please try again.'
+      : 'Failed to generate custom report card PDF';
+    res.status(500).json({ success: false, message: msg });
+  }
+});
+
 module.exports = router;

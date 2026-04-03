@@ -15,6 +15,7 @@ import { academicSessionsService } from '../services/academicsService';
 import ExamResultsModal from '../components/ExamResultsModal';
 import ResultCard from '../components/ResultCard';
 import BulkDownloadProgress from '../components/BulkDownloadProgress';
+import CustomReportCardModal from '../components/CustomReportCardModal';
 import toast from 'react-hot-toast';
 import { formatDate } from '../utils/formatDate';
 import { useAuth } from '../contexts/AuthContext';
@@ -121,6 +122,7 @@ const Exams = () => {
     const [rcSection, setRcSection] = useState('');
     const [rcStudentSearch, setRcStudentSearch] = useState('');
     const [rcDownloading, setRcDownloading] = useState({}); // { [studentId]: true }
+    const [showCustomReportCard, setShowCustomReportCard] = useState(false);
 
     /* ── Accordion collapse state ── */
     const [collapsedClasses, setCollapsedClasses] = useState(new Set());
@@ -1114,6 +1116,27 @@ const Exams = () => {
                         )}
                     </div>
 
+                    {/* Custom Report Card — always visible */}
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-5 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-violet-100 dark:bg-violet-500/20">
+                                    <Edit className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Report Card</h4>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Manually fill in subjects, marks & exam details to generate a report card</p>
+                                </div>
+                            </div>
+                            <button
+                                className="btn gap-2 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-500/20 border border-violet-200 dark:border-violet-500/20 shrink-0"
+                                onClick={() => setShowCustomReportCard(true)}
+                            >
+                                <Edit className="h-4 w-4" /> Create Custom
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Bulk Download Actions */}
                     {rcClass && rcSection && rcSectionId && (
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1546,6 +1569,16 @@ const Exams = () => {
             {/* Bulk download progress modal */}
             {bulkJob && (
                 <BulkDownloadProgress jobId={bulkJob.jobId} totalStudents={bulkJob.totalStudents} onClose={() => setBulkJob(null)} />
+            )}
+
+            {/* Custom Report Card modal */}
+            {showCustomReportCard && (
+                <CustomReportCardModal
+                    onClose={() => setShowCustomReportCard(false)}
+                    students={rcStudents}
+                    classes={availableClasses}
+                    subjects={allSubjects}
+                />
             )}
         </div>
     );

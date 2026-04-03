@@ -879,11 +879,23 @@ router.get('/student/:studentId', protect, authorize('admin', 'accountant'), asy
       studentId: req.params.studentId
     })
       .populate('academicSessionId', 'name')
-      .sort({ issuedDate: -1 });
+      .sort({ issuedDate: -1 })
+      .lean();
+
+    // Enrich with feeItems for frontend display (items → feeItems mapping)
+    const enriched = invoices.map(inv => ({
+      ...inv,
+      feeItems: (inv.items || []).map(item => ({
+        name: item.feeHeadName,
+        amount: item.netAmount || item.periodAmount || item.amount || 0,
+        type: item.type,
+        frequency: item.frequency
+      }))
+    }));
 
     res.json({
       success: true,
-      data: invoices
+      data: enriched
     });
   } catch (error) {
     logger.error('Get student invoices error', error);
@@ -1404,55 +1416,31 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
   body('paymentDate').isISO8601().withMessage('Valid payment date is required'),
   handleValidationErrors
 ], async(req, res) => {
-  // Only use transactions if MongoDB supports them (replica set / Atlas)
-  const topology = mongoose.connection?.db?.s?.topology?.description?.type
-    || mongoose.connection?.readyState;
-  const canUseTransactions = topology === 'ReplicaSetWithPrimary' || topology === 'Sharded'
-    || (mongoose.connection?.client?.options?.replicaSet);
-
-  let session = null;
-  if (canUseTransactions) {
-    session = await mongoose.startSession();
-    session.startTransaction();
-  }
-
-  const sessionOpts = session ? { session } : {};
-
   try {
     const { studentId, invoiceId, amount, paymentMethod, paymentDate, transactionDetails, remarks } = req.body;
     const tenantId = req.user.tenantId;
 
-    // Verify invoice exists
+    // ── Step 1: Validate invoice ──
     const invoice = await FeeInvoice.findOne({ _id: invoiceId, tenantId });
 
     if (!invoice) {
-      if (session) {
-        await session.abortTransaction(); session.endSession();
-      }
       return res.status(404).json({ success: false, message: 'Invoice not found' });
     }
 
     if (invoice.status === 'Paid') {
-      if (session) {
-        await session.abortTransaction(); session.endSession();
-      }
       return res.status(400).json({ success: false, message: 'This invoice is already fully paid' });
     }
 
     if (toNumber(amount) > toNumber(invoice.balanceAmount) + 0.01) {
-      if (session) {
-        await session.abortTransaction(); session.endSession();
-      }
       return res.status(400).json({
         success: false,
         message: `Amount exceeds pending balance of ${roundToRupee(invoice.balanceAmount)}`
       });
     }
 
-    // Generate receipt number
+    // ── Step 2: Create Payment + Update Invoice (core — must succeed) ──
     const receiptNumber = await Payment.generateReceiptNumber(tenantId);
 
-    // Create Payment
     const payment = new Payment({
       tenantId,
       studentId,
@@ -1460,7 +1448,7 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       amount,
       paymentMethod,
       paymentDate: new Date(paymentDate),
-      transactionDetails,
+      transactionDetails: transactionDetails || {},
       remarks,
       receiptNumber,
       isConfirmed: true,
@@ -1469,137 +1457,126 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       collectedBy: req.user._id
     });
 
-    await payment.save(sessionOpts);
+    await payment.save();
 
-    // Update Invoice — use safe rounding; pre-save hook handles balance + status
     invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(amount));
-    await invoice.save(sessionOpts);
+    await invoice.save();
 
-    // Create PaymentAttempt + Receipt so student can see it in their portal
-    const idempotencyKey = `admin_${invoiceId}_${payment._id}`;
-    const attempt = new PaymentAttempt({
-      tenantId,
-      idempotencyKey,
-      studentId,
-      invoiceId,
-      amount,
-      status: 'VERIFIED',
-      triggerSource: 'ADMIN_MANUAL',
-      paymentMode: paymentMethod?.toUpperCase() === 'CASH' ? 'CASH'
-        : paymentMethod?.toUpperCase().includes('UPI') ? 'UPI'
-          : paymentMethod?.toUpperCase().includes('BANK') ? 'BANK_TRANSFER'
-            : 'OTHER',
-      transactionRefId: transactionDetails?.referenceNumber || null,
-      paymentDate: new Date(paymentDate),
-      verifiedBy: req.user._id,
-      verifiedAt: new Date()
-    });
-    await attempt.save(sessionOpts);
-
-    const studentReceiptNum = await Receipt.generateReceiptNumber(tenantId);
-    const studentReceipt = new Receipt({
-      tenantId,
-      paymentAttemptId: attempt._id,
-      studentId,
-      invoiceId,
-      receiptNumber: studentReceiptNum,
-      initiatedBy: 'admin',
-      verifiedByUserId: req.user._id,
-      verifiedByName: req.user.name || req.user.fullName || 'Admin',
-      amount,
-      paymentMode: attempt.paymentMode,
-      transactionRefId: transactionDetails?.referenceNumber || null,
-      paymentDate: new Date(paymentDate)
-    });
-    await studentReceipt.save(sessionOpts);
-
-    if (session) {
-      await session.commitTransaction();
-      session.endSession();
-    }
-
-    // Audit log (best effort)
-    try {
-      await FeeAuditLog.logAction({
-        tenantId,
-        action: 'PAYMENT_COLLECTED',
-        entityType: 'Payment',
-        entityId: payment._id,
-        userId: req.user._id,
-        userName: req.user.name || req.user.fullName || 'Admin',
-        userRole: req.user.role,
-        details: {
-          invoiceNumber: invoice.invoiceNumber,
-          receiptNumber,
-          amount,
-          paymentMethod,
-          studentId
-        },
-        ipAddress: req.ip
-      });
-    } catch (auditErr) {
-      console.error('Audit log failed (non-fatal):', auditErr.message);
-    }
-
-    // Update student balance (best effort)
-    try {
-      await StudentBalance.updateBalance(tenantId, studentId, invoice.academicSessionId);
-    } catch (balanceErr) {
-      console.error('Balance update failed (non-fatal):', balanceErr.message);
-    }
-
-    // Mark admission fee as paid if this invoice was an admission fee and is now fully paid
-    if (invoice.status === 'Paid' && invoice.billingPeriod?.displayText === 'Admission Fee') {
-      try {
-        await User.updateOne(
-          { _id: studentId, tenantId },
-          { $set: { admissionFeePaid: true } }
-        );
-      } catch (flagErr) {
-        console.error('admissionFeePaid flag update failed (non-fatal):', flagErr.message);
-      }
-    }
-
-    // Auto-sync to Finance module (non-blocking)
-    try {
-      const student = await User.findById(studentId).select('name fullName').lean();
-      await syncFeePaymentToIncome({
-        tenantId,
-        paymentId: payment._id,
-        amount,
-        paymentDate: new Date(paymentDate),
-        paymentMethod,
-        studentName: student?.fullName || student?.name || 'Student',
-        invoiceNumber: invoice.invoiceNumber,
-        addedBy: req.user._id,
-        paymentReference: transactionDetails?.referenceNumber || receiptNumber,
-        referenceModel: 'Payment'
-      });
-    } catch (syncErr) {
-      console.error('[Finance-AutoSync] collect-payment sync failed (non-fatal):', syncErr.message);
-    }
-
+    // ── Payment is committed — send success response immediately ──
     res.json({
       success: true,
       message: 'Payment collected successfully',
-      data: { payment, invoice }
+      data: {
+        payment: {
+          _id: payment._id,
+          receiptNumber: payment.receiptNumber,
+          amount: payment.amount,
+          paymentMethod: payment.paymentMethod,
+          paymentDate: payment.paymentDate,
+          isConfirmed: payment.isConfirmed
+        },
+        invoice: {
+          _id: invoice._id,
+          invoiceNumber: invoice.invoiceNumber,
+          totalAmount: invoice.totalAmount,
+          paidAmount: invoice.paidAmount,
+          balanceAmount: invoice.balanceAmount,
+          status: invoice.status
+        }
+      }
     });
 
-  } catch (error) {
-    if (session) {
-      try {
-        await session.abortTransaction();
-      } catch (_) { /* ignore abort errors */ }
-      try {
-        session.endSession();
-      } catch (_) { /* ignore session cleanup errors */ }
+    // ── Step 3: Side-effects (all best-effort, response already sent) ──
+
+    // Create PaymentAttempt + Receipt so student portal shows it
+    try {
+      const paymentModeMap = { CASH: 'CASH', UPI: 'UPI' };
+      const upperMethod = (paymentMethod || '').toUpperCase();
+      const resolvedMode = paymentModeMap[upperMethod]
+        || (upperMethod.includes('BANK') ? 'BANK_TRANSFER' : 'OTHER');
+
+      const attempt = new PaymentAttempt({
+        tenantId,
+        idempotencyKey: `admin_${invoiceId}_${payment._id}`,
+        studentId,
+        invoiceId,
+        amount,
+        status: 'VERIFIED',
+        triggerSource: 'ADMIN_MANUAL',
+        paymentMode: resolvedMode,
+        transactionRefId: transactionDetails?.referenceNumber || null,
+        paymentDate: new Date(paymentDate),
+        verifiedBy: req.user._id,
+        verifiedAt: new Date()
+      });
+      await attempt.save();
+
+      const studentReceiptNum = await Receipt.generateReceiptNumber(tenantId);
+      const studentReceipt = new Receipt({
+        tenantId,
+        paymentAttemptId: attempt._id,
+        studentId,
+        invoiceId,
+        receiptNumber: studentReceiptNum,
+        initiatedBy: 'admin',
+        verifiedByUserId: req.user._id,
+        verifiedByName: req.user.name || req.user.fullName || 'Admin',
+        amount,
+        paymentMode: resolvedMode,
+        transactionRefId: transactionDetails?.referenceNumber || null,
+        paymentDate: new Date(paymentDate)
+      });
+      await studentReceipt.save();
+    } catch (portalErr) {
+      logger.error('PaymentAttempt/Receipt creation failed (non-fatal)', { message: portalErr.message, paymentId: payment._id });
     }
 
-    console.error('Collect payment error:', error.message);
-    logger.error('Collect payment error', error);
+    // Audit log
+    try {
+      await FeeAuditLog.logAction({
+        tenantId, action: 'PAYMENT_COLLECTED', entityType: 'Payment', entityId: payment._id,
+        userId: req.user._id, userName: req.user.name || req.user.fullName || 'Admin', userRole: req.user.role,
+        details: { invoiceNumber: invoice.invoiceNumber, receiptNumber, amount, paymentMethod, studentId },
+        ipAddress: req.ip
+      });
+    } catch (_) { /* non-fatal */ }
+
+    // Update student balance
+    try {
+      await StudentBalance.updateBalance(tenantId, studentId, invoice.academicSessionId);
+    } catch (_) { /* non-fatal */ }
+
+    // Mark admission fee paid
+    if (invoice.status === 'Paid' && invoice.billingPeriod?.displayText === 'Admission Fee') {
+      try { await User.updateOne({ _id: studentId, tenantId }, { $set: { admissionFeePaid: true } }); } catch (_) { /* non-fatal */ }
+    }
+
+    // Auto-sync to Finance module
+    try {
+      const student = await User.findById(studentId).select('name fullName').lean();
+      await syncFeePaymentToIncome({
+        tenantId, paymentId: payment._id, amount, paymentDate: new Date(paymentDate), paymentMethod,
+        studentName: student?.fullName || student?.name || 'Student',
+        invoiceNumber: invoice.invoiceNumber, addedBy: req.user._id,
+        paymentReference: transactionDetails?.referenceNumber || receiptNumber, referenceModel: 'Payment'
+      });
+    } catch (_) { /* non-fatal */ }
+
+  } catch (error) {
+    logger.error('Collect payment error', { message: error.message, stack: error.stack, code: error.code });
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'Duplicate payment detected. This payment may have already been recorded.'
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Server error while collecting payment'
+      message: process.env.NODE_ENV === 'development'
+        ? `Payment error: ${error.message}`
+        : 'Server error while collecting payment'
     });
   }
 });

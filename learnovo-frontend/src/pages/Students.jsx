@@ -25,7 +25,7 @@ const StudentPhotoCell = ({ student }) => {
     return (
       <img
         src={photoUrl}
-        alt={student.fullName}
+        alt={student.fullName || student.name}
         className="h-10 w-10 rounded-full object-cover"
         onError={() => setImgFailed(true)}
       />
@@ -35,7 +35,7 @@ const StudentPhotoCell = ({ student }) => {
   return (
     <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center">
       <span className="text-sm font-semibold text-white">
-        {student.fullName?.charAt(0).toUpperCase() || 'U'}
+        {(student.fullName || student.name)?.charAt(0).toUpperCase() || 'U'}
       </span>
     </div>
   )
@@ -992,7 +992,7 @@ const Students = () => {
                     </td>
                     <td>
                       <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{student.fullName}</div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{student.fullName || student.name || [student.firstName, student.lastName].filter(Boolean).join(' ') || '—'}</div>
                         <div className="text-sm text-gray-500 dark:text-[#8E8E93]">{student.guardians?.[0]?.name}</div>
                       </div>
                     </td>

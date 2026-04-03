@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../utils/formatCurrency'
 import { formatDate } from '../utils/formatDate'
 import { sortByRelevance } from '../utils/searchRelevance'
-import { printReceiptHighQuality, downloadReceiptAsPdf } from '../utils/receiptHelpers'
+import { printReceiptHighQuality, downloadReceiptAsPdf, buildReceiptHtml } from '../utils/receiptHelpers'
 import toast from 'react-hot-toast'
 
 // Shared UI
@@ -247,10 +247,18 @@ const FeesFinance = () => {
 
   const handlePrintReceipt = async (paymentId) => {
     try {
-      const toastId = toast.loading('Preparing high quality receipt...')
+      const toastId = toast.loading('Opening receipt preview...')
       const response = await paymentsService.getReceipt(paymentId)
-      const { payment, school } = response.data; toast.dismiss(toastId)
-      await printReceiptHighQuality(payment, school)
+      const { payment, school } = response.data
+      toast.dismiss(toastId)
+      const html = buildReceiptHtml(payment, school)
+      const win = window.open('', '_blank', 'width=600,height=800')
+      if (win) {
+        win.document.write(html)
+        win.document.close()
+      } else {
+        toast.error('Pop-up blocked. Please allow pop-ups for this site.')
+      }
     } catch {
       toast.dismiss()
       toast.error('Failed to load receipt')

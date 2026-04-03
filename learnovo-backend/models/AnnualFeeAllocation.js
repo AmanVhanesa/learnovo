@@ -169,6 +169,19 @@ const annualFeeAllocationSchema = new mongoose.Schema({
     trim: true
   },
 
+  // Concession (e.g., 3rd student 50% off) — applied before invoice generation
+  concessionPercentage: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100
+  },
+
+  concessionReason: {
+    type: String,
+    trim: true
+  },
+
   generatedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
