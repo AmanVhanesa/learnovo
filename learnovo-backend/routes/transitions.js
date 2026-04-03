@@ -151,6 +151,67 @@ router.post('/promote/bulk', authorize('admin', 'principal'), async(req, res, ne
   }
 });
 
+// ─── BULK SHIFT STUDENTS (by admission numbers) ────────────────────────────
+
+// POST /api/transitions/shift-students
+router.post('/shift-students', authorize('admin', 'principal'), async(req, res, next) => {
+  try {
+    const { admissionNumbers, studentIds, toClass, toSection, academicYear, remarks, forceOverride } = req.body;
+    if (!toClass) {
+      return res.status(400).json({ success: false, message: 'toClass is required', requestId: req.requestId });
+    }
+    if (!academicYear) {
+      return res.status(400).json({ success: false, message: 'academicYear is required', requestId: req.requestId });
+    }
+    if ((!admissionNumbers || admissionNumbers.length === 0) && (!studentIds || studentIds.length === 0)) {
+      return res.status(400).json({ success: false, message: 'Provide admissionNumbers or studentIds', requestId: req.requestId });
+    }
+
+    const result = await transitionService.bulkShiftStudents({
+      tenantId: req.user.tenantId,
+      admissionNumbers: admissionNumbers || [],
+      studentIds: studentIds || [],
+      toClass,
+      toSection,
+      academicYear,
+      remarks,
+      forceOverride: forceOverride === true,
+      performedBy: req.user._id
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, errors: result.errors, requestId: req.requestId });
+    }
+
+    res.json({ success: true, message: 'Student shift completed', data: result.data, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/transitions/resolve-students — preview students from admission numbers
+router.post('/resolve-students', authorize('admin', 'principal'), async(req, res, next) => {
+  try {
+    const { admissionNumbers } = req.body;
+    if (!admissionNumbers || !Array.isArray(admissionNumbers) || admissionNumbers.length === 0) {
+      return res.status(400).json({ success: false, message: 'admissionNumbers array is required', requestId: req.requestId });
+    }
+
+    const result = await transitionService.resolveStudentsByAdmissionNumbers(
+      req.user.tenantId,
+      admissionNumbers
+    );
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, errors: result.errors, requestId: req.requestId });
+    }
+
+    res.json({ success: true, data: result.data, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ─── SECTION SHIFT ───────────────────────────────────────────────────────────
 
 // POST /api/transitions/shift-section/:studentId

@@ -1406,6 +1406,262 @@ async function getSectionsForClass(tenantId, className) {
   return result;
 }
 
+// ─── BULK SHIFT STUDENTS (by admission numbers or IDs) ─────────────────────
+
+/**
+ * Shift students to a target class + section by admission numbers or student IDs.
+ * Unlike promote/demote, this is a direct placement — no hierarchy logic.
+ */
+async function bulkShiftStudents({
+  tenantId, admissionNumbers = [], studentIds = [],
+  toClass, toSection, academicYear, remarks, forceOverride = false, performedBy
+}) {
+  const batchId = uuidv4();
+  const results = { shifted: 0, skipped: 0, failed: 0, notFound: [], details: [] };
+
+  if (!toClass) return { success: false, errors: ['Target class is required'] };
+  if (!academicYear) return { success: false, errors: ['Academic year is required'] };
+
+  // Validate target class + section exist
+  const { classDoc: targetClassDoc, sectionDoc: targetSectionDoc } = await resolveClassAndSection(tenantId, toClass, toSection);
+  if (!targetClassDoc) {
+    return { success: false, errors: [`Target class "${toClass}" does not exist for this school`] };
+  }
+  if (toSection && !targetSectionDoc) {
+    return { success: false, errors: [`Section "${toSection}" does not exist for class ${toClass}`] };
+  }
+
+  // Resolve students from admission numbers and/or IDs
+  const orConditions = [];
+  if (admissionNumbers.length > 0) {
+    // Normalize: trim whitespace, remove empty
+    const cleaned = admissionNumbers
+      .map(a => a.toString().trim())
+      .filter(a => a.length > 0);
+    if (cleaned.length > 0) {
+      orConditions.push({ admissionNumber: { $in: cleaned } });
+    }
+  }
+  if (studentIds.length > 0) {
+    const validIds = studentIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length > 0) {
+      orConditions.push({ _id: { $in: validIds } });
+    }
+  }
+
+  if (orConditions.length === 0) {
+    return { success: false, errors: ['Provide at least one admission number or student ID'] };
+  }
+
+  const students = await User.find({
+    tenantId,
+    role: 'student',
+    $or: orConditions
+  });
+
+  if (students.length === 0) {
+    return { success: false, errors: ['No students found matching the provided admission numbers or IDs'] };
+  }
+
+  // Track which admission numbers were not found
+  if (admissionNumbers.length > 0) {
+    const cleanedNums = admissionNumbers.map(a => a.toString().trim().toLowerCase()).filter(a => a.length > 0);
+    const foundNums = new Set(students.map(s => (s.admissionNumber || '').toLowerCase()));
+    results.notFound = cleanedNums.filter(n => !foundNums.has(n));
+  }
+
+  // Process in chunks
+  const CHUNK_SIZE = 50;
+  for (let i = 0; i < students.length; i += CHUNK_SIZE) {
+    const chunk = students.slice(i, i + CHUNK_SIZE);
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      for (const studentRef of chunk) {
+        const student = await User.findById(studentRef._id).session(session);
+        if (!student) {
+          results.failed++;
+          results.details.push({ admissionNumber: studentRef.admissionNumber, status: 'failed', reason: 'Student disappeared during processing' });
+          continue;
+        }
+
+        // Skip inactive students
+        if (!student.isActive) {
+          results.skipped++;
+          results.details.push({
+            admissionNumber: student.admissionNumber,
+            name: student.name || student.fullName,
+            status: 'skipped',
+            reason: `Student is ${student.removalReason || 'inactive'}`
+          });
+          continue;
+        }
+
+        // Skip if already in target class + section
+        if (student.class === toClass && (!toSection || student.section === toSection.toUpperCase())) {
+          results.skipped++;
+          results.details.push({
+            admissionNumber: student.admissionNumber,
+            name: student.name || student.fullName,
+            status: 'skipped',
+            reason: 'Already in target class/section'
+          });
+          continue;
+        }
+
+        // Check for duplicate transition this year (unless force override)
+        if (!forceOverride) {
+          const existing = await StudentClassHistory.findOne({
+            tenantId,
+            studentId: student._id,
+            academicYear,
+            actionType: 'transferred'
+          }).session(session);
+          if (existing) {
+            results.skipped++;
+            results.details.push({
+              admissionNumber: student.admissionNumber,
+              name: student.name || student.fullName,
+              status: 'skipped',
+              reason: `Already shifted for ${academicYear}`
+            });
+            continue;
+          }
+        }
+
+        const fromClass = student.class;
+        const fromSection = student.section;
+
+        // Preserve admission class on first move
+        if (!student.admissionClass) {
+          student.admissionClass = student.class;
+          student.admissionSection = student.section;
+        }
+
+        // Update student
+        student.class = toClass;
+        student.section = toSection ? toSection.toUpperCase() : student.section;
+        student.academicYear = academicYear;
+        student.classId = targetClassDoc._id;
+        if (targetSectionDoc) {
+          student.sectionId = targetSectionDoc._id;
+        }
+        await student.save({ session });
+
+        // Update section strengths
+        await updateSectionStrength(tenantId, fromClass, fromSection, -1, session);
+        await updateSectionStrength(tenantId, toClass, student.section, 1, session);
+
+        // Create history
+        await StudentClassHistory.create([{
+          tenantId,
+          studentId: student._id,
+          fromClass,
+          fromSection,
+          toClass,
+          toSection: student.section,
+          academicYear,
+          actionType: 'transferred',
+          performedBy,
+          remarks: remarks || `Bulk shift to ${toClass}-${student.section}`
+        }], { session });
+
+        // Create transition log
+        await TransitionLog.create([{
+          tenantId,
+          type: 'section_shift',
+          studentId: student._id,
+          performedBy,
+          fromClass,
+          fromSection,
+          toClass,
+          toSection: student.section,
+          fromAcademicYear: student.academicYear,
+          toAcademicYear: academicYear,
+          reason: remarks || `Bulk shift to ${toClass}-${student.section}`,
+          batchId
+        }], { session });
+
+        results.shifted++;
+        results.details.push({
+          studentId: student._id.toString(),
+          admissionNumber: student.admissionNumber,
+          name: student.name || student.fullName,
+          status: 'shifted',
+          fromClass,
+          fromSection,
+          toClass,
+          toSection: student.section
+        });
+      }
+
+      await session.commitTransaction();
+      session.endSession();
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      for (const s of chunk) {
+        if (!results.details.find(d => d.studentId === s._id.toString() || d.admissionNumber === s.admissionNumber)) {
+          results.failed++;
+          results.details.push({
+            admissionNumber: s.admissionNumber,
+            name: s.name || s.fullName,
+            status: 'failed',
+            reason: error.message
+          });
+        }
+      }
+      logger.error('Bulk shift chunk failed', error, { tenantId, batchId, chunkStart: i });
+    }
+  }
+
+  logger.info(`Bulk student shift complete: ${results.shifted} shifted, ${results.skipped} skipped, ${results.failed} failed`, {
+    tenantId, batchId, performedBy
+  });
+
+  return { success: true, data: { ...results, batchId } };
+}
+
+// ─── RESOLVE STUDENTS BY ADMISSION NUMBERS ─────────────────────────────────
+
+/**
+ * Lookup students by admission numbers (for preview before shift).
+ */
+async function resolveStudentsByAdmissionNumbers(tenantId, admissionNumbers) {
+  const cleaned = admissionNumbers
+    .map(a => a.toString().trim())
+    .filter(a => a.length > 0);
+
+  if (cleaned.length === 0) return { success: false, errors: ['No admission numbers provided'] };
+
+  const students = await User.find({
+    tenantId,
+    role: 'student',
+    admissionNumber: { $in: cleaned }
+  }).select('_id name fullName firstName lastName admissionNumber class section academicYear isActive removalReason').lean();
+
+  const foundNums = new Set(students.map(s => (s.admissionNumber || '').toLowerCase()));
+  const notFound = cleaned.filter(n => !foundNums.has(n.toLowerCase()));
+
+  return {
+    success: true,
+    data: {
+      students: students.map(s => ({
+        _id: s._id,
+        name: s.name || s.fullName || `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+        admissionNumber: s.admissionNumber,
+        class: s.class,
+        section: s.section,
+        academicYear: s.academicYear,
+        isActive: s.isActive,
+        removalReason: s.removalReason
+      })),
+      notFound
+    }
+  };
+}
+
 module.exports = {
   getClassHierarchy,
   getNextClass,
@@ -1422,5 +1678,7 @@ module.exports = {
   undoTransition,
   getTransitionHistory,
   recalculateSectionStrengths,
-  getSectionsForClass
+  getSectionsForClass,
+  bulkShiftStudents,
+  resolveStudentsByAdmissionNumbers
 };

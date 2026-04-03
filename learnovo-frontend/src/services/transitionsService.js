@@ -86,6 +86,18 @@ export const transitionsService = {
   getSectionsForClass: async (className) => {
     const { data } = await api.get(`/transitions/sections/${encodeURIComponent(className)}`)
     return data
+  },
+
+  // Bulk shift students by admission numbers / IDs to a target class+section
+  shiftStudents: async (payload) => {
+    const { data } = await api.post('/transitions/shift-students', payload)
+    return data
+  },
+
+  // Resolve/preview students from admission numbers before shifting
+  resolveStudents: async (admissionNumbers) => {
+    const { data } = await api.post('/transitions/resolve-students', { admissionNumbers })
+    return data
   }
 }
 

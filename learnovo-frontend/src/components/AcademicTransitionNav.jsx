@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { TrendingUp, ArrowRightLeft, CalendarClock, History, Users } from 'lucide-react'
+import { TrendingUp, ArrowRightLeft, CalendarClock, History, Users, Shuffle } from 'lucide-react'
 
 const links = [
   { to: '/app/academic/promotion', label: 'Promotion', icon: TrendingUp },
+  { to: '/app/academic/shifting', label: 'Shifting', icon: Shuffle },
   { to: '/app/academic/sections', label: 'Sections', icon: ArrowRightLeft },
   { to: '/app/academic/year-rollover', label: 'Year Rollover', icon: CalendarClock },
   { to: '/app/academic/history', label: 'History', icon: History },

@@ -62,6 +62,7 @@ const PromotionDashboard = lazy(() => import('./pages/PromotionDashboard'))
 const SectionManagement = lazy(() => import('./pages/SectionManagement'))
 const YearRollover = lazy(() => import('./pages/YearRollover'))
 const TransitionHistory = lazy(() => import('./pages/TransitionHistory'))
+const StudentShifting = lazy(() => import('./pages/StudentShifting'))
 const StudentDetail = lazy(() => import('./pages/StudentDetail'))
 const StudentLists = lazy(() => import('./pages/StudentLists'))
 const Employees = lazy(() => import('./pages/Employees'))
@@ -259,6 +260,11 @@ function App() {
                       <Route path="academic/history" element={
                         <ProtectedRoute allowedRoles={['admin', 'principal']}>
                           <TransitionHistory />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="academic/shifting" element={
+                        <ProtectedRoute allowedRoles={['admin', 'principal']}>
+                          <StudentShifting />
                         </ProtectedRoute>
                       } />
                       <Route path="students/:id" element={
