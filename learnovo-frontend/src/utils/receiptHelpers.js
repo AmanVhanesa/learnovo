@@ -363,9 +363,47 @@ export async function printReceiptHighQuality(rawPayment, rawSchool, opts = {}) 
 
 
 /* ═══════════════════════════════════════════════════════════
-   PDF DOWNLOAD — draws directly with jsPDF (vector text, no html2canvas)
+   PDF DOWNLOAD — renders same HTML template via html2canvas
    ═══════════════════════════════════════════════════════════ */
 
+export async function downloadReceiptAsPdf(rawPayment, rawSchool) {
+  const payment = normalizePayment(rawPayment)
+  const [logoDataUrl, signatureDataUrl] = await Promise.all([
+    toBase64DataUrl(normalizeSchool(rawSchool).logo),
+    toBase64DataUrl(normalizeSchool(rawSchool).principalSignature)
+  ])
+  const html = buildReceiptHtml(rawPayment, rawSchool, { logoDataUrl, signatureDataUrl })
+
+  // Render in hidden container — 720px matches 190mm at 96dpi
+  const container = document.createElement('div')
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:720px;background:#fff;z-index:-1;'
+  // Strip <html>/<head>/<body> tags, inject just the inner content
+  container.innerHTML = html.replace(/<html[\s\S]*?<body[^>]*>/, '').replace(/<\/body[\s\S]*$/, '')
+  // Also inject the styles from the <style> tag
+  const styleMatch = html.match(/<style>([\s\S]*?)<\/style>/)
+  if (styleMatch) {
+    const styleEl = document.createElement('style')
+    styleEl.textContent = styleMatch[1]
+    container.prepend(styleEl)
+  }
+  // Remove toolbar from the container
+  const toolbar = container.querySelector('.toolbar')
+  if (toolbar) toolbar.remove()
+  document.body.appendChild(container)
+
+  await new Promise(r => setTimeout(r, 500))
+
+  try {
+    const target = container.querySelector('.page')
+    await highQualityPrint(target, `Receipt-${payment.receiptNumber || 'receipt'}`, {
+      scale: 3, format: 'a4', orientation: 'portrait', margin: 4,
+    })
+  } finally {
+    document.body.removeChild(container)
+  }
+}
+
+/* ── dead code below — kept to avoid import errors if referenced elsewhere ── */
 const C = {
   black: '#0f172a',
   text: '#111827',
@@ -394,7 +432,8 @@ function hexToRgb(hex) {
   return [r, g, b]
 }
 
-export async function downloadReceiptAsPdf(rawPayment, rawSchool) {
+// Old vector jsPDF download — no longer used, kept to prevent dead reference errors
+async function _oldDownloadReceiptAsPdf_UNUSED(rawPayment, rawSchool) {
   const school = normalizeSchool(rawSchool)
   const payment = normalizePayment(rawPayment)
 

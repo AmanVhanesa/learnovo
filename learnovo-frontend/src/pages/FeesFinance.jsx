@@ -235,14 +235,18 @@ const FeesFinance = () => {
   }
 
   const handleDownloadReceiptPdf = async (paymentId) => {
+    const toastId = toast.loading('Generating PDF...')
     try {
-      const toastId = toast.loading('Generating PDF...')
       const response = await paymentsService.getReceipt(paymentId)
       const { payment, school } = response.data
       await downloadReceiptAsPdf(payment, school)
       toast.dismiss(toastId)
       toast.success('Receipt downloaded!')
-    } catch { toast.error('Failed to download receipt') }
+    } catch (err) {
+      toast.dismiss(toastId)
+      console.error('Receipt download error:', err)
+      toast.error('Failed to download receipt')
+    }
   }
 
   const handlePrintReceipt = async (paymentId) => {
