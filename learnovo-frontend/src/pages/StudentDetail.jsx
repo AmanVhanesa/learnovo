@@ -442,7 +442,7 @@ const StudentDetail = () => {
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Admission Class</p>
-                                <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{admissionClassInfo}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.admissionClass || admissionClassInfo}</p>
                             </div>
                             <div>
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Admission Date</p>
@@ -832,7 +832,7 @@ const StudentDetail = () => {
                                 Class Update History
                             </h3>
                             <span className="text-sm text-gray-500 dark:text-[#8E8E93] bg-gray-100 dark:bg-[#2C2C2E] px-3 py-1 rounded-full whitespace-nowrap">
-                                Admitted In: <span className="font-semibold text-gray-800 dark:text-white">{admissionClassInfo}</span>
+                                Admitted In: <span className="font-semibold text-gray-800 dark:text-white">{student.admissionClass || admissionClassInfo}</span>
                             </span>
                         </div>
                         {classHistory.length > 0 ? (

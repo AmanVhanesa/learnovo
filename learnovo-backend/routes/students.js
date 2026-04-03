@@ -324,7 +324,7 @@ router.get('/import/template', protect, authorize('admin'), planGate.requireActi
   try {
     const fields = [
       'fullName', 'email', 'phone', 'dateOfBirth', 'gender',
-      'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear', 'admissionDate',
+      'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear', 'admissionDate', 'admissionClass',
       'bloodGroup', 'category', 'religion',
       'fatherName', 'fatherPhone', 'fatherEmail',
       'motherName', 'motherPhone', 'motherEmail',
@@ -338,7 +338,7 @@ router.get('/import/template', protect, authorize('admin'), planGate.requireActi
     // Create header row
     const csvContent = `${fields.join(',')  }\n` +
       // Add a sample row
-      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,,,';
+      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,10,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,,,';
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.csv');
@@ -358,7 +358,7 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
 
     const fields = [
       'fullName', 'email', 'phone', 'dateOfBirth', 'gender',
-      'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear', 'admissionDate',
+      'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear', 'admissionDate', 'admissionClass',
       'bloodGroup', 'category', 'religion',
       'fatherName', 'fatherPhone', 'fatherEmail',
       'motherName', 'motherPhone', 'motherEmail',
@@ -381,6 +381,7 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
       'section': 'A',
       'academicYear': '2024-2025',
       'admissionDate': '2024-04-01',
+      'admissionClass': '10',
       'bloodGroup': 'A+',
       'category': 'General',
       'religion': 'Hindu',
@@ -1207,6 +1208,13 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
         if (row.section && row.section.trim() && !studentData.section) {
           studentData.section = row.section.trim().toUpperCase();
         }
+        // Set admissionClass from CSV or fall back to current class
+        if (row.admissionClass && row.admissionClass.trim()) {
+          studentData.admissionClass = row.admissionClass.trim();
+        } else if (studentData.class) {
+          studentData.admissionClass = studentData.class;
+        }
+
         if (row.rollNumber && row.rollNumber.trim()) {
           studentData.rollNumber = row.rollNumber.trim();
         }
@@ -1654,6 +1662,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
       // Academic
       academicYear: { label: 'Academic Year', extract: (s) => s.academicYear || '' },
       admissionDate: { label: 'Admission Date', extract: (s) => s.admissionDate ? new Date(s.admissionDate).toLocaleDateString('en-IN') : '' },
+      admissionClass: { label: 'Admission Class', extract: (s) => s.admissionClass || '' },
       penNumber: { label: 'PEN Number', extract: (s) => s.penNumber || '' },
       subDepartment: { label: 'Sub Department', extract: (s) => s.subDepartment?.name || '' },
 
@@ -1890,7 +1899,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
 
     const {
       fullName, name, firstName, middleName, lastName, email, phone: _phone, password,
-      classId, class: studentClass, section, academicYear, rollNumber, admissionDate,
+      classId, class: studentClass, section, academicYear, rollNumber, admissionDate, admissionClass,
       guardians, address, avatar,
       penNumber, subDepartment, udiseCode,
       transportMode, driverId,
@@ -2006,6 +2015,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       academicYear,
       rollNumber,
       admissionDate: admissionDate || new Date(),
+      admissionClass: admissionClass || studentClass || undefined,
       guardians, address, avatar,
       // Backfill legacy fatherOrHusbandName from guardians for backward compatibility
       fatherOrHusbandName: guardians?.find(g => g.relation === 'Father')?.name || undefined,

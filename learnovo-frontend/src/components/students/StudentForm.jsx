@@ -29,6 +29,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         academicYear: student?.academicYear || defaultAcademicYear,
         rollNumber: student?.rollNumber || '',
         admissionDate: student?.admissionDate ? student.admissionDate.substring(0, 10) : '',
+        admissionClass: student?.admissionClass || '',
         admissionNumber: student?.admissionNumber || '',
         penNumber: student?.penNumber || '',
 
@@ -691,7 +692,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                    <div className={`grid grid-cols-1 ${student ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 mt-4`}>
                                         <div>
                                             <label className="label">Admission Date</label>
                                             <input
@@ -704,6 +705,21 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             {formErrors.admissionDate && (
                                                 <p className="text-xs text-red-500 mt-1">{formErrors.admissionDate}</p>
                                             )}
+                                        </div>
+                                        <div>
+                                            <label className="label">Admission Class</label>
+                                            <select
+                                                className="input"
+                                                value={form.admissionClass}
+                                                onChange={(e) => updateField('admissionClass', e.target.value)}
+                                            >
+                                                <option value="">Select Admission Class</option>
+                                                {classOptions.map(cls => (
+                                                    <option key={cls._id} value={cls.grade || cls.name}>
+                                                        {cls.name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
                                         {student && (
                                             <div>
