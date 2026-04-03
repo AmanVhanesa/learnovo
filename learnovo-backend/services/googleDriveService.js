@@ -1,10 +1,16 @@
 const { google } = require('googleapis');
 const { Readable } = require('stream');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Google Drive Service for Learnovo Backup
  *
  * Uses OAuth2 with a refresh token (works with personal Google accounts).
+ *
+ * IMPORTANT: Make sure your Google Cloud OAuth consent screen is set to
+ * "In production" (not "Testing"). In Testing mode, Google expires refresh
+ * tokens after 7 days, causing repeated auth failures.
  *
  * Env vars required:
  *   GOOGLE_DRIVE_CLIENT_ID      - OAuth2 client ID
@@ -15,6 +21,9 @@ const { Readable } = require('stream');
 
 let _driveClient = null;
 
+// Path to config.env for persisting rotated refresh tokens
+const CONFIG_ENV_PATH = path.resolve(__dirname, '..', 'config.env');
+
 function isConfigured() {
   return !!(
     process.env.GOOGLE_DRIVE_CLIENT_ID &&
@@ -22,6 +31,32 @@ function isConfigured() {
     process.env.GOOGLE_DRIVE_REFRESH_TOKEN &&
     process.env.GOOGLE_DRIVE_FOLDER_ID
   );
+}
+
+/**
+ * Persist a new refresh token to config.env so it survives PM2 restarts.
+ * Google may rotate refresh tokens at any time — if we don't save the new
+ * one, the old token in config.env becomes invalid on next restart.
+ */
+function persistRefreshToken(newToken) {
+  try {
+    if (!fs.existsSync(CONFIG_ENV_PATH)) return;
+
+    let content = fs.readFileSync(CONFIG_ENV_PATH, 'utf8');
+    const regex = /^GOOGLE_DRIVE_REFRESH_TOKEN=.*/m;
+
+    if (regex.test(content)) {
+      content = content.replace(regex, `GOOGLE_DRIVE_REFRESH_TOKEN=${newToken}`);
+    } else {
+      content += `\nGOOGLE_DRIVE_REFRESH_TOKEN=${newToken}\n`;
+    }
+
+    fs.writeFileSync(CONFIG_ENV_PATH, content, 'utf8');
+    process.env.GOOGLE_DRIVE_REFRESH_TOKEN = newToken;
+    console.log('[GDrive] Refresh token rotated and saved to config.env');
+  } catch (err) {
+    console.error('[GDrive] Failed to persist rotated refresh token:', err.message);
+  }
 }
 
 /**
@@ -48,10 +83,19 @@ function getDriveClient() {
     refresh_token: process.env.GOOGLE_DRIVE_REFRESH_TOKEN
   });
 
-  // Automatically update credentials when new tokens are received
+  // When Google issues new tokens, MERGE with existing credentials.
+  // tokens event usually only contains { access_token, expiry_date }
+  // — calling setCredentials(tokens) alone would ERASE the refresh_token,
+  // causing "No refresh token is set" on the next refresh attempt.
   oauth2Client.on('tokens', (tokens) => {
-    if (tokens.access_token) {
-      oauth2Client.setCredentials(tokens);
+    oauth2Client.setCredentials({
+      ...oauth2Client.credentials,
+      ...tokens
+    });
+
+    // Google rotated the refresh token — save it so it survives restarts
+    if (tokens.refresh_token && tokens.refresh_token !== process.env.GOOGLE_DRIVE_REFRESH_TOKEN) {
+      persistRefreshToken(tokens.refresh_token);
     }
   });
   oauth2Client.on('error', () => {

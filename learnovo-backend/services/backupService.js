@@ -61,8 +61,16 @@ async function createAndUploadBackup(tenantId, performedBy, type = 'manual') {
     let storageLocation = 'local';
 
     if (googleDriveService.isConfigured()) {
-      driveResult = await googleDriveService.uploadOrReplace(tenantId, buffer);
-      storageLocation = 'google_drive';
+      try {
+        driveResult = await googleDriveService.uploadOrReplace(tenantId, buffer);
+        storageLocation = 'google_drive';
+      } catch (uploadErr) {
+        logger.error('Google Drive upload failed, falling back to local backup', {
+          tenantId,
+          error: uploadErr.message
+        });
+        // Continue with local backup — don't fail the whole operation
+      }
     }
 
     const log = await BackupLog.create({

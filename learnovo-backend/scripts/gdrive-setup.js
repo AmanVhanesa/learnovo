@@ -61,6 +61,20 @@ const server = http.createServer(async(req, res) => {
       console.log(`GOOGLE_DRIVE_CLIENT_SECRET=${clientSecret}`);
       console.log(`GOOGLE_DRIVE_REFRESH_TOKEN=${tokens.refresh_token}`);
       console.log('');
+      console.log('─────────────────────────────────────────────────────────');
+      console.log('IMPORTANT: Publish your OAuth consent screen!');
+      console.log('');
+      console.log('If your Google Cloud project\'s OAuth consent screen is');
+      console.log('still in "Testing" mode, refresh tokens expire after 7 days.');
+      console.log('');
+      console.log('To fix this permanently:');
+      console.log('  1. Go to https://console.cloud.google.com/apis/credentials/consent');
+      console.log('  2. Click "PUBLISH APP"');
+      console.log('  3. Confirm (no Google review needed for drive.file scope)');
+      console.log('');
+      console.log('Once published, refresh tokens will NOT expire.');
+      console.log('─────────────────────────────────────────────────────────');
+      console.log('');
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'text/html' });
       res.end(`<html><body><h2>Error</h2><p>${error.message}</p></body></html>`);

@@ -36,14 +36,18 @@ router.post('/backup', async(req, res) => {
 
     // Fire-and-forget: upload to Google Drive + log
     (async() => {
-      try {
-        let driveFileId;
-        let storageLocation = 'local';
+      let driveFileId;
+      let storageLocation = 'local';
 
+      try {
         if (googleDriveService.isConfigured()) {
-          const driveResult = await googleDriveService.uploadOrReplace(tenantId, buffer);
-          driveFileId = driveResult.fileId;
-          storageLocation = 'google_drive';
+          try {
+            const driveResult = await googleDriveService.uploadOrReplace(tenantId, buffer);
+            driveFileId = driveResult.fileId;
+            storageLocation = 'google_drive';
+          } catch (uploadErr) {
+            logger.error('Background Drive upload failed, logging as local', uploadErr, { tenantId });
+          }
         }
 
         await BackupLog.create({
@@ -59,7 +63,7 @@ router.post('/backup', async(req, res) => {
           storageLocation
         });
       } catch (err) {
-        logger.error('Post-download backup logging/upload failed', err, { tenantId });
+        logger.error('Post-download backup logging failed', err, { tenantId });
       }
     })();
   } catch (error) {
@@ -101,6 +105,15 @@ router.post('/backup/cloud', async(req, res) => {
     });
   }
 
+  // Verify the token actually works before creating the full backup
+  const connection = await googleDriveService.checkConnection();
+  if (!connection.ok) {
+    return res.status(400).json({
+      success: false,
+      message: `Google Drive connection failed: ${connection.error}`
+    });
+  }
+
   try {
     const { log, driveResult, metadata } = await backupService.createAndUploadBackup(
       tenantId, req.user._id, 'manual'
@@ -108,9 +121,12 @@ router.post('/backup/cloud', async(req, res) => {
 
     res.json({
       success: true,
-      message: 'Backup uploaded to Google Drive successfully.',
+      message: driveResult
+        ? 'Backup uploaded to Google Drive successfully.'
+        : 'Backup saved locally (Google Drive upload failed).',
       data: {
         driveFileId: driveResult?.fileId,
+        storageLocation: driveResult ? 'google_drive' : 'local',
         sizeBytes: metadata.sizeBytes,
         collectionsCount: metadata.collectionsCount,
         documentsCount: metadata.documentsCount,

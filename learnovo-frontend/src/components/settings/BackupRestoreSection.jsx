@@ -22,7 +22,7 @@ const BackupRestoreSection = () => {
   const backupHistory = historyData || []
 
   // Fetch cloud backup status
-  const { data: cloudData } = useQuery({
+  const { data: cloudData, isLoading: cloudLoading } = useQuery({
     queryKey: ['cloud-backup-status'],
     queryFn: async () => {
       const res = await backupService.getCloudStatus()
@@ -157,7 +157,11 @@ const BackupRestoreSection = () => {
           Google Drive Backup
         </h3>
 
-        {cloudStatus.configured && cloudStatus.active !== false ? (
+        {cloudLoading ? (
+          <div className="mt-3 flex items-center gap-2 py-4 text-gray-500 dark:text-[#8E8E93]">
+            <Loader className="h-4 w-4 animate-spin" /> Checking Google Drive connection...
+          </div>
+        ) : cloudStatus.configured && cloudStatus.active !== false ? (
           <div className="mt-3 space-y-3">
             {cloudStatus.file ? (
               <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-[#8E8E93]">
