@@ -258,6 +258,31 @@ export const feesReportsService = {
     const url = `/fees/class-wise-report${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)
     return res.data
+  },
+
+  exportReceipts: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
+    if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
+    params.append('format', filters.format || 'excel')
+
+    const url = `/fees/receipts/export${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url, { responseType: 'blob' })
+    return res.data
+  },
+
+  exportCollectionReport: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
+    if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
+    if (filters.classId) params.append('classId', filters.classId)
+    params.append('format', filters.format || 'excel')
+
+    const url = `/fees/collection-report/export${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url, { responseType: 'blob' })
+    return res.data
   }
 }
 

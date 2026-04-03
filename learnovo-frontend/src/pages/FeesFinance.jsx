@@ -279,6 +279,58 @@ const FeesFinance = () => {
     }
   }
 
+  const handleExportReceipts = async (fmt) => {
+    const toastId = toast.loading(`Exporting ${fmt.toUpperCase()}...`)
+    try {
+      const blob = await feesReportsService.exportReceipts({
+        startDate: receiptFilters.startDate,
+        endDate: receiptFilters.endDate,
+        paymentMethod: receiptFilters.paymentMethod,
+        format: fmt
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `fee_receipts_${new Date().toISOString().split('T')[0]}.${fmt === 'excel' ? 'xlsx' : 'csv'}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.dismiss(toastId)
+      toast.success('Exported successfully')
+    } catch {
+      toast.dismiss(toastId)
+      toast.error('Failed to export receipts')
+    }
+  }
+
+  const handleExportCollectionReport = async (fmt) => {
+    const toastId = toast.loading(`Exporting ${fmt.toUpperCase()}...`)
+    try {
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(1)
+      const blob = await feesReportsService.exportCollectionReport({
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        format: fmt
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `collection_report_${new Date().toISOString().split('T')[0]}.${fmt === 'excel' ? 'xlsx' : 'csv'}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.dismiss(toastId)
+      toast.success('Exported successfully')
+    } catch {
+      toast.dismiss(toastId)
+      toast.error('Failed to export collection report')
+    }
+  }
+
   // ── Early returns ──
 
   if (isLoading) return <LoadingSpinner size="lg" />
@@ -331,10 +383,10 @@ const FeesFinance = () => {
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
         {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
         {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} />}
-        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} />}
+        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} />}
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
-        {activeTab === 'reports' && collectionReport && <ReportsTab report={collectionReport} />}
+        {activeTab === 'reports' && collectionReport && <ReportsTab report={collectionReport} onExport={handleExportCollectionReport} />}
       </div>
 
       {/* Modals */}
@@ -886,7 +938,7 @@ const DefaultersTab = ({ defaulters, loading }) => {
 
 // ── Receipts Tab ──
 
-const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt }) => (
+const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport }) => (
   <div className="space-y-4">
     <div className="card p-3 sm:p-4">
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
@@ -895,6 +947,13 @@ const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilter
         <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">From</label><input type="date" value={filters.startDate} onChange={e => onFilterChange({ ...filters, startDate: e.target.value })} className="input text-sm" /></div>
         <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">To</label><input type="date" value={filters.endDate} onChange={e => onFilterChange({ ...filters, endDate: e.target.value })} className="input text-sm" /></div>
         <button onClick={onClearFilters} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><X className="h-3.5 w-3.5" /> Clear</button>
+        <div className="relative group">
+          <button className="btn btn-outline btn-sm flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
+          <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-10 hidden group-hover:block">
+            <button onClick={() => onExport('csv')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
+            <button onClick={() => onExport('excel')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+          </div>
+        </div>
       </div>
     </div>
     <div className="card overflow-hidden">
@@ -972,9 +1031,18 @@ const DisputesTab = ({ data, loading, resolvingDispute, resolveForm, onSetResolv
 
 // ── Reports Tab ──
 
-const ReportsTab = ({ report }) => (
+const ReportsTab = ({ report, onExport }) => (
   <div className="card p-4 sm:p-6">
-    <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-6">Collection Report (This Month)</h3>
+    <div className="flex items-center justify-between mb-6">
+      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Collection Report (This Month)</h3>
+      <div className="relative group">
+        <button className="btn btn-outline btn-sm flex items-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
+        <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-10 hidden group-hover:block">
+          <button onClick={() => onExport('csv')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
+          <button onClick={() => onExport('excel')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+        </div>
+      </div>
+    </div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
       <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-xl"><p className="text-sm font-medium text-green-900 dark:text-green-300">Total Collected</p><p className="text-2xl font-bold text-green-700 dark:text-green-400 mt-2">{formatCurrency(report.summary.totalAmount)}</p><p className="text-sm text-green-600 dark:text-green-400/80 mt-1">{report.summary.totalCount} payments</p></div>
       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-xl"><p className="text-sm font-medium text-blue-900 dark:text-blue-300">Daily Average</p><p className="text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">{formatCurrency(report.summary.totalAmount / (report.byDate?.length || 1))}</p></div>

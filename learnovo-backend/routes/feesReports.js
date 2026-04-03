@@ -6,6 +6,7 @@ const StudentBalance = require('../models/StudentBalance');
 const { protect, authorize } = require('../middleware/auth');
 const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, sumMoney } = require('../utils/money');
+const ImportExportService = require('../services/importExportService');
 
 const planGate = require('../middleware/planGate');
 
@@ -452,6 +453,213 @@ router.get('/class-wise-report', protect, authorize('admin', 'accountant'), asyn
     res.status(500).json({
       success: false,
       message: 'Server error while generating class-wise report'
+    });
+  }
+});
+
+// @desc    Export receipts / fee collection list as CSV or Excel
+// @route   GET /api/fees/receipts/export
+// @access  Private (Admin, Accountant)
+router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(req, res) => {
+  try {
+    const { startDate, endDate, paymentMethod, format: fmt } = req.query;
+    const tenantId = req.user.tenantId;
+
+    const filter = { tenantId, isReversed: false };
+
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
+
+    if (startDate || endDate) {
+      filter.paymentDate = {};
+      if (startDate) filter.paymentDate.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        filter.paymentDate.$lte = end;
+      }
+    }
+
+    const payments = await Payment.find(filter)
+      .populate('studentId', 'name fullName admissionNumber studentId classId')
+      .populate({
+        path: 'studentId',
+        populate: { path: 'classId', select: 'name' }
+      })
+      .populate('invoiceId', 'invoiceNumber')
+      .populate('collectedBy', 'name')
+      .sort({ paymentDate: -1, createdAt: -1 })
+      .lean();
+
+    const columns = [
+      { key: 'receiptNumber', header: 'Receipt No.' },
+      { key: 'studentId.admissionNumber', header: 'Admission No.' },
+      {
+        key: 'studentName',
+        header: 'Student Name',
+        format: (v) => v || 'N/A'
+      },
+      {
+        key: 'className',
+        header: 'Class',
+        format: (v) => v || '-'
+      },
+      { key: 'invoiceId.invoiceNumber', header: 'Invoice No.' },
+      {
+        key: 'amount',
+        header: 'Amount',
+        format: (v) => (v != null ? Number(v).toFixed(2) : '0.00')
+      },
+      { key: 'paymentMethod', header: 'Payment Method' },
+      {
+        key: 'paymentDate',
+        header: 'Payment Date',
+        format: (v) => (v ? new Date(v).toLocaleDateString('en-IN') : '')
+      },
+      {
+        key: 'isConfirmed',
+        header: 'Confirmed',
+        format: (v) => (v ? 'Yes' : 'No')
+      },
+      {
+        key: 'collectedBy.name',
+        header: 'Collected By',
+        format: (v) => v || '-'
+      },
+      { key: 'remarks', header: 'Remarks', format: (v) => v || '' }
+    ];
+
+    // Flatten nested student fields for the export service
+    const data = payments.map(p => ({
+      ...p,
+      studentName: p.studentId?.fullName || p.studentId?.name || 'N/A',
+      className: p.studentId?.classId?.name || '-'
+    }));
+
+    const today = new Date().toISOString().split('T')[0];
+    let buffer, contentType, ext;
+
+    if (fmt === 'excel') {
+      buffer = ImportExportService.exportToExcel(data, columns, 'Receipts');
+      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      ext = 'xlsx';
+    } else {
+      buffer = await ImportExportService.exportToCSV(data, columns);
+      contentType = 'text/csv';
+      ext = 'csv';
+    }
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename=fee_receipts_${today}.${ext}`);
+    res.status(200).send(buffer);
+  } catch (error) {
+    logger.error('Receipts export error', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while exporting receipts'
+    });
+  }
+});
+
+// @desc    Export collection report summary as CSV or Excel
+// @route   GET /api/fees/collection-report/export
+// @access  Private (Admin, Accountant)
+router.get('/collection-report/export', protect, authorize('admin', 'accountant'), async(req, res) => {
+  try {
+    const { startDate, endDate, paymentMethod, classId, format: fmt } = req.query;
+    const tenantId = req.user.tenantId;
+
+    const filter = {
+      tenantId,
+      isConfirmed: true,
+      isReversed: false
+    };
+
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
+
+    if (startDate || endDate) {
+      filter.paymentDate = {};
+      if (startDate) filter.paymentDate.$gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        filter.paymentDate.$lte = end;
+      }
+    }
+
+    let payments = await Payment.find(filter)
+      .populate('studentId', 'name fullName admissionNumber studentId classId')
+      .populate({
+        path: 'studentId',
+        populate: { path: 'classId', select: 'name' }
+      })
+      .populate('invoiceId', 'invoiceNumber')
+      .populate('collectedBy', 'name')
+      .sort({ paymentDate: -1 })
+      .lean();
+
+    if (classId) {
+      payments = payments.filter(p => p.studentId?.classId?._id?.toString() === classId);
+    }
+
+    const columns = [
+      { key: 'receiptNumber', header: 'Receipt No.' },
+      { key: 'studentId.admissionNumber', header: 'Admission No.' },
+      {
+        key: 'studentName',
+        header: 'Student Name',
+        format: (v) => v || 'N/A'
+      },
+      {
+        key: 'className',
+        header: 'Class',
+        format: (v) => v || '-'
+      },
+      { key: 'invoiceId.invoiceNumber', header: 'Invoice No.' },
+      {
+        key: 'amount',
+        header: 'Amount',
+        format: (v) => (v != null ? Number(v).toFixed(2) : '0.00')
+      },
+      { key: 'paymentMethod', header: 'Payment Method' },
+      {
+        key: 'paymentDate',
+        header: 'Payment Date',
+        format: (v) => (v ? new Date(v).toLocaleDateString('en-IN') : '')
+      },
+      {
+        key: 'collectedBy.name',
+        header: 'Collected By',
+        format: (v) => v || '-'
+      }
+    ];
+
+    const data = payments.map(p => ({
+      ...p,
+      studentName: p.studentId?.fullName || p.studentId?.name || 'N/A',
+      className: p.studentId?.classId?.name || '-'
+    }));
+
+    const today = new Date().toISOString().split('T')[0];
+    let buffer, contentType, ext;
+
+    if (fmt === 'excel') {
+      buffer = ImportExportService.exportToExcel(data, columns, 'Collection Report');
+      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      ext = 'xlsx';
+    } else {
+      buffer = await ImportExportService.exportToCSV(data, columns);
+      contentType = 'text/csv';
+      ext = 'csv';
+    }
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename=collection_report_${today}.${ext}`);
+    res.status(200).send(buffer);
+  } catch (error) {
+    logger.error('Collection report export error', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while exporting collection report'
     });
   }
 });
