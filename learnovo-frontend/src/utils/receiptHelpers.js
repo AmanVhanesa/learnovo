@@ -113,26 +113,26 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
 <title>Receipt #${payment.receiptNumber}</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-  @page { size: A4 portrait; margin: 5mm; }
+  @page { size: A4 portrait; margin: 8mm 10mm; }
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
-    width: 100%;
+    width: 190mm;
     font-family: 'Helvetica Neue', 'Arial', 'Noto Sans', sans-serif;
     color: #111827; background: #fff;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
     text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
   }
 
-  .page { width: 100%; max-width: 760px; margin: 0 auto; background: #fff; }
+  .page { width: 190mm; margin: 0 auto; background: #fff; }
 
   .card {
-    background: #ffffff; border-radius: 6px; border: 1px solid #e5e7eb;
+    background: #ffffff; border-radius: 6px; border: 1px solid #d1d5db;
     overflow: hidden; display: flex; flex-direction: column; position: relative;
   }
 
   /* ═══ DECORATIVE SHAPES ═══ */
-  .deco-shapes { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: hidden; border-radius: 8px; }
+  .deco-shapes { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: hidden; border-radius: 6px; }
   .deco-shapes .s1 { position: absolute; top: -30px; right: -20px; width: 160px; height: 160px; background: #eef9f7; border-radius: 50%; }
   .deco-shapes .s2 { position: absolute; top: 40px; right: -40px; width: 120px; height: 220px; background: #f2faf9; transform: rotate(-25deg); border-radius: 40px; }
   .deco-shapes .s3 { position: absolute; bottom: -20px; left: -25px; width: 120px; height: 120px; background: #f0faf8; border-radius: 50%; }
@@ -224,9 +224,8 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
   @media print {
     .toolbar { display: none !important; }
     .page-body { padding-top: 0 !important; }
-    html, body { width: 100%; }
-    .page { width: 100%; max-width: 100%; }
-    .card { border: 1px solid #e5e7eb; }
+    html, body { width: 190mm; }
+    .page { width: 190mm; }
   }
 </style>
 </head>
@@ -349,7 +348,7 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
 export async function printReceiptHighQuality(rawPayment, rawSchool, opts = {}) {
   const html = buildReceiptHtml(rawPayment, rawSchool, opts)
   const container = document.createElement('div')
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:600px;background:#fff;z-index:-1;'
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:720px;background:#fff;z-index:-1;'
   container.innerHTML = html.replace(/<html[\s\S]*?<body[^>]*>/, '').replace(/<\/body[\s\S]*$/, '')
   document.body.appendChild(container)
   await new Promise(r => setTimeout(r, 400))
