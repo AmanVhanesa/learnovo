@@ -127,9 +127,32 @@ export const examsService = {
 
     // ── Custom / Manual Report Card ──
     generateCustomReportCardPDF: async (payload) => {
-        const res = await api.post('/report-cards/custom/pdf', payload, {
-            responseType: 'blob'
-        })
+        const res = await api.post('/report-cards/custom/pdf', payload)
+        return res.data
+    },
+
+    // ── Custom Report Card History ──
+    getCustomReportCardHistory: async (params = {}) => {
+        const qs = new URLSearchParams()
+        if (params.page) qs.append('page', params.page)
+        if (params.limit) qs.append('limit', params.limit)
+        if (params.search) qs.append('search', params.search)
+        const res = await api.get(`/report-cards/custom/history?${qs.toString()}`)
+        return res.data
+    },
+
+    downloadCustomReportCard: async (id) => {
+        const res = await api.get(`/report-cards/custom/${id}/download`, { responseType: 'blob' })
+        return res.data
+    },
+
+    getCustomReportCardPayload: async (id) => {
+        const res = await api.get(`/report-cards/custom/${id}/payload`)
+        return res.data
+    },
+
+    deleteCustomReportCard: async (id) => {
+        const res = await api.delete(`/report-cards/custom/${id}`)
         return res.data
     }
 }

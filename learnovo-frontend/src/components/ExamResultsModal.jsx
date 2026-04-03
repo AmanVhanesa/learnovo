@@ -9,12 +9,12 @@ import toast from 'react-hot-toast';
 
 /* ── Grade from percentage ── */
 function getGrade(pct) {
-    if (pct >= 90) return { label: 'A+', color: 'text-emerald-600 font-bold' };
-    if (pct >= 80) return { label: 'A', color: 'text-green-600 font-semibold' };
-    if (pct >= 70) return { label: 'B', color: 'text-teal-600 font-semibold' };
-    if (pct >= 60) return { label: 'C', color: 'text-blue-600 font-semibold' };
-    if (pct >= 50) return { label: 'D', color: 'text-amber-600 font-semibold' };
-    return { label: 'F', color: 'text-red-600 font-bold' };
+    if (pct >= 90) return { label: 'A+', color: 'text-emerald-600 dark:text-emerald-400 font-bold' };
+    if (pct >= 80) return { label: 'A', color: 'text-green-600 dark:text-green-400 font-semibold' };
+    if (pct >= 70) return { label: 'B', color: 'text-teal-600 dark:text-teal-400 font-semibold' };
+    if (pct >= 60) return { label: 'C', color: 'text-blue-600 dark:text-blue-400 font-semibold' };
+    if (pct >= 50) return { label: 'D', color: 'text-amber-600 dark:text-amber-400 font-semibold' };
+    return { label: 'F', color: 'text-red-600 dark:text-red-400 font-bold' };
 }
 
 const ExamResultsModal = ({ exam, onClose }) => {
@@ -256,13 +256,13 @@ const ExamResultsModal = ({ exam, onClose }) => {
                                                         <input
                                                             type="number"
                                                             className="input w-24"
-                                                            max={Math.min(exam.totalMarks, 100)}
+                                                            max={exam.totalMarks}
                                                             min="0"
                                                             placeholder="0"
                                                             value={marks[id] !== undefined ? marks[id] : ''}
                                                             onChange={e => {
                                                                 const val = e.target.value;
-                                                                if (val !== '' && Number(val) > 100) return;
+                                                                if (val !== '' && Number(val) > exam.totalMarks) return;
                                                                 setMarks(prev => ({ ...prev, [id]: val }));
                                                             }}
                                                         />
@@ -319,7 +319,7 @@ const ExamResultsModal = ({ exam, onClose }) => {
                     </div>
 
                     {/* Footer */}
-                    <div className="px-4 sm:px-6 py-4 border-t border-gray-200 dark:border-[#38383A] shrink-0 flex flex-col-reverse sm:flex-row items-center gap-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-b-xl">
+                    <div className="px-4 sm:px-6 py-4 border-t border-gray-200 dark:border-[#38383A] shrink-0 flex flex-col-reverse sm:flex-row items-center gap-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-b-2xl">
                         <button className="btn btn-ghost w-full sm:w-auto" onClick={onClose}>Cancel</button>
 
                         {/* Publish toggle — only show if results exist */}

@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../utils/formatCurrency'
 import { formatDate } from '../utils/formatDate'
 import { sortByRelevance } from '../utils/searchRelevance'
-import { printReceiptHighQuality, downloadReceiptAsPdf, buildReceiptHtml } from '../utils/receiptHelpers'
+
 import toast from 'react-hot-toast'
 
 // Shared UI
@@ -237,32 +237,41 @@ const FeesFinance = () => {
   const handleDownloadReceiptPdf = async (paymentId) => {
     const toastId = toast.loading('Generating PDF...')
     try {
-      const response = await paymentsService.getReceipt(paymentId)
-      const { payment, school } = response.data
-      await downloadReceiptAsPdf(payment, school)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE}/invoices/payments/${paymentId}/receipt/pdf`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!response.ok) throw new Error('Failed')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Receipt-${paymentId}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
       toast.dismiss(toastId)
       toast.success('Receipt downloaded!')
-    } catch (err) {
+    } catch {
       toast.dismiss(toastId)
-      console.error('Receipt download error:', err)
       toast.error('Failed to download receipt')
     }
   }
 
   const handlePrintReceipt = async (paymentId) => {
     try {
-      const toastId = toast.loading('Opening receipt preview...')
-      const response = await paymentsService.getReceipt(paymentId)
-      const { payment, school } = response.data
+      const toastId = toast.loading('Opening receipt...')
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE}/invoices/payments/${paymentId}/receipt/pdf`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!response.ok) throw new Error('Failed')
+      const blob = await response.blob()
       toast.dismiss(toastId)
-      const html = buildReceiptHtml(payment, school)
-      const win = window.open('', '_blank', 'width=600,height=800')
-      if (win) {
-        win.document.write(html)
-        win.document.close()
-      } else {
-        toast.error('Pop-up blocked. Please allow pop-ups for this site.')
-      }
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank')
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
     } catch {
       toast.dismiss()
       toast.error('Failed to load receipt')

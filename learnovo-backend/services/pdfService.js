@@ -797,4 +797,7 @@ const pdfService = {
   closeBrowser
 };
 
+// Expose browser helpers for other services (e.g. receiptPdfService) to share the Puppeteer instance
+pdfService._internal = { getBrowser, releaseBrowser };
+
 module.exports = pdfService;
