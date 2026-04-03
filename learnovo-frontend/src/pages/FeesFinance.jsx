@@ -262,16 +262,14 @@ const FeesFinance = () => {
   const handlePrintReceipt = async (paymentId) => {
     try {
       const toastId = toast.loading('Opening receipt...')
-      const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE}/invoices/payments/${paymentId}/receipt/pdf`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      if (!response.ok) throw new Error('Failed')
-      const blob = await response.blob()
+      const response = await paymentsService.getReceipt(paymentId)
+      const { payment, school } = response.data
       toast.dismiss(toastId)
-      const url = URL.createObjectURL(blob)
-      window.open(url, '_blank')
-      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      const { buildReceiptHtml } = await import('../utils/receiptHelpers')
+      const html = buildReceiptHtml(payment, school)
+      const win = window.open('', '_blank', 'width=820,height=1000')
+      if (win) { win.document.write(html); win.document.close() }
+      else toast.error('Pop-up blocked — please allow pop-ups')
     } catch {
       toast.dismiss()
       toast.error('Failed to load receipt')

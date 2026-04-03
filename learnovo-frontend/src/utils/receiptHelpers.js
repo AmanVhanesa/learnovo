@@ -113,18 +113,17 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
 <title>Receipt #${payment.receiptNumber}</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-  @page { size: A4 portrait; margin: 8mm 10mm; }
+  @page { size: A4 portrait; margin: 0; }
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
-    width: 190mm;
     font-family: 'Helvetica Neue', 'Arial', 'Noto Sans', sans-serif;
     color: #111827; background: #fff;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
     text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
   }
 
-  .page { width: 190mm; margin: 0 auto; background: #fff; }
+  .page { width: 100%; max-width: 794px; margin: 0 auto; background: #fff; padding: 24px; }
 
   .card {
     background: #ffffff; border-radius: 6px; border: 1px solid #d1d5db;
@@ -224,8 +223,8 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
   @media print {
     .toolbar { display: none !important; }
     .page-body { padding-top: 0 !important; }
-    html, body { width: 190mm; }
-    .page { width: 190mm; }
+    html, body { width: 210mm; height: 297mm; }
+    .page { width: 210mm; max-width: 210mm; padding: 7mm; }
   }
 </style>
 </head>

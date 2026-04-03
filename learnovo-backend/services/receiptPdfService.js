@@ -56,18 +56,18 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
 <title>Receipt #${payment.receiptNumber}</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-  @page { size: A4 portrait; margin: 8mm 10mm; }
+  @page { size: A4 portrait; margin: 0; }
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
-    width: 190mm;
+    width: 794px; height: 1123px;
     font-family: 'Helvetica Neue', 'Arial', 'Noto Sans', sans-serif;
     color: #111827; background: #fff;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
     text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
   }
 
-  .page { width: 190mm; margin: 0 auto; background: #fff; }
+  .page { width: 794px; height: 1123px; position: relative; overflow: hidden; background: #fff; padding: 24px; }
 
   .card {
     background: #ffffff; border-radius: 6px; border: 1px solid #d1d5db;
@@ -248,7 +248,7 @@ async function generateReceiptPdf(payment, schoolData) {
   const page = await browser.newPage();
 
   try {
-    await page.setViewport({ width: 720, height: 1018, deviceScaleFactor: 3 });
+    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 3 });
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
     await page.evaluateHandle('document.fonts.ready');
 
@@ -256,7 +256,7 @@ async function generateReceiptPdf(payment, schoolData) {
       format: 'A4',
       printBackground: true,
       preferCSSPageSize: true,
-      margin: { top: '8mm', right: '10mm', bottom: '8mm', left: '10mm' }
+      margin: { top: 0, right: 0, bottom: 0, left: 0 }
     });
 
     return Buffer.from(pdfUint8);
