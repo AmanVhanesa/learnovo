@@ -33,22 +33,42 @@ router.get('/', protect, authorize('admin'), [
     console.log('📋 Fetching teachers with filter:', filter);
 
     // Add search filter
-    if (req.query.search) {
+    const searchTerm = req.query.search;
+    if (searchTerm) {
       filter.$or = [
-        { name: { $regex: req.query.search, $options: 'i' } },
-        { email: { $regex: req.query.search, $options: 'i' } }
+        { name: { $regex: searchTerm, $options: 'i' } },
+        { fullName: { $regex: searchTerm, $options: 'i' } },
+        { email: { $regex: searchTerm, $options: 'i' } },
+        { phone: { $regex: searchTerm, $options: 'i' } },
+        { employeeId: { $regex: searchTerm, $options: 'i' } }
       ];
     }
 
-    const teachers = await User.find(filter)
-      .select('-password')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const [teachers, total] = await Promise.all([
+      User.find(filter)
+        .select('-password')
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      User.countDocuments(filter)
+    ]);
 
-    const total = await User.countDocuments(filter);
-
-    console.log(`✅ Found ${teachers.length} teachers (total: ${total})`);
+    // When searching, sort exact name/email matches first
+    if (searchTerm && teachers.length > 1) {
+      const term = searchTerm.toLowerCase();
+      teachers.sort((a, b) => {
+        const aName = (a.name || a.fullName || '').toLowerCase();
+        const bName = (b.name || b.fullName || '').toLowerCase();
+        const aExact = aName === term || (a.employeeId || '').toLowerCase() === term;
+        const bExact = bName === term || (b.employeeId || '').toLowerCase() === term;
+        if (aExact !== bExact) return aExact ? -1 : 1;
+        const aStarts = aName.startsWith(term) || (a.employeeId || '').toLowerCase().startsWith(term);
+        const bStarts = bName.startsWith(term) || (b.employeeId || '').toLowerCase().startsWith(term);
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+        return 0;
+      });
+    }
 
     res.json({
       success: true,

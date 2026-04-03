@@ -243,15 +243,16 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     }
 
     // Add search filter
-    if (req.query.search) {
+    const searchTerm = req.query.search;
+    if (searchTerm) {
       filter.$or = [
-        { name: { $regex: req.query.search, $options: 'i' } },
-        { fullName: { $regex: req.query.search, $options: 'i' } },
-        { email: { $regex: req.query.search, $options: 'i' } },
-        { admissionNumber: { $regex: req.query.search, $options: 'i' } },
-        { rollNumber: { $regex: req.query.search, $options: 'i' } },
-        { studentId: { $regex: req.query.search, $options: 'i' } },
-        { phone: { $regex: req.query.search, $options: 'i' } }
+        { name: { $regex: searchTerm, $options: 'i' } },
+        { fullName: { $regex: searchTerm, $options: 'i' } },
+        { email: { $regex: searchTerm, $options: 'i' } },
+        { admissionNumber: { $regex: searchTerm, $options: 'i' } },
+        { rollNumber: { $regex: searchTerm, $options: 'i' } },
+        { studentId: { $regex: searchTerm, $options: 'i' } },
+        { phone: { $regex: searchTerm, $options: 'i' } }
       ];
     }
 
@@ -260,6 +261,8 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     const selectFields = isLightweight
       ? '_id name firstName lastName fullName admissionNumber rollNumber class section classId sectionId academicYear isActive gender photo'
       : '-password';
+
+    const defaultSort = { name: 1, admissionNumber: 1 };
 
     // Run count and find in parallel for speed
     const [students, total] = await Promise.all([
@@ -270,17 +273,33 @@ router.get('/', protect, authorize('admin', 'teacher'), [
           { path: 'subDepartment', select: 'name', strictPopulate: false },
           { path: 'driverId', select: 'name phone', strictPopulate: false }
         ])
-        .sort(req.query.search ? { score: { $meta: 'textScore' } } : { name: 1, admissionNumber: 1 })
+        .sort(defaultSort)
         .collation({ locale: 'en', numericOrdering: true })
         .skip(skip)
         .limit(limit)
         .lean()
         .catch(async() => {
           // Populate failed — retry without
-          return User.find(filter).select(selectFields).sort({ name: 1 }).skip(skip).limit(limit).lean();
+          return User.find(filter).select(selectFields).sort(defaultSort).skip(skip).limit(limit).lean();
         }),
       User.countDocuments(filter)
     ]);
+
+    // When searching, sort results so exact admission number matches appear first
+    if (searchTerm && students.length > 1) {
+      const term = searchTerm.toLowerCase();
+      students.sort((a, b) => {
+        const aAdm = (a.admissionNumber || '').toLowerCase();
+        const bAdm = (b.admissionNumber || '').toLowerCase();
+        const aExact = aAdm === term;
+        const bExact = bAdm === term;
+        if (aExact !== bExact) return aExact ? -1 : 1;
+        const aStarts = aAdm.startsWith(term);
+        const bStarts = bAdm.startsWith(term);
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+        return 0;
+      });
+    }
 
     // 30s private cache — safe for auth endpoints; avoids repeat fetches on quick back-nav
     res.set('Cache-Control', 'no-cache');

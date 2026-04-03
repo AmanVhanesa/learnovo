@@ -45,12 +45,14 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     }
 
     // Add search filter
-    if (req.query.search) {
+    const searchTerm = req.query.search;
+    if (searchTerm) {
       filter.$or = [
-        { name: { $regex: req.query.search, $options: 'i' } },
-        { email: { $regex: req.query.search, $options: 'i' } },
-        { phone: { $regex: req.query.search, $options: 'i' } },
-        { employeeId: { $regex: req.query.search, $options: 'i' } }
+        { name: { $regex: searchTerm, $options: 'i' } },
+        { fullName: { $regex: searchTerm, $options: 'i' } },
+        { email: { $regex: searchTerm, $options: 'i' } },
+        { phone: { $regex: searchTerm, $options: 'i' } },
+        { employeeId: { $regex: searchTerm, $options: 'i' } }
       ];
     }
 
@@ -58,12 +60,28 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     const [employees, total] = await Promise.all([
       User.find(filter)
         .select('-password')
-        .sort({ createdAt: -1 })
+        .sort({ name: 1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       User.countDocuments(filter)
     ]);
+
+    // When searching, sort exact employeeId/name matches first
+    if (searchTerm && employees.length > 1) {
+      const term = searchTerm.toLowerCase();
+      employees.sort((a, b) => {
+        const aId = (a.employeeId || '').toLowerCase();
+        const bId = (b.employeeId || '').toLowerCase();
+        const aExact = aId === term || (a.name || '').toLowerCase() === term;
+        const bExact = bId === term || (b.name || '').toLowerCase() === term;
+        if (aExact !== bExact) return aExact ? -1 : 1;
+        const aStarts = aId.startsWith(term) || (a.name || '').toLowerCase().startsWith(term);
+        const bStarts = bId.startsWith(term) || (b.name || '').toLowerCase().startsWith(term);
+        if (aStarts !== bStarts) return aStarts ? -1 : 1;
+        return 0;
+      });
+    }
 
     res.json(paginatedResponse(employees, total, page, limit));
   } catch (error) {
