@@ -127,7 +127,9 @@ export const examsService = {
 
     // ── Custom / Manual Report Card ──
     generateCustomReportCardPDF: async (payload) => {
-        const res = await api.post('/report-cards/custom/pdf', payload)
+        const res = await api.post('/report-cards/custom/pdf', payload, {
+            responseType: 'blob'
+        })
         return res.data
     },
 
