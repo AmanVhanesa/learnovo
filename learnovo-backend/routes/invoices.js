@@ -1750,6 +1750,55 @@ router.get('/payments/:id/receipt/pdf', protect, async(req, res) => {
   }
 });
 
+// @desc    Get payment receipt as printable HTML page
+// @route   GET /api/invoices/payments/:id/receipt/html
+// @access  Private
+router.get('/payments/:id/receipt/html', protect, async(req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const payment = await Payment.findOne({ _id: id, tenantId })
+      .populate({
+        path: 'studentId',
+        select: 'name fullName admissionNumber studentId class section parentName fatherName classId',
+        populate: { path: 'classId', select: 'name' }
+      })
+      .populate('invoiceId')
+      .populate('collectedBy', 'name');
+
+    if (!payment) {
+      return res.status(404).send('Payment not found');
+    }
+
+    const tenant = await Tenant.findById(tenantId).select('schoolName schoolCode address phone email logo fullAddress');
+    const settings = await Settings.getSettings(tenantId);
+
+    const schoolData = tenant ? tenant.toObject() : {};
+    if (settings && settings.institution) {
+      if (settings.institution.contact) {
+        if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
+        if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
+      }
+      if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
+      if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+      if (settings.institution.logo) schoolData.logo = settings.institution.logo;
+      if (settings.institution.principalSignature) schoolData.principalSignature = settings.institution.principalSignature;
+    }
+
+    const { generateReceiptHtml } = require('../services/receiptPdfService');
+    const html = await generateReceiptHtml(payment, schoolData);
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    console.error('Receipt HTML error:', error);
+    if (!res.headersSent) {
+      res.status(500).send('Server error generating receipt');
+    }
+  }
+});
+
 // @desc    Cancel an invoice with reason (proper cancel, not delete)
 // @route   POST /api/invoices/:id/cancel
 // @access  Private (Admin)

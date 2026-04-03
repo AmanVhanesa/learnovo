@@ -286,4 +286,35 @@ async function generateReceiptPdf(payment, schoolData) {
   }
 }
 
-module.exports = { generateReceiptPdf };
+/**
+ * Generate printable HTML page — same template as PDF but with a print toolbar.
+ * Browser @page CSS handles the half-A4 sizing when user hits Print.
+ */
+async function generateReceiptHtml(payment, schoolData) {
+  const [logoDataUri, signatureDataUri] = await Promise.all([
+    toBase64DataUri(schoolData.logo),
+    toBase64DataUri(schoolData.principalSignature)
+  ]);
+
+  let html = buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri);
+
+  // Inject a toolbar and tweak for browser viewing/printing
+  const toolbarHtml = `
+    <div id="toolbar" style="position:fixed;top:0;left:0;right:0;background:#1C1C1E;color:#fff;padding:10px 24px;display:flex;gap:10px;align-items:center;z-index:999;font-family:'Helvetica Neue',Arial,sans-serif;">
+      <span style="flex:1;font-size:13px;font-weight:500;">Receipt #${payment.receiptNumber || ''}</span>
+      <button onclick="document.getElementById('toolbar').style.display='none';window.print();setTimeout(()=>document.getElementById('toolbar').style.display='flex',500)" style="padding:7px 18px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;background:#1F6F6D;color:white;">Print</button>
+      <button onclick="window.close()" style="padding:7px 18px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;background:#38383A;color:#8E8E93;">Close</button>
+    </div>`;
+
+  // Add toolbar right after <body>, add padding-top so content isn't hidden behind toolbar
+  html = html.replace('<body>', '<body>' + toolbarHtml);
+  html = html.replace('.page {', '.page { margin-top: 50px; ');
+
+  // Override @page for browser print — half A4, zero margins
+  html = html.replace('@page { size: A4 portrait; margin: 0; }',
+    '@page { size: 210mm 148.5mm; margin: 0; } @media print { #toolbar { display: none !important; } .page { margin-top: 0 !important; } }');
+
+  return html;
+}
+
+module.exports = { generateReceiptPdf, generateReceiptHtml };
