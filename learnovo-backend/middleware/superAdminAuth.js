@@ -26,7 +26,11 @@ const superAdminAuth = async(req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.SUPER_ADMIN_JWT_SECRET || 'super-admin-secret-key');
+      if (!process.env.SUPER_ADMIN_JWT_SECRET) {
+        logger.error('SUPER_ADMIN_JWT_SECRET environment variable is not set', { requestId: req.requestId });
+        return res.status(500).json({ success: false, message: 'Server configuration error.', requestId: req.requestId });
+      }
+      decoded = jwt.verify(token, process.env.SUPER_ADMIN_JWT_SECRET);
     } catch (err) {
       const message = err.name === 'TokenExpiredError' ? 'Super admin token has expired.' : 'Invalid super admin token.';
       return res.status(401).json({

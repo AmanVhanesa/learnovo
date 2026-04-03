@@ -1,9 +1,11 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Tenant = require('../models/Tenant');
 const User = require('../models/User');
+const SuperAdmin = require('../models/SuperAdmin');
 const SuperAdminAuditLog = require('../models/SuperAdminAuditLog');
 const SubscriptionPlan = require('../models/SubscriptionPlan');
 const PlatformInvoice = require('../models/PlatformInvoice');
@@ -13,9 +15,21 @@ const EmailTemplate = require('../models/EmailTemplate');
 const PlatformSettings = require('../models/PlatformSettings');
 const Coupon = require('../models/Coupon');
 const KnowledgeBaseArticle = require('../models/KnowledgeBaseArticle');
+const BackupLog = require('../models/BackupLog');
 const superAdminAuth = require('../middleware/superAdminAuth');
 const { getPlanConfig } = require('../utils/planConfig');
 const { logger } = require('../middleware/errorHandler');
+
+// Generate a cryptographically secure temporary password
+const generateTempPassword = () => {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.randomBytes(16);
+  let password = '';
+  for (let i = 0; i < 16; i++) {
+    password += chars[bytes[i] % chars.length];
+  }
+  return `${password  }@1`;
+};
 
 const router = express.Router();
 
@@ -74,13 +88,22 @@ router.get('/tenants', async(req, res) => {
       Tenant.countDocuments(filter)
     ]);
 
-    // Enrich with quick user counts
-    const enriched = await Promise.all(tenants.map(async(t) => {
-      const [students, teachers] = await Promise.all([
-        User.countDocuments({ tenantId: t._id, role: 'student', isActive: true }),
-        User.countDocuments({ tenantId: t._id, role: 'teacher', isActive: true })
-      ]);
-      return { ...t, usage: { students, teachers } };
+    // Batch user counts in a single aggregation instead of N+1 queries
+    const tenantIds = tenants.map(t => t._id);
+    const userCounts = await User.aggregate([
+      { $match: { tenantId: { $in: tenantIds }, isActive: true, role: { $in: ['student', 'teacher'] } } },
+      { $group: { _id: { tenantId: '$tenantId', role: '$role' }, count: { $sum: 1 } } }
+    ]);
+    const countMap = {};
+    userCounts.forEach(uc => {
+      const tid = uc._id.tenantId.toString();
+      if (!countMap[tid]) countMap[tid] = { students: 0, teachers: 0 };
+      if (uc._id.role === 'student') countMap[tid].students = uc.count;
+      if (uc._id.role === 'teacher') countMap[tid].teachers = uc.count;
+    });
+    const enriched = tenants.map(t => ({
+      ...t,
+      usage: countMap[t._id.toString()] || { students: 0, teachers: 0 }
     }));
 
     return res.json({
@@ -320,45 +343,60 @@ router.post('/tenants', async(req, res) => {
     const resolvedPlan = plan || 'free';
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-    const tenant = await Tenant.create({
-      schoolName: schoolName.trim(),
-      email: resolvedEmail,
-      schoolCode: schoolCode.toLowerCase(),
-      subdomain: (subdomain || schoolCode).toLowerCase(),
-      phone: phone || '',
-      address: address || {},
-      isActive: true,
-      subscription: {
-        plan: resolvedPlan,
-        status: resolvedPlan === 'free' ? 'trial' : 'active',
-        trialEndsAt: resolvedPlan === 'free' ? trialEndsAt : undefined,
-        maxStudents: getPlanConfig(resolvedPlan).limits.students === Infinity ? 0 : getPlanConfig(resolvedPlan).limits.students,
-        maxTeachers: getPlanConfig(resolvedPlan).limits.teachers === Infinity ? 0 : getPlanConfig(resolvedPlan).limits.teachers
-      },
-      settings: { timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', currency: 'INR', academicYear: '2025-2026' }
-    });
+    // Use transaction to prevent orphaned tenants if admin user creation fails
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const [tenant] = await Tenant.create([{
+        schoolName: schoolName.trim(),
+        email: resolvedEmail,
+        schoolCode: schoolCode.toLowerCase(),
+        subdomain: (subdomain || schoolCode).toLowerCase(),
+        phone: phone || '',
+        address: address || {},
+        isActive: true,
+        subscription: {
+          plan: resolvedPlan,
+          status: resolvedPlan === 'free' ? 'trial' : 'active',
+          trialEndsAt: resolvedPlan === 'free' ? trialEndsAt : undefined,
+          maxStudents: getPlanConfig(resolvedPlan).limits.students === Infinity ? 0 : getPlanConfig(resolvedPlan).limits.students,
+          maxTeachers: getPlanConfig(resolvedPlan).limits.teachers === Infinity ? 0 : getPlanConfig(resolvedPlan).limits.teachers
+        },
+        settings: { timezone: 'Asia/Kolkata', dateFormat: 'DD/MM/YYYY', currency: 'INR', academicYear: '2025-2026' }
+      }], { session });
 
-    const adminUser = await User.create({
-      tenantId: tenant._id,
-      fullName: adminName || `${schoolName.trim()} Admin`,
-      firstName: adminName || schoolName.trim(),
-      lastName: adminName ? '' : 'Admin',
-      email: resolvedEmail,
-      password: resolvedPassword,
-      role: 'admin',
-      isActive: true
-    });
+      const [adminUser] = await User.create([{
+        tenantId: tenant._id,
+        fullName: adminName || `${schoolName.trim()} Admin`,
+        firstName: adminName || schoolName.trim(),
+        lastName: adminName ? '' : 'Admin',
+        email: resolvedEmail,
+        password: resolvedPassword,
+        role: 'admin',
+        isActive: true
+      }], { session });
 
-    await audit(req, 'CREATE_TENANT', 'Tenant', tenant._id, { schoolName, schoolCode, email: resolvedEmail });
+      await session.commitTransaction();
+      session.endSession();
 
-    return res.status(201).json({
-      success: true,
-      message: 'Tenant created successfully.',
-      data: { tenant, adminUser: { id: adminUser._id, email: adminUser.email, role: adminUser.role }, schoolCode: tenant.schoolCode },
-      requestId: req.requestId
-    });
+      await audit(req, 'CREATE_TENANT', 'Tenant', tenant._id, { schoolName, schoolCode, email: resolvedEmail });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Tenant created successfully.',
+        data: { tenant, adminUser: { id: adminUser._id, email: adminUser.email, role: adminUser.role }, schoolCode: tenant.schoolCode },
+        requestId: req.requestId
+      });
+    } catch (txError) {
+      await session.abortTransaction();
+      session.endSession();
+      throw txError;
+    }
   } catch (error) {
     logger.error('Super admin: create tenant error', error, { requestId: req.requestId });
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'A tenant with this school code, subdomain, or email already exists.', requestId: req.requestId });
+    }
     return res.status(500).json({ success: false, message: error.message || 'Server error creating tenant.', requestId: req.requestId });
   }
 });
@@ -652,7 +690,7 @@ router.post('/tenants/:tenantId/reset-admin-password', async(req, res) => {
     const admin = await User.findOne({ tenantId: tenant._id, role: 'admin', isActive: true });
     if (!admin) return res.status(404).json({ success: false, message: 'No active admin found for this tenant.', requestId: req.requestId });
 
-    const tempPassword = `${Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase()  }@1`;
+    const tempPassword = generateTempPassword();
     admin.password = tempPassword;
     await admin.save();
 
@@ -814,8 +852,8 @@ router.patch('/users/:id/reset-password', async(req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ success: false, message: 'User not found.', requestId: req.requestId });
 
-    // Generate a secure temporary password
-    const tempPassword = `${Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase()  }@1`;
+    // Generate a cryptographically secure temporary password
+    const tempPassword = generateTempPassword();
     const salt = await bcrypt.genSalt(12);
     user.password = await bcrypt.hash(tempPassword, salt);
     user.updatedAt = new Date();
@@ -1149,8 +1187,8 @@ router.post('/tenants/:id/impersonate', async(req, res) => {
     // Generate impersonation token with limited TTL
     const impersonationToken = jwt.sign(
       { id: admin._id, role: admin.role, tenantId: tenant._id, isImpersonation: true, impersonatedBy: req.superAdmin._id },
-      process.env.JWT_SECRET || 'jwt-secret-change-in-production',
-      { expiresIn: '2h' }
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
     );
 
     await audit(req, 'IMPERSONATE_TENANT', 'Tenant', tenant._id, { adminEmail: admin.email });
@@ -1181,16 +1219,19 @@ router.post('/tenants/:id/impersonate', async(req, res) => {
  */
 router.get('/plans', async(req, res) => {
   try {
-    const plans = await SubscriptionPlan.find().sort({ sortOrder: 1 }).lean();
+    const [plans, subscriberCounts] = await Promise.all([
+      SubscriptionPlan.find().sort({ sortOrder: 1 }).lean(),
+      Tenant.aggregate([
+        { $match: { isDeleted: { $ne: true } } },
+        { $group: { _id: '$subscription.plan', count: { $sum: 1 } } }
+      ])
+    ]);
 
-    // Enrich with subscriber counts
-    const enriched = await Promise.all(plans.map(async(plan) => {
-      const subscriberCount = await Tenant.countDocuments({
-        isDeleted: { $ne: true },
-        'subscription.plan': plan.slug
-      });
-      return { ...plan, subscriberCount };
-    }));
+    const countMap = {};
+    subscriberCounts.forEach(sc => {
+      countMap[sc._id] = sc.count;
+    });
+    const enriched = plans.map(plan => ({ ...plan, subscriberCount: countMap[plan.slug] || 0 }));
 
     return res.json({ success: true, data: enriched, requestId: req.requestId });
   } catch (error) {
@@ -1583,6 +1624,106 @@ router.get('/support-tickets', async(req, res) => {
   }
 });
 
+/**
+ * GET /api/super-admin/support-tickets/stats/summary
+ * SLA Dashboard stats — must be before /:id to avoid param collision
+ */
+router.get('/support-tickets/stats/summary', async(req, res) => {
+  try {
+    const [statusBreakdown, priorityBreakdown, categoryBreakdown, avgResponseTime] = await Promise.all([
+      SupportTicket.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+      SupportTicket.aggregate([{ $group: { _id: '$priority', count: { $sum: 1 } } }]),
+      SupportTicket.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }]),
+      SupportTicket.aggregate([
+        { $match: { firstResponseAt: { $ne: null } } },
+        { $project: { responseTime: { $subtract: ['$firstResponseAt', '$createdAt'] } } },
+        { $group: { _id: null, avg: { $avg: '$responseTime' } } }
+      ])
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        byStatus: statusBreakdown,
+        byPriority: priorityBreakdown,
+        byCategory: categoryBreakdown,
+        avgResponseTimeMs: avgResponseTime[0]?.avg || 0
+      },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('Super admin: ticket stats error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * PATCH /api/super-admin/support-tickets/bulk
+ * Bulk update tickets — must be before /:id to avoid param collision
+ */
+router.patch('/support-tickets/bulk', async(req, res) => {
+  try {
+    const { ticketIds, action, assignedTo, status } = req.body;
+    if (!ticketIds || !Array.isArray(ticketIds) || ticketIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'ticketIds[] is required.', requestId: req.requestId });
+    }
+
+    const update = {};
+    if (action === 'assign' && assignedTo) update.assignedTo = assignedTo;
+    if (action === 'change_status' && status) {
+      update.status = status;
+      if (status === 'resolved') update.resolvedAt = new Date();
+      if (status === 'closed') update.closedAt = new Date();
+    }
+    if (action === 'close') {
+      update.status = 'closed';
+      update.closedAt = new Date();
+    }
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid action specified.', requestId: req.requestId });
+    }
+
+    const result = await SupportTicket.updateMany({ _id: { $in: ticketIds } }, update);
+    await audit(req, 'BULK_UPDATE_TICKETS', 'SuperAdmin', req.superAdmin._id, { ticketIds, action, count: result.modifiedCount });
+
+    return res.json({ success: true, message: `${result.modifiedCount} tickets updated.`, data: result, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: bulk update tickets error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * GET /api/super-admin/support-tickets/export
+ * Export support tickets as CSV — must be before /:id to avoid param collision
+ */
+router.get('/support-tickets/export', async(req, res) => {
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+
+    const tickets = await SupportTicket.find(filter)
+      .populate('tenantId', 'schoolName')
+      .sort({ createdAt: -1 })
+      .limit(5000)
+      .lean();
+
+    const headers = 'Ticket ID,Subject,School,Status,Priority,Category,Created At,Resolved At\n';
+    const rows = tickets.map(t =>
+      `"${t._id}","${t.subject || ''}","${t.tenantId?.schoolName || ''}","${t.status}","${t.priority || ''}","${t.category || ''}","${t.createdAt?.toISOString()}","${t.resolvedAt?.toISOString() || ''}"`
+    );
+
+    const csv = headers + rows.join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="support-tickets-export.csv"');
+    return res.send(csv);
+  } catch (error) {
+    logger.error('Super admin: export tickets error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
 router.get('/support-tickets/:id', async(req, res) => {
   try {
     const ticket = await SupportTicket.findById(req.params.id)
@@ -1656,38 +1797,7 @@ router.post('/support-tickets/:id/reply', async(req, res) => {
   }
 });
 
-/**
- * GET /api/super-admin/support-tickets/stats/summary
- * SLA Dashboard stats
- */
-router.get('/support-tickets/stats/summary', async(req, res) => {
-  try {
-    const [statusBreakdown, priorityBreakdown, categoryBreakdown, avgResponseTime] = await Promise.all([
-      SupportTicket.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
-      SupportTicket.aggregate([{ $group: { _id: '$priority', count: { $sum: 1 } } }]),
-      SupportTicket.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }]),
-      SupportTicket.aggregate([
-        { $match: { firstResponseAt: { $ne: null } } },
-        { $project: { responseTime: { $subtract: ['$firstResponseAt', '$createdAt'] } } },
-        { $group: { _id: null, avg: { $avg: '$responseTime' } } }
-      ])
-    ]);
-
-    return res.json({
-      success: true,
-      data: {
-        byStatus: statusBreakdown,
-        byPriority: priorityBreakdown,
-        byCategory: categoryBreakdown,
-        avgResponseTimeMs: avgResponseTime[0]?.avg || 0
-      },
-      requestId: req.requestId
-    });
-  } catch (error) {
-    logger.error('Super admin: ticket stats error', error, { requestId: req.requestId });
-    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
-  }
-});
+// stats/summary route moved above :id route to prevent param collision
 
 // ─── KNOWLEDGE BASE ─────────────────────────────────────────────────────────
 
@@ -1807,14 +1917,19 @@ const MODULES = [
 
 router.get('/modules', async(req, res) => {
   try {
-    // Enrich with usage stats
-    const moduleUsage = await Promise.all(MODULES.map(async(mod) => {
-      const tenantsUsingModule = await Tenant.countDocuments({
-        isDeleted: { $ne: true },
-        [`settings.features.${mod.slug}`]: true
+    // Single aggregation to count module usage across all tenants
+    const allTenants = await Tenant.find({ isDeleted: { $ne: true } }).select('settings.features').lean();
+    const moduleCountMap = {};
+    MODULES.forEach(m => {
+      moduleCountMap[m.slug] = 0;
+    });
+    allTenants.forEach(t => {
+      const features = t.settings?.features || {};
+      Object.entries(features).forEach(([key, val]) => {
+        if (val && moduleCountMap[key] !== undefined) moduleCountMap[key]++;
       });
-      return { ...mod, tenantsUsing: tenantsUsingModule };
-    }));
+    });
+    const moduleUsage = MODULES.map(mod => ({ ...mod, tenantsUsing: moduleCountMap[mod.slug] || 0 }));
     return res.json({ success: true, data: moduleUsage, requestId: req.requestId });
   } catch (error) {
     logger.error('Super admin: list modules error', error, { requestId: req.requestId });
@@ -2050,6 +2165,727 @@ router.get('/system/health', async(req, res) => {
     });
   } catch (error) {
     logger.error('Super admin: system health error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+// ─── SUPER ADMIN PROFILE ────────────────────────────────────────────────────
+
+/**
+ * PATCH /api/super-admin/profile
+ * Update own profile (name, email)
+ */
+router.patch('/profile', async(req, res) => {
+  try {
+    const { name, email } = req.body;
+    const superAdmin = await SuperAdmin.findById(req.superAdmin._id);
+    if (!superAdmin) return res.status(404).json({ success: false, message: 'Super admin not found.', requestId: req.requestId });
+
+    if (name) superAdmin.name = name.trim();
+    if (email) {
+      const emailLower = email.toLowerCase().trim();
+      const existing = await SuperAdmin.findOne({ email: emailLower, _id: { $ne: superAdmin._id } });
+      if (existing) return res.status(409).json({ success: false, message: 'Email already in use by another super admin.', requestId: req.requestId });
+      superAdmin.email = emailLower;
+    }
+    await superAdmin.save();
+    await audit(req, 'UPDATE_PROFILE', 'SuperAdmin', superAdmin._id, { name, email });
+
+    return res.json({ success: true, message: 'Profile updated successfully.', data: { id: superAdmin._id, name: superAdmin.name, email: superAdmin.email }, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: update profile error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error updating profile.', requestId: req.requestId });
+  }
+});
+
+/**
+ * PATCH /api/super-admin/profile/password
+ * Change own password
+ */
+router.patch('/profile/password', async(req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'currentPassword and newPassword are required.', requestId: req.requestId });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters.', requestId: req.requestId });
+    }
+
+    const superAdmin = await SuperAdmin.findById(req.superAdmin._id).select('+password');
+    if (!superAdmin) return res.status(404).json({ success: false, message: 'Super admin not found.', requestId: req.requestId });
+
+    const isMatch = await superAdmin.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Current password is incorrect.', requestId: req.requestId });
+    }
+
+    superAdmin.password = newPassword;
+    await superAdmin.save();
+    await audit(req, 'CHANGE_PASSWORD', 'SuperAdmin', superAdmin._id, {});
+
+    return res.json({ success: true, message: 'Password changed successfully.', requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: change password error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error changing password.', requestId: req.requestId });
+  }
+});
+
+// ─── SUPER ADMIN MANAGEMENT ────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/admins
+ * List all super admins
+ */
+router.get('/admins', async(req, res) => {
+  try {
+    const admins = await SuperAdmin.find().select('-password').sort({ createdAt: -1 }).lean();
+    return res.json({ success: true, data: admins, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: list admins error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * POST /api/super-admin/admins
+ * Create a new super admin
+ */
+router.post('/admins', async(req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'name, email, and password are required.', requestId: req.requestId });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters.', requestId: req.requestId });
+    }
+
+    const existing = await SuperAdmin.findOne({ email: email.toLowerCase() });
+    if (existing) return res.status(409).json({ success: false, message: 'A super admin with this email already exists.', requestId: req.requestId });
+
+    const admin = await SuperAdmin.create({ name: name.trim(), email: email.toLowerCase().trim(), password });
+    await audit(req, 'CREATE_SUPER_ADMIN', 'SuperAdmin', admin._id, { email: admin.email });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Super admin created successfully.',
+      data: { id: admin._id, name: admin.name, email: admin.email, isActive: admin.isActive },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('Super admin: create admin error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * PATCH /api/super-admin/admins/:id
+ * Update a super admin
+ */
+router.patch('/admins/:id', async(req, res) => {
+  try {
+    const admin = await SuperAdmin.findById(req.params.id);
+    if (!admin) return res.status(404).json({ success: false, message: 'Super admin not found.', requestId: req.requestId });
+
+    if (req.body.name) admin.name = req.body.name.trim();
+    if (req.body.email) {
+      const emailLower = req.body.email.toLowerCase().trim();
+      const existing = await SuperAdmin.findOne({ email: emailLower, _id: { $ne: admin._id } });
+      if (existing) return res.status(409).json({ success: false, message: 'Email already in use.', requestId: req.requestId });
+      admin.email = emailLower;
+    }
+    await admin.save();
+    await audit(req, 'UPDATE_SUPER_ADMIN', 'SuperAdmin', admin._id, req.body);
+
+    return res.json({ success: true, data: { id: admin._id, name: admin.name, email: admin.email, isActive: admin.isActive }, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: update admin error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * DELETE /api/super-admin/admins/:id
+ * Deactivate a super admin
+ */
+router.delete('/admins/:id', async(req, res) => {
+  try {
+    if (req.params.id === req.superAdmin._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot deactivate your own account.', requestId: req.requestId });
+    }
+
+    const admin = await SuperAdmin.findById(req.params.id);
+    if (!admin) return res.status(404).json({ success: false, message: 'Super admin not found.', requestId: req.requestId });
+
+    admin.isActive = false;
+    await admin.save();
+    await audit(req, 'DEACTIVATE_SUPER_ADMIN', 'SuperAdmin', admin._id, { email: admin.email });
+
+    return res.json({ success: true, message: 'Super admin deactivated.', requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: deactivate admin error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+// ─── BACKUP MANAGEMENT ─────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/backups
+ * List backup logs
+ */
+router.get('/backups', async(req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const [backups, total] = await Promise.all([
+      BackupLog.find()
+        .populate('tenantId', 'schoolName schoolCode')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      BackupLog.countDocuments()
+    ]);
+
+    return res.json({
+      success: true,
+      data: backups,
+      pagination: { current: page, pages: Math.ceil(total / limit), total },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('Super admin: list backups error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * POST /api/super-admin/backups/trigger
+ * Trigger a manual backup
+ */
+router.post('/backups/trigger', async(req, res) => {
+  try {
+    let backupService;
+    try {
+      backupService = require('../services/backupService');
+    } catch (e) {
+      return res.status(501).json({ success: false, message: 'Backup service is not configured.', requestId: req.requestId });
+    }
+
+    // Trigger backup asynchronously
+    const result = await backupService.createAndUploadBackup
+      ? backupService.createAndUploadBackup({ type: 'manual', performedBy: req.superAdmin._id })
+      : Promise.resolve({ message: 'Backup initiated' });
+
+    await audit(req, 'TRIGGER_BACKUP', 'SuperAdmin', req.superAdmin._id, {});
+
+    return res.json({ success: true, message: 'Backup triggered successfully.', data: result, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: trigger backup error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error triggering backup.', requestId: req.requestId });
+  }
+});
+
+/**
+ * DELETE /api/super-admin/backups/:id
+ * Delete a backup log entry
+ */
+router.delete('/backups/:id', async(req, res) => {
+  try {
+    const backup = await BackupLog.findByIdAndDelete(req.params.id);
+    if (!backup) return res.status(404).json({ success: false, message: 'Backup not found.', requestId: req.requestId });
+    await audit(req, 'DELETE_BACKUP', 'SuperAdmin', req.superAdmin._id, { filename: backup.filename });
+    return res.json({ success: true, message: 'Backup log deleted.', requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: delete backup error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+// ─── EXTENDED REPORTS ──────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/reports/school-activity
+ * School activity report with student/teacher counts and last login
+ */
+router.get('/reports/school-activity', async(req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const filter = { isDeleted: { $ne: true } };
+    if (req.query.search) {
+      filter.$or = [
+        { schoolName: { $regex: req.query.search, $options: 'i' } },
+        { schoolCode: { $regex: req.query.search, $options: 'i' } }
+      ];
+    }
+    if (req.query.plan) filter['subscription.plan'] = req.query.plan;
+    if (req.query.status) filter['subscription.status'] = req.query.status;
+
+    const [tenants, total] = await Promise.all([
+      Tenant.find(filter).select('schoolName schoolCode subscription createdAt').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Tenant.countDocuments(filter)
+    ]);
+
+    const tenantIds = tenants.map(t => t._id);
+    const [userCounts, lastLogins] = await Promise.all([
+      User.aggregate([
+        { $match: { tenantId: { $in: tenantIds }, isActive: true, role: { $in: ['student', 'teacher'] } } },
+        { $group: { _id: { tenantId: '$tenantId', role: '$role' }, count: { $sum: 1 } } }
+      ]),
+      User.aggregate([
+        { $match: { tenantId: { $in: tenantIds }, lastLogin: { $ne: null } } },
+        { $group: { _id: '$tenantId', lastActivity: { $max: '$lastLogin' } } }
+      ])
+    ]);
+
+    const countMap = {};
+    userCounts.forEach(uc => {
+      const tid = uc._id.tenantId.toString();
+      if (!countMap[tid]) countMap[tid] = { students: 0, teachers: 0 };
+      if (uc._id.role === 'student') countMap[tid].students = uc.count;
+      if (uc._id.role === 'teacher') countMap[tid].teachers = uc.count;
+    });
+    const activityMap = {};
+    lastLogins.forEach(ll => {
+      activityMap[ll._id.toString()] = ll.lastActivity;
+    });
+
+    const data = tenants.map(t => ({
+      _id: t._id,
+      schoolName: t.schoolName,
+      schoolCode: t.schoolCode,
+      plan: t.subscription?.plan,
+      status: t.subscription?.status,
+      students: countMap[t._id.toString()]?.students || 0,
+      teachers: countMap[t._id.toString()]?.teachers || 0,
+      lastActivity: activityMap[t._id.toString()] || null,
+      createdAt: t.createdAt
+    }));
+
+    return res.json({
+      success: true,
+      data,
+      pagination: { current: page, pages: Math.ceil(total / limit), total },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('Super admin: school activity report error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * GET /api/super-admin/reports/revenue
+ * Monthly revenue breakdown from paid invoices
+ */
+router.get('/reports/revenue', async(req, res) => {
+  try {
+    const months = parseInt(req.query.months) || 12;
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+
+    const [monthlyRevenue, revenueByPlan] = await Promise.all([
+      PlatformInvoice.aggregate([
+        { $match: { status: 'paid', paidAt: { $gte: startDate } } },
+        { $group: { _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } }, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+        { $sort: { '_id.year': 1, '_id.month': 1 } }
+      ]),
+      Tenant.aggregate([
+        { $match: { isDeleted: { $ne: true }, 'subscription.status': 'active', 'subscription.plan': { $ne: 'free' } } },
+        { $group: { _id: '$subscription.plan', count: { $sum: 1 } } }
+      ])
+    ]);
+
+    // Estimated MRR from active paid tenants
+    let estimatedMRR = 0;
+    revenueByPlan.forEach(rp => {
+      const cfg = getPlanConfig(rp._id);
+      if (cfg?.price) estimatedMRR += cfg.price * rp.count;
+    });
+
+    return res.json({
+      success: true,
+      data: { monthlyRevenue, revenueByPlan, estimatedMRR, estimatedARR: estimatedMRR * 12 },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('Super admin: revenue report error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * GET /api/super-admin/reports/trial-funnel
+ * Trial conversion funnel: registered → trial active → converted to paid
+ */
+router.get('/reports/trial-funnel', async(req, res) => {
+  try {
+    const months = parseInt(req.query.months) || 6;
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+
+    const [totalRegistered, activeTrials, convertedPaid, cancelledExpired] = await Promise.all([
+      Tenant.countDocuments({ isDeleted: { $ne: true }, createdAt: { $gte: startDate } }),
+      Tenant.countDocuments({ isDeleted: { $ne: true }, 'subscription.status': 'trial', createdAt: { $gte: startDate } }),
+      Tenant.countDocuments({ isDeleted: { $ne: true }, 'subscription.status': 'active', 'subscription.plan': { $ne: 'free' }, createdAt: { $gte: startDate } }),
+      Tenant.countDocuments({ isDeleted: { $ne: true }, 'subscription.status': { $in: ['suspended', 'cancelled'] }, createdAt: { $gte: startDate } })
+    ]);
+
+    const conversionRate = totalRegistered > 0 ? Math.round((convertedPaid / totalRegistered) * 100 * 10) / 10 : 0;
+
+    return res.json({
+      success: true,
+      data: {
+        totalRegistered,
+        activeTrials,
+        convertedPaid,
+        cancelledExpired,
+        conversionRate,
+        period: `Last ${months} months`
+      },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('Super admin: trial funnel error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * GET /api/super-admin/reports/export/:type
+ * Export report data as CSV
+ */
+router.get('/reports/export/:type', async(req, res) => {
+  try {
+    const { type } = req.params;
+    let data = [];
+    let filename = 'report.csv';
+    let headers = '';
+
+    switch (type) {
+    case 'tenants': {
+      const tenants = await Tenant.find({ isDeleted: { $ne: true } })
+        .select('schoolName schoolCode email subscription createdAt')
+        .sort({ createdAt: -1 }).lean();
+      headers = 'School Name,School Code,Email,Plan,Status,Created At\n';
+      data = tenants.map(t =>
+        `"${t.schoolName}","${t.schoolCode}","${t.email}","${t.subscription?.plan}","${t.subscription?.status}","${t.createdAt?.toISOString()}"`
+      );
+      filename = 'tenants-report.csv';
+      break;
+    }
+    case 'users': {
+      const users = await User.find({ isActive: true })
+        .select('fullName firstName lastName email role tenantId createdAt')
+        .populate('tenantId', 'schoolName')
+        .sort({ createdAt: -1 }).limit(5000).lean();
+      headers = 'Name,Email,Role,School,Created At\n';
+      data = users.map(u =>
+        `"${u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim()}","${u.email || ''}","${u.role}","${u.tenantId?.schoolName || ''}","${u.createdAt?.toISOString()}"`
+      );
+      filename = 'users-report.csv';
+      break;
+    }
+    case 'revenue': {
+      const invoices = await PlatformInvoice.find({ status: 'paid' })
+        .populate('tenantId', 'schoolName')
+        .sort({ paidAt: -1 }).lean();
+      headers = 'Invoice Number,School,Amount,Paid At,Payment Method\n';
+      data = invoices.map(inv =>
+        `"${inv.invoiceNumber}","${inv.tenantId?.schoolName || ''}","${inv.totalAmount}","${inv.paidAt?.toISOString()}","${inv.paymentMethod || ''}"`
+      );
+      filename = 'revenue-report.csv';
+      break;
+    }
+    default:
+      return res.status(400).json({ success: false, message: `Unknown report type: ${type}`, requestId: req.requestId });
+    }
+
+    const csv = headers + data.join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(csv);
+  } catch (error) {
+    logger.error('Super admin: export report error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+// ─── BILLING REVENUE CHART ─────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/billing/revenue-chart
+ * Monthly revenue chart data
+ */
+router.get('/billing/revenue-chart', async(req, res) => {
+  try {
+    const months = parseInt(req.query.months) || 12;
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+
+    const revenueData = await PlatformInvoice.aggregate([
+      { $match: { status: 'paid', paidAt: { $gte: startDate } } },
+      { $group: { _id: { year: { $year: '$paidAt' }, month: { $month: '$paidAt' } }, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const labels = [];
+    const data = [];
+    const curr = new Date(startDate);
+    const now = new Date();
+    while (curr <= now) {
+      const year = curr.getFullYear();
+      const month = curr.getMonth() + 1;
+      labels.push(`${monthNames[curr.getMonth()]} ${year}`);
+      const found = revenueData.find(r => r._id.year === year && r._id.month === month);
+      data.push(found ? found.total : 0);
+      curr.setMonth(curr.getMonth() + 1);
+    }
+
+    return res.json({ success: true, data: { labels, data }, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: revenue chart error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+// ─── INVOICE DETAIL ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/invoices/:id
+ * Get invoice detail
+ */
+router.get('/invoices/:id', async(req, res) => {
+  try {
+    const invoice = await PlatformInvoice.findById(req.params.id)
+      .populate('tenantId', 'schoolName schoolCode email phone address')
+      .lean();
+    if (!invoice) return res.status(404).json({ success: false, message: 'Invoice not found.', requestId: req.requestId });
+    return res.json({ success: true, data: invoice, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: get invoice error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+// ─── EXTENDED COMMUNICATION ────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/announcements/scheduled
+ * List scheduled (not yet sent) announcements
+ */
+router.get('/announcements/scheduled', async(req, res) => {
+  try {
+    const announcements = await PlatformAnnouncement.find({ status: 'scheduled' })
+      .populate('createdBy', 'name email')
+      .sort({ scheduledAt: 1 })
+      .lean();
+    return res.json({ success: true, data: announcements, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: scheduled announcements error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * PATCH /api/super-admin/announcements/:id/cancel
+ * Cancel a scheduled announcement
+ */
+router.patch('/announcements/:id/cancel', async(req, res) => {
+  try {
+    const announcement = await PlatformAnnouncement.findById(req.params.id);
+    if (!announcement) return res.status(404).json({ success: false, message: 'Announcement not found.', requestId: req.requestId });
+    if (announcement.status !== 'scheduled') {
+      return res.status(400).json({ success: false, message: 'Only scheduled announcements can be cancelled.', requestId: req.requestId });
+    }
+    announcement.status = 'cancelled';
+    await announcement.save();
+    return res.json({ success: true, message: 'Announcement cancelled.', data: announcement, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: cancel announcement error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * POST /api/super-admin/announcements/preview
+ * Preview an announcement without sending
+ */
+router.post('/announcements/preview', async(req, res) => {
+  try {
+    const { title, body, targetType, targetPlans } = req.body;
+    let recipientCount = 0;
+
+    if (targetType === 'all') {
+      recipientCount = await Tenant.countDocuments({ isDeleted: { $ne: true }, isActive: true });
+    } else if (targetType === 'plan_based' && targetPlans?.length) {
+      recipientCount = await Tenant.countDocuments({ isDeleted: { $ne: true }, isActive: true, 'subscription.plan': { $in: targetPlans } });
+    } else if (targetType === 'selected') {
+      recipientCount = req.body.targetTenants?.length || 0;
+    }
+
+    return res.json({
+      success: true,
+      data: { title, body, recipientCount, targetType },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('Super admin: preview announcement error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * POST /api/super-admin/email-templates/:id/test
+ * Send test email using a template
+ */
+router.post('/email-templates/:id/test', async(req, res) => {
+  try {
+    const template = await EmailTemplate.findById(req.params.id).lean();
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found.', requestId: req.requestId });
+
+    try {
+      const emailService = require('../services/emailService');
+      await emailService.sendEmail({
+        to: req.superAdmin.email,
+        subject: `[TEST] ${template.subject || template.name}`,
+        html: template.body || template.content || '<p>Template preview</p>'
+      });
+      return res.json({ success: true, message: `Test email sent to ${req.superAdmin.email}`, requestId: req.requestId });
+    } catch (emailErr) {
+      return res.status(500).json({ success: false, message: 'Failed to send test email. Check email configuration.', requestId: req.requestId });
+    }
+  } catch (error) {
+    logger.error('Super admin: test email template error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * GET /api/super-admin/email-templates/:id/preview
+ * Preview rendered email template
+ */
+router.get('/email-templates/:id/preview', async(req, res) => {
+  try {
+    const template = await EmailTemplate.findById(req.params.id).lean();
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found.', requestId: req.requestId });
+    return res.json({ success: true, data: template, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: preview email template error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+/**
+ * GET /api/super-admin/email-history
+ * Placeholder — email history (depends on email service tracking)
+ */
+router.get('/email-history', async(req, res) => {
+  try {
+    // Email history would require a dedicated EmailLog model.
+    // For now, return an empty array to prevent frontend errors.
+    return res.json({ success: true, data: [], pagination: { current: 1, pages: 0, total: 0 }, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: email history error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
+  }
+});
+
+// ─── EXTENDED SUPPORT ──────────────────────────────────────────────────────
+
+// support-tickets/bulk and export routes moved above :id routes to prevent param collision
+
+// ─── SETTINGS TESTING ──────────────────────────────────────────────────────
+
+/**
+ * POST /api/super-admin/settings/test-email
+ * Test email configuration by sending a test email
+ */
+router.post('/settings/test-email', async(req, res) => {
+  try {
+    const emailService = require('../services/emailService');
+    await emailService.sendEmail({
+      to: req.superAdmin.email,
+      subject: 'Learnovo - Email Configuration Test',
+      html: '<p>This is a test email from Learnovo platform settings.</p><p>If you received this, your email configuration is working correctly.</p>'
+    });
+    return res.json({ success: true, message: `Test email sent to ${req.superAdmin.email}`, requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: test email config error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Email test failed. Check your SMTP configuration.', requestId: req.requestId });
+  }
+});
+
+/**
+ * POST /api/super-admin/settings/test-payment
+ * Test payment gateway configuration
+ */
+router.post('/settings/test-payment', async(req, res) => {
+  try {
+    const razorpayConfigured = !!(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+    if (!razorpayConfigured) {
+      return res.status(400).json({ success: false, message: 'Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.', requestId: req.requestId });
+    }
+
+    // Verify credentials by fetching Razorpay account
+    const Razorpay = require('razorpay');
+    const instance = new Razorpay({ key_id: process.env.RAZORPAY_KEY_ID, key_secret: process.env.RAZORPAY_KEY_SECRET });
+    // Fetch a small list of payments to verify credentials work
+    await instance.payments.all({ count: 1 });
+
+    return res.json({ success: true, message: 'Payment gateway connection successful.', requestId: req.requestId });
+  } catch (error) {
+    logger.error('Super admin: test payment config error', error, { requestId: req.requestId });
+    return res.status(500).json({ success: false, message: 'Payment gateway test failed. Check your credentials.', requestId: req.requestId });
+  }
+});
+
+// ─── AUDIT LOG EXPORT ──────────────────────────────────────────────────────
+
+/**
+ * GET /api/super-admin/audit-logs/export
+ * Export audit logs as CSV
+ */
+router.get('/audit-logs/export', async(req, res) => {
+  try {
+    const filter = {};
+    if (req.query.action) filter.action = req.query.action;
+    if (req.query.targetType) filter.targetType = req.query.targetType;
+    if (req.query.from || req.query.to) {
+      filter.timestamp = {};
+      if (req.query.from) filter.timestamp.$gte = new Date(req.query.from);
+      if (req.query.to) filter.timestamp.$lte = new Date(req.query.to);
+    }
+
+    const logs = await SuperAdminAuditLog.find(filter)
+      .populate('superAdminId', 'name email')
+      .sort({ timestamp: -1 })
+      .limit(10000)
+      .lean();
+
+    const headers = 'Timestamp,Admin,Action,Target Type,Target ID,IP\n';
+    const rows = logs.map(l =>
+      `"${l.timestamp?.toISOString()}","${l.superAdminId?.name || ''}","${l.action}","${l.targetType || ''}","${l.targetId || ''}","${l.ip || ''}"`
+    );
+
+    const csv = headers + rows.join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="audit-logs-export.csv"');
+    return res.send(csv);
+  } catch (error) {
+    logger.error('Super admin: export audit logs error', error, { requestId: req.requestId });
     return res.status(500).json({ success: false, message: 'Server error.', requestId: req.requestId });
   }
 });

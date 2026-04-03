@@ -78,7 +78,11 @@ router.post('/login', loginLimiter, [
     }
 
     // Sign JWT with dedicated SUPER_ADMIN_JWT_SECRET
-    const secret = process.env.SUPER_ADMIN_JWT_SECRET || 'super-admin-secret-key-change-in-production';
+    if (!process.env.SUPER_ADMIN_JWT_SECRET) {
+      logger.error('SUPER_ADMIN_JWT_SECRET environment variable is not set', { requestId: req.requestId });
+      return res.status(500).json({ success: false, message: 'Server configuration error.', requestId: req.requestId });
+    }
+    const secret = process.env.SUPER_ADMIN_JWT_SECRET;
     const token = jwt.sign(
       {
         id: superAdmin._id,
