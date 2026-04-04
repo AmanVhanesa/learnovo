@@ -73,23 +73,34 @@ export function TenantProvider({ children }) {
     if (!subdomain || !tenant) return
 
     // Swap manifest to tenant-specific one
+    // Replace the link entirely so the browser re-fetches the manifest
     const apiBase = import.meta.env.VITE_API_URL || ''
     const manifestUrl = `${apiBase}/api/tenants/manifest/${subdomain}`
-    let manifestLink = document.querySelector('link[rel="manifest"]')
-    if (manifestLink) {
-      manifestLink.href = manifestUrl
-    } else {
-      manifestLink = document.createElement('link')
-      manifestLink.rel = 'manifest'
-      manifestLink.href = manifestUrl
-      document.head.appendChild(manifestLink)
-    }
+    const oldManifest = document.querySelector('link[rel="manifest"]')
+    if (oldManifest) oldManifest.remove()
+    const manifestLink = document.createElement('link')
+    manifestLink.rel = 'manifest'
+    manifestLink.href = manifestUrl
+    manifestLink.crossOrigin = 'use-credentials'
+    document.head.appendChild(manifestLink)
 
     // Update theme-color meta to match tenant
     const themeColor = tenant.primaryColor || '#3EC4B1'
     let themeMeta = document.querySelector('meta[name="theme-color"]')
     if (themeMeta) {
       themeMeta.content = themeColor
+    }
+
+    // Update apple-mobile-web-app-title so iOS uses the school name
+    const schoolName = tenant.schoolName || tenant.name || 'Learnovo'
+    let appTitleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]')
+    if (appTitleMeta) {
+      appTitleMeta.content = schoolName
+    } else {
+      appTitleMeta = document.createElement('meta')
+      appTitleMeta.name = 'apple-mobile-web-app-title'
+      appTitleMeta.content = schoolName
+      document.head.appendChild(appTitleMeta)
     }
 
     // Update apple-touch-icon to tenant logo if available
