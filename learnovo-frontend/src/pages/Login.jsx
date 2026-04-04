@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useTenant } from '../contexts/TenantContext'
-import { Eye, EyeOff, Sun, Moon, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon, ArrowLeft, Download, Share } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { HeroGeometric } from '../components/ui/ShapeLandingHero'
 
@@ -20,11 +20,33 @@ const Login = () => {
   const [formReady, setFormReady] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
 
+  const [installPrompt, setInstallPrompt] = useState(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+
   const { login, isAuthenticated, isLoading: authLoading, error, clearError, user } = useAuth()
   const { theme, toggleMode } = useTheme()
   const { isSubdomainApp, tenant } = useTenant()
   const isDark = theme?.mode === 'dark'
   const navigate = useNavigate()
+
+  // PWA install detection
+  const isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+
+  useEffect(() => {
+    if (isStandalone) { setIsInstalled(true); return }
+    const handler = (e) => { e.preventDefault(); setInstallPrompt(e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [isStandalone])
+
+  const handlePWAInstall = async () => {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') setIsInstalled(true)
+    setInstallPrompt(null)
+  }
 
   // Tenant branding
   const isTenantLogin = isSubdomainApp && tenant
@@ -453,6 +475,57 @@ const Login = () => {
               </p>
             )}
           </motion.div>
+
+          {/* Install App — shown on tenant subdomain when not yet installed */}
+          {isTenantLogin && !isInstalled && (
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 1.1, ease: [0.25, 0.4, 0.25, 1] }}
+              className="mt-4"
+            >
+              <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] px-5 py-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  {tenant.logo ? (
+                    <img src={tenant.logo} alt={tenant.schoolName} className="w-11 h-11 rounded-xl object-contain flex-shrink-0" />
+                  ) : (
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
+                      style={{ background: tenantColor }}
+                    >
+                      {tenant.schoolName?.charAt(0) || 'S'}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold text-gray-900 dark:text-white truncate">
+                      Get {tenant.schoolName} App
+                    </p>
+                    <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] mt-0.5">
+                      {isIOSSafari ? 'Add to your home screen' : 'Install for quick access'}
+                    </p>
+                  </div>
+                  {installPrompt ? (
+                    <button
+                      type="button"
+                      onClick={handlePWAInstall}
+                      className="flex-shrink-0 flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5 active:scale-95"
+                      style={{ background: tenantColor }}
+                    >
+                      <Download size={14} />
+                      Install
+                    </button>
+                  ) : isIOSSafari ? (
+                    <div className="flex-shrink-0 text-right">
+                      <p className="text-[11px] text-gray-500 dark:text-[#8E8E93] leading-relaxed">
+                        Tap <Share size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> then
+                      </p>
+                      <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300">"Add to Home Screen"</p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           {/* Demo access — hidden on tenant subdomain */}
           {!isTenantLogin && <motion.div

@@ -424,6 +424,69 @@ router.get('/public/:subdomain', async(req, res) => {
   }
 });
 
+// @desc    Dynamic PWA manifest for a tenant (school name + logo on install)
+// @route   GET /api/tenants/manifest/:subdomain
+// @access  Public
+router.get('/manifest/:subdomain', async (req, res) => {
+  try {
+    const { subdomain } = req.params;
+    const tenant = await Tenant.findOne({
+      subdomain: subdomain.toLowerCase(),
+      isActive: true,
+      isDeleted: { $ne: true }
+    }).select('schoolName schoolCode subdomain logo primaryColor secondaryColor').lean();
+
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'School not found' });
+    }
+
+    // Resolve logo: tenant → settings → default
+    let logo = tenant.logo;
+    if (!logo) {
+      const settings = await Settings.findOne({ tenantId: tenant._id }).select('institution.logo').lean();
+      logo = settings?.institution?.logo || null;
+    }
+
+    const themeColor = tenant.primaryColor || '#3EC4B1';
+    const schoolName = tenant.schoolName || 'Learnovo';
+
+    // Build icons array — use school logo if available, else default PWA icons
+    const icons = logo
+      ? [
+          { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: logo, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        ]
+      : [
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        ];
+
+    const manifest = {
+      name: schoolName,
+      short_name: schoolName.length > 12 ? schoolName.substring(0, 12) : schoolName,
+      description: `${schoolName} — School Management Portal`,
+      theme_color: themeColor,
+      background_color: '#ffffff',
+      display: 'standalone',
+      orientation: 'portrait-primary',
+      scope: '/',
+      start_url: '/',
+      categories: ['education', 'productivity'],
+      icons
+    };
+
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.json(manifest);
+  } catch (error) {
+    logger.error('Generate tenant manifest error', error, {
+      requestId: req.requestId,
+      subdomain: req.params.subdomain
+    });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @desc    Check if school code/subdomain is available
 // @route   GET /api/tenants/check-availability
 // @access  Public

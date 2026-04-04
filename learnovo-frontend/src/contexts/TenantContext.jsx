@@ -68,6 +68,39 @@ export function TenantProvider({ children }) {
     return () => { cancelled = true }
   }, [subdomain])
 
+  // Dynamically set PWA manifest and apple-touch-icon for tenant branding
+  useEffect(() => {
+    if (!subdomain || !tenant) return
+
+    // Swap manifest to tenant-specific one
+    const apiBase = import.meta.env.VITE_API_URL || ''
+    const manifestUrl = `${apiBase}/api/tenants/manifest/${subdomain}`
+    let manifestLink = document.querySelector('link[rel="manifest"]')
+    if (manifestLink) {
+      manifestLink.href = manifestUrl
+    } else {
+      manifestLink = document.createElement('link')
+      manifestLink.rel = 'manifest'
+      manifestLink.href = manifestUrl
+      document.head.appendChild(manifestLink)
+    }
+
+    // Update theme-color meta to match tenant
+    const themeColor = tenant.primaryColor || '#3EC4B1'
+    let themeMeta = document.querySelector('meta[name="theme-color"]')
+    if (themeMeta) {
+      themeMeta.content = themeColor
+    }
+
+    // Update apple-touch-icon to tenant logo if available
+    if (tenant.logo) {
+      let appleIcon = document.querySelector('link[rel="apple-touch-icon"]')
+      if (appleIcon) {
+        appleIcon.href = tenant.logo
+      }
+    }
+  }, [subdomain, tenant])
+
   const value = {
     subdomain,       // raw slug string or null
     tenant,          // resolved tenant object or null

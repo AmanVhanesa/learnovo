@@ -12,6 +12,7 @@ import { TenantProvider, useTenant } from './contexts/TenantContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import SuperAdminRoute from './components/superadmin/SuperAdminRoute'
 import Layout from './components/Layout'
+import InstallPWA from './components/InstallPWA'
 import ErrorBoundary, { setErrorBoundaryQueryClient } from './components/ErrorBoundary'
 import { setPageErrorBoundaryQueryClient } from './components/PageErrorBoundary'
 
@@ -219,6 +220,8 @@ function App() {
                     error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
                   }}
                 />
+
+                <InstallPWA />
 
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
