@@ -84,13 +84,7 @@ export function TenantProvider({ children }) {
       }))
     } catch (e) { /* quota exceeded — ignore */ }
 
-    // Stop the MutationObserver that blocks static manifest links
-    if (window.__pwaManifestObserver) {
-      window.__pwaManifestObserver.disconnect()
-      window.__pwaManifestObserver = null
-    }
-
-    // Remove any existing manifest links (static or previous blob)
+    // Remove any existing manifest links (previous blob URLs)
     document.querySelectorAll('link[rel="manifest"]').forEach(el => el.remove())
 
     // Build manifest as a blob URL — avoids cross-origin issues entirely

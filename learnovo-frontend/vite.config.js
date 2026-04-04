@@ -2,6 +2,22 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Strip the auto-injected <link rel="manifest"> from built HTML.
+// We handle manifest linking at runtime (inline script + TenantContext)
+// so the browser never sees the static "Learnovo" manifest on tenant subdomains.
+function stripManifestLink() {
+  return {
+    name: 'strip-manifest-link',
+    enforce: 'post',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        return html.replace(/<link rel="manifest"[^>]*>/g, '')
+      }
+    }
+  }
+}
+
 export default defineConfig({
   plugins: [
     react(),
@@ -109,7 +125,8 @@ export default defineConfig({
           }
         ]
       }
-    })
+    }),
+    stripManifestLink()
   ],
   server: {
     port: 3000,
