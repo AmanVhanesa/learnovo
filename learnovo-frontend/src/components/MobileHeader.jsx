@@ -46,8 +46,8 @@ const MobileHeader = ({ onMenuClick }) => {
 
         {/* Right side - Search, notifications, profile */}
         <div className="flex items-center space-x-0.5 flex-shrink-0">
-          {/* Child switcher for parent accounts */}
-          <ChildSwitcher compact />
+          {/* Child/sibling switcher */}
+          <ChildSwitcher />
 
           <button
             onClick={() => navigate('/app/search')}

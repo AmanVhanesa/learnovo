@@ -101,7 +101,7 @@ const Header = ({ onToggleSidebar }) => {
             </div>
           </form>
 
-          {/* Child switcher for parent accounts */}
+          {/* Child/sibling switcher */}
           <ChildSwitcher />
 
           {/* Dark/Light mode toggle */}
