@@ -109,9 +109,9 @@ const StudentLists = () => {
     const [showSidebar, setShowSidebar] = useState(true);
 
     return (
-        <div className="flex flex-col md:flex-row h-[calc(100vh-theme(spacing.16))] bg-gray-50 dark:bg-[#000000] overflow-hidden">
+        <div className="flex flex-col md:flex-row h-[calc(100vh-theme(spacing.16))] bg-gray-50 dark:bg-[#000000] overflow-hidden rounded-2xl border border-gray-200 dark:border-[#38383A]">
             {/* Sidebar */}
-            <div className={`${showSidebar ? 'flex' : 'hidden'} md:flex w-full md:w-80 border-b md:border-b-0 md:border-r border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] flex-col shrink-0 ${activeListId && activeListData ? 'max-h-48 md:max-h-full' : ''}`}>
+            <div className={`${showSidebar ? 'flex' : 'hidden'} md:flex w-full md:w-80 border-b md:border-b-0 md:border-r border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] flex-col shrink-0 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl ${activeListId && activeListData ? 'max-h-48 md:max-h-full' : ''}`}>
                 <div className="p-4 border-b border-gray-200 dark:border-[#38383A]">
                     <button
                         onClick={() => setIsCreatingList(true)}
@@ -175,7 +175,7 @@ const StudentLists = () => {
             </div>
 
             {/* Main Content */}
-            <div className={`${!showSidebar ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-w-0 bg-gray-50/50 dark:bg-[#000000] relative`}>
+            <div className={`${!showSidebar ? 'flex' : 'hidden'} md:flex flex-1 flex-col min-w-0 bg-gray-50/50 dark:bg-[#000000] relative rounded-b-2xl md:rounded-b-none md:rounded-r-2xl overflow-hidden`}>
                 {activeListId && activeListData ? (
                     <>
                         {/* Header */}
