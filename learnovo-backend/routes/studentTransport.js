@@ -521,7 +521,213 @@ router.post('/bulk-assign', protect, authorize('admin'), [
   }
 });
 
-// @desc    Export student transport assignments
-// @route   GET /api/student-transport/export
+// @desc    Resolve admission numbers to transport assignments
+// @route   POST /api/student-transport/resolve-by-admission
 // @access  Private (Admin)
+router.post('/resolve-by-admission', protect, authorize('admin'), [
+  body('admissionNumbers').isArray({ min: 1 }).withMessage('At least one admission number is required'),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const { admissionNumbers } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const students = [];
+    const notFound = [];
+
+    for (const admNum of admissionNumbers) {
+      const trimmed = admNum.trim();
+      if (!trimmed) continue;
+
+      const student = await User.findOne({
+        tenantId,
+        role: 'student',
+        admissionNumber: { $regex: new RegExp(`^${trimmed}$`, 'i') }
+      }).select('name admissionNumber class section isActive').lean();
+
+      if (!student) {
+        notFound.push(trimmed);
+        continue;
+      }
+
+      // Find active transport assignment
+      const assignment = await StudentTransportAssignment.findOne({
+        student: student._id,
+        tenantId,
+        isActive: true
+      })
+        .populate('route', 'routeName routeCode assignedDriver')
+        .populate({ path: 'route', populate: { path: 'assignedDriver', select: 'name phone' } })
+        .lean();
+
+      students.push({
+        _id: student._id,
+        name: student.name,
+        admissionNumber: student.admissionNumber,
+        class: student.class,
+        section: student.section,
+        isActive: student.isActive,
+        hasTransport: !!assignment,
+        assignment: assignment || null
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { students, notFound }
+    });
+  } catch (error) {
+    console.error('Resolve by admission error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while resolving admission numbers'
+    });
+  }
+});
+
+// @desc    Bulk transfer students from one route/driver to another
+// @route   POST /api/student-transport/bulk-transfer
+// @access  Private (Admin)
+router.post('/bulk-transfer', protect, authorize('admin'), [
+  body('toRouteId').notEmpty().withMessage('Target route is required'),
+  body('toStop').trim().notEmpty().withMessage('Target stop is required'),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const {
+      admissionNumbers, studentIds, fromRouteId,
+      toRouteId, toStop, transportType, monthlyFee
+    } = req.body;
+
+    const tenantId = req.user.tenantId;
+
+    // Validate target route
+    const toRoute = await Route.findOne({ _id: toRouteId, tenantId, isActive: true });
+    if (!toRoute) {
+      return res.status(400).json({ success: false, message: 'Target route not found or inactive' });
+    }
+
+    // Validate target stop
+    const stopExists = toRoute.stops.some(
+      s => s.stopName.toLowerCase() === toStop.toLowerCase()
+    );
+    if (!stopExists) {
+      return res.status(400).json({ success: false, message: 'Stop does not exist in the target route' });
+    }
+
+    // Resolve students to transfer
+    let studentsToTransfer = [];
+
+    if (admissionNumbers && admissionNumbers.length > 0) {
+      // Resolve by admission numbers
+      for (const admNum of admissionNumbers) {
+        const student = await User.findOne({
+          tenantId,
+          role: 'student',
+          admissionNumber: { $regex: new RegExp(`^${admNum.trim()}$`, 'i') }
+        }).select('_id name admissionNumber').lean();
+        if (student) studentsToTransfer.push(student);
+      }
+    } else if (studentIds && studentIds.length > 0) {
+      // Resolve by student IDs
+      studentsToTransfer = await User.find({
+        _id: { $in: studentIds },
+        tenantId,
+        role: 'student'
+      }).select('_id name admissionNumber').lean();
+    } else if (fromRouteId) {
+      // Get all active students on the source route
+      const sourceAssignments = await StudentTransportAssignment.find({
+        route: fromRouteId,
+        tenantId,
+        isActive: true
+      }).populate('student', '_id name admissionNumber').lean();
+      studentsToTransfer = sourceAssignments.map(a => a.student).filter(Boolean);
+    }
+
+    if (studentsToTransfer.length === 0) {
+      return res.status(400).json({ success: false, message: 'No valid students found to transfer' });
+    }
+
+    const results = { transferred: [], skipped: [], failed: [] };
+
+    for (const student of studentsToTransfer) {
+      try {
+        // Find existing active assignment
+        const existing = await StudentTransportAssignment.findOne({
+          student: student._id,
+          tenantId,
+          isActive: true
+        });
+
+        if (!existing) {
+          results.skipped.push({
+            admissionNumber: student.admissionNumber,
+            name: student.name,
+            reason: 'No active transport assignment'
+          });
+          continue;
+        }
+
+        // Skip if already on the target route+stop
+        if (existing.route.toString() === toRouteId && existing.stop.toLowerCase() === toStop.toLowerCase()) {
+          results.skipped.push({
+            admissionNumber: student.admissionNumber,
+            name: student.name,
+            reason: 'Already on the target route and stop'
+          });
+          continue;
+        }
+
+        // Deactivate old assignment
+        existing.isActive = false;
+        existing.inactiveReason = 'Transferred to another route';
+        existing.inactivatedAt = new Date();
+        existing.endDate = new Date();
+        existing.updatedBy = req.user._id;
+        await existing.save();
+
+        // Create new assignment on target route
+        const newAssignment = await StudentTransportAssignment.create({
+          tenantId,
+          student: student._id,
+          route: toRouteId,
+          stop: toStop,
+          transportType: transportType || existing.transportType,
+          academicYear: existing.academicYear,
+          monthlyFee: monthlyFee != null ? monthlyFee : existing.monthlyFee,
+          startDate: new Date(),
+          isActive: true,
+          notes: `Transferred from previous route`,
+          createdBy: req.user._id
+        });
+
+        results.transferred.push({
+          admissionNumber: student.admissionNumber,
+          name: student.name,
+          newAssignmentId: newAssignment._id
+        });
+      } catch (error) {
+        results.failed.push({
+          admissionNumber: student.admissionNumber,
+          name: student.name,
+          reason: error.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Transfer complete. Transferred: ${results.transferred.length}, Skipped: ${results.skipped.length}, Failed: ${results.failed.length}`,
+      data: results
+    });
+  } catch (error) {
+    console.error('Bulk transfer error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during bulk transfer'
+    });
+  }
+});
+
 module.exports = router;

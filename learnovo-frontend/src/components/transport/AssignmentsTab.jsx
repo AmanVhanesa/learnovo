@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Plus, Edit, Trash2, X, Search, Download } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, X, Search, Download, ArrowRightLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
 import api from '../../services/authService';
-import axios from 'axios';
+import BulkTransferModal from './BulkTransferModal';
 
 const AssignmentsTab = ({ onStatsUpdate }) => {
     const [assignments, setAssignments] = useState([]);
@@ -20,6 +20,7 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
     const [drivers, setDrivers] = useState([]);
     const [subDepartments, setSubDepartments] = useState([]);
     const [exporting, setExporting] = useState(false);
+    const [showBulkTransfer, setShowBulkTransfer] = useState(false);
 
     useEffect(() => {
         fetchAssignments();
@@ -55,11 +56,7 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
 
     const fetchStudents = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/students`, {
-                headers: { Authorization: `Bearer ${token}` },
-                params: { limit: 500 }
-            });
+            const response = await api.get('/students', { params: { limit: 500, status: 'active' } });
             setStudents(response.data.data || []);
         } catch (error) {
         }
@@ -86,19 +83,15 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
     const handleExport = async () => {
         try {
             setExporting(true);
-            const token = localStorage.getItem('token');
-            const params = new URLSearchParams();
-            if (driverFilter) params.append('driver', driverFilter);
-            if (subDepartmentFilter) params.append('subDepartment', subDepartmentFilter);
-            if (statusFilter !== 'all') params.append('status', statusFilter);
+            const params = {};
+            if (driverFilter) params.driver = driverFilter;
+            if (subDepartmentFilter) params.subDepartment = subDepartmentFilter;
+            if (statusFilter !== 'all') params.status = statusFilter;
 
-            const response = await axios.get(
-                `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/students/export?${params.toString()}`,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                    responseType: 'blob'
-                }
-            );
+            const response = await api.get('/students/export', {
+                params,
+                responseType: 'blob'
+            });
 
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
@@ -200,6 +193,13 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                 >
                     <Download className="w-4 h-4" />
                     {exporting ? 'Exporting...' : 'Export List'}
+                </button>
+                <button
+                    onClick={() => setShowBulkTransfer(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"
+                >
+                    <ArrowRightLeft className="w-4 h-4" />
+                    Bulk Transfer
                 </button>
                 <button
                     onClick={handleAddAssignment}
@@ -310,6 +310,23 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                     />
                 )
             }
+
+            {/* Bulk Transfer Modal */}
+            {
+                showBulkTransfer && (
+                    <BulkTransferModal
+                        routes={routes}
+                        drivers={drivers}
+                        onClose={(success) => {
+                            setShowBulkTransfer(false);
+                            if (success) {
+                                fetchAssignments();
+                                onStatsUpdate();
+                            }
+                        }}
+                    />
+                )
+            }
         </div >
     );
 };
@@ -352,7 +369,13 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                 await transportService.updateStudentTransportAssignment(assignment._id, formData);
                 toast.success('Assignment updated successfully');
             } else {
-                await transportService.assignStudentToRoute(formData);
+                // Backend expects studentId/routeId, form uses student/route
+                const payload = {
+                    ...formData,
+                    studentId: formData.student,
+                    routeId: formData.route
+                };
+                await transportService.assignStudentToRoute(payload);
                 toast.success('Student assigned successfully');
             }
             onClose(true);

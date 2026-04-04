@@ -281,6 +281,20 @@ export const exportStudentTransportAssignments = async (params = {}) => {
     return response.data;
 };
 
+export const resolveStudentsByAdmission = async (admissionNumbers) => {
+    const response = await axios.post(`${API_URL}/student-transport/resolve-by-admission`, { admissionNumbers }, {
+        headers: getAuthHeader()
+    });
+    return response.data;
+};
+
+export const bulkTransferStudents = async (transferData) => {
+    const response = await axios.post(`${API_URL}/student-transport/bulk-transfer`, transferData, {
+        headers: getAuthHeader()
+    });
+    return response.data;
+};
+
 export default {
     // Drivers
     getDrivers,
@@ -321,5 +335,7 @@ export default {
     updateStudentTransportAssignment,
     deactivateStudentTransportAssignment,
     bulkAssignStudents,
-    exportStudentTransportAssignments
+    exportStudentTransportAssignments,
+    resolveStudentsByAdmission,
+    bulkTransferStudents
 };
