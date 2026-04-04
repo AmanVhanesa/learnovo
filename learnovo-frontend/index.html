@@ -38,7 +38,12 @@
       }
     }
     if(!sub)return;
-    // Block static manifest links injected by vite-plugin-pwa
+    // Remove any static manifest link already in the DOM
+    var existing=document.querySelectorAll('link[rel="manifest"]');
+    for(var j=0;j<existing.length;j++){
+      if(!existing[j].dataset.tenant)existing[j].remove();
+    }
+    // Block future static manifest links injected by vite-plugin-pwa
     var mo=new MutationObserver(function(ms){
       ms.forEach(function(m){
         m.addedNodes.forEach(function(n){
