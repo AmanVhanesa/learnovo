@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, CreditCard, Calendar, MoreHorizontal, BookCheck, Megaphone } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, Calendar, MoreHorizontal, BookCheck, Megaphone, BookOpen } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const BottomNav = () => {
@@ -18,15 +18,21 @@ const BottomNav = () => {
       ]
     }
 
+    if (role === 'teacher') {
+      return [
+        { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
+        { name: 'Students', href: '/app/students', icon: Users },
+        { name: 'Homework', href: '/app/homework', icon: BookOpen },
+        { name: 'Attendance', href: '/app/attendance', icon: Calendar },
+      ]
+    }
+
     const base = [
       { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
     ]
 
-    if (['admin', 'teacher'].includes(role)) {
-      base.push({ name: 'Students', href: '/app/students', icon: Users })
-    }
-
     if (['admin'].includes(role)) {
+      base.push({ name: 'Students', href: '/app/students', icon: Users })
       base.push({ name: 'Fees', href: '/app/fees-finance', icon: CreditCard })
     }
 

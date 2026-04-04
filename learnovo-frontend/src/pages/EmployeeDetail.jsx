@@ -379,7 +379,7 @@ const EmployeeDetail = () => {
 
             {/* Tabs */}
             <div className="border-b border-gray-200 dark:border-[#38383A]">
-                <nav className="-mb-px flex overflow-x-auto whitespace-nowrap space-x-4 sm:space-x-8">
+                <nav className="-mb-px flex overflow-x-auto overflow-y-hidden whitespace-nowrap space-x-4 sm:space-x-8">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}

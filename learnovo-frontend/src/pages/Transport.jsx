@@ -82,7 +82,7 @@ const Transport = () => {
             {/* Tabs */}
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass overflow-hidden">
                 <div className="border-b border-gray-200 dark:border-[#38383A]">
-                    <nav className="flex space-x-8 px-6" aria-label="Tabs">
+                    <nav className="flex space-x-8 px-6 overflow-x-auto overflow-y-hidden whitespace-nowrap" aria-label="Tabs">
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
                             return (

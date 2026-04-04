@@ -174,7 +174,7 @@ const ClassDetail = () => {
 
       {/* Tabs */}
       <div className="card">
-        <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto">
+        <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto overflow-y-hidden">
           <nav className="flex space-x-8 px-4 sm:px-6 whitespace-nowrap">
             <button
               onClick={() => setActiveTab('students')}

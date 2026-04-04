@@ -202,23 +202,47 @@ const TimetableSchedule = () => {
 
   const { data: weekData, isLoading: weekLoading, error: weekError } = useQuery({
     queryKey: ['week-schedule', scheduleParams, activeView],
-    queryFn: fetchScheduleFn,
-    enabled: shouldFetch
+    queryFn: async () => {
+      try {
+        return await fetchScheduleFn()
+      } catch (err) {
+        // Treat 404 as empty data (no timetable published yet)
+        const status = err?.status || err?.response?.status || err?.statusCode
+        if (status === 404) return { data: { days: [] } }
+        throw err
+      }
+    },
+    enabled: shouldFetch,
+    retry: false
   })
 
-  // Show error toast when week schedule fails
+  // Show error toast only for actual server errors (not 404/empty)
   React.useEffect(() => {
-    if (weekError) toast.error('Failed to load timetable')
+    if (weekError) {
+      const status = weekError?.status || weekError?.response?.status || weekError?.statusCode
+      if (status !== 404) {
+        toast.error('Failed to load timetable')
+      }
+    }
   }, [weekError])
 
   const { data: todayData, isLoading: todayLoading } = useQuery({
     queryKey: ['today-schedule', effectiveClassId || selectedClassId || user?._id],
-    queryFn: () => timetableService.getTodaySchedule({
-      classId: effectiveClassId || selectedClassId,
-      sectionId: effectiveSectionId || selectedSectionId,
-      teacherId: isTeacher ? user?._id : selectedTeacherId
-    }),
-    enabled: shouldFetch
+    queryFn: async () => {
+      try {
+        return await timetableService.getTodaySchedule({
+          classId: effectiveClassId || selectedClassId,
+          sectionId: effectiveSectionId || selectedSectionId,
+          teacherId: isTeacher ? user?._id : selectedTeacherId
+        })
+      } catch (err) {
+        const status = err?.status || err?.response?.status || err?.statusCode
+        if (status === 404) return { data: [] }
+        throw err
+      }
+    },
+    enabled: shouldFetch,
+    retry: false
   })
 
   // Extract data — backend returns { data: { days: [{ dayOfWeek, entries, timings }] } }
@@ -667,7 +691,7 @@ const TimetableSchedule = () => {
 
           {/* Mobile Day Tabs */}
           <div className="md:hidden space-y-4">
-            <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+            <div className="flex gap-1 overflow-x-auto overflow-y-hidden pb-1 scrollbar-hide">
               {workingDays.map((day) => {
                 const dayIdx = DAYS_LOWER.indexOf(day.toLowerCase())
                 if (dayIdx < 0) return null

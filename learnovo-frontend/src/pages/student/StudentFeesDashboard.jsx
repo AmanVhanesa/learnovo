@@ -492,7 +492,7 @@ const StudentFeesDashboard = () => {
             </div>
 
             {/* TABS */}
-            <div className="flex border-b border-gray-200 dark:border-[#38383A] gap-4 sm:gap-6 overflow-x-auto whitespace-nowrap">
+            <div className="flex border-b border-gray-200 dark:border-[#38383A] gap-4 sm:gap-6 overflow-x-auto overflow-y-hidden whitespace-nowrap">
                 <button
                     onClick={() => setActiveTab('invoices')}
                     className={`pb-3 font-medium text-sm transition-colors ${activeTab === 'invoices' ? 'border-b-2 border-primary-600 text-primary-600' : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'}`}

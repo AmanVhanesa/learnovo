@@ -354,7 +354,7 @@ const FeesFinance = () => {
       </div>
 
       {/* Tabs — grouped by workflow */}
-      <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto scrollbar-none">
+      <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto overflow-y-hidden scrollbar-none">
         <nav className="-mb-px flex whitespace-nowrap px-1">
           {TAB_GROUPS.map((group, gIdx) => (
             <div key={group.label} className="flex items-end">

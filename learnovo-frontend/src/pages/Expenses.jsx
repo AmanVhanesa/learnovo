@@ -417,7 +417,7 @@ const Expenses = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-gray-100/80 dark:bg-[#2C2C2E] rounded-xl mb-6 overflow-x-auto whitespace-nowrap scrollbar-hide">
+      <div className="flex gap-1 p-1 bg-gray-100/80 dark:bg-[#2C2C2E] rounded-xl mb-6 overflow-x-auto overflow-y-hidden whitespace-nowrap scrollbar-hide">
         {TABS.map(tab => (
           <button
             key={tab.id}

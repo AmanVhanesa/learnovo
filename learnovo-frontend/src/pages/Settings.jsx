@@ -231,7 +231,7 @@ const Settings = () => {
 
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 dark:border-[#38383A]">
-        <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
+        <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto overflow-y-hidden whitespace-nowrap scrollbar-hide">
           {tabs.map((tab) => (
             <button
               key={tab.id}

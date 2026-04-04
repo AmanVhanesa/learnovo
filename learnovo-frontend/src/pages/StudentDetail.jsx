@@ -475,7 +475,7 @@ const StudentDetail = () => {
 
             {/* Tabs */}
             <div className="border-b border-gray-200 dark:border-[#38383A]">
-                <nav className="-mb-px flex space-x-8 overflow-x-auto">
+                <nav className="-mb-px flex space-x-8 overflow-x-auto overflow-y-hidden">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}

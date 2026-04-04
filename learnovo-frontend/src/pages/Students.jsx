@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp, AlertTriangle, RefreshCw, Users } from 'lucide-react'
+import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp, AlertTriangle, RefreshCw, Users, SlidersHorizontal, ChevronDown } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
@@ -59,6 +59,7 @@ const Students = () => {
   const [driverFilter, setDriverFilter] = useState('')
 
   // UI state
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
@@ -617,8 +618,90 @@ const Students = () => {
           />
         </div>
 
-        {/* Filter Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Mobile: Filter toggle + Export */}
+        <div className="flex items-center gap-2 sm:hidden">
+          <button
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className={`h-9 px-3.5 text-xs font-medium rounded-lg border transition-all inline-flex items-center gap-2 ${
+              (classFilter || sectionFilter || yearFilter || driverFilter)
+                ? 'bg-primary-50 dark:bg-primary-500/10 border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
+            }`}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            Filters
+            {(classFilter || sectionFilter || yearFilter || driverFilter) && (
+              <span className="h-4 min-w-[16px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {[classFilter, sectionFilter, yearFilter, driverFilter].filter(Boolean).length}
+              </span>
+            )}
+          </button>
+          <div className="flex-1" />
+          <button
+            onClick={handleExport}
+            className="h-9 px-3.5 text-xs font-medium text-primary-600 dark:text-primary-400 border border-primary-600 dark:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg transition-all inline-flex items-center gap-1.5"
+          >
+            <Upload className="h-3.5 w-3.5 rotate-180" />
+            <span>Export</span>
+          </button>
+        </div>
+
+        {/* Mobile: Collapsible filters */}
+        {showMobileFilters && (
+          <div className="flex flex-col gap-3 sm:hidden pb-2">
+            <div className="relative">
+              <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}
+                className="appearance-none w-full h-10 pl-3 pr-8 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer">
+                <option value="">Class</option>
+                {filterOptions.classes.map(cls => (<option key={cls} value={cls}>{cls}</option>))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
+              </div>
+            </div>
+            <div className="relative">
+              <select value={sectionFilter} onChange={(e) => setSectionFilter(e.target.value)}
+                className="appearance-none w-full h-10 pl-3 pr-8 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer">
+                <option value="">Section</option>
+                {filterOptions.sections.map(sec => (<option key={sec} value={sec}>{sec}</option>))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
+              </div>
+            </div>
+            <div className="relative">
+              <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}
+                className="appearance-none w-full h-10 pl-3 pr-8 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer">
+                <option value="">Year</option>
+                {filterOptions.academicYears.map(year => (<option key={year} value={year}>{year}</option>))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
+              </div>
+            </div>
+            {filterOptions.drivers && filterOptions.drivers.length > 0 && (
+              <div className="relative">
+                <select value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)}
+                  className="appearance-none w-full h-10 pl-3 pr-8 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer">
+                  <option value="">Driver</option>
+                  {filterOptions.drivers.map(driver => (<option key={driver._id} value={driver._id}>{driver.name}</option>))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
+                </div>
+              </div>
+            )}
+            {(classFilter || sectionFilter || yearFilter || driverFilter) && (
+              <button onClick={clearFilters}
+                className="h-9 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-lg transition-all self-start">
+                Clear all filters
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Desktop: Inline filters */}
+        <div className="hidden sm:flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Filters:</span>
 
           {/* Class Filter */}
@@ -626,7 +709,7 @@ const Students = () => {
             <select
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
-              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
               <option value="">Class</option>
               {filterOptions.classes.map(cls => (
@@ -634,9 +717,7 @@ const Students = () => {
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <ChevronDown className="h-3 w-3 text-gray-400 dark:text-[#8E8E93]" />
             </div>
           </div>
 
@@ -645,7 +726,7 @@ const Students = () => {
             <select
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
               <option value="">Section</option>
               {filterOptions.sections.map(sec => (
@@ -653,9 +734,7 @@ const Students = () => {
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <ChevronDown className="h-3 w-3 text-gray-400 dark:text-[#8E8E93]" />
             </div>
           </div>
 
@@ -664,7 +743,7 @@ const Students = () => {
             <select
               value={yearFilter}
               onChange={(e) => setYearFilter(e.target.value)}
-              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
             >
               <option value="">Year</option>
               {filterOptions.academicYears.map(year => (
@@ -672,9 +751,7 @@ const Students = () => {
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+              <ChevronDown className="h-3 w-3 text-gray-400 dark:text-[#8E8E93]" />
             </div>
           </div>
 
@@ -684,7 +761,7 @@ const Students = () => {
               <select
                 value={driverFilter}
                 onChange={(e) => setDriverFilter(e.target.value)}
-                className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+                className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
               >
                 <option value="">Driver</option>
                 {filterOptions.drivers.map(driver => (
@@ -692,9 +769,7 @@ const Students = () => {
                 ))}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <ChevronDown className="h-3 w-3 text-gray-400 dark:text-[#8E8E93]" />
               </div>
             </div>
           )}
@@ -715,7 +790,7 @@ const Students = () => {
           {/* Export Button */}
           <button
             onClick={handleExport}
-            className="h-8 px-3 text-xs font-medium text-primary-600 border border-primary-600 hover:bg-primary-50 rounded-md transition-all inline-flex items-center gap-1.5"
+            className="h-8 px-3 text-xs font-medium text-primary-600 dark:text-primary-400 border border-primary-600 dark:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-md transition-all inline-flex items-center gap-1.5"
           >
             <Upload className="h-3.5 w-3.5 rotate-180" />
             <span>Export</span>

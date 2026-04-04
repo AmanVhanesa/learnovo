@@ -209,7 +209,7 @@ const AcademicsManagement = () => {
             )}
 
             {/* Tabs */}
-            <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto">
+            <div className="border-b border-gray-200 dark:border-[#38383A] overflow-x-auto overflow-y-hidden">
                 <nav className="-mb-px flex space-x-8 whitespace-nowrap">
                     {tabs.map((tab) => {
                         const Icon = tab.icon
