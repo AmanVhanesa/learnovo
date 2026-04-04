@@ -493,6 +493,159 @@ router.get('/me', protect, async(req, res) => {
   }
 });
 
+// @desc    Get siblings for the logged-in student (via Family model or parent's children)
+// @route   GET /api/auth/siblings
+// @access  Private (Student)
+router.get('/siblings', protect, async(req, res) => {
+  try {
+    if (req.user.role !== 'student') {
+      return res.json({ success: true, data: [] });
+    }
+
+    const Family = require('../models/Family');
+
+    // Strategy 1: Find via Family model
+    let siblingIds = [];
+    const family = await Family.findOne({
+      tenantId: req.user.tenantId,
+      students: req.user._id,
+      isActive: true
+    });
+    if (family && family.students.length > 1) {
+      siblingIds = family.students.filter(id => id.toString() !== req.user._id.toString());
+    }
+
+    // Strategy 2: Find via parent's children array (if Family didn't yield results)
+    if (siblingIds.length === 0) {
+      const parent = await User.findOne({
+        tenantId: req.user.tenantId,
+        role: 'parent',
+        children: req.user._id
+      });
+      if (parent && parent.children.length > 1) {
+        siblingIds = parent.children.filter(id => id.toString() !== req.user._id.toString());
+      }
+    }
+
+    if (siblingIds.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const siblings = await User.find(
+      { _id: { $in: siblingIds }, tenantId: req.user.tenantId, role: 'student', isActive: true },
+      'name firstName lastName fullName admissionNumber class section avatar photo'
+    ).populate('class', 'name').populate('section', 'name');
+
+    const data = siblings.map(s => ({
+      id: s._id,
+      name: s.fullName || s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+      admissionNumber: s.admissionNumber,
+      className: s.class?.name || '',
+      sectionName: s.section?.name || '',
+      avatar: s.avatar || s.photo || null
+    }));
+
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error fetching siblings:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @desc    Switch to a sibling account (issues new JWT)
+// @route   POST /api/auth/switch-child/:studentId
+// @access  Private (Student or Parent)
+router.post('/switch-child/:studentId', protect, async(req, res) => {
+  try {
+    const targetId = req.params.studentId;
+    const Family = require('../models/Family');
+    let allowed = false;
+
+    if (req.user.role === 'parent') {
+      // Parent: check children array
+      const children = (req.user.children || []).map(c => c.toString());
+      allowed = children.includes(targetId);
+    } else if (req.user.role === 'student') {
+      // Student: check via Family or parent's children
+      const family = await Family.findOne({
+        tenantId: req.user.tenantId,
+        students: { $all: [req.user._id, targetId] },
+        isActive: true
+      });
+      if (family) {
+        allowed = true;
+      } else {
+        const parent = await User.findOne({
+          tenantId: req.user.tenantId,
+          role: 'parent',
+          children: { $all: [req.user._id, targetId] }
+        });
+        allowed = !!parent;
+      }
+    }
+
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'You are not authorized to switch to this account' });
+    }
+
+    // Fetch target student
+    const target = await User.findOne({
+      _id: targetId,
+      tenantId: req.user.tenantId,
+      role: 'student',
+      isActive: true
+    }).populate('class', 'name').populate('section', 'name');
+
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Generate new token for target student
+    const token = generateToken(target._id);
+
+    // Fetch tenant info
+    const tenant = await Tenant.findById(target.tenantId);
+
+    res.json({
+      success: true,
+      message: `Switched to ${target.fullName || target.name}`,
+      token,
+      user: {
+        id: target._id,
+        name: target.name,
+        fullName: target.fullName,
+        firstName: target.firstName,
+        lastName: target.lastName,
+        email: target.email,
+        role: target.role,
+        avatar: target.avatar,
+        photo: target.photo,
+        phone: target.phone,
+        tenantId: target.tenantId,
+        admissionNumber: target.admissionNumber,
+        rollNumber: target.rollNumber,
+        class: target.class,
+        section: target.section,
+        admissionDate: target.admissionDate,
+        dateOfBirth: target.dateOfBirth,
+        gender: target.gender,
+        guardians: target.guardians
+      },
+      tenant: tenant ? {
+        id: tenant._id,
+        schoolName: tenant.schoolName,
+        schoolCode: tenant.schoolCode,
+        subdomain: tenant.subdomain,
+        primaryColor: tenant.primaryColor,
+        secondaryColor: tenant.secondaryColor
+      } : null
+    });
+  } catch (error) {
+    console.error('Error switching child:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
 // @access  Private

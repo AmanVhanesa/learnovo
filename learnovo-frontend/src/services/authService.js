@@ -115,6 +115,18 @@ export const authService = {
     formData.append('photo', file)
     const response = await api.post('/auth/upload-photo', formData)
     return response.data
+  },
+
+  // Get siblings for the logged-in student
+  getSiblings: async () => {
+    const response = await api.get('/auth/siblings')
+    return response.data
+  },
+
+  // Switch to a sibling/child account (returns new token + user)
+  switchChild: async (studentId) => {
+    const response = await api.post(`/auth/switch-child/${studentId}`)
+    return response.data
   }
 }
 
