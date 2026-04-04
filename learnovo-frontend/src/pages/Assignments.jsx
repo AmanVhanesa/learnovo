@@ -307,7 +307,7 @@ const Assignments = () => {
             <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
             <p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || error.message || 'Failed to load assignments.'}</p>
           </div>
-          <button onClick={() => queryClient.invalidateQueries({ queryKey: ['assignments'] })} className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline">
+          <button onClick={() => queryClient.refetchQueries({ queryKey: ['assignments'] })} className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline">
             Try again
           </button>
         </div>

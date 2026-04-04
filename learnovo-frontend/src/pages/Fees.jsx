@@ -287,7 +287,7 @@ const Fees = () => {
             <p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || 'Failed to load fees. Please check your connection and try again.'}</p>
           </div>
           <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['fees'] })}
+            onClick={() => queryClient.refetchQueries({ queryKey: ['fees'] })}
             className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 underline"
           >
             Try again

@@ -221,7 +221,7 @@ const Notifications = () => {
             <div className="flex-1">
               <p className="text-sm font-medium text-red-700 dark:text-red-400">{errorMessage}</p>
               <button
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['notifications'] })}
+                onClick={() => queryClient.refetchQueries({ queryKey: ['notifications'] })}
                 className="mt-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
               >
                 Try again

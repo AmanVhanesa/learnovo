@@ -161,7 +161,7 @@ const Teachers = () => {
             <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
           </div>
           <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['teachers'] })}
+            onClick={() => queryClient.refetchQueries({ queryKey: ['teachers'] })}
             className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 underline"
           >
             Try again

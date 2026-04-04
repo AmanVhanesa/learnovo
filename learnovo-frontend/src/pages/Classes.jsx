@@ -166,7 +166,7 @@ const Classes = () => {
             <p className="text-sm text-red-600 dark:text-red-400">{error.response?.data?.message || 'Failed to load classes. Please check your connection and try again.'}</p>
           </div>
           <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['classes'] })}
+            onClick={() => queryClient.refetchQueries({ queryKey: ['classes'] })}
             className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 underline"
           >
             Try again

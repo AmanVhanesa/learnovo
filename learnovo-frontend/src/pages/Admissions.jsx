@@ -141,7 +141,7 @@ const Admissions = () => {
             <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
           </div>
           <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['admissions'] })}
+            onClick={() => queryClient.refetchQueries({ queryKey: ['admissions'] })}
             className="mt-2 text-sm text-red-600 dark:text-red-400 hover:text-red-800 underline"
           >
             Try again
