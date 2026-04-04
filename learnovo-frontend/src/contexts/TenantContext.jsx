@@ -72,7 +72,7 @@ export function TenantProvider({ children }) {
   useEffect(() => {
     if (!subdomain || !tenant) return
 
-    const schoolName = tenant.schoolName || tenant.name || 'Learnovo'
+    const shortCode = (tenant.schoolCode || tenant.subdomain || subdomain).toUpperCase()
     const themeColor = tenant.primaryColor || '#3EC4B1'
     const logo = tenant.logo
 
@@ -80,7 +80,7 @@ export function TenantProvider({ children }) {
     // so next page load has the correct name BEFORE React hydrates
     try {
       localStorage.setItem('pwa_tenant_' + subdomain, JSON.stringify({
-        n: schoolName, c: themeColor, l: logo || ''
+        n: shortCode, c: themeColor, l: logo || ''
       }))
     } catch (e) { /* quota exceeded — ignore */ }
 
@@ -98,16 +98,16 @@ export function TenantProvider({ children }) {
     document.head.appendChild(manifestLink)
 
     // Update document title — Safari uses this for "Add to Dock" name
-    document.title = schoolName
+    document.title = shortCode
 
     // Update apple-mobile-web-app-title — iOS uses this for Home Screen name
     let appTitleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]')
     if (appTitleMeta) {
-      appTitleMeta.content = schoolName
+      appTitleMeta.content = shortCode
     } else {
       appTitleMeta = document.createElement('meta')
       appTitleMeta.name = 'apple-mobile-web-app-title'
-      appTitleMeta.content = schoolName
+      appTitleMeta.content = shortCode
       document.head.appendChild(appTitleMeta)
     }
 

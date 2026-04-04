@@ -461,9 +461,11 @@ router.get('/manifest/:subdomain', async (req, res) => {
           { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ];
 
+    const shortCode = (tenant.schoolCode || tenant.subdomain || 'APP').toUpperCase();
+
     const manifest = {
       name: schoolName,
-      short_name: schoolName,
+      short_name: shortCode,
       description: `${schoolName} — School Management Portal`,
       theme_color: themeColor,
       background_color: '#ffffff',
