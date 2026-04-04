@@ -463,7 +463,7 @@ router.get('/manifest/:subdomain', async (req, res) => {
 
     const manifest = {
       name: schoolName,
-      short_name: schoolName.length > 12 ? schoolName.substring(0, 12) : schoolName,
+      short_name: schoolName,
       description: `${schoolName} — School Management Portal`,
       theme_color: themeColor,
       background_color: '#ffffff',
