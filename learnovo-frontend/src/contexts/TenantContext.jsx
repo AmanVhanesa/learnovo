@@ -68,31 +68,53 @@ export function TenantProvider({ children }) {
     return () => { cancelled = true }
   }, [subdomain])
 
-  // Dynamically set PWA manifest and apple-touch-icon for tenant branding
+  // Dynamically set PWA manifest, title, and icons for tenant branding
   useEffect(() => {
     if (!subdomain || !tenant) return
 
-    // Swap manifest to tenant-specific one
-    // Replace the link entirely so the browser re-fetches the manifest
-    const apiBase = import.meta.env.VITE_API_URL || ''
-    const manifestUrl = `${apiBase}/api/tenants/manifest/${subdomain}`
+    const schoolName = tenant.schoolName || tenant.name || 'Learnovo'
+    const themeColor = tenant.primaryColor || '#3EC4B1'
+    const logo = tenant.logo
+
+    // Build manifest as a blob URL — avoids cross-origin issues entirely
+    const icons = logo
+      ? [
+          { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: logo, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        ]
+      : [
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        ]
+
+    const manifest = {
+      name: schoolName,
+      short_name: schoolName.length > 12 ? schoolName.substring(0, 12) : schoolName,
+      description: `${schoolName} — School Management Portal`,
+      theme_color: themeColor,
+      background_color: '#ffffff',
+      display: 'standalone',
+      orientation: 'portrait-primary',
+      scope: '/',
+      start_url: '/',
+      categories: ['education', 'productivity'],
+      icons
+    }
+
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' })
+    const manifestUrl = URL.createObjectURL(blob)
+
     const oldManifest = document.querySelector('link[rel="manifest"]')
     if (oldManifest) oldManifest.remove()
     const manifestLink = document.createElement('link')
     manifestLink.rel = 'manifest'
     manifestLink.href = manifestUrl
-    manifestLink.crossOrigin = 'use-credentials'
     document.head.appendChild(manifestLink)
 
-    // Update theme-color meta to match tenant
-    const themeColor = tenant.primaryColor || '#3EC4B1'
-    let themeMeta = document.querySelector('meta[name="theme-color"]')
-    if (themeMeta) {
-      themeMeta.content = themeColor
-    }
+    // Update document title — Safari uses this for "Add to Dock" name
+    document.title = schoolName
 
-    // Update apple-mobile-web-app-title so iOS uses the school name
-    const schoolName = tenant.schoolName || tenant.name || 'Learnovo'
+    // Update apple-mobile-web-app-title — iOS uses this for Home Screen name
     let appTitleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]')
     if (appTitleMeta) {
       appTitleMeta.content = schoolName
@@ -103,13 +125,21 @@ export function TenantProvider({ children }) {
       document.head.appendChild(appTitleMeta)
     }
 
+    // Update theme-color meta
+    let themeMeta = document.querySelector('meta[name="theme-color"]')
+    if (themeMeta) {
+      themeMeta.content = themeColor
+    }
+
     // Update apple-touch-icon to tenant logo if available
-    if (tenant.logo) {
+    if (logo) {
       let appleIcon = document.querySelector('link[rel="apple-touch-icon"]')
       if (appleIcon) {
-        appleIcon.href = tenant.logo
+        appleIcon.href = logo
       }
     }
+
+    return () => URL.revokeObjectURL(manifestUrl)
   }, [subdomain, tenant])
 
   const value = {
