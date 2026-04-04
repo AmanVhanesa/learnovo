@@ -9,12 +9,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import api from '../services/authService'
 import { studentsService } from '../services/studentsService'
-import { exportPDF } from '../utils/exportHelpers'
+import { invoicesService, feesReportsService } from '../services/feesService'
+import { exportPDF, exportExcel } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 
 const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0)
 const fmtNum = (n) => new Intl.NumberFormat('en-IN').format(n || 0)
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '\u2014'
+const fmtAmount = (n) => n != null ? Number(n).toFixed(2) : '0.00'
 
 function exportCSV(rows, filename) {
   if (!rows || rows.length === 0) return
@@ -131,25 +133,133 @@ const Reports = () => {
     { id: 'promotions', label: 'Class Actions', icon: RefreshCw },
   ]
 
-  const exportActivities = () => exportCSV(activities.map(a => ({ Type: a.type, Message: a.message, Date: fmtDate(a.date), Amount: a.amount || '' })), 'activity-report.csv')
-  const exportAttendance = () => exportCSV(attendanceReport.map(r => ({ Student: r.studentName || r.name, Class: r.class, Present: r.presentDays, Absent: r.absentDays, Percentage: r.percentage })), 'attendance-report.csv')
-  const exportPromotions = async () => {
-    toast.loading('Generating Promotion PDF...', { id: 'promo-export' });
+  const exportActivities = async () => {
+    toast.loading('Fetching all activities...', { id: 'act-export' })
     try {
-      const headers = ["Admission No", "Student Name", "Date", "Action", "From", "To", "Academic Year", "Performed By"];
-      const rows = promotionsReport.map(r => [r.studentId?.admissionNumber || 'N/A', r.studentId?.name || r.studentId?.fullName || 'N/A', fmtDate(r.createdAt), r.actionType, `${r.fromClass || ''} ${r.fromSection || ''}`.trim(), `${r.toClass || ''} ${r.toSection || ''}`.trim(), r.academicYear, r.performedBy?.name || r.performedBy?.fullName || 'System']);
-      await exportPDF(`promotions_report_${todayStr}.pdf`, headers, rows, settings?.institution);
-      toast.success('Report exported!', { id: 'promo-export' });
-    } catch (err) { toast.error('Export failed', { id: 'promo-export' }); }
+      const params = new URLSearchParams({ page: 1, limit: 5000 })
+      if (filters.startDate) params.set('startDate', filters.startDate)
+      if (filters.endDate) params.set('endDate', filters.endDate)
+      const r = await api.get(`/reports/activities?${params}`)
+      const allActivities = r.data?.data || []
+      if (allActivities.length === 0) { toast.error('No activities to export', { id: 'act-export' }); return }
+      exportCSV(allActivities.map(a => ({
+        Type: a.type || '',
+        Message: a.message || '',
+        Date: fmtDate(a.date),
+        Amount: a.amount != null ? fmtAmount(a.amount) : '',
+        'Student Name': a.studentName || '',
+        Action: a.action || '',
+      })), `activity_report_${todayStr}.csv`)
+      toast.success(`Exported ${allActivities.length} activities`, { id: 'act-export' })
+    } catch { toast.error('Export failed', { id: 'act-export' }) }
   }
-  const exportEnrollment = () => {
-    if (!dashboard?.enrollmentTrend) return
-    const rows = dashboard.enrollmentTrend.labels.map((m, i) => ({ Month: m, Enrollments: dashboard.enrollmentTrend.data[i] }))
-    exportCSV(rows, 'enrollment-trend.csv')
+
+  const exportAttendance = () => {
+    if (!attendanceReport || attendanceReport.length === 0) { toast.error('No attendance data to export'); return }
+    exportCSV(attendanceReport.map(r => {
+      const pct = parseFloat(r.percentage || r.attendancePercentage || 0)
+      const totalDays = (r.presentDays ?? r.present ?? 0) + (r.absentDays ?? r.absent ?? 0) + (r.lateDays ?? r.late ?? 0)
+      return {
+        'Student Name': r.studentName || r.name || '',
+        'Admission No': r.admissionNumber || r.admNo || '',
+        Class: r.class || r.className || '',
+        Section: r.section || r.sectionName || '',
+        'Present Days': r.presentDays ?? r.present ?? 0,
+        'Absent Days': r.absentDays ?? r.absent ?? 0,
+        'Late Days': r.lateDays ?? r.late ?? 0,
+        'Half Days': r.halfDays ?? r.halfDay ?? 0,
+        'Excused': r.excusedDays ?? r.excused ?? 0,
+        'Total Working Days': totalDays,
+        'Attendance %': pct.toFixed(1),
+        'Status': pct >= 75 ? 'Regular' : pct >= 50 ? 'Irregular' : 'Critical',
+      }
+    }), `attendance_report_${filters.startDate}_to_${filters.endDate}.csv`)
+    toast.success('Attendance report exported')
   }
-  const exportFees = () => {
-    if (!dashboard?.fees) return
-    exportCSV([{ Collected: dashboard.fees.paid, Pending: dashboard.fees.pending, Overdue: dashboard.fees.overdue, Total: dashboard.fees.total, CollectedToday: dashboard.fees.collectedToday }], 'fee-report.csv')
+
+  const exportPromotions = async () => {
+    toast.loading('Generating Promotion PDF...', { id: 'promo-export' })
+    try {
+      const headers = ["Admission No", "Student Name", "Date", "Action", "From", "To", "Academic Year", "Performed By"]
+      const rows = promotionsReport.map(r => [r.studentId?.admissionNumber || 'N/A', r.studentId?.name || r.studentId?.fullName || 'N/A', fmtDate(r.createdAt), r.actionType, `${r.fromClass || ''} ${r.fromSection || ''}`.trim(), `${r.toClass || ''} ${r.toSection || ''}`.trim(), r.academicYear, r.performedBy?.name || r.performedBy?.fullName || 'System'])
+      await exportPDF(`promotions_report_${todayStr}.pdf`, headers, rows, settings?.institution)
+      toast.success('Report exported!', { id: 'promo-export' })
+    } catch { toast.error('Export failed', { id: 'promo-export' }) }
+  }
+
+  const exportEnrollment = async () => {
+    toast.loading('Fetching detailed enrollment data...', { id: 'enroll-export' })
+    try {
+      const r = await studentsService.list({ page: 1, limit: 500 })
+      const students = r.data || []
+      if (students.length === 0) { toast.error('No students found', { id: 'enroll-export' }); return }
+      const sorted = [...students].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      exportCSV(sorted.map(s => ({
+        'Admission No': s.admissionNumber || '',
+        'Student Name': s.name || s.fullName || `${s.firstName || ''} ${s.lastName || ''}`.trim(),
+        Class: s.class || s.className || '',
+        Section: s.section || s.sectionName || '',
+        'Roll No': s.rollNumber || '',
+        'Date of Birth': fmtDate(s.dateOfBirth || s.dob),
+        Gender: s.gender || '',
+        'Guardian Name': s.fatherName || s.guardianName || s.parentName || '',
+        'Guardian Phone': s.phone || s.guardianPhone || s.parentPhone || '',
+        Email: s.email || '',
+        'Enrollment Date': fmtDate(s.createdAt),
+        Status: s.isActive ? 'Active' : 'Inactive',
+      })), `enrollment_report_${todayStr}.csv`)
+      toast.success(`Exported ${sorted.length} student records`, { id: 'enroll-export' })
+    } catch { toast.error('Export failed', { id: 'enroll-export' }) }
+  }
+
+  const exportFees = async () => {
+    toast.loading('Fetching detailed fee data...', { id: 'fee-export' })
+    try {
+      const r = await invoicesService.list({ page: 1, limit: 500 })
+      const invoices = r.data || r.invoices || []
+      if (invoices.length === 0) { toast.error('No fee records found', { id: 'fee-export' }); return }
+      exportCSV(invoices.map(inv => ({
+        'Invoice No': inv.invoiceNumber || '',
+        'Student Name': inv.studentId?.name || inv.studentName || '',
+        'Admission No': inv.studentId?.admissionNumber || inv.admissionNumber || '',
+        Class: inv.classId?.name || inv.className || '',
+        'Period': inv.periodLabel || '',
+        'Fee Heads': (inv.items || []).map(i => i.feeHeadName).join(', '),
+        'Total Amount': fmtAmount(inv.totalAmount),
+        'Paid Amount': fmtAmount(inv.paidAmount),
+        'Balance': fmtAmount(inv.balanceAmount),
+        'Late Fee': fmtAmount(inv.lateFeeApplied || 0),
+        'Discount': fmtAmount((inv.items || []).reduce((s, i) => s + (i.discount || 0), 0)),
+        'Due Date': fmtDate(inv.dueDate),
+        'Status': inv.status || '',
+        'Issued Date': fmtDate(inv.issuedDate || inv.createdAt),
+      })), `fee_detailed_report_${todayStr}.csv`)
+      toast.success(`Exported ${invoices.length} invoice records`, { id: 'fee-export' })
+    } catch { toast.error('Export failed', { id: 'fee-export' }) }
+  }
+
+  const exportOverview = () => {
+    if (!dashboard) return
+    const rows = [
+      { Category: 'Students', Metric: 'Total Students', Value: dashboard.students?.total || 0 },
+      { Category: 'Students', Metric: 'Active Students', Value: dashboard.students?.active || 0 },
+      { Category: 'Teachers', Metric: 'Total Teachers', Value: dashboard.teachers?.total || 0 },
+      { Category: 'Teachers', Metric: 'Active Teachers', Value: dashboard.teachers?.active || 0 },
+      { Category: 'Admissions', Metric: 'Total Admissions', Value: dashboard.admissions?.total || 0 },
+      { Category: 'Admissions', Metric: 'Pending', Value: dashboard.admissions?.pending || 0 },
+      { Category: 'Admissions', Metric: 'Approved', Value: dashboard.admissions?.approved || 0 },
+      { Category: 'Admissions', Metric: 'This Month', Value: dashboard.admissions?.thisMonth || 0 },
+      { Category: 'Fees', Metric: 'Total Fee Base', Value: fmtAmount(fees.total) },
+      { Category: 'Fees', Metric: 'Collected', Value: fmtAmount(fees.paid) },
+      { Category: 'Fees', Metric: 'Pending', Value: fmtAmount(fees.pending) },
+      { Category: 'Fees', Metric: 'Overdue', Value: fmtAmount(fees.overdue) },
+      { Category: 'Fees', Metric: 'Collected Today', Value: fmtAmount(fees.collectedToday) },
+      { Category: 'Fees', Metric: 'Collection Rate %', Value: fees.total > 0 ? `${Math.round((fees.paid / fees.total) * 100)}%` : '0%' },
+      { Category: 'Attendance', Metric: 'Students Present Today', Value: dashboard.attendance?.studentsPresentToday || 0 },
+      { Category: 'Attendance', Metric: 'Staff Present Today', Value: dashboard.attendance?.employeesPresentToday || 0 },
+    ]
+    exportCSV(rows, `school_overview_report_${todayStr}.csv`)
+    toast.success('Overview report exported')
   }
 
   const refetchAttendance = () => queryClient.invalidateQueries({ queryKey: ['reports-attendance'] })
@@ -176,11 +286,12 @@ const Reports = () => {
           <button onClick={() => refetchDashboard()} className="btn btn-ghost gap-2" disabled={loadingDashboard}>
             <RefreshCw className={`h-4 w-4 ${loadingDashboard ? 'animate-spin' : ''}`} /> Refresh
           </button>
-          {activeTab === 'activity' && <button onClick={exportActivities} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
-          {activeTab === 'attendance' && <button onClick={exportAttendance} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
-          {activeTab === 'promotions' && <button onClick={exportPromotions} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export PDF</button>}
-          {activeTab === 'enrollment' && <button onClick={exportEnrollment} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
-          {activeTab === 'fees' && <button onClick={exportFees} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export</button>}
+          {activeTab === 'overview' && dashboard && <button onClick={exportOverview} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export Overview</button>}
+          {activeTab === 'activity' && <button onClick={exportActivities} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export All Activities</button>}
+          {activeTab === 'attendance' && attendanceReport.length > 0 && <button onClick={exportAttendance} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export Detailed</button>}
+          {activeTab === 'promotions' && promotionsReport.length > 0 && <button onClick={exportPromotions} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export PDF</button>}
+          {activeTab === 'enrollment' && <button onClick={exportEnrollment} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export Students</button>}
+          {activeTab === 'fees' && <button onClick={exportFees} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export Invoices</button>}
         </div>
       </div>
 

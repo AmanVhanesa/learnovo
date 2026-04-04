@@ -12,6 +12,19 @@ import { examsService } from '../../services/examsService'
 import homeworkService from '../../services/homeworkService'
 import toast from 'react-hot-toast'
 
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '\u2014'
+
+function downloadCSV(rows, filename) {
+  if (!rows || rows.length === 0) return
+  const headers = Object.keys(rows[0])
+  const csv = [headers.join(','), ...rows.map(r => headers.map(h => `"${r[h] ?? ''}"`).join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
 const TeacherReports = () => {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('attendance')
@@ -118,6 +131,49 @@ const TeacherReports = () => {
     toast.success('Report exported')
   }
 
+  const exportAcademicCSV = () => {
+    if (!teacherExams || teacherExams.length === 0) { toast.error('No exam data to export'); return }
+    downloadCSV(teacherExams.map(exam => ({
+      'Exam Name': exam.name || '',
+      'Exam Series': exam.examSeries || '',
+      'Subject': exam.subject || '',
+      'Class': exam.class || '',
+      'Section': exam.section || '',
+      'Date': fmtDate(exam.date),
+      'Total Marks': exam.totalMarks ?? '',
+      'Passing Marks': exam.passingMarks ?? '',
+      'Exam Type': exam.examType || '',
+      'Status': exam.status || '',
+      'Results Published': exam.resultsPublished ? 'Yes' : 'No',
+    })), `academic_performance_report_${new Date().toISOString().slice(0, 10)}.csv`)
+    toast.success(`Exported ${teacherExams.length} exam records`)
+  }
+
+  const exportHomeworkCSV = () => {
+    if (!homeworkData || homeworkData.length === 0) { toast.error('No homework data to export'); return }
+    downloadCSV(homeworkData.map(hw => {
+      const isOverdue = new Date(hw.dueDate) < new Date()
+      const submitted = hw.submissionStats?.submitted || 0
+      const total = hw.submissionStats?.total || 0
+      const rate = total > 0 ? Math.round((submitted / total) * 100) : 0
+      return {
+        'Title': hw.title || '',
+        'Subject': hw.subject?.name || '',
+        'Class': hw.class?.name || '',
+        'Section': hw.section?.name || '',
+        'Assigned Date': fmtDate(hw.createdAt),
+        'Due Date': fmtDate(hw.dueDate),
+        'Status': isOverdue ? 'Past Due' : 'Active',
+        'Total Students': total,
+        'Submitted': submitted,
+        'Not Submitted': total - submitted,
+        'Submission Rate %': `${rate}%`,
+        'Description': (hw.description || '').replace(/\n/g, ' ').slice(0, 200),
+      }
+    }), `homework_report_${new Date().toISOString().slice(0, 10)}.csv`)
+    toast.success(`Exported ${homeworkData.length} homework records`)
+  }
+
   const tabs = [
     { id: 'attendance', label: 'Attendance', icon: Calendar },
     { id: 'academic', label: 'Academic Performance', icon: BarChart3 },
@@ -127,11 +183,25 @@ const TeacherReports = () => {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Reports</h1>
-        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
-          View attendance, academic performance, and submission reports for your classes
-        </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Reports</h1>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
+            View attendance, academic performance, and submission reports for your classes
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {activeTab === 'academic' && teacherExams.length > 0 && (
+            <button onClick={exportAcademicCSV} className="btn btn-primary gap-2">
+              <Download className="h-4 w-4" />Export Exams
+            </button>
+          )}
+          {activeTab === 'homework' && homeworkData.length > 0 && (
+            <button onClick={exportHomeworkCSV} className="btn btn-primary gap-2">
+              <Download className="h-4 w-4" />Export Homework
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Overview Stats */}
