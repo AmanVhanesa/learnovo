@@ -84,40 +84,16 @@ export function TenantProvider({ children }) {
       }))
     } catch (e) { /* quota exceeded — ignore */ }
 
-    // Remove any existing manifest links (previous blob URLs)
+    // Remove any existing manifest links
     document.querySelectorAll('link[rel="manifest"]').forEach(el => el.remove())
 
-    // Build manifest as a blob URL — avoids cross-origin issues entirely
-    const icons = logo
-      ? [
-          { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: logo, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-        ]
-      : [
-          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-        ]
-
-    const manifest = {
-      name: schoolName,
-      short_name: schoolName.length > 12 ? schoolName.substring(0, 12) : schoolName,
-      description: `${schoolName} — School Management Portal`,
-      theme_color: themeColor,
-      background_color: '#ffffff',
-      display: 'standalone',
-      orientation: 'portrait-primary',
-      scope: '/',
-      start_url: '/',
-      categories: ['education', 'productivity'],
-      icons
-    }
-
-    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' })
-    const manifestUrl = URL.createObjectURL(blob)
-
+    // Use the backend tenant manifest endpoint — Chrome needs a real URL
+    // (not a blob) for PWA installability checks. CORS is handled by the
+    // backend's global cors middleware for *.learnovoportal.com origins.
     const manifestLink = document.createElement('link')
     manifestLink.rel = 'manifest'
-    manifestLink.href = manifestUrl
+    manifestLink.href = `https://api.learnovoportal.com/api/tenants/manifest/${subdomain}`
+    manifestLink.crossOrigin = 'use-credentials'
     manifestLink.dataset.tenant = '1'
     document.head.appendChild(manifestLink)
 
@@ -149,7 +125,6 @@ export function TenantProvider({ children }) {
       }
     }
 
-    return () => URL.revokeObjectURL(manifestUrl)
   }, [subdomain, tenant])
 
   const value = {
