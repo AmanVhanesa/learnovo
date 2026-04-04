@@ -3,8 +3,50 @@ const { body, query } = require('express-validator');
 const Admission = require('../models/Admission');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors, validateAdmission } = require('../middleware/validation');
+const ImportExportService = require('../services/importExportService');
 
 const router = express.Router();
+
+// @desc    Export admissions as CSV
+// @route   GET /api/admissions/export
+// @access  Private (Admin)
+router.get('/export', protect, authorize('admin'), async(req, res) => {
+  try {
+    const filter = { tenantId: req.user.tenantId };
+    if (req.query.status) filter.status = req.query.status;
+
+    const admissions = await Admission.find(filter).sort({ createdAt: -1 }).lean();
+
+    const columns = [
+      { key: 'applicationNumber', header: 'Application Number' },
+      { key: 'personalInfo', header: 'First Name', format: (val) => val?.firstName || '' },
+      { key: 'personalInfo', header: 'Last Name', format: (val) => val?.lastName || '' },
+      { key: 'personalInfo', header: 'Date of Birth', format: (val) => val?.dateOfBirth ? new Date(val.dateOfBirth).toLocaleDateString() : '' },
+      { key: 'personalInfo', header: 'Gender', format: (val) => val?.gender || '' },
+      { key: 'contactInfo', header: 'Email', format: (val) => val?.email || '' },
+      { key: 'contactInfo', header: 'Phone', format: (val) => val?.phone || '' },
+      { key: 'contactInfo', header: 'City', format: (val) => val?.address?.city || '' },
+      { key: 'contactInfo', header: 'State', format: (val) => val?.address?.state || '' },
+      { key: 'guardianInfo', header: 'Father Name', format: (val) => val?.fatherName || '' },
+      { key: 'guardianInfo', header: 'Mother Name', format: (val) => val?.motherName || '' },
+      { key: 'guardianInfo', header: 'Father Phone', format: (val) => val?.fatherPhone || '' },
+      { key: 'academicInfo', header: 'Class Applied', format: (val) => val?.classApplied || '' },
+      { key: 'academicInfo', header: 'Previous School', format: (val) => val?.previousSchool || '' },
+      { key: 'status', header: 'Status' },
+      { key: 'createdAt', header: 'Applied On', format: (val) => val ? new Date(val).toLocaleDateString() : '' }
+    ];
+
+    const csvBuffer = await ImportExportService.exportToCSV(admissions, columns);
+    const filename = `admissions_export_${new Date().toISOString().split('T')[0]}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(csvBuffer);
+  } catch (error) {
+    console.error('Export admissions error:', error);
+    res.status(500).json({ success: false, message: 'Server error while exporting admissions' });
+  }
+});
 
 // @desc    Get all admissions
 // @route   GET /api/admissions

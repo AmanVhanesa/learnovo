@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { studentsService } from '../../services/studentsService';
-import { sortStudentsByRelevance } from '../../utils/searchRelevance';
+import { sortStudentsByRelevance, getMatchedField } from '../../utils/searchRelevance';
 
 const StudentSearchDropdown = ({ onSelect }) => {
     const [query, setQuery] = useState('');
@@ -93,12 +93,15 @@ const StudentSearchDropdown = ({ onSelect }) => {
                                 <div className="flex flex-col">
                                     <span className="font-medium text-gray-900 dark:text-white">{student.fullName || student.name}</span>
                                     <span className="text-xs text-gray-500 dark:text-[#8E8E93]">
-                                        {student.class || '-'} {student.section ? `(${student.section})` : ''}
+                                        {student.admissionNumber || 'N/A'} | {student.class || '-'} {student.section ? `(${student.section})` : ''}
+                                        {(() => {
+                                            const match = getMatchedField(student, query.trim())
+                                            return match && match.label !== 'Name' && match.value !== String(student.admissionNumber)
+                                                ? <span className="ml-1 text-amber-600 dark:text-amber-400"> · Matched {match.label}: {match.value}</span>
+                                                : null
+                                        })()}
                                     </span>
                                 </div>
-                                <span className="text-xs font-mono bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] px-2 py-1 rounded">
-                                    {student.admissionNumber || 'N/A'}
-                                </span>
                             </div>
                         </button>
                     ))}

@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, CheckCircle, XCircle, X, AlertTriangle } from 'lucide-react'
+import { Plus, Eye, CheckCircle, XCircle, X, AlertTriangle, Download } from 'lucide-react'
 import { admissionsService } from '../services/admissionsService'
 import { formatDate } from '../utils/formatDate'
+import toast from 'react-hot-toast'
 
 const Admissions = () => {
   const queryClient = useQueryClient()
@@ -72,6 +73,28 @@ const Admissions = () => {
     rejectMutation.mutate({ ad, reason })
   }
 
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async () => {
+    try {
+      setExporting(true)
+      const response = await admissionsService.export({ status: statusFilter })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `admissions_export_${new Date().toISOString().split('T')[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('Admissions exported successfully')
+    } catch (err) {
+      toast.error('Failed to export admissions')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const errorMessage = error?.response?.data?.message || (error ? 'Failed to load admissions. Please check your connection and try again.' : null)
 
   if (isLoading) {
@@ -95,6 +118,14 @@ const Admissions = () => {
             <option value="rejected">Rejected</option>
             <option value="waitlisted">Waitlisted</option>
           </select>
+          <button
+            className="btn btn-outline w-full sm:w-auto justify-center gap-2"
+            onClick={handleExport}
+            disabled={exporting || admissions.length === 0}
+          >
+            <Download className="h-4 w-4" />
+            {exporting ? 'Exporting...' : 'Export'}
+          </button>
           <button className="btn btn-primary w-full sm:w-auto justify-center" onClick={openNew}>
             <Plus className="h-4 w-4 mr-2" />
             New Admission

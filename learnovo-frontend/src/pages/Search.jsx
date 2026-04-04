@@ -6,7 +6,7 @@ import { studentsService } from '../services/studentsService'
 import { teachersService } from '../services/teachersService'
 import { feesService } from '../services/feesService'
 import { assignmentsService } from '../services/assignmentsService'
-import { sortStudentsByRelevance, sortByRelevance } from '../utils/searchRelevance'
+import { sortStudentsByRelevance, sortByRelevance, getMatchedField } from '../utils/searchRelevance'
 import { formatDate } from '../utils/formatDate'
 
 const Search = () => {
@@ -152,10 +152,16 @@ const Search = () => {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900 dark:text-white">{student.fullName || student.name || 'Unknown'}</p>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-[#8E8E93]">
+                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-[#8E8E93] flex-wrap">
                             {student.admissionNumber && <span className="font-mono font-semibold text-teal-600">#{student.admissionNumber}</span>}
                             {student.class && <span>Class {student.class}{student.section ? `-${student.section}` : ''}</span>}
                             {student.rollNumber && <span>Roll: {student.rollNumber}</span>}
+                            {(() => {
+                              const match = getMatchedField(student, debouncedQuery)
+                              return match && match.label !== 'Name' && match.value !== String(student.admissionNumber)
+                                ? <span className="text-amber-600 dark:text-amber-400">· Matched {match.label}: {match.value}</span>
+                                : null
+                            })()}
                           </div>
                           {student.guardians?.[0]?.name && (
                             <p className="text-xs text-gray-400 dark:text-[#636366] mt-0.5">{student.guardians[0].name}</p>

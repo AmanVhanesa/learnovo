@@ -54,7 +54,7 @@ const Students = () => {
   const [classFilter, setClassFilter] = useState(searchParams.get('class') || '')
   const [sectionFilter, setSectionFilter] = useState('')
   const [yearFilter, setYearFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('') // active/inactive
+  const [statusFilter, setStatusFilter] = useState('active') // active/inactive
   const [driverFilter, setDriverFilter] = useState('')
 
   // UI state
@@ -510,7 +510,7 @@ const Students = () => {
     setClassFilter('')
     setSectionFilter('')
     setYearFilter('')
-    setStatusFilter('')
+    setStatusFilter('active')
     setDriverFilter('')
   }
 
@@ -578,6 +578,30 @@ const Students = () => {
         </div>
       )}
 
+      {/* Active / Inactive Tabs */}
+      <div className="flex gap-1 bg-gray-100 dark:bg-[#2C2C2E] p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setStatusFilter('active')}
+          className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+            statusFilter === 'active'
+              ? 'bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'
+          }`}
+        >
+          Active Students
+        </button>
+        <button
+          onClick={() => setStatusFilter('inactive')}
+          className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+            statusFilter === 'inactive'
+              ? 'bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'
+          }`}
+        >
+          Inactive Students
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="card p-4">
         {/* Search Bar */}
@@ -585,7 +609,7 @@ const Students = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" />
           <input
             type="text"
-            placeholder="Search by name, admission number, roll number..."
+            placeholder="Search by name, admission number, roll number, phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="input pl-10"
@@ -653,24 +677,6 @@ const Students = () => {
             </div>
           </div>
 
-          {/* Status Filter */}
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
-            >
-              <option value="">Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <svg className="h-3 w-3 text-gray-400 dark:text-[#636366]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
-
           {/* Driver Filter */}
           {filterOptions.drivers && filterOptions.drivers.length > 0 && (
             <div className="relative">
@@ -693,7 +699,7 @@ const Students = () => {
           )}
 
           {/* Clear Filters Button */}
-          {(searchQuery || classFilter || sectionFilter || yearFilter || statusFilter || driverFilter) && (
+          {(searchQuery || classFilter || sectionFilter || yearFilter || driverFilter) && (
             <button
               onClick={clearFilters}
               className="h-8 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-md transition-all"
@@ -732,8 +738,8 @@ const Students = () => {
                 <div className="px-6 pt-4">
                   <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide mb-2">Active Filters (applied to export)</p>
                   <div className="flex flex-wrap gap-1.5 mb-4">
-                    {!classFilter && !sectionFilter && !yearFilter && !statusFilter && !driverFilter && !searchQuery && (
-                      <span className="text-xs text-gray-400 italic">None — will export all students</span>
+                    {!classFilter && !sectionFilter && !yearFilter && !driverFilter && !searchQuery && (
+                      <span className="text-xs text-gray-400 italic">None — will export all {statusFilter === 'inactive' ? 'inactive' : 'active'} students</span>
                     )}
                     {classFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Class: {classFilter}</span>}
                     {sectionFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Section: {sectionFilter}</span>}
@@ -828,7 +834,7 @@ const Students = () => {
         )}
 
         {/* Active Filters Display */}
-        {(classFilter || sectionFilter || yearFilter || statusFilter || driverFilter) && (
+        {(classFilter || sectionFilter || yearFilter || driverFilter) && (
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-[#38383A]">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-gray-500 dark:text-[#8E8E93]">Active filters:</span>
@@ -863,19 +869,6 @@ const Students = () => {
                   Year: {yearFilter}
                   <button
                     onClick={() => setYearFilter('')}
-                    className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
-                  >
-                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </span>
-              )}
-              {statusFilter && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
-                  Status: {statusFilter === 'active' ? 'Active' : 'Inactive'}
-                  <button
-                    onClick={() => setStatusFilter('')}
                     className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
                   >
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

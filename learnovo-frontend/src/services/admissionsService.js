@@ -20,6 +20,10 @@ export const admissionsService = {
   reject: async (id, payload) => {
     const res = await api.put(`/admissions/${id}/reject`, payload)
     return res.data
+  },
+  export: async (params = {}) => {
+    const res = await api.get('/admissions/export', { params, responseType: 'blob' })
+    return res
   }
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Calendar, BookOpen, Clock, CheckCircle, XCircle, Eye, Edit, Trash2, Filter } from 'lucide-react';
+import { Plus, Search, Calendar, BookOpen, Clock, CheckCircle, XCircle, Eye, Edit, Trash2, Filter, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import homeworkService from '../services/homeworkService';
 import { classesService } from '../services/classesService';
@@ -203,6 +203,27 @@ const Homework = () => {
 
     const formatDate = (date) => formatDateShort(date);
 
+    const [exportingHw, setExportingHw] = useState(false);
+    const handleExportHomework = async () => {
+        try {
+            setExportingHw(true);
+            const response = await homeworkService.exportHomework();
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `homework_export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success('Homework exported successfully');
+        } catch (err) {
+            toast.error('Failed to export homework');
+        } finally {
+            setExportingHw(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -218,13 +239,23 @@ const Homework = () => {
                     </p>
                 </div>
                 {isTeacher && (
-                    <button
-                        onClick={handleCreateHomework}
-                        className="btn btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
-                    >
-                        <Plus className="h-5 w-5" />
-                        Create Homework
-                    </button>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                            onClick={handleExportHomework}
+                            disabled={exportingHw}
+                            className="btn btn-outline flex items-center gap-2 justify-center"
+                        >
+                            <Download className="h-4 w-4" />
+                            {exportingHw ? 'Exporting...' : 'Export'}
+                        </button>
+                        <button
+                            onClick={handleCreateHomework}
+                            className="btn btn-primary flex items-center gap-2 flex-1 sm:flex-none justify-center"
+                        >
+                            <Plus className="h-5 w-5" />
+                            Create Homework
+                        </button>
+                    </div>
                 )}
             </div>
 

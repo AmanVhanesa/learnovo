@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MapPin, Plus, Edit, Trash2, X, Search, Minus } from 'lucide-react';
+import { MapPin, Plus, Edit, Trash2, X, Search, Minus, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
+import { exportCSV } from '../../utils/exportHelpers';
+import { formatDate } from '../../utils/formatDate';
 
 const RoutesTab = ({ onStatsUpdate }) => {
     const [routes, setRoutes] = useState([]);
@@ -110,6 +112,29 @@ const RoutesTab = ({ onStatsUpdate }) => {
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
+                    <button
+                        onClick={() => {
+                            if (routes.length === 0) { toast.error('No routes to export'); return; }
+                            const rows = [
+                                ['Route Name', 'Route Code', 'Stops', 'Vehicle', 'Driver', 'Distance (km)', 'Monthly Fee', 'Status']
+                            ].concat(routes.map(r => [
+                                r.routeName || '',
+                                r.routeCode || '',
+                                r.stops?.length || 0,
+                                r.vehicle?.vehicleNumber || 'Not Assigned',
+                                r.driver?.name || 'Not Assigned',
+                                r.distance || '',
+                                r.monthlyFee || '',
+                                r.isActive ? 'Active' : 'Inactive'
+                            ]));
+                            exportCSV('routes.csv', rows);
+                            toast.success('Routes exported successfully');
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
+                    >
+                        <Download className="w-4 h-4" />
+                        Export
+                    </button>
                     <button
                         onClick={handleAddRoute}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"

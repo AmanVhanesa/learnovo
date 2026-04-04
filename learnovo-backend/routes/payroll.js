@@ -7,8 +7,59 @@ const { handleValidationErrors } = require('../middleware/validation');
 const payrollService = require('../services/payrollService');
 const payrollPdfService = require('../services/payrollPdfService');
 const { syncPayrollToExpense, reversePayrollExpense } = require('../services/financeAutoSyncService');
+const ImportExportService = require('../services/importExportService');
 
 const router = express.Router();
+
+// @desc    Export payroll records as CSV
+// @route   GET /api/payroll/export
+// @access  Private (Admin)
+router.get('/export', protect, authorize('admin'), async(req, res) => {
+  try {
+    const filter = { tenantId: req.user.tenantId, isDeleted: { $ne: true } };
+    if (req.query.month) filter.month = parseInt(req.query.month);
+    if (req.query.year) filter.year = parseInt(req.query.year);
+    if (req.query.status) filter.paymentStatus = req.query.status;
+
+    const records = await Payroll.find(filter)
+      .populate('employeeId', 'name email phone department designation employeeId')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    const columns = [
+      { key: 'employeeId', header: 'Employee ID', format: (val) => val?.employeeId || '' },
+      { key: 'employeeId', header: 'Employee Name', format: (val) => val?.name || '' },
+      { key: 'employeeId', header: 'Department', format: (val) => val?.department || '' },
+      { key: 'employeeId', header: 'Designation', format: (val) => val?.designation || '' },
+      { key: 'month', header: 'Month', format: (val) => MONTH_NAMES[val - 1] || val },
+      { key: 'year', header: 'Year' },
+      { key: 'baseSalary', header: 'Base Salary' },
+      { key: 'bonuses', header: 'Bonuses' },
+      { key: 'otherDeductions', header: 'Other Deductions' },
+      { key: 'totalAdvanceDeduction', header: 'Advance Deduction' },
+      { key: 'leaveDays', header: 'Leave Days' },
+      { key: 'leaveDeduction', header: 'Leave Deduction' },
+      { key: 'netSalary', header: 'Net Salary' },
+      { key: 'paymentStatus', header: 'Payment Status' },
+      { key: 'paymentDate', header: 'Payment Date', format: (val) => val ? new Date(val).toLocaleDateString() : '' },
+      { key: 'paymentMethod', header: 'Payment Method' }
+    ];
+
+    const csvBuffer = await ImportExportService.exportToCSV(records, columns);
+    const monthLabel = req.query.month ? MONTH_NAMES[parseInt(req.query.month) - 1] : 'all';
+    const yearLabel = req.query.year || 'all';
+    const filename = `payroll_export_${monthLabel}_${yearLabel}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(csvBuffer);
+  } catch (error) {
+    console.error('Export payroll error:', error);
+    res.status(500).json({ success: false, message: 'Server error while exporting payroll' });
+  }
+});
 
 // @desc    Get all payroll records
 // @route   GET /api/payroll

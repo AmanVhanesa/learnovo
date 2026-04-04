@@ -31,6 +31,11 @@ export const feeStructuresService = {
   delete: async (id) => {
     const res = await api.delete(`/fee-structures/${id}`)
     return res.data
+  },
+
+  export: async (params = {}) => {
+    const res = await api.get('/fee-structures/export', { params, responseType: 'blob' })
+    return res
   }
 }
 

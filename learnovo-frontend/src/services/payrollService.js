@@ -263,6 +263,11 @@ const payrollService = {
         } catch (error) {
             throw error.response?.data || error;
         }
+    },
+
+    exportPayrollCSV: async (params = {}) => {
+        const response = await api.get('/payroll/export', { params, responseType: 'blob' });
+        return response;
     }
 };
 

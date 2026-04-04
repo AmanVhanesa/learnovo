@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, Loader2, X, User } from 'lucide-react'
 import { studentsService } from '../../services/studentsService'
-import { sortStudentsByRelevance } from '../../utils/searchRelevance'
+import { sortStudentsByRelevance, getMatchedField } from '../../utils/searchRelevance'
 
 const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admission number, phone...' }) => {
   const [searchTerm, setSearchTerm] = useState('')
@@ -114,6 +114,12 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
                 </p>
                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] truncate">
                   {student.admissionNumber || student.studentId || 'N/A'} &middot; {student.classId?.name || student.class || 'N/A'}
+                  {(() => {
+                    const match = getMatchedField(student, searchTerm.trim())
+                    return match && match.label !== 'Name' && match.value !== String(student.admissionNumber)
+                      ? <span className="ml-1 text-amber-600 dark:text-amber-400"> · Matched {match.label}: {match.value}</span>
+                      : null
+                  })()}
                 </p>
               </div>
             </button>

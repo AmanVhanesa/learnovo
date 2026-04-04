@@ -76,3 +76,26 @@ function getGenericScore(item, q, fields) {
 function getNestedValue(obj, path) {
   return path.split('.').reduce((acc, part) => acc?.[part], obj)
 }
+
+/**
+ * Returns which field matched the search term for a student result.
+ * Used to show "Matched Phone: 9459885502" style indicators in search dropdowns.
+ */
+export function getMatchedField(student, searchTerm) {
+  if (!searchTerm) return null
+  const term = searchTerm.toLowerCase()
+  const fields = [
+    { key: 'admissionNumber', label: 'Admission No' },
+    { key: 'name', label: 'Name' },
+    { key: 'fullName', label: 'Name' },
+    { key: 'rollNumber', label: 'Roll No' },
+    { key: 'studentId', label: 'Student ID' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+  ]
+  for (const { key, label } of fields) {
+    const val = student[key]
+    if (val && String(val).toLowerCase().includes(term)) return { label, value: String(val) }
+  }
+  return null
+}

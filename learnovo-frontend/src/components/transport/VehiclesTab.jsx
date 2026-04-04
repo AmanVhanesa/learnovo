@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bus, Plus, Edit, Trash2, X, Search } from 'lucide-react';
+import { Bus, Plus, Edit, Trash2, X, Search, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
+import { exportCSV } from '../../utils/exportHelpers';
+import { formatDate } from '../../utils/formatDate';
 
 const VehiclesTab = ({ onStatsUpdate }) => {
     const [vehicles, setVehicles] = useState([]);
@@ -106,6 +108,30 @@ const VehiclesTab = ({ onStatsUpdate }) => {
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
+                    <button
+                        onClick={() => {
+                            if (vehicles.length === 0) { toast.error('No vehicles to export'); return; }
+                            const rows = [
+                                ['Vehicle Number', 'Type', 'Model', 'Capacity', 'Driver', 'Insurance Expiry', 'Fitness Expiry', 'Pollution Expiry', 'Status']
+                            ].concat(vehicles.map(v => [
+                                v.vehicleNumber || '',
+                                v.type || '',
+                                v.model || '',
+                                v.capacity || '',
+                                v.driver?.name || 'Not Assigned',
+                                v.insuranceExpiry ? formatDate(v.insuranceExpiry) : '',
+                                v.fitnessExpiry ? formatDate(v.fitnessExpiry) : '',
+                                v.pollutionExpiry ? formatDate(v.pollutionExpiry) : '',
+                                v.isActive ? 'Active' : 'Inactive'
+                            ]));
+                            exportCSV('vehicles.csv', rows);
+                            toast.success('Vehicles exported successfully');
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
+                    >
+                        <Download className="w-4 h-4" />
+                        Export
+                    </button>
                     <button
                         onClick={handleAddVehicle}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"

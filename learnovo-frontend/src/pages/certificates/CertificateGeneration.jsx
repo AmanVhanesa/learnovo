@@ -9,6 +9,7 @@ import { reportsService } from '../../services/reportsService';
 import { toast } from 'react-hot-toast';
 import CertificatePreviewContent from './CertificatePreviewContent';
 import { highQualityPrint } from '../../utils/highQualityPrint';
+import { getMatchedField } from '../../utils/searchRelevance';
 
 const Loader2 = ({ className }) => <svg className={`w-5 h-5 ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>;
 
@@ -110,25 +111,6 @@ const CertificateGeneration = () => {
         },
         enabled: debouncedSearch.length >= 2,
     });
-
-    const getMatchedField = (student) => {
-        if (!debouncedSearch) return null;
-        const term = debouncedSearch.toLowerCase();
-        const fields = [
-            { key: 'admissionNumber', label: 'Admission No' },
-            { key: 'name', label: 'Name' },
-            { key: 'fullName', label: 'Name' },
-            { key: 'rollNumber', label: 'Roll No' },
-            { key: 'studentId', label: 'Student ID' },
-            { key: 'phone', label: 'Phone' },
-            { key: 'email', label: 'Email' },
-        ];
-        for (const { key, label } of fields) {
-            const val = student[key];
-            if (val && String(val).toLowerCase().includes(term)) return { label, value: String(val) };
-        }
-        return null;
-    };
 
     const selectStudent = (student) => {
         setSelectedStudent(student);
@@ -457,7 +439,7 @@ const CertificateGeneration = () => {
                                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
                                                     {student.admissionNumber} | Class {student.class}
                                                     {(() => {
-                                                        const match = getMatchedField(student);
+                                                        const match = getMatchedField(student, debouncedSearch);
                                                         return match && match.label !== 'Name' && match.value !== String(student.admissionNumber)
                                                             ? <span className="ml-1 text-amber-600 dark:text-amber-400"> · Matched {match.label}: {match.value}</span>
                                                             : null;

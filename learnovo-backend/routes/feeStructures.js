@@ -4,10 +4,81 @@ const FeeStructure = require('../models/FeeStructure');
 const Class = require('../models/Class');
 const { protect, authorize } = require('../middleware/auth');
 const planGate = require('../middleware/planGate');
+const ImportExportService = require('../services/importExportService');
 
 // All fee structure routes require fees/finance feature (Basic+)
 router.use(planGate.requireActiveSubscription);
 router.use(planGate.checkFeesAndFinance);
+
+// @desc    Export fee structures as CSV
+// @route   GET /api/fee-structures/export
+// @access  Private (Admin, Accountant)
+router.get('/export', protect, authorize('admin', 'accountant'), async(req, res) => {
+  try {
+    const filter = { tenantId: req.user.tenantId };
+    if (req.query.academicSessionId) filter.academicSessionId = req.query.academicSessionId;
+    if (req.query.classId) filter.classId = req.query.classId;
+
+    const feeStructures = await FeeStructure.find(filter)
+      .populate('classId', 'name grade')
+      .populate('sectionId', 'name')
+      .populate('academicSessionId', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Flatten fee heads into one row per fee head
+    const rows = [];
+    for (const fs of feeStructures) {
+      const className = fs.classId?.name || '';
+      const sectionName = fs.sectionId?.name || 'All Sections';
+      const sessionName = fs.academicSessionId?.name || '';
+      const status = fs.isActive ? 'Active' : 'Inactive';
+      const lateFee = fs.lateFeeConfig?.enabled ? `${fs.lateFeeConfig.type === 'percentage' ? fs.lateFeeConfig.amount + '%' : fs.lateFeeConfig.amount} after ${fs.lateFeeConfig.gracePeriodDays} days` : 'Disabled';
+
+      if (fs.feeHeads && fs.feeHeads.length > 0) {
+        for (const head of fs.feeHeads) {
+          rows.push({
+            className,
+            sectionName,
+            sessionName,
+            feeHeadName: head.name || '',
+            type: head.type || '',
+            annualAmount: head.annualAmount || head.amount || 0,
+            isOptional: head.isOptional ? 'Yes' : 'No',
+            isAdmissionFee: head.isAdmissionFee ? 'Yes' : 'No',
+            lateFee,
+            status
+          });
+        }
+      } else {
+        rows.push({ className, sectionName, sessionName, feeHeadName: '', type: '', annualAmount: 0, isOptional: '', isAdmissionFee: '', lateFee, status });
+      }
+    }
+
+    const columns = [
+      { key: 'className', header: 'Class' },
+      { key: 'sectionName', header: 'Section' },
+      { key: 'sessionName', header: 'Academic Session' },
+      { key: 'feeHeadName', header: 'Fee Head' },
+      { key: 'type', header: 'Type' },
+      { key: 'annualAmount', header: 'Annual Amount' },
+      { key: 'isOptional', header: 'Optional' },
+      { key: 'isAdmissionFee', header: 'Admission Fee' },
+      { key: 'lateFee', header: 'Late Fee' },
+      { key: 'status', header: 'Status' }
+    ];
+
+    const csvBuffer = await ImportExportService.exportToCSV(rows, columns);
+    const filename = `fee_structures_export_${new Date().toISOString().split('T')[0]}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(csvBuffer);
+  } catch (error) {
+    console.error('Export fee structures error:', error);
+    res.status(500).json({ success: false, message: 'Server error while exporting fee structures' });
+  }
+});
 
 // @desc    Get all fee structures
 // @route   GET /api/fee-structures

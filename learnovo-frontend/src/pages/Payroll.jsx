@@ -248,6 +248,25 @@ const Payroll = () => {
         setShowExportMenu(false);
     };
 
+    // ─── CSV Export (via backend) ─────────────────────────────
+    const handleExportCSV = async () => {
+        try {
+            const response = await payrollService.exportPayrollCSV({ month: filters.month, year: filters.year });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `payroll_${MONTH_NAMES[filters.month - 1]}_${filters.year}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            toast.success('CSV file downloaded');
+            setShowExportMenu(false);
+        } catch {
+            toast.error('Failed to export CSV');
+        }
+    };
+
     // ─── Bank Statement Export (NEFT/RTGS format) ───────────
     const handleExportBankStatement = () => {
         if (payrollRecords.length === 0) {
@@ -403,6 +422,13 @@ const Payroll = () => {
                                                 <div className="text-left">
                                                     <div className="font-medium">Payroll Data (Excel)</div>
                                                     <div className="text-[11px] text-gray-400 dark:text-[#636366]">Full breakdown with deductions</div>
+                                                </div>
+                                            </button>
+                                            <button onClick={handleExportCSV} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 dark:text-[#E5E5EA] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                                                <FileText className="h-4 w-4 text-orange-500" />
+                                                <div className="text-left">
+                                                    <div className="font-medium">Payroll Data (CSV)</div>
+                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">Lightweight CSV for spreadsheets</div>
                                                 </div>
                                             </button>
                                             <div className="border-t border-gray-100 dark:border-[#2C2C2E] my-1" />

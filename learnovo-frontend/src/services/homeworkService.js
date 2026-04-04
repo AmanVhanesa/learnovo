@@ -134,6 +134,11 @@ class HomeworkService {
 
         return attachments;
     }
+
+    async exportHomework(params = {}) {
+        const response = await api.get('/homework/export', { params, responseType: 'blob' });
+        return response;
+    }
 }
 
 export default new HomeworkService();
