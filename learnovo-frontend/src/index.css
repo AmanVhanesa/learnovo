@@ -23,6 +23,11 @@ html {
   text-size-adjust: 100%;
 }
 
+/* Ensure white background during PWA startup (prevents black flash on Android) */
+body {
+  background-color: #ffffff;
+}
+
 /* Prevent zoom on input focus on iOS (font-size < 16px triggers zoom) */
 input, select, textarea {
   font-size: 16px !important;
