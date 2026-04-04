@@ -1,17 +1,21 @@
 import api from './authService';
 
+/** Build query string with optional childId for parent access */
+const childParam = (childId) => childId ? `?childId=${childId}` : '';
+const childParamAnd = (childId) => childId ? `&childId=${childId}` : '';
+
 export const studentFeesService = {
     // Check if online payment gateway is enabled for this tenant
     getGatewayStatus: () => api.get('/student-fees/gateway-status'),
 
     // Get all assigned invoices
-    getInvoices: () => api.get('/student-fees'),
+    getInvoices: (childId) => api.get(`/student-fees${childParam(childId)}`),
 
     // Get full history of attempts
-    getHistory: () => api.get('/student-fees/history'),
+    getHistory: (childId) => api.get(`/student-fees/history${childParam(childId)}`),
 
     // Get single invoice detail with attempts
-    getInvoiceDetails: (id) => api.get(`/student-fees/${id}`),
+    getInvoiceDetails: (id, childId) => api.get(`/student-fees/${id}${childParam(childId)}`),
 
     // Initiate payment flow (gateway mode)
     initiatePayment: (invoiceId) => api.post(`/student-fees/${invoiceId}/pay`),
@@ -29,19 +33,19 @@ export const studentFeesService = {
     submitCombinedManualPayment: (invoiceIds, data) => api.post('/student-fees/submit-payment-combined', { invoiceIds, ...data }),
 
     // Check attempt status directly
-    checkPaymentStatus: (attemptId) => api.get(`/student-fees/payment/${attemptId}/status`),
+    checkPaymentStatus: (attemptId, childId) => api.get(`/student-fees/payment/${attemptId}/status${childParam(childId)}`),
 
     // File a dispute
     raiseDispute: (data) => api.post('/student-fees/dispute', data),
 
     // Get dispute status
-    getDispute: (id) => api.get(`/student-fees/dispute/${id}`),
+    getDispute: (id, childId) => api.get(`/student-fees/dispute/${id}${childParam(childId)}`),
 
     // Get receipt data (by receipt ID or paymentAttemptId)
-    getReceipt: (id) => api.get(`/student-fees/receipt/${id}`),
+    getReceipt: (id, childId) => api.get(`/student-fees/receipt/${id}${childParam(childId)}`),
 
     // Get all receipts for the logged-in student
-    getReceipts: () => api.get('/student-fees/receipts'),
+    getReceipts: (childId) => api.get(`/student-fees/receipts${childParam(childId)}`),
 
     // Request a refund (student-initiated)
     requestRefund: (data) => api.post('/student-fees/refund-request', data),

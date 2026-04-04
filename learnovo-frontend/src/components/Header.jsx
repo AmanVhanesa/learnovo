@@ -7,6 +7,7 @@ import { useUserDisplay } from '../hooks/useUserDisplay'
 import { useClickOutside } from '../hooks/useClickOutside'
 import NotificationBell from './NotificationBell'
 import UserAvatar from './UserAvatar'
+import ChildSwitcher from './ChildSwitcher'
 
 const PAGE_TITLES = {
   '/app/dashboard': 'Dashboard',
@@ -99,6 +100,9 @@ const Header = ({ onToggleSidebar }) => {
               />
             </div>
           </form>
+
+          {/* Child switcher for parent accounts */}
+          <ChildSwitcher />
 
           {/* Dark/Light mode toggle */}
           <button

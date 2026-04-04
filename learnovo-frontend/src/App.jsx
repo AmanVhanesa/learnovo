@@ -7,6 +7,7 @@ import { SuperAdminProvider } from './contexts/SuperAdminContext'
 import { SettingsProvider } from './contexts/SettingsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { NotificationProvider } from './contexts/NotificationContext'
+import { ChildProvider } from './contexts/ChildContext'
 import { TenantProvider, useTenant } from './contexts/TenantContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import SuperAdminRoute from './components/superadmin/SuperAdminRoute'
@@ -231,7 +232,9 @@ function App() {
                     <Route path="/app" element={
                       <ProtectedRoute>
                         <NotificationProvider>
-                          <Layout />
+                          <ChildProvider>
+                            <Layout />
+                          </ChildProvider>
                         </NotificationProvider>
                       </ProtectedRoute>
                     }>

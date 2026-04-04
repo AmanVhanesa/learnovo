@@ -7,6 +7,7 @@ import { studentFeesService } from '../../services/studentFeesService';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { printReceiptHighQuality, downloadReceiptAsPdf } from '../../utils/receiptHelpers';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useChild } from '../../contexts/ChildContext';
 
 // Format date
 const formatDate = (dateString, withTime = false) => {
@@ -25,6 +26,7 @@ const formatDate = (dateString, withTime = false) => {
 
 const StudentFeesDashboard = () => {
     const { settings: schoolSettings } = useSettings();
+    const { isParent, selectedChildId, selectedChild } = useChild();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('invoices'); // invoices, history
     const [selectedInvoice, setSelectedInvoice] = useState(null); // Triggers Invoice Detail Modal
@@ -91,27 +93,30 @@ const StudentFeesDashboard = () => {
 
     // Fetch invoices and history via useQuery
     const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-        queryKey: ['student-invoices'],
+        queryKey: ['student-invoices', selectedChildId],
         queryFn: async () => {
-            const res = await studentFeesService.getInvoices();
+            const res = await studentFeesService.getInvoices(selectedChildId);
             return res.data?.data || [];
         },
+        enabled: !isParent || !!selectedChildId,
     });
 
     const { data: history = [], isLoading: historyLoading } = useQuery({
-        queryKey: ['student-payment-history'],
+        queryKey: ['student-payment-history', selectedChildId],
         queryFn: async () => {
-            const res = await studentFeesService.getHistory();
+            const res = await studentFeesService.getHistory(selectedChildId);
             return res.data?.data || [];
         },
+        enabled: !isParent || !!selectedChildId,
     });
 
     const { data: receipts = [], isLoading: receiptsLoading } = useQuery({
-        queryKey: ['student-receipts'],
+        queryKey: ['student-receipts', selectedChildId],
         queryFn: async () => {
-            const res = await studentFeesService.getReceipts();
+            const res = await studentFeesService.getReceipts(selectedChildId);
             return res.data?.data || [];
         },
+        enabled: !isParent || !!selectedChildId,
     });
 
     const isLoading = invoicesLoading || historyLoading;
@@ -458,8 +463,28 @@ const StudentFeesDashboard = () => {
 
     return (
         <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4 sm:space-y-6">
+            {/* Child indicator for parent view */}
+            {isParent && selectedChild && (
+                <div className="flex items-center gap-3 px-4 py-3 bg-primary-50 dark:bg-[rgba(62,196,177,0.08)] rounded-xl ring-1 ring-primary-200 dark:ring-[rgba(62,196,177,0.2)]">
+                    <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-semibold text-white">
+                            {selectedChild.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                        </span>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-gray-800 dark:text-white">
+                            Viewing fees for <span className="font-semibold text-primary-700 dark:text-[#3EC4B1]">{selectedChild.name}</span>
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                            {selectedChild.className}{selectedChild.sectionName ? ` - ${selectedChild.sectionName}` : ''}
+                            {selectedChild.admissionNumber ? ` | ${selectedChild.admissionNumber}` : ''}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-gray-900 dark:text-white border-b border-gray-200 dark:border-[#38383A] pb-4">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">My Fees & Payments</h1>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">{isParent ? `${selectedChild?.name?.split(' ')[0]}'s Fees` : 'My Fees & Payments'}</h1>
                 <div className="sm:text-right">
                     <p className="text-xs sm:text-sm text-gray-500 dark:text-[#8E8E93] uppercase font-semibold">Total Outstanding</p>
                     <p className="text-lg sm:text-2xl font-bold text-red-600">{formatCurrency(totalOutstanding)}</p>

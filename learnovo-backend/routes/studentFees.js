@@ -26,6 +26,30 @@ router.use(planGate.requireActiveSubscription);
 router.use(planGate.checkFeesAndFinance);
 
 /**
+ * Helper: Resolve the target student ID for fee queries.
+ * - For students: returns their own ID
+ * - For parents: returns the childId from query param (validated against their children array)
+ * Returns { studentId, error }
+ */
+function resolveStudentId(req) {
+  if (req.user.role === 'student') {
+    return { studentId: req.user._id };
+  }
+  if (req.user.role === 'parent') {
+    const childId = req.query.childId;
+    if (!childId) {
+      return { error: 'childId query parameter is required for parent access' };
+    }
+    const children = (req.user.children || []).map(c => c.toString());
+    if (!children.includes(childId.toString())) {
+      return { error: 'You can only access your children\'s fee data' };
+    }
+    return { studentId: childId };
+  }
+  return { error: 'Unauthorized role' };
+}
+
+/**
  * Helper to log state transitions strictly
  */
 async function createAuditLog(paymentAttemptId, session, tenantId, previousStatus, newStatus, triggerSource, note = '') {
@@ -109,14 +133,17 @@ async function applyPaymentToInvoices(attempt, session, opts = {}) {
 }
 
 /**
- * @desc    Get all fee invoices assigned to the logged-in student
- * @route   GET /api/student-fees
- * @access  Private (Student)
+ * @desc    Get all fee invoices assigned to the logged-in student (or parent's child)
+ * @route   GET /api/student-fees?childId=xxx (childId required for parents)
+ * @access  Private (Student, Parent)
  */
-router.get('/', protect, authorize('student'), async(req, res) => {
+router.get('/', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
     const invoices = await FeeInvoice.find({
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId,
       status: { $ne: 'Cancelled' }
     })
@@ -138,10 +165,13 @@ router.get('/', protect, authorize('student'), async(req, res) => {
  * @route   GET /api/student-fees/history
  * @access  Private (Student)
  */
-router.get('/history', protect, authorize('student'), async(req, res) => {
+router.get('/history', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
     const attempts = await PaymentAttempt.find({
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId
     })
       .populate('invoiceId', 'invoiceNumber totalAmount status dueDate')
@@ -164,20 +194,23 @@ router.get('/history', protect, authorize('student'), async(req, res) => {
  * Returns total annual fee, paid, outstanding, payment plan, and allocation info.
  * Excludes cancelled invoices from all calculations.
  */
-router.get('/summary', protect, authorize('student'), async(req, res) => {
+router.get('/summary', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
     const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
 
     // Find active allocation for this student
     const allocation = await AnnualFeeAllocation.findOne({
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId,
       status: { $in: ['active', 'completed'] }
     }).sort({ createdAt: -1 });
 
     // Get non-cancelled invoices
     const invoices = await FeeInvoice.find({
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId,
       status: { $ne: 'Cancelled' }
     }).sort({ dueDate: 1 });
@@ -215,11 +248,14 @@ router.get('/summary', protect, authorize('student'), async(req, res) => {
  * @route   GET /api/student-fees/:id
  * @access  Private (Student)
  */
-router.get('/:id', protect, authorize('student'), async(req, res) => {
+router.get('/:id', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
     const invoice = await FeeInvoice.findOne({
       _id: req.params.id,
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId,
       status: { $ne: 'Cancelled' }
     });
@@ -628,11 +664,14 @@ router.post('/:id/submit-payment', protect, authorize('student'), [
  * @route   GET /api/student-fees/payment/:id/status
  * @access  Private (Student)
  */
-router.get('/payment/:id/status', protect, authorize('student'), async(req, res) => {
+router.get('/payment/:id/status', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
     const attempt = await PaymentAttempt.findOne({
       _id: req.params.id,
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId
     });
 
@@ -759,11 +798,14 @@ router.post('/dispute', protect, authorize('student'), [
  * @route   GET /api/student-fees/dispute/:id
  * @access  Private (Student)
  */
-router.get('/dispute/:id', protect, authorize('student'), async(req, res) => {
+router.get('/dispute/:id', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
     const dispute = await PaymentDispute.findOne({
       _id: req.params.id,
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId
     }).populate('invoiceId', 'invoiceNumber totalAmount');
 
@@ -780,10 +822,13 @@ router.get('/dispute/:id', protect, authorize('student'), async(req, res) => {
  * @route   GET /api/student-fees/receipts
  * @access  Private (Student)
  */
-router.get('/receipts', protect, authorize('student'), async(req, res) => {
+router.get('/receipts', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
     const receipts = await Receipt.find({
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId
     })
       .populate('invoiceId', 'invoiceNumber totalAmount items')
@@ -802,19 +847,22 @@ router.get('/receipts', protect, authorize('student'), async(req, res) => {
  * @route   GET /api/student-fees/receipt/:id
  * @access  Private (Student)
  */
-router.get('/receipt/:id', protect, authorize('student'), async(req, res) => {
+router.get('/receipt/:id', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
     // Try by receipt _id first, then by paymentAttemptId
     let receipt = await Receipt.findOne({
       _id: req.params.id,
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId
     });
 
     if (!receipt) {
       receipt = await Receipt.findOne({
         paymentAttemptId: req.params.id,
-        studentId: req.user._id,
+        studentId,
         tenantId: req.user.tenantId
       });
     }
@@ -1259,7 +1307,7 @@ router.post('/payment/icici-return', express.urlencoded({ extended: true }), asy
  * @route   GET /api/student-fees/gateway-status
  * @access  Private (student)
  */
-router.get('/gateway-status', protect, authorize('student'), async(req, res) => {
+router.get('/gateway-status', protect, authorize('student', 'parent'), async(req, res) => {
   try {
     const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway').lean();
     if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });

@@ -7,6 +7,7 @@ import { useUserDisplay } from '../hooks/useUserDisplay'
 import { useClickOutside } from '../hooks/useClickOutside'
 import NotificationBell from './NotificationBell'
 import UserAvatar from './UserAvatar'
+import ChildSwitcher from './ChildSwitcher'
 
 const MobileHeader = ({ onMenuClick }) => {
   const { logout } = useAuth()
@@ -45,6 +46,9 @@ const MobileHeader = ({ onMenuClick }) => {
 
         {/* Right side - Search, notifications, profile */}
         <div className="flex items-center space-x-0.5 flex-shrink-0">
+          {/* Child switcher for parent accounts */}
+          <ChildSwitcher compact />
+
           <button
             onClick={() => navigate('/app/search')}
             className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#2C2C2E] focus:outline-none"

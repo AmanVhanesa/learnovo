@@ -228,6 +228,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('tenant')
+    localStorage.removeItem('selectedChildId')
     dispatch({ type: 'LOGOUT' })
     toast.success('Logged out successfully!')
   }

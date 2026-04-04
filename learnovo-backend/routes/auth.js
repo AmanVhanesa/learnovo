@@ -294,6 +294,23 @@ router.post('/login', [
     // Update last login (non-blocking)
     User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } }).catch(() => { });
 
+    // Populate children for parent role (name, class, section, avatar, admissionNumber)
+    let populatedChildren = [];
+    if (user.role === 'parent' && user.children && user.children.length > 0) {
+      const childDocs = await User.find(
+        { _id: { $in: user.children }, tenantId: user.tenantId },
+        'name firstName lastName fullName admissionNumber class section avatar photo'
+      ).populate('class', 'name').populate('section', 'name');
+      populatedChildren = childDocs.map(c => ({
+        id: c._id,
+        name: c.fullName || c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+        admissionNumber: c.admissionNumber,
+        className: c.class?.name || '',
+        sectionName: c.section?.name || '',
+        avatar: c.avatar || c.photo || null
+      }));
+    }
+
     // Generate token
     let token;
     try {
@@ -354,7 +371,9 @@ router.post('/login', [
         nationalId: user.nationalId,
         education: user.education,
         experience: user.experience,
-        guardians: user.guardians
+        guardians: user.guardians,
+        // Parent-specific: populated children list
+        children: populatedChildren.length > 0 ? populatedChildren : undefined
       },
       tenant: tenant ? {
         id: tenant._id,
@@ -402,6 +421,23 @@ router.get('/me', protect, async(req, res) => {
       }
     }
 
+    // Populate children for parent role
+    let populatedChildren = [];
+    if (user.role === 'parent' && user.children && user.children.length > 0) {
+      const childDocs = await User.find(
+        { _id: { $in: user.children }, tenantId: user.tenantId },
+        'name firstName lastName fullName admissionNumber class section avatar photo'
+      ).populate('class', 'name').populate('section', 'name');
+      populatedChildren = childDocs.map(c => ({
+        id: c._id,
+        name: c.fullName || c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+        admissionNumber: c.admissionNumber,
+        className: c.class?.name || '',
+        sectionName: c.section?.name || '',
+        avatar: c.avatar || c.photo || null
+      }));
+    }
+
     res.json({
       success: true,
       user: {
@@ -442,7 +478,9 @@ router.get('/me', protect, async(req, res) => {
         nationalId: user.nationalId,
         education: user.education,
         experience: user.experience,
-        guardians: user.guardians
+        guardians: user.guardians,
+        // Parent-specific: populated children list
+        children: populatedChildren.length > 0 ? populatedChildren : undefined
       },
       tenant
     });
