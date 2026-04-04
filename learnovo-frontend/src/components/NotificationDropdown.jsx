@@ -111,7 +111,7 @@ const NotificationDropdown = ({ onClose, bellRef }) => {
     return (
         <div
             ref={dropdownRef}
-            className="absolute right-0 sm:right-0 mt-2.5 w-[calc(100vw-1rem)] sm:w-[400px] max-w-[calc(100vw-1rem)] bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] z-50 flex flex-col animate-slide-down overflow-hidden -mr-2 sm:mr-0"
+            className="fixed inset-x-2 top-16 sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2.5 sm:w-[400px] bg-white/95 dark:bg-[#1C1C1E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-white dark:ring-[#1C1C1E] z-50 flex flex-col animate-slide-down overflow-hidden"
             style={{ maxHeight: 'min(520px, calc(100vh - 6rem))' }}
         >
             {/* ── Header ── */}

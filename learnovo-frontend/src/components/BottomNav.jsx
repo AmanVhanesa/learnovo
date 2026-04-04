@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, CreditCard, Calendar, MoreHorizontal } from 'lucide-react'
+import { LayoutDashboard, Users, CreditCard, Calendar, MoreHorizontal, BookCheck, Megaphone } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const BottomNav = () => {
@@ -9,18 +9,25 @@ const BottomNav = () => {
 
   // Role-aware nav items
   const getItems = () => {
+    if (['student', 'parent'].includes(role)) {
+      return [
+        { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
+        { name: 'My Fees', href: '/app/student/fees', icon: CreditCard },
+        { name: 'Homework', href: '/app/homework', icon: BookCheck },
+        { name: 'Announce', href: '/app/announcements', icon: Megaphone },
+      ]
+    }
+
     const base = [
       { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
     ]
 
-    if (['admin', 'teacher', 'parent'].includes(role)) {
+    if (['admin', 'teacher'].includes(role)) {
       base.push({ name: 'Students', href: '/app/students', icon: Users })
     }
 
     if (['admin'].includes(role)) {
       base.push({ name: 'Fees', href: '/app/fees-finance', icon: CreditCard })
-    } else if (['student', 'parent'].includes(role)) {
-      base.push({ name: 'My Fees', href: '/app/student/fees', icon: CreditCard })
     }
 
     base.push({ name: 'Attendance', href: '/app/attendance', icon: Calendar })

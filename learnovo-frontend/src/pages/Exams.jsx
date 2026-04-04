@@ -552,27 +552,34 @@ const Exams = () => {
                     </button>
                 </div>
 
-                {/* Exam Series Filter */}
-                <div className="flex items-center gap-3 flex-wrap">
-                    <label className="text-sm font-medium text-gray-700 dark:text-[#8E8E93]">Filter:</label>
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => setExamSeriesFilter('')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!examSeriesFilter ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#38383A]'}`}
-                        >
-                            All
-                        </button>
-                        {EXAM_SERIES.map(series => (
-                            <button
-                                key={series}
-                                onClick={() => setExamSeriesFilter(series)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${examSeriesFilter === series ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#38383A]'}`}
-                            >
-                                {series}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {/* Exam Series Filter — only show series that have exams for this student */}
+                {(() => {
+                    const availableSeries = [...new Set(exams.map(e => e.examSeries || 'Custom'))];
+                    const orderedSeries = EXAM_SERIES.filter(s => availableSeries.includes(s));
+                    if (orderedSeries.length === 0) return null;
+                    return (
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <label className="text-sm font-medium text-gray-700 dark:text-[#8E8E93]">Filter:</label>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setExamSeriesFilter('')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!examSeriesFilter ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#38383A]'}`}
+                                >
+                                    All
+                                </button>
+                                {orderedSeries.map(series => (
+                                    <button
+                                        key={series}
+                                        onClick={() => setExamSeriesFilter(series)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${examSeriesFilter === series ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#38383A]'}`}
+                                    >
+                                        {series}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {/* Summary Cards */}
                 {loadingMyResults ? (
@@ -658,10 +665,10 @@ const Exams = () => {
                         </div>
                     </>
                 ) : (
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] flex flex-col items-center py-16 text-gray-400 dark:text-[#636366]">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] flex flex-col items-center justify-center py-16 px-6 text-center text-gray-400 dark:text-[#636366]">
                         <Award className="h-10 w-10 mb-3 opacity-30" />
-                        <p className="font-medium">No results published yet</p>
-                        <p className="text-sm mt-1">Your exam results will appear here once your teacher publishes them.</p>
+                        <p className="font-medium text-gray-500 dark:text-[#8E8E93]">No results published yet</p>
+                        <p className="text-sm mt-1 max-w-xs">Your exam results will appear here once your teacher publishes them.</p>
                     </div>
                 )}
 

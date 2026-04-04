@@ -18,45 +18,60 @@ const ChildSwitcher = ({ compact = false }) => {
     return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
   }
 
+  const firstName = selectedChild?.name?.split(' ')[0] || ''
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Trigger button */}
       <button
         onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-2 rounded-xl transition-all duration-200 focus:outline-none ${
+        className={`flex items-center gap-1.5 rounded-xl transition-all duration-200 focus:outline-none ${
           compact
-            ? 'p-1.5 hover:bg-gray-100 dark:hover:bg-[#2C2C2E]'
+            ? 'py-1 px-2 bg-primary-50 dark:bg-[rgba(62,196,177,0.1)] hover:bg-primary-100 dark:hover:bg-[rgba(62,196,177,0.18)] ring-1 ring-primary-200 dark:ring-[rgba(62,196,177,0.2)]'
             : 'py-1.5 px-3 bg-primary-50 dark:bg-[rgba(62,196,177,0.1)] hover:bg-primary-100 dark:hover:bg-[rgba(62,196,177,0.18)] ring-1 ring-primary-200 dark:ring-[rgba(62,196,177,0.2)]'
         }`}
       >
         {selectedChild?.avatar ? (
           <UserAvatar photoUrl={selectedChild.avatar} initials={getInitials(selectedChild.name)} alt={selectedChild.name} size="sm" />
         ) : (
-          <div className="h-7 w-7 rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0">
-            <span className="text-[11px] font-semibold text-white">{getInitials(selectedChild?.name)}</span>
+          <div className={`${compact ? 'h-6 w-6' : 'h-7 w-7'} rounded-full bg-primary-500 flex items-center justify-center flex-shrink-0`}>
+            <span className={`${compact ? 'text-[10px]' : 'text-[11px]'} font-semibold text-white`}>{getInitials(selectedChild?.name)}</span>
           </div>
         )}
-        {!compact && (
-          <div className="text-left hidden sm:block">
+        {/* Always show first name, full name+class on sm+ in non-compact */}
+        {compact ? (
+          <span className="text-xs font-medium text-primary-700 dark:text-[#3EC4B1] max-w-[80px] truncate">
+            {firstName}
+          </span>
+        ) : (
+          <div className="text-left">
             <p className="text-sm font-medium text-gray-800 dark:text-white leading-tight truncate max-w-[120px]">
               {selectedChild?.name}
             </p>
-            <p className="text-[10px] text-gray-500 dark:text-[#8E8E93] leading-tight">
+            <p className="text-[10px] text-gray-500 dark:text-[#8E8E93] leading-tight hidden sm:block">
               {selectedChild?.className}{selectedChild?.sectionName ? ` - ${selectedChild.sectionName}` : ''}
             </p>
           </div>
         )}
-        <ChevronDown className={`h-3.5 w-3.5 text-gray-400 dark:text-[#8E8E93] transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-3 w-3 text-gray-400 dark:text-[#8E8E93] transition-transform duration-200 flex-shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white/95 dark:bg-[#2C2C2E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-gray-200 dark:ring-[#38383A] py-1 z-50 animate-slide-down">
+        <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:top-auto sm:left-0 sm:right-auto sm:mt-2 sm:w-64 bg-white/95 dark:bg-[#2C2C2E] backdrop-blur-xl rounded-2xl shadow-glass-lg ring-1 ring-gray-200 dark:ring-[#38383A] py-1 z-[100] animate-slide-down">
           {/* Header */}
           <div className="px-4 py-2.5 border-b border-gray-100 dark:border-[#38383A]">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary-500 dark:text-[#3EC4B1]" />
-              <p className="text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">My Children</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary-500 dark:text-[#3EC4B1]" />
+                <p className="text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Switch Child</p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="sm:hidden p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#3A3A3C]"
+              >
+                <span className="text-xs font-medium">Done</span>
+              </button>
             </div>
           </div>
 
@@ -71,7 +86,7 @@ const ChildSwitcher = ({ compact = false }) => {
                     selectChild(child.id)
                     setOpen(false)
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
                     isSelected
                       ? 'bg-primary-50 dark:bg-[rgba(62,196,177,0.1)]'
                       : 'hover:bg-gray-50 dark:hover:bg-[#3A3A3C]'
