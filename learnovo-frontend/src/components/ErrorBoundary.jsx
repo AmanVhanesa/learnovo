@@ -1,23 +1,40 @@
 import React from 'react'
 
+// Shared QueryClient reference — set via setErrorBoundaryQueryClient() so we can
+// clear stale/errored query cache before retrying, preventing the same crash loop.
+let _queryClient = null
+export function setErrorBoundaryQueryClient(qc) { _queryClient = qc }
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null, errorInfo: null }
+    this.state = { hasError: false, error: null, errorInfo: null, retryKey: 0 }
   }
 
   static getDerivedStateFromError(error) {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true }
   }
 
   componentDidCatch(error, errorInfo) {
-    // Log the error to an error reporting service
     console.error('ErrorBoundary caught an error:', error, errorInfo)
     this.setState({
       error: error,
       errorInfo: errorInfo
     })
+  }
+
+  handleRetry = () => {
+    // Clear all React Query caches so stale error data doesn't cause the same crash
+    if (_queryClient) {
+      _queryClient.removeQueries()
+    }
+    // Increment retryKey to force unmount+remount of the entire child tree
+    this.setState(prev => ({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+      retryKey: prev.retryKey + 1
+    }))
   }
 
   render() {
@@ -39,9 +56,7 @@ class ErrorBoundary extends React.Component {
               </p>
               <div className="space-y-3">
                 <button
-                  onClick={() => {
-                    this.setState({ hasError: false, error: null, errorInfo: null })
-                  }}
+                  onClick={this.handleRetry}
                   className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Try Again
@@ -59,14 +74,14 @@ class ErrorBoundary extends React.Component {
                   Reload Page
                 </button>
               </div>
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {import.meta.env.DEV && this.state.error && (
                 <details className="mt-6 text-left">
                   <summary className="cursor-pointer text-sm text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white">
                     Error Details (Dev Only)
                   </summary>
                   <pre className="mt-2 text-xs bg-gray-100 dark:bg-[#2C2C2E] p-4 rounded overflow-auto max-h-48 text-gray-900 dark:text-white">
                     {this.state.error.toString()}
-                    {this.state.errorInfo.componentStack}
+                    {this.state.errorInfo?.componentStack}
                   </pre>
                 </details>
               )}
@@ -76,7 +91,7 @@ class ErrorBoundary extends React.Component {
       )
     }
 
-    return this.props.children
+    return <React.Fragment key={this.state.retryKey}>{this.props.children}</React.Fragment>
   }
 }
 

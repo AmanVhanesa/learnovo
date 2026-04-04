@@ -12,7 +12,7 @@ import { TenantProvider, useTenant } from './contexts/TenantContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import SuperAdminRoute from './components/superadmin/SuperAdminRoute'
 import Layout from './components/Layout'
-import ErrorBoundary from './components/ErrorBoundary'
+import ErrorBoundary, { setErrorBoundaryQueryClient } from './components/ErrorBoundary'
 import { setPageErrorBoundaryQueryClient } from './components/PageErrorBoundary'
 
 const queryClient = new QueryClient({
@@ -26,8 +26,9 @@ const queryClient = new QueryClient({
   },
 })
 
-// Allow PageErrorBoundary to clear query cache on retry
+// Allow error boundaries to clear query cache on retry
 setPageErrorBoundaryQueryClient(queryClient)
+setErrorBoundaryQueryClient(queryClient)
 
 // ── Public / auth pages — kept eager (tiny, shown before auth)
 import Landing from './pages/Landing'
