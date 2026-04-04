@@ -115,28 +115,28 @@ const StudentLists = () => {
                 <div className="p-4 border-b border-gray-200 dark:border-[#38383A]">
                     <button
                         onClick={() => setIsCreatingList(true)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+                        className="btn btn-primary w-full"
                     >
-                        <Plus className="w-4 h-4" />
-                        <span className="font-medium text-sm">Create New List</span>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create New List
                     </button>
 
                     <div className="mt-4 relative">
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <Search className="w-4 h-4 text-gray-400 dark:text-[#636366] absolute left-3 top-1/2 -translate-y-1/2" />
                         <input
                             type="text"
                             placeholder="Search lists..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-[#1C1C1E] dark:border-[#38383A] dark:text-white dark:placeholder-[#636366]"
+                            className="input pl-9"
                         />
                     </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
                     {isLoadingLists ? (
-                        <div className="flex justify-center p-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                        <div className="flex items-center justify-center p-8">
+                            <div className="loading-spinner"></div>
                         </div>
                     ) : filteredLists.length > 0 ? (
                         filteredLists.map((list) => (
@@ -179,7 +179,7 @@ const StudentLists = () => {
                 {activeListId && activeListData ? (
                     <>
                         {/* Header */}
-                        <div className="bg-white dark:bg-[#1C1C1E] border-b border-gray-200 px-4 sm:px-8 py-4 sm:py-6 shrink-0 z-10">
+                        <div className="bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-4 sm:px-8 py-4 sm:py-6 shrink-0 z-10">
                             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                 <div>
                                     <div className="flex items-center gap-2 md:hidden mb-2">
@@ -207,27 +207,27 @@ const StudentLists = () => {
                                 <div className="flex flex-wrap gap-2">
                                     <button
                                         onClick={() => handleExport('pdf')}
-                                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-[#8E8E93] bg-white dark:bg-[#1C1C1E] border border-gray-300 dark:border-[#38383A] rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-[#2C2C2E] flex items-center gap-2 w-full sm:w-auto"
+                                        className="btn btn-outline w-full sm:w-auto"
                                     >
-                                        <FileText className="w-4 h-4 text-red-500" /> PDF
+                                        <FileText className="w-4 h-4 mr-2 text-red-500" /> PDF
                                     </button>
                                     <button
                                         onClick={() => handleExport('excel')}
-                                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-[#8E8E93] bg-white dark:bg-[#1C1C1E] border border-gray-300 dark:border-[#38383A] rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-[#2C2C2E] flex items-center gap-2 w-full sm:w-auto"
+                                        className="btn btn-outline w-full sm:w-auto"
                                     >
-                                        <FileSpreadsheet className="w-4 h-4 text-green-600" /> Excel
+                                        <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600" /> Excel
                                     </button>
                                     <button
                                         onClick={() => setIsAddingStudents(true)}
-                                        className="px-4 py-2 text-sm font-medium text-primary-700 dark:text-[#3EC4B1] bg-primary-50 dark:bg-[rgba(62,196,177,0.12)] rounded-lg hover:bg-primary-100 dark:hover:bg-[rgba(62,196,177,0.2)] flex items-center gap-2 transition-colors w-full sm:w-auto"
+                                        className="btn btn-primary w-full sm:w-auto"
                                     >
-                                        <Plus className="w-4 h-4" /> Add Students
+                                        <Plus className="w-4 h-4 mr-2" /> Add Students
                                     </button>
                                     <button
                                         onClick={handleDeleteList}
-                                        className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/20 flex items-center gap-2 transition-colors w-full sm:w-auto"
+                                        className="btn bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 border-red-200 dark:border-red-500/20 w-full sm:w-auto"
                                     >
-                                        <Trash2 className="w-4 h-4" /> Delete List
+                                        <Trash2 className="w-4 h-4 mr-2" /> Delete List
                                     </button>
                                 </div>
                             </div>
@@ -236,66 +236,56 @@ const StudentLists = () => {
                         {/* Content area: scrollable */}
                         <div className="flex-1 overflow-y-auto p-4 sm:p-8">
                             {isLoadingDetail ? (
-                                <div className="flex justify-center p-12">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                                <div className="flex items-center justify-center p-12">
+                                    <div className="loading-spinner"></div>
                                 </div>
                             ) : activeListData.students.length > 0 ? (
                                 <div className="card overflow-hidden">
                                     <div className="overflow-x-auto">
-                                        <table className="min-w-full min-w-[500px] divide-y divide-gray-200 dark:divide-[#38383A]">
-                                            <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
+                                        <table className="table min-w-[500px]">
+                                            <thead>
                                                 <tr>
-                                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider w-16">
-                                                        S.No
-                                                    </th>
-                                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">
-                                                        Admission No
-                                                    </th>
-                                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">
-                                                        Student Name
-                                                    </th>
-                                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">
-                                                        Class/Section
-                                                    </th>
-                                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">
-                                                        Phone
-                                                    </th>
-                                                    <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider w-24">
-                                                        Action
-                                                    </th>
+                                                    <th className="w-16">S.No</th>
+                                                    <th>Admission No</th>
+                                                    <th>Student Name</th>
+                                                    <th>Class/Section</th>
+                                                    <th>Phone</th>
+                                                    <th className="w-24">Action</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
+                                            <tbody>
                                                 {activeListData.students.map((student, index) => (
-                                                    <tr key={student._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
-                                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">
+                                                    <tr key={student._id}>
+                                                        <td className="text-sm text-gray-500 dark:text-[#8E8E93]">
                                                             {index + 1}
                                                         </td>
-                                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white border-l border-transparent">
-                                                            {student.admissionNumber || '-'}
+                                                        <td>
+                                                            <span className="font-mono text-sm font-semibold text-teal-600">
+                                                                {student.admissionNumber || '-'}
+                                                            </span>
                                                         </td>
-                                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                                        <td>
                                                             <div className="flex items-center">
-                                                                <div className="h-8 w-8 rounded-full bg-primary-100 dark:bg-[rgba(62,196,177,0.12)] flex items-center justify-center text-primary-700 dark:text-[#3EC4B1] font-bold text-xs mr-3">
-                                                                    {(student.fullName || student.name) ? (student.fullName || student.name).charAt(0).toUpperCase() : '?'}
+                                                                <div className="h-10 w-10 bg-gradient-to-br from-teal-400 to-teal-700 rounded-full flex items-center justify-center mr-3">
+                                                                    <span className="text-sm font-semibold text-white">
+                                                                        {(student.fullName || student.name) ? (student.fullName || student.name).charAt(0).toUpperCase() : '?'}
+                                                                    </span>
                                                                 </div>
                                                                 <div className="text-sm font-medium text-gray-900 dark:text-white">
                                                                     {student.fullName || student.name || 'Unknown'}
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400">
-                                                                {student.class || '-'} {student.section && `- ${student.section}`}
-                                                            </span>
+                                                        <td className="text-sm text-gray-900 dark:text-white">
+                                                            {student.class || '-'} {student.section && `- ${student.section}`}
                                                         </td>
-                                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">
+                                                        <td className="text-sm text-gray-900 dark:text-white">
                                                             {student.phone || '-'}
                                                         </td>
-                                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-right text-sm">
+                                                        <td>
                                                             <button
                                                                 onClick={() => handleRemoveStudent(student._id)}
-                                                                className="text-red-400 hover:text-red-600 transition-colors p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10"
+                                                                className="btn-icon hover:text-red-600"
                                                                 title="Remove from list"
                                                             >
                                                                 <Trash2 className="w-4 h-4" />
@@ -308,22 +298,22 @@ const StudentLists = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="text-center card p-12">
-                                    <div className="mx-auto w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mb-4">
-                                        <Users className="w-6 h-6 text-gray-400 dark:text-[#636366]" />
-                                    </div>
-                                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">No students in this list</h3>
-                                    <p className="mt-1 text-sm text-gray-500 dark:text-[#8E8E93]">
-                                        Get started by adding students to this custom list.
-                                    </p>
-                                    <div className="mt-6">
-                                        <button
-                                            onClick={() => setIsAddingStudents(true)}
-                                            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-                                        >
-                                            <Plus className="w-4 h-4 mr-2" />
-                                            Add Students
-                                        </button>
+                                <div className="card">
+                                    <div className="text-center py-12">
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mb-3">
+                                                <Users className="w-6 h-6 text-gray-400 dark:text-[#636366]" />
+                                            </div>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">No students in this list</p>
+                                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Get started by adding students to this custom list.</p>
+                                            <button
+                                                onClick={() => setIsAddingStudents(true)}
+                                                className="btn btn-primary mt-4"
+                                            >
+                                                <Plus className="w-4 h-4 mr-2" />
+                                                Add Students
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -331,16 +321,16 @@ const StudentLists = () => {
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gray-50/50 dark:bg-transparent">
-                        <div className="w-16 h-16 bg-white dark:bg-[#1C1C1E] shadow-sm rounded-2xl flex items-center justify-center mb-6">
-                            <FileSpreadsheet className="w-8 h-8 text-primary-500" />
+                        <div className="w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mb-4">
+                            <FileSpreadsheet className="w-6 h-6 text-gray-400 dark:text-[#636366]" />
                         </div>
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Custom Student Lists</h2>
-                        <p className="text-gray-500 dark:text-[#8E8E93] max-w-md mb-8">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">Custom Student Lists</p>
+                        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1 max-w-md">
                             Select a list from the sidebar to view details, or create a new one to group students for activities, tours, or events.
                         </p>
                         <button
                             onClick={() => setIsCreatingList(true)}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-primary-700 dark:text-[#3EC4B1] bg-primary-100 dark:bg-[rgba(62,196,177,0.12)] hover:bg-primary-200 dark:hover:bg-[rgba(62,196,177,0.2)] shadow-sm"
+                            className="btn btn-primary mt-4"
                         >
                             <Plus className="w-4 h-4 mr-2" />
                             Create New List

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp, AlertTriangle, RefreshCw, Users } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
@@ -959,8 +959,14 @@ const Students = () => {
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.role === 'admin' ? 9 : 8} className="text-center py-12 text-gray-500 dark:text-[#8E8E93]">
-                    No students found
+                  <td colSpan={user?.role === 'admin' ? 9 : 8} className="text-center py-12">
+                    <div className="flex flex-col items-center">
+                      <div className="w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mb-3">
+                        <Users className="w-6 h-6 text-gray-400 dark:text-[#636366]" />
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">No students found</p>
+                      <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Try adjusting your filters or add a new student.</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -1054,7 +1060,7 @@ const Students = () => {
                             </button>
                             <button
                               onClick={() => handleToggleStatus(student)}
-                              className={student.isActive ? 'p-1 text-gray-400 hover:text-orange-500' : 'p-1 text-gray-400 hover:text-green-600'}
+                              className={`btn-icon ${student.isActive ? 'hover:text-red-600' : 'hover:text-green-600'}`}
                               title={student.isActive ? 'Deactivate' : 'Activate'}
                             >
                               {student.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
@@ -1088,7 +1094,7 @@ const Students = () => {
             <select
               value={perPage}
               onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1); }}
-              className="border border-gray-300 dark:border-[#38383A] rounded px-2 py-1 text-sm"
+              className="border border-gray-300 dark:border-[#38383A] rounded px-2 py-1 text-sm dark:bg-[#1C1C1E] dark:text-white"
             >
               <option value={50}>50 / page</option>
               <option value={100}>100 / page</option>
