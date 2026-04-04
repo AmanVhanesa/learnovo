@@ -1,14 +1,9 @@
 import React from 'react'
 
-// Shared QueryClient reference — set via setErrorBoundaryQueryClient() so we can
-// clear stale/errored query cache before retrying, preventing the same crash loop.
-let _queryClient = null
-export function setErrorBoundaryQueryClient(qc) { _queryClient = qc }
-
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null, errorInfo: null, retryKey: 0 }
+    this.state = { hasError: false, error: null, errorInfo: null }
   }
 
   static getDerivedStateFromError(error) {
@@ -21,20 +16,6 @@ class ErrorBoundary extends React.Component {
       error: error,
       errorInfo: errorInfo
     })
-  }
-
-  handleRetry = () => {
-    // Clear all React Query caches so stale error data doesn't cause the same crash
-    if (_queryClient) {
-      _queryClient.removeQueries()
-    }
-    // Increment retryKey to force unmount+remount of the entire child tree
-    this.setState(prev => ({
-      hasError: false,
-      error: null,
-      errorInfo: null,
-      retryKey: prev.retryKey + 1
-    }))
   }
 
   render() {
@@ -56,22 +37,16 @@ class ErrorBoundary extends React.Component {
               </p>
               <div className="space-y-3">
                 <button
-                  onClick={this.handleRetry}
+                  onClick={() => window.location.reload()}
                   className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Try Again
+                  Reload Page
                 </button>
                 <button
                   onClick={() => window.location.href = '/app/dashboard'}
                   className="w-full bg-gray-200 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-[#38383A] transition-colors"
                 >
                   Go to Dashboard
-                </button>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="w-full bg-gray-200 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-[#38383A] transition-colors"
-                >
-                  Reload Page
                 </button>
               </div>
               {import.meta.env.DEV && this.state.error && (
@@ -91,7 +66,7 @@ class ErrorBoundary extends React.Component {
       )
     }
 
-    return <React.Fragment key={this.state.retryKey}>{this.props.children}</React.Fragment>
+    return this.props.children
   }
 }
 

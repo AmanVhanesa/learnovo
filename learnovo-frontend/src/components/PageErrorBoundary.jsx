@@ -1,6 +1,5 @@
 import React from 'react'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
-import { QueryClient } from '@tanstack/react-query'
+import { AlertTriangle, RotateCcw } from 'lucide-react'
 
 // Shared reference — set by the provider wrapper so the boundary can clear cache on retry
 let _queryClient = null
@@ -27,17 +26,18 @@ class PageErrorBoundary extends React.Component {
   }
 
   handleRetry = () => {
-    // Clear all query caches so stale/error data doesn't cause the same crash
     if (_queryClient) {
       _queryClient.removeQueries()
     }
-    // Increment retryKey to force React to unmount and remount children,
-    // which gives React Query a clean slate to refetch
     this.setState(prev => ({
       hasError: false,
       error: null,
       retryKey: prev.retryKey + 1
     }))
+  }
+
+  handleReload = () => {
+    window.location.reload()
   }
 
   render() {
@@ -54,13 +54,15 @@ class PageErrorBoundary extends React.Component {
             <p className="text-sm text-gray-500 dark:text-[#8E8E93] mb-5">
               Something went wrong loading this page. The rest of the app is unaffected.
             </p>
-            <button
-              onClick={this.handleRetry}
-              className="btn btn-primary gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Try Again
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={this.handleReload}
+                className="btn btn-primary gap-2"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reload Page
+              </button>
+            </div>
             {import.meta.env.DEV && this.state.error && (
               <details className="mt-5 text-left">
                 <summary className="cursor-pointer text-xs text-gray-400 hover:text-gray-600 dark:hover:text-white">
