@@ -19,6 +19,7 @@ const PAGE_SIZE = 50
 
 const AllInvoicesTab = ({
   activeSession,
+  initialStudentId,
   onEditInvoice,
   onCollectPayment,
   onPrintReceipt,
@@ -57,7 +58,7 @@ const AllInvoicesTab = ({
 
   // Server-side paginated query
   const { data: invoicesResponse, isLoading, isError, error } = useQuery({
-    queryKey: ['all-invoices', activeSession?._id, filters.status, filters.classId, filters.startDate, filters.endDate, page, debouncedSearch],
+    queryKey: ['all-invoices', activeSession?._id, filters.status, filters.classId, filters.startDate, filters.endDate, page, debouncedSearch, initialStudentId],
     queryFn: async () => {
       const params = {
         page,
@@ -69,6 +70,7 @@ const AllInvoicesTab = ({
       if (filters.startDate) params.startDate = filters.startDate
       if (filters.endDate) params.endDate = filters.endDate
       if (debouncedSearch) params.search = debouncedSearch
+      if (initialStudentId) params.studentId = initialStudentId
       return await invoicesService.list(params)
     },
     enabled: !!activeSession,

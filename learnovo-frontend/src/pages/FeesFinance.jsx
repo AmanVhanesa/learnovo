@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar,
@@ -11,6 +11,7 @@ import {
   feesReportsService, invoicesService, paymentsService, feeStructuresService, refundsService, discountsService, allocationsService
 } from '../services/feesService'
 import { academicSessionsService, classesService } from '../services/academicsService'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../utils/formatCurrency'
 import { formatDate } from '../utils/formatDate'
@@ -75,7 +76,9 @@ const TABS = TAB_GROUPS.flatMap(g => g.tabs)
 const FeesFinance = () => {
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const studentIdFromUrl = searchParams.get('student')
+  const [activeTab, setActiveTab] = useState(studentIdFromUrl ? 'allInvoices' : 'dashboard')
 
   const [showFeeStructureModal, setShowFeeStructureModal] = useState(false)
   const [editingFeeStructure, setEditingFeeStructure] = useState(null)
@@ -378,7 +381,7 @@ const FeesFinance = () => {
       <div>
         {activeTab === 'dashboard' && dashboardData && <DashboardTab data={dashboardData} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onEditInvoice={setEditingInvoice} onDeleteInvoice={handleDeleteInvoice} onNavigate={setActiveTab} />}
         {activeTab === 'allocations' && <AnnualAllocationsTab activeSession={activeSession} />}
-        {activeTab === 'allInvoices' && <AllInvoicesTab activeSession={activeSession} onEditInvoice={setEditingInvoice} onCollectPayment={async (inv) => { if (inv.studentId) { const s = typeof inv.studentId === 'object' ? inv.studentId : { _id: inv.studentId }; await handleSelectStudent(s) } }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onDeleteInvoice={handleDeleteInvoice} />}
+        {activeTab === 'allInvoices' && <AllInvoicesTab activeSession={activeSession} initialStudentId={studentIdFromUrl} onEditInvoice={setEditingInvoice} onCollectPayment={async (inv) => { if (inv.studentId) { const s = typeof inv.studentId === 'object' ? inv.studentId : { _id: inv.studentId }; await handleSelectStudent(s) } }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onDeleteInvoice={handleDeleteInvoice} />}
         {activeTab === 'feeStructure' && <FeeStructureTab feeStructures={feeStructures} classes={classes} onCreateNew={() => { setEditingFeeStructure(null); setShowFeeStructureModal(true) }} onEdit={(s) => { setEditingFeeStructure(s); setShowFeeStructureModal(true) }} onDelete={async (id) => { if (window.confirm('Delete this fee structure?')) { try { await feeStructuresService.delete(id); toast.success('Deleted'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } } }} onDuplicate={async (s) => { try { await feeStructuresService.create({ classId: typeof s.classId === 'object' ? s.classId._id : s.classId, sectionId: s.sectionId ? (typeof s.sectionId === 'object' ? s.sectionId._id : s.sectionId) : null, academicSessionId: activeSession._id, feeHeads: s.feeHeads.map(h => ({ name: h.name, amount: h.amount, frequency: h.frequency, isCompulsory: h.isCompulsory, dueDay: h.dueDay })), isActive: true }); toast.success('Duplicated'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } }} />}
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
         {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
@@ -583,6 +586,27 @@ const FeeStructureTab = ({ feeStructures, classes, onCreateNew, onEdit, onDelete
   const [searchQuery, setSearchQuery] = useState('')
   const [filterClass, setFilterClass] = useState('')
   const [expandedId, setExpandedId] = useState(null)
+  const [exporting, setExporting] = useState(false)
+
+  const handleExportStructures = async () => {
+    try {
+      setExporting(true)
+      const response = await feeStructuresService.export()
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `fee_structures_export_${new Date().toISOString().split('T')[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      toast.success('Fee structures exported successfully')
+    } catch (err) {
+      toast.error('Failed to export fee structures')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const getClassSortOrder = (name) => {
     const specialOrder = { 'nursery': 0, 'lkg': 1, 'ukg': 2 }
@@ -621,6 +645,7 @@ const FeeStructureTab = ({ feeStructures, classes, onCreateNew, onEdit, onDelete
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
             <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" /><input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-3 py-2 border border-gray-200 dark:border-[#38383A] dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366] rounded-xl text-sm w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary-300" /></div>
             {classes.length > 0 && <select value={filterClass} onChange={(e) => setFilterClass(e.target.value)} className="input text-sm w-auto"><option value="">All Classes</option>{classes.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select>}
+            <button onClick={handleExportStructures} disabled={exporting || feeStructures.length === 0} className="btn btn-outline btn-sm flex items-center justify-center gap-1.5"><Download className="h-4 w-4" /> {exporting ? 'Exporting...' : 'Export'}</button>
             <button onClick={onCreateNew} className="btn btn-primary btn-sm flex items-center justify-center gap-1.5"><Plus className="h-4 w-4" /> Create New</button>
           </div>
         </div>

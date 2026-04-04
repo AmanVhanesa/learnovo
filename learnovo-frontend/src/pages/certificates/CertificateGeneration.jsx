@@ -896,7 +896,7 @@ const CertificateGeneration = () => {
                             <button
                                 onClick={() => {
                                     setShowFeesModal(false);
-                                    navigate(`/app/fees?student=${selectedStudent._id}`);
+                                    navigate(`/app/fees-finance?student=${selectedStudent._id}`);
                                 }}
                                 className="btn btn-primary w-full gap-2 justify-center"
                             >

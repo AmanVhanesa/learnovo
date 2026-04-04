@@ -800,7 +800,7 @@ router.get('/', protect, authorize('admin', 'accountant'), async(req, res) => {
       // Search by invoice number, student name, or admission number
       const User = require('../models/User');
       const matchingStudents = await User.find({
-        tenantId: req.tenant._id,
+        tenantId: req.user.tenantId,
         $or: [
           { fullName: searchRegex },
           { name: searchRegex },
