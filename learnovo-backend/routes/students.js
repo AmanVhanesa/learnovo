@@ -331,14 +331,16 @@ router.get('/import/template', protect, authorize('admin'), planGate.requireActi
       'guardianName', 'guardianPhone',
       'address',
       'penNumber', 'subDepartment', 'driverName',
+      'isActive', 'deactivatedAt', 'removalDate', 'removalReason', 'removalNotes',
       // Optional: firstName, middleName, lastName for backward compatibility
       'firstName', 'middleName', 'lastName'
     ];
 
     // Create header row
     const csvContent = `${fields.join(',')  }\n` +
-      // Add a sample row
-      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,10,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,,,';
+      // Add sample rows — one active, one inactive
+      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,10,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,active,,,,,,,' + '\n' +
+      'Jane Smith,jane@example.com,9876543210,2009-08-20,female,ADM002,2,9,B,2024-2025,2023-04-01,8,B+,General,,Father Name,9876543212,,Mother Name,9876543213,,,456 Oak Ave,,,inactive,2025-03-15,2025-03-15,Transferred,Moved to another city,,,';
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.csv');
@@ -365,11 +367,12 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
       'guardianName', 'guardianPhone',
       'address',
       'penNumber', 'subDepartment', 'driverName',
+      'isActive', 'deactivatedAt', 'removalDate', 'removalReason', 'removalNotes',
       'firstName', 'middleName', 'lastName'
     ];
 
-    // Sample data row
-    const sampleData = {
+    // Sample data rows — one active, one inactive
+    const sampleActive = {
       'fullName': 'John David Doe',
       'email': 'john.doe@example.com',
       'phone': '1234567890',
@@ -397,13 +400,56 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
       'penNumber': '12345678901',
       'subDepartment': '27 LG SEC',
       'driverName': 'Raju Singh',
+      'isActive': 'active',
+      'deactivatedAt': '',
+      'removalDate': '',
+      'removalReason': '',
+      'removalNotes': '',
+      'firstName': '',
+      'middleName': '',
+      'lastName': ''
+    };
+
+    const sampleInactive = {
+      'fullName': 'Jane Smith',
+      'email': 'jane@example.com',
+      'phone': '9876543210',
+      'dateOfBirth': '2009-08-20',
+      'gender': 'female',
+      'admissionNumber': 'ADM002',
+      'rollNumber': '2',
+      'class': '9',
+      'section': 'B',
+      'academicYear': '2024-2025',
+      'admissionDate': '2023-04-01',
+      'admissionClass': '8',
+      'bloodGroup': 'B+',
+      'category': 'General',
+      'religion': '',
+      'fatherName': 'Father Name',
+      'fatherPhone': '9876543212',
+      'fatherEmail': '',
+      'motherName': 'Mother Name',
+      'motherPhone': '9876543213',
+      'motherEmail': '',
+      'guardianName': '',
+      'guardianPhone': '',
+      'address': '456 Oak Ave',
+      'penNumber': '',
+      'subDepartment': '',
+      'driverName': '',
+      'isActive': 'inactive',
+      'deactivatedAt': '2025-03-15',
+      'removalDate': '2025-03-15',
+      'removalReason': 'Transferred',
+      'removalNotes': 'Moved to another city',
       'firstName': '',
       'middleName': '',
       'lastName': ''
     };
 
     // Create worksheet with headers and sample data
-    const wsData = [fields, Object.values(sampleData)];
+    const wsData = [fields, Object.values(sampleActive), Object.values(sampleInactive)];
     const worksheet = XLSX.utils.aoa_to_sheet(wsData);
 
     // Set column widths for better readability
@@ -522,6 +568,13 @@ router.post('/import/preview', protect, authorize('admin'), planGate.requireActi
         'drivername': 'driverName',
         'isactive': 'isActive',
         'is_active': 'isActive',
+        'status': 'isActive',
+        'deactivatedat': 'deactivatedAt',
+        'deactivated_at': 'deactivatedAt',
+        'inactivatedat': 'deactivatedAt',
+        'inactivated_at': 'deactivatedAt',
+        'deactivation_date': 'deactivatedAt',
+        'deactivationdate': 'deactivatedAt',
         'removaldate': 'removalDate',
         'removal_date': 'removalDate',
         'removalreason': 'removalReason',
@@ -1274,12 +1327,29 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
           if (['false', 'no', '0', 'inactive'].includes(isActiveValue)) {
             studentData.isActive = false;
 
+            // Set deactivation date from CSV (deactivatedAt column) or fall back to removalDate or current date
+            if (row.deactivatedAt) {
+              const deactivatedDate = parseDate(row.deactivatedAt);
+              if (deactivatedDate) {
+                studentData.inactivatedAt = deactivatedDate;
+              }
+            }
+
             // If student is inactive, handle removal fields
             if (row.removalDate) {
               const removalDate = parseDate(row.removalDate);
               if (removalDate) {
                 studentData.removalDate = removalDate;
+                // Fall back to removalDate if no explicit deactivatedAt was provided
+                if (!studentData.inactivatedAt) {
+                  studentData.inactivatedAt = removalDate;
+                }
               }
+            }
+
+            // If still no deactivation date, default to now
+            if (!studentData.inactivatedAt) {
+              studentData.inactivatedAt = new Date();
             }
 
             // Normalize removal reason to match enum
@@ -3061,12 +3131,18 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
       { key: 'class.name', header: 'Class' },
       { key: 'section', header: 'Section' },
       { key: 'rollNumber', header: 'Roll Number' },
+      { key: 'admissionDate', header: 'Admission Date', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+      { key: 'admissionClass', header: 'Admission Class' },
       { key: 'bloodGroup', header: 'Blood Group' },
       { key: 'address', header: 'Address' },
       { key: 'city', header: 'City' },
       { key: 'state', header: 'State' },
       { key: 'pincode', header: 'Pincode' },
       { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' },
+      { key: 'inactivatedAt', header: 'Deactivated At', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+      { key: 'removalDate', header: 'Removal Date', format: (val) => val ? new Date(val).toISOString().split('T')[0] : '' },
+      { key: 'removalReason', header: 'Removal Reason' },
+      { key: 'removalNotes', header: 'Removal Notes' },
       { key: 'createdAt', header: 'Created At', format: (val) => new Date(val).toISOString().split('T')[0] }
     ];
 
