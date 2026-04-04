@@ -5,7 +5,7 @@ import {
   Users, FileText, Search, X, Plus, Receipt, Settings, History,
   Edit, Trash2, Eye, Printer, RotateCcw, Check, Ban, List,
   ArrowUpRight, ArrowDownRight, Download, ChevronDown, ChevronUp,
-  Copy
+  Copy, Upload
 } from 'lucide-react'
 import {
   feesReportsService, invoicesService, paymentsService, feeStructuresService, refundsService, discountsService, allocationsService
@@ -24,6 +24,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
 import StatusBadge from '../components/StatusBadge'
 import EditInvoiceModal from '../components/EditInvoiceModal'
+import ImportModal from '../components/ImportModal'
 
 // Fees sub-components
 import StudentSearch from '../components/fees/StudentSearch'
@@ -59,6 +60,7 @@ const TAB_GROUPS = [
     tabs: [
       { id: 'feeStructure', label: 'Fee Structure', icon: Settings },
       { id: 'allocations', label: 'Annual Allocations', icon: Calendar },
+      { id: 'importFees', label: 'Import Fees', icon: Upload },
     ],
   },
   {
@@ -89,6 +91,7 @@ const FeesFinance = () => {
   const [studentPayments, setStudentPayments] = useState([])
   const [editingInvoice, setEditingInvoice] = useState(null)
   const [receiptFilters, setReceiptFilters] = useState({ search: '', paymentMethod: '', startDate: '', endDate: '' })
+  const [showFeeImportModal, setShowFeeImportModal] = useState(false)
   const [resolvingDispute, setResolvingDispute] = useState(null)
   const [resolveForm, setResolveForm] = useState({ action: 'APPROVE', note: '' })
 
@@ -390,6 +393,7 @@ const FeesFinance = () => {
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
         {activeTab === 'reports' && collectionReport && <ReportsTab report={collectionReport} onExport={handleExportCollectionReport} />}
+        {activeTab === 'importFees' && <ImportFeesTab onImport={() => setShowFeeImportModal(true)} />}
       </div>
 
       {/* Modals */}
@@ -397,6 +401,7 @@ const FeesFinance = () => {
       {showInvoiceModal && <IndividualInvoiceModal feeStructures={feeStructures} activeSession={activeSession} onClose={() => setShowInvoiceModal(false)} onSuccess={() => { setShowInvoiceModal(false); toast.success('Invoice generated'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
       {showPaymentModal && <PaymentModal student={selectedStudent} invoices={studentInvoices} payments={studentPayments} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onClose={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); setStudentPayments([]) }} onSuccess={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); toast.success('Payment collected') }} />}
       {editingInvoice && <EditInvoiceModal invoice={editingInvoice} onClose={() => setEditingInvoice(null)} onSuccess={() => { setEditingInvoice(null); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
+      {showFeeImportModal && <ImportModal isOpen={showFeeImportModal} onClose={() => setShowFeeImportModal(false)} module="fees" title="Import Fee Records" templateUrl="/fees/import/template" previewUrl="/fees/import/preview" executeUrl="/fees/import/execute" onSuccess={(result) => { setShowFeeImportModal(false); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fee-allocations'] }); toast.success(`Import complete: ${result?.allocationsCreated || result?.created || 0} records created`) }} />}
     </div>
   )
 }
@@ -404,6 +409,89 @@ const FeesFinance = () => {
 // ════════════════════════════════════════════════════════════════════════════
 // TAB COMPONENTS
 // ════════════════════════════════════════════════════════════════════════════
+
+const ImportFeesTab = ({ onImport }) => (
+  <div className="space-y-6">
+    <div className="card p-6 sm:p-8">
+      <div className="flex items-start gap-4">
+        <div className="p-3 rounded-xl bg-primary-100 dark:bg-primary-900/30">
+          <Upload className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+        </div>
+        <div className="flex-1">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Import Fee Records</h2>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1 leading-relaxed">
+            Bulk import student fee allocations, invoices, and payment history from a CSV or Excel file.
+            Useful when migrating from another system or recording offline payment data.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 p-4 rounded-lg bg-gray-50 dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A]">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">How it works</h3>
+        <ol className="text-sm text-gray-600 dark:text-[#8E8E93] space-y-2">
+          <li className="flex gap-2"><span className="font-semibold text-primary-600 dark:text-primary-400">1.</span> Download the CSV template and fill in your fee data</li>
+          <li className="flex gap-2"><span className="font-semibold text-primary-600 dark:text-primary-400">2.</span> Each row = one fee head per student (e.g., Tuition Fee, Transport Fee)</li>
+          <li className="flex gap-2"><span className="font-semibold text-primary-600 dark:text-primary-400">3.</span> Include paid amounts and payment details for historical records</li>
+          <li className="flex gap-2"><span className="font-semibold text-primary-600 dark:text-primary-400">4.</span> Upload the file — we'll validate and show a preview before importing</li>
+        </ol>
+      </div>
+
+      <div className="mt-6 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
+        <div className="flex gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-amber-700 dark:text-amber-300">
+            <p className="font-medium">Before you import</p>
+            <ul className="mt-1 space-y-1 text-amber-600 dark:text-amber-400">
+              <li>• Students must already exist in the system (use their admission numbers)</li>
+              <li>• An active academic session must be set up</li>
+              <li>• Existing allocations for the same student + session will not be overwritten</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <button
+          onClick={onImport}
+          className="btn btn-primary px-6 py-2.5"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Start Import
+        </button>
+      </div>
+    </div>
+
+    <div className="card p-6">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">CSV Column Reference</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 dark:border-[#38383A]">
+              <th className="text-left py-2 pr-4 font-medium text-gray-500 dark:text-[#8E8E93]">Column</th>
+              <th className="text-left py-2 pr-4 font-medium text-gray-500 dark:text-[#8E8E93]">Required</th>
+              <th className="text-left py-2 font-medium text-gray-500 dark:text-[#8E8E93]">Description</th>
+            </tr>
+          </thead>
+          <tbody className="text-gray-600 dark:text-[#AEAEB2]">
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">admissionNumber</td><td className="py-2 pr-4 text-red-500">Yes</td><td className="py-2">Student admission number</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">feeHead</td><td className="py-2 pr-4 text-red-500">Yes</td><td className="py-2">Fee head name (e.g., Tuition Fee, Transport Fee)</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">annualAmount</td><td className="py-2 pr-4 text-red-500">Yes</td><td className="py-2">Total annual fee amount</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">feeType</td><td className="py-2 pr-4">No</td><td className="py-2">recurring (default) or one_time</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">paidAmount</td><td className="py-2 pr-4">No</td><td className="py-2">Amount already paid (0 if unpaid)</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">paymentDate</td><td className="py-2 pr-4">No</td><td className="py-2">Date of payment (YYYY-MM-DD)</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">paymentMethod</td><td className="py-2 pr-4">No</td><td className="py-2">Cash, Bank Transfer, UPI, Cheque, Card, or Online</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">receiptNumber</td><td className="py-2 pr-4">No</td><td className="py-2">Existing receipt number (auto-generated if blank)</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">dueDate</td><td className="py-2 pr-4">No</td><td className="py-2">Due date (YYYY-MM-DD)</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">discountAmount</td><td className="py-2 pr-4">No</td><td className="py-2">Discount amount</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">discountReason</td><td className="py-2 pr-4">No</td><td className="py-2">Reason for discount</td></tr>
+            <tr className="border-b border-gray-100 dark:border-[#2C2C2E]"><td className="py-2 pr-4 font-mono text-xs">academicSession</td><td className="py-2 pr-4">No</td><td className="py-2">Session name (e.g., 2025-2026). Uses active session if blank</td></tr>
+            <tr><td className="py-2 pr-4 font-mono text-xs">remarks</td><td className="py-2 pr-4">No</td><td className="py-2">Any notes</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)
 
 const DashboardTab = ({ data, onPrintReceipt, onDownloadReceipt, onEditInvoice, onDeleteInvoice, onNavigate }) => {
   const summary = data.summary || {}
