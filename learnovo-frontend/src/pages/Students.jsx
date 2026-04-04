@@ -14,6 +14,7 @@ import { useSettings } from '../contexts/SettingsContext'
 
 import { SERVER_URL } from '../constants/config'
 import { formatDate } from '../utils/formatDate'
+import { getMatchedField } from '../utils/searchRelevance'
 
 const StudentPhotoCell = ({ student }) => {
   const [imgFailed, setImgFailed] = React.useState(false)
@@ -987,6 +988,12 @@ const Students = () => {
                       <div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{student.fullName || student.name || [student.firstName, student.lastName].filter(Boolean).join(' ') || '—'}</div>
                         <div className="text-sm text-gray-500 dark:text-[#8E8E93]">{student.guardians?.[0]?.name}</div>
+                        {debouncedSearch && (() => {
+                          const match = getMatchedField(student, debouncedSearch)
+                          return match && match.label !== 'Name' && match.value !== String(student.admissionNumber)
+                            ? <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Matched {match.label}: {match.value}</div>
+                            : null
+                        })()}
                       </div>
                     </td>
                     <td className="text-sm text-gray-900 dark:text-white">{student.rollNumber || '-'}</td>
