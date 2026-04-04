@@ -493,7 +493,7 @@ router.get('/me', protect, async(req, res) => {
   }
 });
 
-// @desc    Get siblings for the logged-in student (via Family model or parent's children)
+// @desc    Get siblings for the logged-in student (matched by shared phone number)
 // @route   GET /api/auth/siblings
 // @access  Private (Student)
 router.get('/siblings', protect, async(req, res) => {
@@ -502,39 +502,35 @@ router.get('/siblings', protect, async(req, res) => {
       return res.json({ success: true, data: [] });
     }
 
-    const Family = require('../models/Family');
-
-    // Strategy 1: Find via Family model
-    let siblingIds = [];
-    const family = await Family.findOne({
-      tenantId: req.user.tenantId,
-      students: req.user._id,
-      isActive: true
-    });
-    if (family && family.students.length > 1) {
-      siblingIds = family.students.filter(id => id.toString() !== req.user._id.toString());
-    }
-
-    // Strategy 2: Find via parent's children array (if Family didn't yield results)
-    if (siblingIds.length === 0) {
-      const parent = await User.findOne({
-        tenantId: req.user.tenantId,
-        role: 'parent',
-        children: req.user._id
+    // Collect all phone numbers associated with this student
+    const currentUser = await User.findById(req.user._id).select('phone guardians tenantId');
+    const phones = new Set();
+    if (currentUser.phone) phones.add(currentUser.phone.replace(/\s+/g, ''));
+    if (currentUser.guardians && currentUser.guardians.length > 0) {
+      currentUser.guardians.forEach(g => {
+        if (g.phone) phones.add(g.phone.replace(/\s+/g, ''));
       });
-      if (parent && parent.children.length > 1) {
-        siblingIds = parent.children.filter(id => id.toString() !== req.user._id.toString());
-      }
     }
 
-    if (siblingIds.length === 0) {
+    if (phones.size === 0) {
       return res.json({ success: true, data: [] });
     }
 
-    const siblings = await User.find(
-      { _id: { $in: siblingIds }, tenantId: req.user.tenantId, role: 'student', isActive: true },
-      'name firstName lastName fullName admissionNumber class section avatar photo'
-    ).populate('class', 'name').populate('section', 'name');
+    const phoneArray = [...phones];
+
+    // Find other students in the same tenant with a matching phone or guardian phone
+    const siblings = await User.find({
+      tenantId: req.user.tenantId,
+      role: 'student',
+      isActive: true,
+      _id: { $ne: req.user._id },
+      $or: [
+        { phone: { $in: phoneArray } },
+        { 'guardians.phone': { $in: phoneArray } }
+      ]
+    }, 'name firstName lastName fullName admissionNumber class section avatar photo')
+      .populate('class', 'name')
+      .populate('section', 'name');
 
     const data = siblings.map(s => ({
       id: s._id,
@@ -558,29 +554,34 @@ router.get('/siblings', protect, async(req, res) => {
 router.post('/switch-child/:studentId', protect, async(req, res) => {
   try {
     const targetId = req.params.studentId;
-    const Family = require('../models/Family');
     let allowed = false;
 
     if (req.user.role === 'parent') {
-      // Parent: check children array
       const children = (req.user.children || []).map(c => c.toString());
       allowed = children.includes(targetId);
     } else if (req.user.role === 'student') {
-      // Student: check via Family or parent's children
-      const family = await Family.findOne({
-        tenantId: req.user.tenantId,
-        students: { $all: [req.user._id, targetId] },
-        isActive: true
-      });
-      if (family) {
-        allowed = true;
-      } else {
-        const parent = await User.findOne({
-          tenantId: req.user.tenantId,
-          role: 'parent',
-          children: { $all: [req.user._id, targetId] }
+      // Verify sibling relationship via shared phone number
+      const currentUser = await User.findById(req.user._id).select('phone guardians tenantId');
+      const phones = new Set();
+      if (currentUser.phone) phones.add(currentUser.phone.replace(/\s+/g, ''));
+      if (currentUser.guardians && currentUser.guardians.length > 0) {
+        currentUser.guardians.forEach(g => {
+          if (g.phone) phones.add(g.phone.replace(/\s+/g, ''));
         });
-        allowed = !!parent;
+      }
+      if (phones.size > 0) {
+        const phoneArray = [...phones];
+        const match = await User.findOne({
+          _id: targetId,
+          tenantId: req.user.tenantId,
+          role: 'student',
+          isActive: true,
+          $or: [
+            { phone: { $in: phoneArray } },
+            { 'guardians.phone': { $in: phoneArray } }
+          ]
+        });
+        allowed = !!match;
       }
     }
 
