@@ -19,6 +19,52 @@
 
   <!-- Splash screens for iOS -->
   <meta name="mobile-web-app-capable" content="yes" />
+
+  <!--
+    Tenant PWA branding — runs BEFORE React to override "Learnovo" with school name.
+    Safari/iOS read <title> and meta tags on first parse, so this must be inline and early.
+  -->
+  <script>
+  (function(){
+    var h=location.hostname.toLowerCase();
+    var bases=['learnovoportal.com','learnovo.app'];
+    var skip=['www','api','admin','app','mail','ftp','staging','dev'];
+    var sub=null;
+    for(var i=0;i<bases.length;i++){
+      if(h!==bases[i]&&h.endsWith('.'+bases[i])){
+        sub=h.slice(0,-(bases[i].length+1)).split('.')[0];
+        if(!sub||skip.indexOf(sub)!==-1)sub=null;
+        break;
+      }
+    }
+    if(!sub)return;
+    // Block static manifest links injected by vite-plugin-pwa
+    var mo=new MutationObserver(function(ms){
+      ms.forEach(function(m){
+        m.addedNodes.forEach(function(n){
+          if(n.tagName==='LINK'&&n.rel==='manifest'&&!n.dataset.tenant){
+            n.remove();
+          }
+        });
+      });
+    });
+    mo.observe(document.head,{childList:true});
+    window.__pwaManifestObserver=mo;
+    // Apply cached tenant branding instantly
+    try{
+      var c=JSON.parse(localStorage.getItem('pwa_tenant_'+sub));
+      if(c&&c.n){
+        document.title=c.n;
+        var mt=document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if(mt)mt.content=c.n;
+        var th=document.querySelector('meta[name="theme-color"]');
+        if(th&&c.c)th.content=c.c;
+        var ai=document.querySelector('link[rel="apple-touch-icon"]');
+        if(ai&&c.l)ai.href=c.l;
+      }
+    }catch(e){}
+  })();
+  </script>
 </head>
 
 <body>

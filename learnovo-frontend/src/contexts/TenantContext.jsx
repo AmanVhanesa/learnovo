@@ -76,6 +76,23 @@ export function TenantProvider({ children }) {
     const themeColor = tenant.primaryColor || '#3EC4B1'
     const logo = tenant.logo
 
+    // Cache tenant branding for the inline script in index.html
+    // so next page load has the correct name BEFORE React hydrates
+    try {
+      localStorage.setItem('pwa_tenant_' + subdomain, JSON.stringify({
+        n: schoolName, c: themeColor, l: logo || ''
+      }))
+    } catch (e) { /* quota exceeded — ignore */ }
+
+    // Stop the MutationObserver that blocks static manifest links
+    if (window.__pwaManifestObserver) {
+      window.__pwaManifestObserver.disconnect()
+      window.__pwaManifestObserver = null
+    }
+
+    // Remove any existing manifest links (static or previous blob)
+    document.querySelectorAll('link[rel="manifest"]').forEach(el => el.remove())
+
     // Build manifest as a blob URL — avoids cross-origin issues entirely
     const icons = logo
       ? [
@@ -104,11 +121,10 @@ export function TenantProvider({ children }) {
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' })
     const manifestUrl = URL.createObjectURL(blob)
 
-    const oldManifest = document.querySelector('link[rel="manifest"]')
-    if (oldManifest) oldManifest.remove()
     const manifestLink = document.createElement('link')
     manifestLink.rel = 'manifest'
     manifestLink.href = manifestUrl
+    manifestLink.dataset.tenant = '1'
     document.head.appendChild(manifestLink)
 
     // Update document title — Safari uses this for "Add to Dock" name
