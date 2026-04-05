@@ -84,16 +84,45 @@ export function TenantProvider({ children }) {
       }))
     } catch (e) { /* quota exceeded — ignore */ }
 
-    // Remove any existing manifest links
-    document.querySelectorAll('link[rel="manifest"]').forEach(el => el.remove())
+    // Remove any existing manifest links and blob URLs
+    document.querySelectorAll('link[rel="manifest"]').forEach(el => {
+      if (el.href?.startsWith('blob:')) URL.revokeObjectURL(el.href)
+      el.remove()
+    })
 
-    // Use the backend tenant manifest endpoint — Chrome needs a real URL
-    // (not a blob) for PWA installability checks. CORS is handled by the
-    // backend's global cors middleware for *.learnovoportal.com origins.
+    // Build icons — use school logo if available, else default PWA icons
+    const icons = logo
+      ? [
+          { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: logo, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        ]
+      : [
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+        ]
+
+    // Generate manifest as a same-origin blob URL to avoid cross-origin
+    // CORS issues with the backend endpoint that block beforeinstallprompt
+    const manifest = {
+      name: tenant.schoolName || 'Learnovo',
+      short_name: shortCode,
+      description: `${tenant.schoolName || 'Learnovo'} — School Management Portal`,
+      theme_color: themeColor,
+      background_color: '#ffffff',
+      display: 'standalone',
+      orientation: 'portrait-primary',
+      scope: '/',
+      start_url: '/',
+      categories: ['education', 'productivity'],
+      icons
+    }
+
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' })
+    const manifestUrl = URL.createObjectURL(blob)
+
     const manifestLink = document.createElement('link')
     manifestLink.rel = 'manifest'
-    manifestLink.href = `https://api.learnovoportal.com/api/tenants/manifest/${subdomain}`
-    manifestLink.crossOrigin = 'use-credentials'
+    manifestLink.href = manifestUrl
     manifestLink.dataset.tenant = '1'
     document.head.appendChild(manifestLink)
 
