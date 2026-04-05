@@ -464,7 +464,7 @@ router.get('/manifest/:subdomain', async (req, res) => {
     const shortCode = (tenant.schoolCode || tenant.subdomain || 'APP').toUpperCase();
 
     const manifest = {
-      name: schoolName,
+      name: shortCode,
       short_name: shortCode,
       description: `${schoolName} — School Management Portal`,
       theme_color: themeColor,
