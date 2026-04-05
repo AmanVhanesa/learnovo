@@ -46,27 +46,31 @@ export default function InstallPWA() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [isStandalone])
 
-  // Show banner when prompt is available OR on tenant login with iOS
+  // Show banner when prompt is available OR always on tenant login page
   useEffect(() => {
     if (dismissed || isStandalone) return
 
     if (deferredPrompt) {
       setShowBanner(true)
-    } else if (isSubdomainApp && isOnLoginPage && tenant && isIOSSafari) {
+    } else if (isSubdomainApp && isOnLoginPage && tenant) {
+      // Always show on tenant login — native prompt may arrive later
       setShowBanner(true)
     } else {
       setShowBanner(false)
     }
-  }, [isSubdomainApp, isOnLoginPage, tenant, deferredPrompt, dismissed, isStandalone, isIOSSafari])
+  }, [isSubdomainApp, isOnLoginPage, tenant, deferredPrompt, dismissed, isStandalone])
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
+    // Use component state first, fall back to global capture
+    const prompt = deferredPrompt || window.__pwaInstallPrompt
+    if (!prompt) return
+    prompt.prompt()
+    const { outcome } = await prompt.userChoice
     if (outcome === 'accepted') {
       setShowBanner(false)
     }
     setDeferredPrompt(null)
+    window.__pwaInstallPrompt = null
   }
 
   const handleDismiss = () => {
