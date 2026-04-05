@@ -33,9 +33,19 @@ const Login = () => {
   const handlePWAInstall = async () => {
     if (install?.canNativeInstall) {
       await install.triggerInstall()
-    } else {
-      setShowLoginInstallHelp(prev => !prev)
+      return
     }
+    // On tenant subdomains Chrome may not have fired beforeinstallprompt yet
+    // (manifest loads from API). Wait briefly for it, then fall back to instructions.
+    if (window.__pwaInstallPrompt) {
+      // Early-captured prompt that InstallProvider missed
+      const prompt = window.__pwaInstallPrompt
+      delete window.__pwaInstallPrompt
+      prompt.prompt()
+      await prompt.userChoice
+      return
+    }
+    setShowLoginInstallHelp(prev => !prev)
   }
 
   // Tenant branding
