@@ -157,9 +157,9 @@ function SubdomainGate({ children }) {
   // Subdomain detected but still resolving tenant
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-black">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-white">
         <div className="loading-spinner mb-4" />
-        <p className="text-gray-500 dark:text-gray-400">Loading school portal...</p>
+        <p className="text-gray-500">Loading school portal...</p>
       </div>
     )
   }
@@ -167,7 +167,7 @@ function SubdomainGate({ children }) {
   // Subdomain resolved but tenant not found
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-black px-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-white px-4">
         <div className="max-w-md text-center">
           <h1 className="text-6xl font-bold text-gray-300 dark:text-gray-700 mb-4">404</h1>
           <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">

@@ -65,8 +65,24 @@
   </script>
 </head>
 
-<body style="background-color: #ffffff;">
+<body style="background-color: #ffffff; margin: 0;">
+  <!-- Inline splash screen — visible until React mounts and replaces #root content -->
+  <div id="splash" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#ffffff;">
+    <img src="/learnovo.png" alt="" width="80" height="80" style="border-radius:16px;" />
+  </div>
   <div id="root"></div>
+  <script>
+    // Hide splash as soon as React renders
+    var ro = new MutationObserver(function() {
+      var root = document.getElementById('root');
+      if (root && root.childNodes.length > 0) {
+        var splash = document.getElementById('splash');
+        if (splash) splash.style.display = 'none';
+        ro.disconnect();
+      }
+    });
+    ro.observe(document.getElementById('root'), { childList: true });
+  </script>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 
