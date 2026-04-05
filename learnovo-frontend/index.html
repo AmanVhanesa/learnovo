@@ -53,34 +53,27 @@
       document.head.appendChild(l);
       return;
     }
-    // Tenant subdomain — apply cached branding + manifest immediately
-    var name=sub.toUpperCase(),color='#3EC4B1',logo='';
+    // Tenant subdomain — apply cached branding + use static manifest
+    // Chrome requires a real file URL (not blob) for installability checks,
+    // so we link the static manifest first to trigger beforeinstallprompt.
+    // TenantContext swaps it with tenant-branded manifest once data loads.
+    var ml=document.createElement('link');
+    ml.rel='manifest';ml.href='/manifest.webmanifest';
+    document.head.appendChild(ml);
     try{
       var c=JSON.parse(localStorage.getItem('pwa_tenant_'+sub));
       if(c&&c.n){
-        name=c.n;
-        if(c.c)color=c.c;
-        if(c.l)logo=c.l;
         document.title=c.n;
         var mt=document.querySelector('meta[name="apple-mobile-web-app-title"]');
         if(mt)mt.content=c.n;
         var desc=document.querySelector('meta[name="description"]');
         if(desc)desc.content=c.n+' \u2014 School Management Portal';
         var th=document.querySelector('meta[name="theme-color"]');
-        if(th)th.content=color;
+        if(th&&c.c)th.content=c.c;
         var ai=document.querySelector('link[rel="apple-touch-icon"]');
-        if(ai&&logo)ai.href=logo;
+        if(ai&&c.l)ai.href=c.l;
       }
     }catch(e){}
-    // Generate blob manifest so Chrome sees it on page load
-    var icons=logo
-      ?[{src:logo,sizes:'192x192',type:'image/png',purpose:'any'},{src:logo,sizes:'512x512',type:'image/png',purpose:'any maskable'}]
-      :[{src:'/icons/icon-192x192.png',sizes:'192x192',type:'image/png',purpose:'any'},{src:'/icons/icon-512x512.png',sizes:'512x512',type:'image/png',purpose:'any maskable'}];
-    var m={name:name,short_name:name,description:name+' \u2014 School Management Portal',theme_color:color,background_color:'#ffffff',display:'standalone',orientation:'portrait-primary',scope:'/',start_url:'/',categories:['education','productivity'],icons:icons};
-    var blob=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});
-    var ml=document.createElement('link');
-    ml.rel='manifest';ml.href=URL.createObjectURL(blob);
-    document.head.appendChild(ml);
   })();
   </script>
 </head>

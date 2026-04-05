@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { X, Share, Download } from 'lucide-react'
+import { X, Share } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
 
 export default function InstallPWA() {
@@ -46,22 +46,18 @@ export default function InstallPWA() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [isStandalone])
 
-  // Determine when to show:
-  // - On root domain: only when beforeinstallprompt fired (Chrome native)
-  // - On tenant subdomain login: always show (native install button if available, otherwise guidance)
+  // Show banner when prompt is available OR on tenant login with iOS
   useEffect(() => {
     if (dismissed || isStandalone) return
 
-    if (isSubdomainApp && isOnLoginPage && tenant) {
-      // Always show on tenant login page
+    if (deferredPrompt) {
       setShowBanner(true)
-    } else if (deferredPrompt) {
-      // On root domain, show only when native prompt is available
+    } else if (isSubdomainApp && isOnLoginPage && tenant && isIOSSafari) {
       setShowBanner(true)
     } else {
       setShowBanner(false)
     }
-  }, [isSubdomainApp, isOnLoginPage, tenant, deferredPrompt, dismissed, isStandalone])
+  }, [isSubdomainApp, isOnLoginPage, tenant, deferredPrompt, dismissed, isStandalone, isIOSSafari])
 
   const handleInstall = async () => {
     if (!deferredPrompt) return
@@ -107,7 +103,7 @@ export default function InstallPWA() {
     )
   }
 
-  // Android/Desktop — native install button or browser menu guidance
+  // Android/Desktop — native install button (only shown when deferredPrompt exists)
   return (
     <div className="fixed bottom-20 left-4 right-4 z-50 md:bottom-6 md:left-auto md:right-6 md:w-96 animate-slide-up">
       <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl border border-gray-200 dark:border-[#38383A] p-4 flex items-center gap-3">
@@ -116,28 +112,13 @@ export default function InstallPWA() {
           <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">Install {appName}</p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Add to home screen for quick access</p>
         </div>
-        {deferredPrompt ? (
-          <button
-            onClick={handleInstall}
-            className="flex-shrink-0 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-            style={{ backgroundColor: brandColor }}
-          >
-            Install
-          </button>
-        ) : (
-          <button
-            onClick={() => {
-              // Try to trigger browser's native install UI via the address bar
-              // Show guidance since native prompt isn't available
-              alert('Tap the browser menu (⋮) and select "Install app" or "Add to Home Screen"')
-            }}
-            className="flex-shrink-0 flex items-center gap-1.5 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-            style={{ backgroundColor: brandColor }}
-          >
-            <Download size={14} />
-            Install
-          </button>
-        )}
+        <button
+          onClick={handleInstall}
+          className="flex-shrink-0 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+          style={{ backgroundColor: brandColor }}
+        >
+          Install
+        </button>
         <button
           onClick={handleDismiss}
           className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
