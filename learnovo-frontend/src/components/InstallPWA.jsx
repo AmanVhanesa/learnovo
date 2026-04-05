@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, createContext, useContext } from 'react'
 import { X, Share, MoreVertical, Menu, Download } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
 
-// Detect browser environment
+// ── Browser detection ────────────────────────────────────────────────
 function detectBrowser() {
   const ua = navigator.userAgent
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
@@ -30,110 +30,136 @@ function detectBrowser() {
   return { name: 'other' }
 }
 
-// Get browser-specific install instructions
+// ── Browser-specific instructions ────────────────────────────────────
 function getInstallInstructions(browser, brandColor) {
   switch (browser.name) {
     case 'ios-safari':
       return {
-        icon: <Share size={15} className="inline -mt-0.5" style={{ color: brandColor }} />,
         text: <>Tap <Share size={14} className="inline -mt-0.5" style={{ color: brandColor }} /> at the bottom, then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
       }
     case 'ios-chrome':
       return {
-        icon: <Share size={15} className="inline -mt-0.5" style={{ color: brandColor }} />,
         text: <>Tap <Share size={14} className="inline -mt-0.5" style={{ color: brandColor }} /> at the top, then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
       }
     case 'ios-firefox':
     case 'ios-other':
       return {
-        icon: <Menu size={15} className="inline -mt-0.5" style={{ color: brandColor }} />,
         text: <>Open in <span className="font-medium">Safari</span>, tap <Share size={14} className="inline -mt-0.5" style={{ color: brandColor }} /> then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
       }
     case 'firefox':
       return {
-        icon: <MoreVertical size={15} className="inline -mt-0.5" style={{ color: brandColor }} />,
         text: <>Tap <MoreVertical size={14} className="inline -mt-0.5" style={{ color: brandColor }} /> menu, then <span className="font-medium">&quot;Install&quot;</span></>
       }
     case 'samsung':
       return {
-        icon: <Menu size={15} className="inline -mt-0.5" style={{ color: brandColor }} />,
-        text: <>Tap <Menu size={14} className="inline -mt-0.5" style={{ color: brandColor }} /> menu, then <span className="font-medium">&quot;Add page to&quot;</span> → <span className="font-medium">&quot;Home screen&quot;</span></>
+        text: <>Tap <Menu size={14} className="inline -mt-0.5" style={{ color: brandColor }} /> menu, then <span className="font-medium">&quot;Add page to&quot;</span> &rarr; <span className="font-medium">&quot;Home screen&quot;</span></>
       }
     case 'opera':
       return {
-        icon: <MoreVertical size={15} className="inline -mt-0.5" style={{ color: brandColor }} />,
         text: <>Tap <MoreVertical size={14} className="inline -mt-0.5" style={{ color: brandColor }} /> menu, then <span className="font-medium">&quot;Home screen&quot;</span></>
       }
     default:
       return {
-        icon: <MoreVertical size={15} className="inline -mt-0.5" style={{ color: brandColor }} />,
         text: <>Tap <MoreVertical size={14} className="inline -mt-0.5" style={{ color: brandColor }} /> menu, then look for <span className="font-medium">&quot;Install&quot;</span> or <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
       }
   }
 }
 
+// ── Install context (shared between banner + sidebar button) ─────────
+const InstallContext = createContext(null)
+
+export function InstallProvider({ children }) {
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [browser, setBrowser] = useState(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+
+  useEffect(() => {
+    const detected = detectBrowser()
+    if (detected.name === 'standalone') {
+      setIsInstalled(true)
+      return
+    }
+    setBrowser(detected)
+
+    const handler = (e) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+
+    const installedHandler = () => setIsInstalled(true)
+    window.addEventListener('appinstalled', installedHandler)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler)
+      window.removeEventListener('appinstalled', installedHandler)
+    }
+  }, [])
+
+  const triggerInstall = useCallback(async () => {
+    if (!deferredPrompt) return false
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    setDeferredPrompt(null)
+    if (outcome === 'accepted') {
+      setIsInstalled(true)
+      return true
+    }
+    return false
+  }, [deferredPrompt])
+
+  return (
+    <InstallContext.Provider value={{
+      browser,
+      canNativeInstall: !!deferredPrompt,
+      isInstalled,
+      triggerInstall,
+    }}>
+      {children}
+    </InstallContext.Provider>
+  )
+}
+
+export function useInstall() {
+  return useContext(InstallContext)
+}
+
+// ── Auto-popup banner ────────────────────────────────────────────────
 export default function InstallPWA() {
   const { tenant, isSubdomainApp } = useTenant()
-  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const install = useInstall()
   const [showBanner, setShowBanner] = useState(false)
-  const [browser, setBrowser] = useState(null)
 
   const appName = (isSubdomainApp && tenant?.schoolName) || 'Learnovo'
   const appIcon = (isSubdomainApp && tenant?.logo) || '/icons/icon-96x96.png'
   const brandColor = (isSubdomainApp && tenant?.primaryColor) || '#3EC4B1'
 
   useEffect(() => {
+    if (!install || install.isInstalled) return
     const dismissed = localStorage.getItem('pwa-install-dismissed')
     if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return
 
-    const detected = detectBrowser()
-    if (detected.name === 'standalone') return
-
-    setBrowser(detected)
-
-    // Chrome/Edge/Opera fire beforeinstallprompt — wait for it
-    const handler = (e) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-      setShowBanner(true)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-
-    // For browsers that don't fire beforeinstallprompt, show manual instructions
-    // after a short delay (give beforeinstallprompt a chance to fire first)
-    const fallbackTimer = setTimeout(() => {
-      setShowBanner((current) => {
-        // Only show if beforeinstallprompt hasn't already shown the banner
-        if (!current) return true
-        return current
-      })
-    }, 2000)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler)
-      clearTimeout(fallbackTimer)
-    }
-  }, [])
-
-  const handleInstall = async () => {
-    if (!deferredPrompt) return
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-    if (outcome === 'accepted') {
-      setShowBanner(false)
-    }
-    setDeferredPrompt(null)
-  }
+    // Show banner after a short delay
+    const timer = setTimeout(() => setShowBanner(true), 2000)
+    return () => clearTimeout(timer)
+  }, [install])
 
   const handleDismiss = () => {
     setShowBanner(false)
     localStorage.setItem('pwa-install-dismissed', String(Date.now()))
   }
 
-  if (!showBanner || !browser) return null
+  const handleInstall = async () => {
+    if (install?.canNativeInstall) {
+      const accepted = await install.triggerInstall()
+      if (accepted) setShowBanner(false)
+    }
+  }
+
+  if (!showBanner || !install || install.isInstalled || !install.browser) return null
 
   // Native install prompt available (Chrome, Edge, etc.)
-  if (deferredPrompt) {
+  if (install.canNativeInstall) {
     return (
       <div className="fixed bottom-20 left-4 right-4 z-50 md:bottom-6 md:left-auto md:right-6 md:w-96 animate-slide-up">
         <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl border border-gray-200 dark:border-[#38383A] p-4 flex items-center gap-3">
@@ -162,7 +188,7 @@ export default function InstallPWA() {
   }
 
   // Manual instructions for all other browsers
-  const instructions = getInstallInstructions(browser, brandColor)
+  const instructions = getInstallInstructions(install.browser, brandColor)
   return (
     <div className="fixed bottom-20 left-4 right-4 z-50 md:bottom-6 md:left-auto md:right-6 md:w-96 animate-slide-up">
       <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl border border-gray-200 dark:border-[#38383A] p-4">

@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useTenant } from '../contexts/TenantContext'
-import { Eye, EyeOff, Sun, Moon, ArrowLeft, Download, Share } from 'lucide-react'
+import { Eye, EyeOff, Sun, Moon, ArrowLeft, Download, Share, MoreVertical } from 'lucide-react'
+import { useInstall } from '../components/InstallPWA'
 import { motion } from 'framer-motion'
 import { HeroGeometric } from '../components/ui/ShapeLandingHero'
 
@@ -20,32 +21,21 @@ const Login = () => {
   const [formReady, setFormReady] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
 
-  const [installPrompt, setInstallPrompt] = useState(null)
-  const [isInstalled, setIsInstalled] = useState(false)
+  const [showLoginInstallHelp, setShowLoginInstallHelp] = useState(false)
 
   const { login, isAuthenticated, isLoading: authLoading, error, clearError, user } = useAuth()
   const { theme, toggleMode } = useTheme()
   const { isSubdomainApp, tenant } = useTenant()
+  const install = useInstall()
   const isDark = theme?.mode === 'dark'
   const navigate = useNavigate()
 
-  // PWA install detection
-  const isIOSSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream && /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-
-  useEffect(() => {
-    if (isStandalone) { setIsInstalled(true); return }
-    const handler = (e) => { e.preventDefault(); setInstallPrompt(e) }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [isStandalone])
-
   const handlePWAInstall = async () => {
-    if (!installPrompt) return
-    installPrompt.prompt()
-    const { outcome } = await installPrompt.userChoice
-    if (outcome === 'accepted') setIsInstalled(true)
-    setInstallPrompt(null)
+    if (install?.canNativeInstall) {
+      await install.triggerInstall()
+    } else {
+      setShowLoginInstallHelp(prev => !prev)
+    }
   }
 
   // Tenant branding
@@ -477,7 +467,7 @@ const Login = () => {
           </motion.div>
 
           {/* Install App — shown on tenant subdomain when not yet installed */}
-          {isTenantLogin && !isInstalled && (
+          {isTenantLogin && install && !install.isInstalled && (
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -501,28 +491,44 @@ const Login = () => {
                       Get {tenant.schoolName} App
                     </p>
                     <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] mt-0.5">
-                      {isIOSSafari ? 'Add to your home screen' : 'Install for quick access'}
+                      Install for quick access
                     </p>
                   </div>
-                  {installPrompt ? (
-                    <button
-                      type="button"
-                      onClick={handlePWAInstall}
-                      className="flex-shrink-0 flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5 active:scale-95"
-                      style={{ background: tenantColor }}
-                    >
-                      <Download size={14} />
-                      Install
-                    </button>
-                  ) : isIOSSafari ? (
-                    <div className="flex-shrink-0 text-right">
-                      <p className="text-[11px] text-gray-500 dark:text-[#8E8E93] leading-relaxed">
-                        Tap <Share size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> then
-                      </p>
-                      <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300">"Add to Home Screen"</p>
-                    </div>
-                  ) : null}
+                  <button
+                    type="button"
+                    onClick={handlePWAInstall}
+                    className="flex-shrink-0 flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5 active:scale-95"
+                    style={{ background: tenantColor }}
+                  >
+                    <Download size={14} />
+                    Install
+                  </button>
                 </div>
+                {showLoginInstallHelp && !install.canNativeInstall && install.browser && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#2C2C2E] text-[11px] text-gray-500 dark:text-[#8E8E93] leading-relaxed">
+                    {install.browser.name === 'ios-safari' && (
+                      <>Tap <Share size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> at the bottom, then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
+                    )}
+                    {install.browser.name === 'ios-chrome' && (
+                      <>Tap <Share size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> at the top, then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
+                    )}
+                    {(install.browser.name === 'ios-firefox' || install.browser.name === 'ios-other') && (
+                      <>Open in <span className="font-medium">Safari</span>, tap <Share size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
+                    )}
+                    {install.browser.name === 'firefox' && (
+                      <>Tap <MoreVertical size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> menu, then <span className="font-medium">&quot;Install&quot;</span></>
+                    )}
+                    {install.browser.name === 'samsung' && (
+                      <>Tap the menu button, then <span className="font-medium">&quot;Add page to&quot;</span> &rarr; <span className="font-medium">&quot;Home screen&quot;</span></>
+                    )}
+                    {install.browser.name === 'opera' && (
+                      <>Tap <MoreVertical size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> menu, then <span className="font-medium">&quot;Home screen&quot;</span></>
+                    )}
+                    {!['ios-safari', 'ios-chrome', 'ios-firefox', 'ios-other', 'firefox', 'samsung', 'opera'].includes(install.browser.name) && (
+                      <>Tap <MoreVertical size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> browser menu, then look for <span className="font-medium">&quot;Install&quot;</span> or <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

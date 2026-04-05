@@ -12,7 +12,7 @@ import { TenantProvider, useTenant } from './contexts/TenantContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import SuperAdminRoute from './components/superadmin/SuperAdminRoute'
 import Layout from './components/Layout'
-import InstallPWA from './components/InstallPWA'
+import InstallPWA, { InstallProvider } from './components/InstallPWA'
 import ErrorBoundary from './components/ErrorBoundary'
 import { setPageErrorBoundaryQueryClient } from './components/PageErrorBoundary'
 
@@ -200,6 +200,7 @@ function App() {
         <SuperAdminProvider>
           <SettingsProvider>
             <ThemeProvider>
+            <InstallProvider>
             <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
               <SubdomainGate>
               <div className="App">
@@ -471,6 +472,7 @@ function App() {
               </div>
               </SubdomainGate>
             </Router>
+            </InstallProvider>
           </ThemeProvider>
           </SettingsProvider>
         </SuperAdminProvider>
