@@ -132,7 +132,7 @@ export function useInstall() {
   return useContext(InstallContext)
 }
 
-// ── Auto-popup banner (hidden on /login and /register — those pages have their own card) ──
+// ── Auto-popup banner ────────────────────────────────────────────────
 export default function InstallPWA() {
   const { tenant, isSubdomainApp } = useTenant()
   const install = useInstall()
@@ -142,11 +142,8 @@ export default function InstallPWA() {
   const appIcon = (isSubdomainApp && tenant?.logo) || '/icons/icon-96x96.png'
   const brandColor = (isSubdomainApp && tenant?.primaryColor) || '#3EC4B1'
 
-  // Don't show auto-popup on login/register pages — they have their own install card
-  const isAuthPage = typeof window !== 'undefined' && /^\/(login|register)(\/|$)/i.test(window.location.pathname)
-
   useEffect(() => {
-    if (!install || install.isInstalled || isAuthPage) return
+    if (!install || install.isInstalled) return
     const dismissed = localStorage.getItem('pwa-install-dismissed')
     if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return
 

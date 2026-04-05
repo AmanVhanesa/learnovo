@@ -3,8 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useTenant } from '../contexts/TenantContext'
-import { Eye, EyeOff, Sun, Moon, ArrowLeft, Download, Share, MoreVertical } from 'lucide-react'
-import { useInstall } from '../components/InstallPWA'
+import { Eye, EyeOff, Sun, Moon, ArrowLeft } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { HeroGeometric } from '../components/ui/ShapeLandingHero'
 
@@ -21,32 +20,11 @@ const Login = () => {
   const [formReady, setFormReady] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
 
-  const [showLoginInstallHelp, setShowLoginInstallHelp] = useState(false)
-
   const { login, isAuthenticated, isLoading: authLoading, error, clearError, user } = useAuth()
   const { theme, toggleMode } = useTheme()
   const { isSubdomainApp, tenant } = useTenant()
-  const install = useInstall()
   const isDark = theme?.mode === 'dark'
   const navigate = useNavigate()
-
-  const handlePWAInstall = async () => {
-    if (install?.canNativeInstall) {
-      await install.triggerInstall()
-      return
-    }
-    // On tenant subdomains Chrome may not have fired beforeinstallprompt yet
-    // (manifest loads from API). Wait briefly for it, then fall back to instructions.
-    if (window.__pwaInstallPrompt) {
-      // Early-captured prompt that InstallProvider missed
-      const prompt = window.__pwaInstallPrompt
-      delete window.__pwaInstallPrompt
-      prompt.prompt()
-      await prompt.userChoice
-      return
-    }
-    setShowLoginInstallHelp(prev => !prev)
-  }
 
   // Tenant branding
   const isTenantLogin = isSubdomainApp && tenant
@@ -476,67 +454,7 @@ const Login = () => {
             )}
           </motion.div>
 
-          {/* Install App — shown on all login pages when not yet installed */}
-          {install && !install.isInstalled && (
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 1.1, ease: [0.25, 0.4, 0.25, 1] }}
-              className="mt-4"
-            >
-              <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] px-5 py-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  {isTenantLogin && tenant?.logo ? (
-                    <img src={tenant.logo} alt={tenant.schoolName} className="w-11 h-11 rounded-xl object-contain flex-shrink-0" />
-                  ) : (
-                    <img src="/icons/icon-96x96.png" alt="Learnovo" className="w-11 h-11 rounded-xl object-contain flex-shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-semibold text-gray-900 dark:text-white truncate">
-                      Get {isTenantLogin ? tenant.schoolName : 'Learnovo'} App
-                    </p>
-                    <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] mt-0.5">
-                      Install for quick access
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handlePWAInstall}
-                    className="flex-shrink-0 flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5 active:scale-95"
-                    style={{ background: isTenantLogin ? tenantColor : '#3EC4B1' }}
-                  >
-                    <Download size={14} />
-                    Install
-                  </button>
-                </div>
-                {showLoginInstallHelp && !install.canNativeInstall && install.browser && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#2C2C2E] text-[11px] text-gray-500 dark:text-[#8E8E93] leading-relaxed">
-                    {install.browser.name === 'ios-safari' && (
-                      <>Tap <Share size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> at the bottom, then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
-                    )}
-                    {install.browser.name === 'ios-chrome' && (
-                      <>Tap <Share size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> at the top, then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
-                    )}
-                    {(install.browser.name === 'ios-firefox' || install.browser.name === 'ios-other') && (
-                      <>Open in <span className="font-medium">Safari</span>, tap <Share size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
-                    )}
-                    {install.browser.name === 'firefox' && (
-                      <>Tap <MoreVertical size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> menu, then <span className="font-medium">&quot;Install&quot;</span></>
-                    )}
-                    {install.browser.name === 'samsung' && (
-                      <>Tap the menu button, then <span className="font-medium">&quot;Add page to&quot;</span> &rarr; <span className="font-medium">&quot;Home screen&quot;</span></>
-                    )}
-                    {install.browser.name === 'opera' && (
-                      <>Tap <MoreVertical size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> menu, then <span className="font-medium">&quot;Home screen&quot;</span></>
-                    )}
-                    {!['ios-safari', 'ios-chrome', 'ios-firefox', 'ios-other', 'firefox', 'samsung', 'opera'].includes(install.browser.name) && (
-                      <>Tap <MoreVertical size={12} className="inline -mt-0.5" style={{ color: tenantColor }} /> browser menu, then look for <span className="font-medium">&quot;Install&quot;</span> or <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
-                    )}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
+          {/* Install popup is handled by the global InstallPWA banner component */}
 
           {/* Demo access — hidden on tenant subdomain */}
           {!isTenantLogin && <motion.div
