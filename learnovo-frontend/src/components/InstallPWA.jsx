@@ -150,7 +150,7 @@ export default function InstallPWA() {
     // Show banner after a short delay
     const timer = setTimeout(() => setShowBanner(true), 2000)
     return () => clearTimeout(timer)
-  }, [install, isAuthPage])
+  }, [install])
 
   const handleDismiss = () => {
     setShowBanner(false)
