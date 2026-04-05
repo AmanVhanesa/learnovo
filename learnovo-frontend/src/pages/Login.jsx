@@ -466,8 +466,8 @@ const Login = () => {
             )}
           </motion.div>
 
-          {/* Install App — shown on tenant subdomain when not yet installed */}
-          {isTenantLogin && install && !install.isInstalled && (
+          {/* Install App — shown on all login pages when not yet installed */}
+          {install && !install.isInstalled && (
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -476,19 +476,14 @@ const Login = () => {
             >
               <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] px-5 py-4 shadow-sm">
                 <div className="flex items-center gap-3">
-                  {tenant.logo ? (
+                  {isTenantLogin && tenant?.logo ? (
                     <img src={tenant.logo} alt={tenant.schoolName} className="w-11 h-11 rounded-xl object-contain flex-shrink-0" />
                   ) : (
-                    <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-                      style={{ background: tenantColor }}
-                    >
-                      {tenant.schoolName?.charAt(0) || 'S'}
-                    </div>
+                    <img src="/icons/icon-96x96.png" alt="Learnovo" className="w-11 h-11 rounded-xl object-contain flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-semibold text-gray-900 dark:text-white truncate">
-                      Get {tenant.schoolName} App
+                      Get {isTenantLogin ? tenant.schoolName : 'Learnovo'} App
                     </p>
                     <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] mt-0.5">
                       Install for quick access
@@ -498,7 +493,7 @@ const Login = () => {
                     type="button"
                     onClick={handlePWAInstall}
                     className="flex-shrink-0 flex items-center gap-1.5 text-white text-[13px] font-semibold px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5 active:scale-95"
-                    style={{ background: tenantColor }}
+                    style={{ background: isTenantLogin ? tenantColor : '#3EC4B1' }}
                   >
                     <Download size={14} />
                     Install
