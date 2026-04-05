@@ -74,7 +74,13 @@ export function TenantProvider({ children }) {
 
     const shortCode = (tenant.schoolCode || tenant.subdomain || subdomain).toUpperCase()
     const themeColor = tenant.primaryColor || '#3EC4B1'
-    const logo = tenant.logo
+    let logo = tenant.logo
+
+    // For Cloudinary logos, flatten transparency to white background
+    // so PWA splash and inline splash don't render transparent pixels as black
+    if (logo && logo.includes('res.cloudinary.com')) {
+      logo = logo.replace('/upload/', '/upload/b_white,fl_flatten/')
+    }
 
     // Cache tenant branding for the inline script in index.html
     // so next page load has the correct name BEFORE React hydrates

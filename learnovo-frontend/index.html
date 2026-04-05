@@ -68,8 +68,29 @@
 <body style="background-color: #ffffff; margin: 0;">
   <!-- Inline splash screen — visible until React mounts and replaces #root content -->
   <div id="splash" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#ffffff;">
-    <img src="/learnovo.png" alt="" width="80" height="80" style="border-radius:16px;" />
+    <img id="splash-logo" src="/learnovo.png" alt="" width="80" height="80" style="border-radius:16px;background:#ffffff;" />
   </div>
+  <script>
+    // On tenant subdomains, show cached tenant logo instead of default Learnovo logo
+    (function(){
+      var h=location.hostname.toLowerCase();
+      var bases=['learnovoportal.com','learnovo.app'];
+      var sub=null;
+      for(var i=0;i<bases.length;i++){
+        if(h!==bases[i]&&h.endsWith('.'+bases[i])){
+          sub=h.slice(0,-(bases[i].length+1)).split('.')[0];break;
+        }
+      }
+      if(!sub)return;
+      try{
+        var c=JSON.parse(localStorage.getItem('pwa_tenant_'+sub));
+        if(c&&c.l){
+          var img=document.getElementById('splash-logo');
+          if(img){img.src=c.l;img.width=120;img.height=120;}
+        }
+      }catch(e){}
+    })();
+  </script>
   <div id="root"></div>
   <script>
     // Hide splash as soon as React renders
