@@ -53,12 +53,12 @@
       document.head.appendChild(l);
       return;
     }
-    // Tenant subdomain — apply cached branding + use static manifest
-    // Chrome requires a real file URL (not blob) for installability checks,
-    // so we link the static manifest first to trigger beforeinstallprompt.
-    // TenantContext swaps it with tenant-branded manifest once data loads.
+    // Tenant subdomain — use backend manifest endpoint via nginx proxy.
+    // Nginx proxies /api/ to the backend on the same origin, so Chrome
+    // sees a real same-origin URL and accepts it for installability.
+    // The backend returns tenant-branded manifest (school name + logo).
     var ml=document.createElement('link');
-    ml.rel='manifest';ml.href='/manifest.webmanifest';
+    ml.rel='manifest';ml.href='/api/tenants/manifest/'+sub;
     document.head.appendChild(ml);
     try{
       var c=JSON.parse(localStorage.getItem('pwa_tenant_'+sub));
