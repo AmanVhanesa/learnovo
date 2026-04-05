@@ -84,47 +84,9 @@ export function TenantProvider({ children }) {
       }))
     } catch (e) { /* quota exceeded — ignore */ }
 
-    // Remove any existing manifest links and blob URLs
-    document.querySelectorAll('link[rel="manifest"]').forEach(el => {
-      if (el.href?.startsWith('blob:')) URL.revokeObjectURL(el.href)
-      el.remove()
-    })
-
-    // Build icons — use school logo if available, else default PWA icons
-    const icons = logo
-      ? [
-          { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: logo, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-        ]
-      : [
-          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-        ]
-
-    // Generate manifest as a same-origin blob URL to avoid cross-origin
-    // CORS issues with the backend endpoint that block beforeinstallprompt
-    const manifest = {
-      name: tenant.schoolName || 'Learnovo',
-      short_name: shortCode,
-      description: `${tenant.schoolName || 'Learnovo'} — School Management Portal`,
-      theme_color: themeColor,
-      background_color: '#ffffff',
-      display: 'standalone',
-      orientation: 'portrait-primary',
-      scope: '/',
-      start_url: '/',
-      categories: ['education', 'productivity'],
-      icons
-    }
-
-    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' })
-    const manifestUrl = URL.createObjectURL(blob)
-
-    const manifestLink = document.createElement('link')
-    manifestLink.rel = 'manifest'
-    manifestLink.href = manifestUrl
-    manifestLink.dataset.tenant = '1'
-    document.head.appendChild(manifestLink)
+    // Do NOT replace the static manifest link — Chrome requires a real file
+    // URL for PWA installability checks. The static /manifest.webmanifest
+    // (added in index.html) ensures beforeinstallprompt fires.
 
     // Update document title — Safari uses this for "Add to Dock" name
     document.title = shortCode
