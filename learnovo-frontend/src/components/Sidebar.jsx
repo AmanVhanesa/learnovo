@@ -32,12 +32,8 @@ import {
   LayoutGrid,
   CircleDollarSign,
   PieChart,
-  Merge,
-  Download,
-  Share,
-  MoreVertical
+  Merge
 } from 'lucide-react'
-import { useInstall } from './InstallPWA'
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { user, logout } = useAuth()
@@ -46,8 +42,6 @@ const Sidebar = ({ isOpen, onClose }) => {
   const location = useLocation()
   const [logoFailed, setLogoFailed] = useState(false)
   const isLargeDesktop = useIsLargeDesktop()
-  const install = useInstall()
-  const [showInstallHelp, setShowInstallHelp] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -227,50 +221,8 @@ const Sidebar = ({ isOpen, onClose }) => {
           ))}
         </nav>
 
-        {/* Install App + Sign out */}
-        <div className="px-4 py-3 border-t border-gray-100 dark:border-[#2C2C2E] flex-shrink-0 space-y-1">
-          {install && !install.isInstalled && (
-            <>
-              <button
-                onClick={async () => {
-                  if (install.canNativeInstall) {
-                    await install.triggerInstall()
-                  } else {
-                    setShowInstallHelp(prev => !prev)
-                  }
-                }}
-                className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-primary-600 dark:text-[#3EC4B1] hover:bg-primary-50 dark:hover:bg-[rgba(62,196,177,0.1)] rounded-xl transition-all duration-200"
-              >
-                <Download className="mr-3 h-4 w-4" />
-                Install App
-              </button>
-              {showInstallHelp && !install.canNativeInstall && install.browser && (
-                <div className="mx-3 mb-1 p-3 rounded-lg bg-gray-50 dark:bg-[#2C2C2E] text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                  {install.browser.name === 'ios-safari' && (
-                    <>Tap <Share size={12} className="inline -mt-0.5 text-primary-500" /> at the bottom, then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
-                  )}
-                  {install.browser.name === 'ios-chrome' && (
-                    <>Tap <Share size={12} className="inline -mt-0.5 text-primary-500" /> at the top, then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
-                  )}
-                  {(install.browser.name === 'ios-firefox' || install.browser.name === 'ios-other') && (
-                    <>Open in <span className="font-medium">Safari</span>, tap <Share size={12} className="inline -mt-0.5 text-primary-500" /> then <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
-                  )}
-                  {install.browser.name === 'firefox' && (
-                    <>Tap <MoreVertical size={12} className="inline -mt-0.5 text-primary-500" /> menu, then <span className="font-medium">&quot;Install&quot;</span></>
-                  )}
-                  {install.browser.name === 'samsung' && (
-                    <>Tap the menu button, then <span className="font-medium">&quot;Add page to&quot;</span> &rarr; <span className="font-medium">&quot;Home screen&quot;</span></>
-                  )}
-                  {install.browser.name === 'opera' && (
-                    <>Tap <MoreVertical size={12} className="inline -mt-0.5 text-primary-500" /> menu, then <span className="font-medium">&quot;Home screen&quot;</span></>
-                  )}
-                  {!['ios-safari', 'ios-chrome', 'ios-firefox', 'ios-other', 'firefox', 'samsung', 'opera'].includes(install.browser.name) && (
-                    <>Tap <MoreVertical size={12} className="inline -mt-0.5 text-primary-500" /> browser menu, then look for <span className="font-medium">&quot;Install&quot;</span> or <span className="font-medium">&quot;Add to Home Screen&quot;</span></>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+        {/* Sign out only — profile is in the Header */}
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-[#2C2C2E] flex-shrink-0">
           <button
             onClick={handleLogout}
             className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-500 dark:text-[#8E8E93] hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/10 dark:hover:text-red-400 rounded-xl transition-all duration-200"

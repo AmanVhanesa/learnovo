@@ -74,13 +74,7 @@ export function TenantProvider({ children }) {
 
     const shortCode = (tenant.schoolCode || tenant.subdomain || subdomain).toUpperCase()
     const themeColor = tenant.primaryColor || '#3EC4B1'
-    let logo = tenant.logo
-
-    // For Cloudinary logos, flatten transparency to white background
-    // so PWA splash and inline splash don't render transparent pixels as black
-    if (logo && logo.includes('res.cloudinary.com')) {
-      logo = logo.replace('/upload/', '/upload/b_white,fl_flatten/')
-    }
+    const logo = tenant.logo
 
     // Cache tenant branding for the inline script in index.html
     // so next page load has the correct name BEFORE React hydrates
@@ -90,17 +84,18 @@ export function TenantProvider({ children }) {
       }))
     } catch (e) { /* quota exceeded — ignore */ }
 
-    // Manifest link is now added early in index.html inline script.
-    // Only add it here if not already present (e.g. localhost dev).
-    if (!document.querySelector('link[rel="manifest"][data-tenant="1"]')) {
-      document.querySelectorAll('link[rel="manifest"]').forEach(el => el.remove())
-      const manifestLink = document.createElement('link')
-      manifestLink.rel = 'manifest'
-      manifestLink.href = `https://api.learnovoportal.com/api/tenants/manifest/${subdomain}`
-      manifestLink.crossOrigin = 'anonymous'
-      manifestLink.dataset.tenant = '1'
-      document.head.appendChild(manifestLink)
-    }
+    // Remove any existing manifest links
+    document.querySelectorAll('link[rel="manifest"]').forEach(el => el.remove())
+
+    // Use the backend tenant manifest endpoint — Chrome needs a real URL
+    // (not a blob) for PWA installability checks. CORS is handled by the
+    // backend's global cors middleware for *.learnovoportal.com origins.
+    const manifestLink = document.createElement('link')
+    manifestLink.rel = 'manifest'
+    manifestLink.href = `https://api.learnovoportal.com/api/tenants/manifest/${subdomain}`
+    manifestLink.crossOrigin = 'use-credentials'
+    manifestLink.dataset.tenant = '1'
+    document.head.appendChild(manifestLink)
 
     // Update document title — Safari uses this for "Add to Dock" name
     document.title = shortCode

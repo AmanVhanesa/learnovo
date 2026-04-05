@@ -451,18 +451,10 @@ router.get('/manifest/:subdomain', async (req, res) => {
     const schoolName = tenant.schoolName || 'Learnovo';
 
     // Build icons array — use school logo if available, else default PWA icons
-    // For Cloudinary logos, flatten transparency to white background so Android
-    // PWA splash screen doesn't render transparent pixels as black.
-    let iconUrl = logo;
-    if (logo && logo.includes('res.cloudinary.com')) {
-      // Insert Cloudinary transformation: white background, flatten, PNG format
-      iconUrl = logo.replace('/upload/', '/upload/b_white,fl_flatten/');
-    }
-
-    const icons = iconUrl
+    const icons = logo
       ? [
-          { src: iconUrl, sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: iconUrl, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+          { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: logo, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ]
       : [
           { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
