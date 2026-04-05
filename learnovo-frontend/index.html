@@ -65,8 +65,8 @@
   </script>
 </head>
 
-<body style="background-color: #ffffff; margin: 0;">
-  <!-- Inline splash screen — visible until React mounts and replaces #root content -->
+<body class="pwa-splash" style="background-color: #ffffff; margin: 0;">
+  <!-- Inline splash screen — visible until React mounts -->
   <div id="splash" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#ffffff;">
     <img id="splash-logo" src="/learnovo.png" alt="" width="80" height="80" style="border-radius:16px;background:#ffffff;" />
   </div>
@@ -93,12 +93,13 @@
   </script>
   <div id="root"></div>
   <script>
-    // Hide splash as soon as React renders
+    // Hide splash + remove pwa-splash class as soon as React renders
     var ro = new MutationObserver(function() {
       var root = document.getElementById('root');
       if (root && root.childNodes.length > 0) {
         var splash = document.getElementById('splash');
         if (splash) splash.style.display = 'none';
+        document.body.classList.remove('pwa-splash');
         ro.disconnect();
       }
     });

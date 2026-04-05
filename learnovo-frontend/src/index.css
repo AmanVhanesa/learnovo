@@ -23,9 +23,11 @@ html {
   text-size-adjust: 100%;
 }
 
-/* Ensure white background during PWA startup (prevents black flash on Android) */
-body {
-  background-color: #ffffff;
+/* Ensure white background during PWA startup (prevents black flash on Android).
+   The !important overrides dark:bg-[#000000] in @layer base below until
+   the app removes this class after mounting — see main.jsx */
+body.pwa-splash {
+  background-color: #ffffff !important;
 }
 
 /* Prevent zoom on input focus on iOS (font-size < 16px triggers zoom) */
