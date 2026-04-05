@@ -20,6 +20,14 @@ export default function InstallPWA() {
     if (dismissed && Date.now() - Number(dismissed) < 7 * 24 * 60 * 60 * 1000) return
     if (window.matchMedia('(display-mode: standalone)').matches) return
 
+    // Check if the event was already captured globally before React mounted
+    if (window.__pwaInstallPrompt) {
+      setDeferredPrompt(window.__pwaInstallPrompt)
+      setShowInstallBanner(true)
+      window.__pwaInstallPrompt = null
+    }
+
+    // Also listen for future events (e.g. after manifest loads late)
     const handler = (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
