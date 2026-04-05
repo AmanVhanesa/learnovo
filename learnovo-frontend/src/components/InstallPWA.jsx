@@ -81,9 +81,17 @@ export function InstallProvider({ children }) {
     }
     setBrowser(detected)
 
+    // Pick up prompt captured early by inline script in index.html
+    if (window.__pwaInstallPrompt) {
+      setDeferredPrompt(window.__pwaInstallPrompt)
+      delete window.__pwaInstallPrompt
+    }
+
     const handler = (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
+      // Clear the global in case it was set
+      delete window.__pwaInstallPrompt
     }
     window.addEventListener('beforeinstallprompt', handler)
 
