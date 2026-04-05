@@ -9,7 +9,9 @@ export default function InstallPWA() {
   const [showIOSPrompt, setShowIOSPrompt] = useState(false)
 
   // Resolve display values based on tenant
-  const appName = (isSubdomainApp && tenant?.schoolName) || 'Learnovo'
+  const appName = (isSubdomainApp && tenant)
+    ? (tenant.schoolCode || tenant.subdomain || '').toUpperCase()
+    : 'Learnovo'
   const appIcon = (isSubdomainApp && tenant?.logo) || '/icons/icon-96x96.png'
   const brandColor = (isSubdomainApp && tenant?.primaryColor) || '#3EC4B1'
 
