@@ -1099,26 +1099,32 @@ const Exams = () => {
                     })
                     : rcStudents;
 
-                const handleIndividualDownload = async (studentId, studentName) => {
-                    const key = `${studentId}-download`;
+                const handleIndividualDownload = async (studentId, studentName, type = 'cumulative') => {
+                    const key = `${studentId}-${type}`;
                     setRcDownloading(prev => ({ ...prev, [key]: true }));
                     try {
-                        const sessionRes = await academicSessionsService.getActive();
-                        const session = sessionRes?.data || sessionRes;
-                        if (!session?._id) {
-                            toast.error('No active academic session found.');
-                            return;
+                        let blob;
+                        if (type === 'blank') {
+                            blob = await examsService.downloadBlankReportCardPDF(studentId, {});
+                        } else {
+                            // Cumulative / Full Year — two-term format
+                            const sessionRes = await academicSessionsService.getActive();
+                            const session = sessionRes?.data || sessionRes;
+                            if (!session?._id) {
+                                toast.error('No active academic session found.');
+                                return;
+                            }
+                            blob = await examsService.downloadFinalReportCardPDF(studentId, session._id);
                         }
-                        const blob = await examsService.downloadFinalReportCardPDF(studentId, session._id);
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `Report_Card_${(studentName || 'Student').replace(/\s+/g, '_')}.pdf`;
+                        a.download = `${type === 'blank' ? 'Blank_' : ''}Report_Card_${(studentName || 'Student').replace(/\s+/g, '_')}.pdf`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
-                        toast.success('Report card downloaded');
+                        toast.success(`${type === 'blank' ? 'Blank r' : 'R'}eport card downloaded`);
                     } catch (err) {
                         let msg = 'Failed to download report card';
                         try {
@@ -1278,7 +1284,7 @@ const Exams = () => {
                                                     <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{sname}</td>
                                                     <td className="px-5 py-3 text-gray-500 dark:text-[#8E8E93] text-xs font-mono">{student.admissionNumber || '—'}</td>
                                                     <td className="px-5 py-3">
-                                                        <div className="flex items-center gap-1.5 justify-end">
+                                                        <div className="flex items-center gap-1.5 justify-end flex-wrap">
                                                             <button
                                                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10 hover:bg-primary-100 dark:hover:bg-primary-500/20 transition-colors"
                                                                 onClick={() => setResultCardTarget({ studentId: sid, studentName: sname, examSeries: '' })}
@@ -1288,11 +1294,19 @@ const Exams = () => {
                                                             </button>
                                                             <button
                                                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
-                                                                onClick={() => handleIndividualDownload(sid, sname)}
-                                                                disabled={rcDownloading[`${sid}-download`]}
+                                                                onClick={() => handleIndividualDownload(sid, sname, 'cumulative')}
+                                                                disabled={rcDownloading[`${sid}-cumulative`]}
                                                             >
-                                                                <Download className="h-3.5 w-3.5" />
-                                                                {rcDownloading[`${sid}-download`] ? '...' : 'Download'}
+                                                                <BarChart3 className="h-3.5 w-3.5" />
+                                                                {rcDownloading[`${sid}-cumulative`] ? '...' : 'Full Year'}
+                                                            </button>
+                                                            <button
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#2C2C2E] hover:bg-gray-200 dark:hover:bg-[#38383A] transition-colors disabled:opacity-50"
+                                                                onClick={() => handleIndividualDownload(sid, sname, 'blank')}
+                                                                disabled={rcDownloading[`${sid}-blank`]}
+                                                            >
+                                                                <FileText className="h-3.5 w-3.5" />
+                                                                {rcDownloading[`${sid}-blank`] ? '...' : 'Blank'}
                                                             </button>
                                                         </div>
                                                     </td>

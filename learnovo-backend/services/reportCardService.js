@@ -444,8 +444,8 @@ const reportCardService = {
 
       return {
         subject, marks,
-        term1Total: t1Total, term1Max: t1Max, term1Pct, term1Grade: calculateGrade(t1Pct),
-        term2Total: t2Total, term2Max: t2Max, term2Pct, term2Grade: calculateGrade(t2Pct),
+        term1Total: t1Total, term1Max: t1Max, term1Pct: t1Pct, term1Grade: calculateGrade(t1Pct),
+        term2Total: t2Total, term2Max: t2Max, term2Pct: t2Pct, term2Grade: calculateGrade(t2Pct),
         overallPct: (t1Max + t2Max) > 0 ? Math.round(((t1Total + t2Total) / (t1Max + t2Max)) * 100 * 10) / 10 : 0,
         isPassed: ((t1Max + t2Max) > 0 ? ((t1Total + t2Total) / (t1Max + t2Max)) * 100 : 0) >= 33
       };
