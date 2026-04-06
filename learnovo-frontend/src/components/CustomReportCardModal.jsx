@@ -261,6 +261,28 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
         return allStudents.find(s => (s._id || s.id) === selectedStudentId) || null;
     }, [selectedStudentId, allStudents]);
 
+    /* ── Subjects filtered by selected student's class ── */
+    const filteredSubjectsList = useMemo(() => {
+        if (mode === 'system' && selectedStudent?.class) {
+            const cls = classes.find(c => c.grade === selectedStudent.class || c.name === selectedStudent.class);
+            if (cls?.subjects?.length) {
+                const classSubjectNames = new Set();
+                const classSubjects = [];
+                (cls.subjects || []).forEach(s => {
+                    const sub = s.subject;
+                    if (!sub) return;
+                    const name = sub.name || sub.subjectCode || '';
+                    if (name && !classSubjectNames.has(name)) {
+                        classSubjectNames.add(name);
+                        classSubjects.push(typeof sub === 'object' ? sub : { name: sub, isActive: true });
+                    }
+                });
+                if (classSubjects.length > 0) return classSubjects;
+            }
+        }
+        return subjectsList;
+    }, [mode, selectedStudent, classes, subjectsList]);
+
     /* ── Single mode: Subject row handlers ── */
     const addSubjectRow = () => setSubjectRows(prev => [...prev, { ...EMPTY_SUBJECT }]);
 
@@ -330,11 +352,11 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
 
     /* ── Populate subjects from system ── */
     const populateFromSystem = useCallback(() => {
-        if (subjectsList.length === 0) {
-            toast.error('No subjects found in the system');
+        if (filteredSubjectsList.length === 0) {
+            toast.error('No subjects found for this class');
             return;
         }
-        const active = subjectsList.filter(s => s.isActive !== false);
+        const active = filteredSubjectsList.filter(s => s.isActive !== false);
         if (reportType === 'single') {
             setSubjectRows(active.map(s => ({
                 name: s.name || s.subjectCode || '',
@@ -350,8 +372,8 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                 marks: {}
             })));
         }
-        toast.success(`${active.length} subjects loaded from system`);
-    }, [subjectsList, reportType]);
+        toast.success(`${active.length} subjects loaded`);
+    }, [filteredSubjectsList, reportType]);
 
     /* ── Summary calculation (single mode) ── */
     const singleSummary = useMemo(() => {
@@ -881,7 +903,7 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                                             <SubjectComboInput
                                                 value={row.name}
                                                 onChange={val => updateSubjectRow(idx, 'name', val)}
-                                                subjectsList={subjectsList}
+                                                subjectsList={filteredSubjectsList}
                                                 placeholder="Select or type subject"
                                             />
                                             <input
@@ -1076,7 +1098,7 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                                                             <SubjectComboInput
                                                                 value={sub.name}
                                                                 onChange={val => updateCumulativeSubject(si, 'name', val)}
-                                                                subjectsList={subjectsList}
+                                                                subjectsList={filteredSubjectsList}
                                                                 placeholder="Select or type"
                                                                 className="min-w-[140px]"
                                                             />
