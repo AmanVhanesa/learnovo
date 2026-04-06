@@ -384,7 +384,7 @@ const reportCardService = {
         path: 'exam',
         select: 'name subject class section date totalMarks passingMarks examSeries examType term'
       })
-      .populate('student', 'name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName skippedSubjects')
+      .populate('student', 'name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName guardians skippedSubjects')
       .lean();
 
     const session = await AcademicSession.findOne({ _id: sessionId, tenantId }).lean();
@@ -470,8 +470,10 @@ const reportCardService = {
       school: buildSchoolData(settings),
       student: {
         ...buildStudentData(studentDoc, filtered[0]?.exam?.class, filtered[0]?.exam?.section),
-        fatherName: studentDoc?.fatherOrHusbandName || '',
-        motherName: ''
+        fatherName: studentDoc?.fatherOrHusbandName
+          || (studentDoc?.guardians || []).find(g => /father/i.test(g.relation))?.name
+          || '',
+        motherName: (studentDoc?.guardians || []).find(g => /mother/i.test(g.relation))?.name || ''
       },
       session: { name: session.name },
       term1: { exams: term1Exams },
