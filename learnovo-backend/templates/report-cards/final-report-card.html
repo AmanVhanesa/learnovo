@@ -25,7 +25,7 @@
     --rc-fail: #DC2626;
   }
 
-  @page { size: A4; margin: 12mm 14mm; }
+  @page { size: A4; margin: 10mm 12mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -37,8 +37,8 @@
   }
 
   .page {
-    width: 210mm; max-height: 273mm;
-    background: #FFFFFF; padding: 12mm 14mm; margin: 0 auto; position: relative;
+    width: 100%; max-width: 186mm;
+    background: #FFFFFF; padding: 0; margin: 0 auto; position: relative;
     overflow: hidden; page-break-inside: avoid; page-break-after: avoid;
   }
 
@@ -63,8 +63,8 @@
   .school-info { text-align: center; }
   .school-name {
     font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-    font-size: 22px; font-weight: 800; color: #1F6F6D;
-    letter-spacing: 2px; line-height: 1.1; text-transform: uppercase; white-space: nowrap;
+    font-size: 20px; font-weight: 800; color: #1F6F6D;
+    letter-spacing: 1px; line-height: 1.1; text-transform: uppercase;
   }
   .school-address { font-size: 11px; color: #374151; font-weight: 500; margin-top: 2px; line-height: 1.4; }
   .school-contact { font-size: 11px; color: #374151; font-weight: 500; margin-top: 1px; }
@@ -105,7 +105,7 @@
   }
 
   /* ── MARKS TABLE (matches existing style — no hard borders) ── */
-  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; table-layout: auto; word-wrap: break-word; }
   .marks-table thead th {
     font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.06em; color: var(--rc-text-primary);
@@ -209,7 +209,7 @@
   .footer { text-align: center; padding-top: 6px; border-top: 0.5px solid var(--rc-border-light); }
   .footer-text { font-size: 8px; color: var(--rc-text-muted); letter-spacing: 0.02em; font-style: italic; }
 
-  @media print { body { background: white; } .page { padding: 0; } }
+  @media print { body { background: white; } .page { padding: 0; width: 100%; max-width: 100%; } }
 </style>
 </head>
 <body>
