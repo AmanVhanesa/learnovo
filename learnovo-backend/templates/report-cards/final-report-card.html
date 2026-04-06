@@ -46,95 +46,95 @@
   }
 
   /* ── HEADER ── */
-  .header { position: relative; text-align: center; padding: 0 0 8px; margin-bottom: 0; }
+  .header { position: relative; text-align: center; padding: 0 0 10px; margin-bottom: 0; }
   .logo-wrap {
     position: absolute; left: 0; top: 0;
-    width: 80px; height: 80px;
+    width: 90px; height: 90px;
     display: flex; align-items: center; justify-content: center;
     border-radius: 8px; overflow: hidden;
   }
-  .logo-wrap img, .logo-wrap svg { width: 80px; height: 80px; object-fit: contain; }
-  .school-logo { width: 80px; height: 80px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+  .logo-wrap img, .logo-wrap svg { width: 90px; height: 90px; object-fit: contain; }
+  .school-logo { width: 90px; height: 90px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
   .school-logo img { width: 100%; height: 100%; object-fit: contain; }
   .school-logo-fallback {
-    width: 80px; height: 80px; border-radius: 8px;
+    width: 90px; height: 90px; border-radius: 8px;
     background: var(--rc-primary);
     display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; flex-shrink: 0;
+    color: white; font-weight: 700; font-size: 24px; letter-spacing: -0.02em; flex-shrink: 0;
   }
 
   .school-info { text-align: center; }
   .school-name {
     font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-    font-size: 19px; font-weight: 800; color: #1F6F6D;
-    letter-spacing: 1px; line-height: 1.15; text-transform: uppercase;
+    font-size: 20px; font-weight: 800; color: #1F6F6D;
+    letter-spacing: 1.5px; line-height: 1.15; text-transform: uppercase;
     word-wrap: break-word; overflow-wrap: break-word;
   }
-  .school-address { font-size: 11px; color: #374151; font-weight: 500; margin-top: 3px; line-height: 1.4; }
+  .school-address { font-size: 12px; color: #374151; font-weight: 500; margin-top: 4px; line-height: 1.4; }
   .school-contact { font-size: 11px; color: #374151; font-weight: 500; margin-top: 2px; }
-  .aff-row { display: flex; justify-content: center; gap: 16px; margin-top: 4px; flex-wrap: wrap; }
-  .aff-line { font-size: 10px; color: #374151; font-weight: 500; line-height: 1.5; }
+  .aff-row { display: flex; justify-content: center; gap: 18px; margin-top: 5px; flex-wrap: wrap; }
+  .aff-line { font-size: 11px; color: #374151; font-weight: 500; line-height: 1.5; }
   .aff-line b { font-weight: 700; color: #111827; }
 
-  .accent-line { height: 1px; background: #9CA3AF; margin: 8px 0 10px; border: none; }
+  .accent-line { height: 1.5px; background: #9CA3AF; margin: 10px 0 14px; border: none; }
 
   /* ── TITLE ROW ── */
   .report-title-row {
-    display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;
+    display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px;
   }
   .report-title {
-    font-size: 14px; font-weight: 700; color: var(--rc-primary);
+    font-size: 15px; font-weight: 700; color: var(--rc-primary);
     text-transform: uppercase; letter-spacing: 0.1em;
   }
-  .report-meta { font-size: 12px; color: var(--rc-text-muted); text-align: right; }
-  .report-meta span { display: block; line-height: 1.4; }
+  .report-meta { font-size: 13px; color: var(--rc-text-muted); text-align: right; }
+  .report-meta span { display: block; line-height: 1.5; }
   .report-meta .exam-type { font-weight: 600; color: var(--rc-text-secondary); }
 
   /* ── STUDENT INFO CARD ── */
   .student-card {
-    background: var(--rc-bg-subtle); border-radius: 8px;
-    padding: 14px 18px; margin-bottom: 16px;
+    background: var(--rc-bg-subtle); border-radius: 10px;
+    padding: 18px 22px; margin-bottom: 22px;
   }
-  .student-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 24px; }
+  .student-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px 28px; }
   .info-label {
-    font-size: 9px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.12em; color: var(--rc-text-muted); margin-bottom: 2px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--rc-text-muted); margin-bottom: 3px;
   }
-  .info-value { font-size: 13px; font-weight: 600; color: var(--rc-text-primary); }
+  .info-value { font-size: 14px; font-weight: 600; color: var(--rc-text-primary); }
 
   /* ── SECTION LABEL ── */
   .section-label {
     font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.14em; color: var(--rc-text-muted); margin-bottom: 8px;
+    letter-spacing: 0.14em; color: var(--rc-text-muted); margin-bottom: 10px;
   }
 
   /* ── MARKS TABLE ── */
-  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; table-layout: fixed; }
+  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 22px; table-layout: fixed; }
   .marks-table thead th {
-    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.04em; color: var(--rc-text-primary);
-    padding: 6px 2px; text-align: center;
+    padding: 10px 3px; text-align: center;
     border-bottom: 1.5px solid var(--rc-border);
     overflow: hidden; word-wrap: break-word;
   }
   .marks-table thead th.subject-col { text-align: left; width: 22%; }
   .marks-table thead th.num { text-align: center; }
   .marks-table tbody td {
-    font-size: 10px; color: var(--rc-text-primary);
-    padding: 6px 2px; text-align: center;
+    font-size: 12px; color: var(--rc-text-primary);
+    padding: 10px 3px; text-align: center;
     border-bottom: 0.5px solid var(--rc-border-light); font-weight: 500;
     overflow: hidden;
   }
   .marks-table tbody tr:nth-child(even) { background: rgba(249, 250, 251, 0.5); }
   .marks-table tbody td.subject-cell {
     text-align: left; font-weight: 600; color: var(--rc-text-primary);
-    font-size: 9px; word-wrap: break-word; overflow-wrap: break-word;
+    font-size: 10px; word-wrap: break-word; overflow-wrap: break-word;
   }
   .marks-table tbody td.no-data { color: #D1D5DB; }
 
   /* Grade display */
   .grade-display { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
-  .grade-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+  .grade-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
   .grade-dot.excellent { background: var(--rc-grade-excellent); }
   .grade-dot.good { background: var(--rc-grade-good); }
   .grade-dot.average { background: var(--rc-grade-average); }
@@ -144,36 +144,36 @@
 
   /* Grand Total Row */
   .marks-table tfoot td {
-    font-size: 10px; font-weight: 700; color: var(--rc-text-primary);
-    padding: 7px 2px; text-align: center;
+    font-size: 12px; font-weight: 700; color: var(--rc-text-primary);
+    padding: 10px 3px; text-align: center;
     border-top: 1.5px solid var(--rc-primary); background: var(--rc-primary-light);
   }
   .marks-table tfoot td.subject-cell { text-align: left; }
 
   /* ── RESULT BANNER ── */
   .result-banner {
-    border-radius: 0 6px 6px 0; padding: 12px 18px;
-    margin-bottom: 16px; display: flex;
+    border-radius: 0 8px 8px 0; padding: 16px 22px;
+    margin-bottom: 22px; display: flex;
     align-items: center; justify-content: space-between;
   }
   .result-banner.pass { border-left: 3px solid var(--rc-pass); background: rgba(5, 150, 105, 0.04); }
   .result-banner.fail { border-left: 3px solid var(--rc-fail); background: rgba(220, 38, 38, 0.04); }
-  .result-status { display: flex; align-items: center; gap: 8px; }
-  .result-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .result-status { display: flex; align-items: center; gap: 10px; }
+  .result-dot { width: 10px; height: 10px; border-radius: 50%; }
   .result-dot.pass { background: var(--rc-pass); }
   .result-dot.fail { background: var(--rc-fail); }
-  .result-label { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; }
+  .result-label { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; }
   .result-label.pass { color: var(--rc-pass); }
   .result-label.fail { color: var(--rc-fail); }
   .result-details { text-align: right; }
-  .result-perf { font-size: 11px; color: var(--rc-text-secondary); margin-bottom: 2px; }
-  .result-stats { font-size: 10px; color: var(--rc-text-muted); }
+  .result-perf { font-size: 12px; color: var(--rc-text-secondary); margin-bottom: 2px; }
+  .result-stats { font-size: 11px; color: var(--rc-text-muted); }
 
   /* ── GRADE SCALE ── */
-  .grade-scale-wrap { margin-bottom: 16px; }
+  .grade-scale-wrap { margin-bottom: 24px; }
   .grade-scale { margin: 0 auto; border-collapse: collapse; }
   .grade-scale th, .grade-scale td {
-    padding: 3px 18px; font-size: 10px; text-align: center;
+    padding: 4px 22px; font-size: 11px; text-align: center;
     border-bottom: 0.5px solid var(--rc-border-light);
   }
   .grade-scale th {
@@ -184,37 +184,37 @@
   .grade-scale td:last-child { font-weight: 600; color: var(--rc-text-primary); }
 
   /* ── ATTENDANCE ── */
-  .attendance-section { margin-bottom: 14px; }
-  .attendance-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-  .att-card { background: var(--rc-bg-subtle); border-radius: 6px; padding: 8px 12px; text-align: center; }
-  .att-value { font-size: 16px; font-weight: 700; color: var(--rc-text-primary); }
-  .att-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--rc-text-muted); margin-top: 2px; }
+  .attendance-section { margin-bottom: 18px; }
+  .attendance-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .att-card { background: var(--rc-bg-subtle); border-radius: 8px; padding: 10px 14px; text-align: center; }
+  .att-value { font-size: 18px; font-weight: 700; color: var(--rc-text-primary); }
+  .att-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--rc-text-muted); margin-top: 3px; }
 
   /* ── REMARKS ── */
-  .remarks-section { margin-bottom: 16px; }
+  .remarks-section { margin-bottom: 20px; }
   .remarks-text {
-    font-size: 11px; color: var(--rc-text-secondary); line-height: 1.5;
-    padding: 8px 0; border-bottom: 0.5px solid var(--rc-border-light);
-    min-height: 24px; font-style: italic;
+    font-size: 12px; color: var(--rc-text-secondary); line-height: 1.6;
+    padding: 10px 0; border-bottom: 0.5px solid var(--rc-border-light);
+    min-height: 30px; font-style: italic;
   }
 
   /* ── SIGNATURES ── */
-  .signatures { display: flex; justify-content: space-between; margin-bottom: 16px; padding-top: 6px; }
-  .sig-block { text-align: center; width: 140px; }
+  .signatures { display: flex; justify-content: space-between; margin-bottom: 20px; padding-top: 8px; }
+  .sig-block { text-align: center; width: 150px; }
   .sig-line {
     width: 100%; height: 1px; background: var(--rc-border);
-    margin-bottom: 6px; margin-top: 36px; position: relative;
+    margin-bottom: 8px; margin-top: 44px; position: relative;
   }
   .sig-img {
     position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
-    max-height: 50px; max-width: 130px; object-fit: contain;
+    max-height: 55px; max-width: 140px; object-fit: contain;
   }
-  .sig-label { font-size: 11px; font-weight: 600; color: var(--rc-text-secondary); }
+  .sig-label { font-size: 12px; font-weight: 600; color: var(--rc-text-secondary); }
   .sig-sublabel { font-size: 9px; color: var(--rc-text-muted); margin-top: 2px; }
 
   /* ── FOOTER ── */
-  .footer { text-align: center; padding-top: 8px; border-top: 0.5px solid var(--rc-border-light); }
-  .footer-text { font-size: 9px; color: var(--rc-text-muted); letter-spacing: 0.02em; font-style: italic; }
+  .footer { text-align: center; padding-top: 12px; border-top: 0.5px solid var(--rc-border-light); }
+  .footer-text { font-size: 10px; color: var(--rc-text-muted); letter-spacing: 0.02em; font-style: italic; }
 
   @media print { body { background: white; } .page { padding: 0; } }
 </style>
