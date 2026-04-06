@@ -128,12 +128,12 @@ const AcademicsManagement = () => {
     })
     const deleteSubjectMutation = useMutation({
         mutationFn: (id) => subjectsService.remove(id),
-        onSuccess: () => { toast.success('Subject deleted successfully'); queryClient.invalidateQueries({ queryKey: ['academic-subjects'] }) },
+        onSuccess: () => { toast.success('Subject deleted successfully'); queryClient.invalidateQueries({ queryKey: ['academic-subjects'] }); queryClient.invalidateQueries({ queryKey: ['academic-assignments'] }) },
         onError: (error) => { toast.error(error.response?.data?.message || 'Failed to delete subject') },
     })
     const toggleSubjectMutation = useMutation({
         mutationFn: (id) => subjectsService.toggle(id),
-        onSuccess: () => { toast.success('Subject status updated'); queryClient.invalidateQueries({ queryKey: ['academic-subjects'] }) },
+        onSuccess: () => { toast.success('Subject status updated'); queryClient.invalidateQueries({ queryKey: ['academic-subjects'] }); queryClient.invalidateQueries({ queryKey: ['academic-assignments'] }) },
         onError: () => { toast.error('Failed to update subject status') },
     })
 
@@ -718,6 +718,7 @@ const AcademicsManagement = () => {
                     onSuccess={() => {
                         setShowSubjectForm(false)
                         queryClient.invalidateQueries({ queryKey: ['academic-subjects'] })
+                        queryClient.invalidateQueries({ queryKey: ['academic-assignments'] })
                         queryClient.invalidateQueries({ queryKey: ['class-subjects'] })
                     }}
                 />
