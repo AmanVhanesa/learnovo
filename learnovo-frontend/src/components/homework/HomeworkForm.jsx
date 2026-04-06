@@ -5,10 +5,9 @@ import homeworkService from '../../services/homeworkService';
 import { classesService } from '../../services/classesService';
 import { subjectsService } from '../../services/subjectsService';
 import { attendanceService } from '../../services/attendanceService';
-import { teacherAssignmentsService } from '../../services/academicsService';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { sortClassObjects } from '../../utils/classOrder';
+import { sortClassObjects, getClassOrder } from '../../utils/classOrder';
 
 const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     const { user } = useAuth();
@@ -27,7 +26,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     const [files, setFiles] = useState([]);
     const [existingAttachments, setExistingAttachments] = useState([]);
     const [classes, setClasses] = useState([]);
-    const [subjects, setSubjects] = useState([]);
+    const [allSubjects, setAllSubjects] = useState([]);
     const [sections, setSections] = useState([]);
     const [selectedGrade, setSelectedGrade] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -35,8 +34,9 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     // Track whether we are in the middle of restoring an existing homework
     const restoringRef = useRef(false);
 
-    // Derive unique grades from loaded classes
-    const uniqueGrades = [...new Set(classes.map(cls => cls.grade).filter(Boolean))].sort();
+    // Derive unique grades from loaded classes, sorted in educational hierarchy
+    const uniqueGrades = [...new Set(classes.map(cls => cls.grade).filter(Boolean))]
+        .sort((a, b) => getClassOrder(a) - getClassOrder(b));
 
     // Initial load
     useEffect(() => {
@@ -98,56 +98,45 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
         setSections(gradeSections);
 
         if (!restoringRef.current) {
-            // User manually changed the grade — reset class and section
-            setFormData(prev => ({ ...prev, class: '', section: '' }));
+            // User manually changed the grade — reset class, section and subject
+            setFormData(prev => ({ ...prev, class: '', section: '', subject: '' }));
         }
         // After first restore, allow subsequent user-driven grade changes to reset
         restoringRef.current = false;
     }, [selectedGrade, classes]);
 
+    // Derive subjects for the selected grade's class
+    const subjects = (() => {
+        if (!selectedGrade || classes.length === 0) return allSubjects;
+        const gradeClasses = classes.filter(c => c.grade === selectedGrade);
+        // Collect subjects from class data (deduplicated)
+        const subjectMap = new Map();
+        gradeClasses.forEach(cls => {
+            (cls.subjects || []).forEach(s => {
+                if (s._id && s.name) subjectMap.set(s._id.toString(), s);
+            });
+        });
+        if (subjectMap.size > 0) return Array.from(subjectMap.values());
+        // Fallback to all subjects if class has no subjects configured
+        return allSubjects;
+    })();
+
     const fetchOptions = async () => {
         try {
             if (user?.role === 'teacher') {
-                const [classesRes, subjectsRes, assignmentsRes] = await Promise.all([
+                const [classesRes, subjectsRes] = await Promise.all([
                     attendanceService.getTeacherClasses(),
-                    subjectsService.list(),
-                    teacherAssignmentsService.list({ teacherId: user._id })
+                    subjectsService.list()
                 ]);
-                const teacherClasses = sortClassObjects(classesRes?.data || [], 'name');
-                setClasses(teacherClasses);
-
-                const allSubjects = subjectsRes.success ? (subjectsRes.data || []) : [];
-                const mySubjectIds = new Set((assignmentsRes.data || []).map(a => (a.subjectId?._id || a.subjectId)));
-                let filteredSubjects = allSubjects.filter(s => mySubjectIds.has(s._id));
-
-                // Fallback: if no TeacherSubjectAssignment records, use subjects from class data
-                if (filteredSubjects.length === 0 && teacherClasses.length > 0) {
-                    const classSubjectIds = new Set();
-                    teacherClasses.forEach(cls => {
-                        (cls.subjects || []).forEach(s => {
-                            if (s._id) classSubjectIds.add(s._id.toString());
-                        });
-                    });
-                    filteredSubjects = allSubjects.filter(s => classSubjectIds.has(s._id));
-                    // If still empty, use all subjects from class data directly
-                    if (filteredSubjects.length === 0) {
-                        const subjectMap = new Map();
-                        teacherClasses.forEach(cls => {
-                            (cls.subjects || []).forEach(s => {
-                                if (s._id && s.name) subjectMap.set(s._id, s);
-                            });
-                        });
-                        filteredSubjects = Array.from(subjectMap.values());
-                    }
-                }
-                setSubjects(filteredSubjects);
+                setClasses(sortClassObjects(classesRes?.data || [], 'name'));
+                setAllSubjects(subjectsRes.success ? (subjectsRes.data || []) : []);
             } else {
                 const [classesRes, subjectsRes] = await Promise.all([
                     classesService.list(),
                     subjectsService.list()
                 ]);
                 if (classesRes.success) setClasses(sortClassObjects(classesRes.data || [], 'name'));
-                if (subjectsRes.success) setSubjects(subjectsRes.data || []);
+                if (subjectsRes.success) setAllSubjects(subjectsRes.data || []);
             }
         } catch (error) {
             toast.error('Failed to load class/subject options');
@@ -284,28 +273,8 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                         />
                     </div>
 
-                    {/* Subject, Grade, Section */}
+                    {/* Grade, Section, Subject */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Subject */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
-                                Subject <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={formData.subject}
-                                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
-                                required
-                            >
-                                <option value="">Select Subject</option>
-                                {subjects.map((subject) => (
-                                    <option key={subject._id} value={subject._id}>
-                                        {subject.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
                         {/* Grade */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
@@ -345,6 +314,27 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                                 {sections.map((section) => (
                                     <option key={section._id} value={section._id}>
                                         {section.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Subject — shown after grade is selected */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">
+                                Subject <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                value={formData.subject}
+                                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-[#1C1C1E] dark:text-white"
+                                disabled={!selectedGrade}
+                                required
+                            >
+                                <option value="">Select Subject</option>
+                                {subjects.map((subject) => (
+                                    <option key={subject._id} value={subject._id}>
+                                        {subject.name}
                                     </option>
                                 ))}
                             </select>
