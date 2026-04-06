@@ -90,7 +90,7 @@ const AcademicsManagement = () => {
         queryFn: async () => { const res = await employeesService.list({ role: 'teacher', limit: 100 }); return res.data || [] },
     })
 
-    // Assignments query (only when on assignments tab with active session)
+    // Assignments query (subjects + assignments tabs need class-subject mappings)
     const { data: assignmentsData } = useQuery({
         queryKey: ['academic-assignments', activeSession?._id],
         queryFn: async () => {
@@ -100,7 +100,7 @@ const AcademicsManagement = () => {
             ])
             return { classSubjects: csRes.data || [], teacherAssignments: taRes.data || [] }
         },
-        enabled: activeTab === 'assignments' && !!activeSession,
+        enabled: (activeTab === 'assignments' || activeTab === 'subjects') && !!activeSession,
     })
     const classSubjects = assignmentsData?.classSubjects || []
     const teacherAssignments = assignmentsData?.teacherAssignments || []
@@ -569,6 +569,26 @@ const AcademicsManagement = () => {
                                                                 <span className="text-gray-300 dark:text-[#636366]">|</span>
                                                                 <span>Pass: <strong className="text-gray-800 dark:text-white">{subject.passingMarks || 33}</strong></span>
                                                             </div>
+
+                                                            {/* Assigned classes */}
+                                                            {(() => {
+                                                                const assignedClasses = classSubjects
+                                                                    .filter(cs => cs.subjectId?._id === subject._id)
+                                                                    .map(cs => cs.classId?.name)
+                                                                    .filter(Boolean)
+                                                                if (assignedClasses.length === 0) return (
+                                                                    <p className="mt-2 text-[10px] text-gray-400 dark:text-[#636366] italic">No classes assigned</p>
+                                                                )
+                                                                return (
+                                                                    <div className="mt-2 flex flex-wrap gap-1">
+                                                                        {assignedClasses.map(name => (
+                                                                            <span key={name} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-[#38383A] text-gray-600 dark:text-[#8E8E93]">
+                                                                                {name}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                )
+                                                            })()}
 
                                                             {/* Status badge */}
                                                             {!subject.isActive && (
