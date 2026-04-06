@@ -166,7 +166,7 @@ router.get('/final/:studentId/:sessionId', protect, examPlanGates, async(req, re
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const data = await getReportCardService().getFinalReportCardData(req.user.tenantId, studentId, sessionId);
+    const data = await getReportCardService().getTwoTermReportCardData(req.user.tenantId, studentId, sessionId);
 
     if (!data) {
       return res.status(404).json({ success: false, message: 'No cumulative results found' });
@@ -189,15 +189,16 @@ router.get('/final/:studentId/:sessionId/pdf', protect, examPlanGates, async(req
       return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const data = await getReportCardService().getFinalReportCardData(req.user.tenantId, studentId, sessionId);
+    // Use two-term format for the cumulative report card
+    const data = await getReportCardService().getTwoTermReportCardData(req.user.tenantId, studentId, sessionId);
 
     if (!data) {
       return res.status(404).json({ success: false, message: 'No cumulative results found' });
     }
 
-    const pdfBuffer = await getPdfService().generateFinalReportCard(data);
+    const pdfBuffer = await getPdfService().generateTwoTermReportCard(data);
     const studentName = (data.student.name || 'Student').replace(/\s+/g, '_');
-    const filename = `Final_Report_Card_${studentName}_${data.session.name || ''}.pdf`;
+    const filename = `Report_Card_${studentName}_${data.session.name || ''}.pdf`;
 
     res.set({
       'Content-Type': 'application/pdf',

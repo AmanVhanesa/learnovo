@@ -140,7 +140,7 @@ const bulkPdfService = {
       if (type === 'blank') {
         await reportCardService.getBlankReportCardData(tenantId, firstId, { examSeries, className });
       } else if (type === 'final') {
-        await reportCardService.getFinalReportCardData(tenantId, firstId, sessionId);
+        await reportCardService.getTwoTermReportCardData(tenantId, firstId, sessionId);
       } else {
         await reportCardService.getReportCardData(tenantId, firstId, { examSeries, className });
       }
@@ -164,9 +164,9 @@ const bulkPdfService = {
               if (!data) throw new Error(`No data for student ${studentName}`);
               buf = await pdfService.generateBlankReportCard(data);
             } else if (type === 'final') {
-              const data = await reportCardService.getFinalReportCardData(tenantId, studentId, sessionId);
+              const data = await reportCardService.getTwoTermReportCardData(tenantId, studentId, sessionId);
               if (!data) throw new Error(`No exam results found for ${studentName}`);
-              buf = await pdfService.generateFinalReportCard(data);
+              buf = await pdfService.generateTwoTermReportCard(data);
             } else {
               const data = await reportCardService.getReportCardData(tenantId, studentId, { examSeries, className });
               if (!data) throw new Error(`No results for student ${studentName}`);

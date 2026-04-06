@@ -251,7 +251,7 @@ const reportCardService = {
     const allResults = await Result.find({ tenantId, student: studentId })
       .populate({
         path: 'exam',
-        select: 'name subject class section date totalMarks passingMarks examSeries examType'
+        select: 'name subject class section date totalMarks passingMarks examSeries examType term'
       })
       .populate('student', 'name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName skippedSubjects')
       .sort({ 'exam.date': 1 });
@@ -363,6 +363,126 @@ const reportCardService = {
         totalSubjects: subjectRows.length
       },
       attendance: null,
+      signatures: {
+        principal: settings?.institution?.principalSignature || null,
+        class_teacher: null
+      }
+    };
+  },
+
+  /**
+   * Get two-term report card data for a student.
+   * Groups exam results by Term 1 and Term 2 using the exam.term field.
+   */
+  async getTwoTermReportCardData(tenantId, studentId, sessionId) {
+    const baseData = await this.getFinalReportCardData(tenantId, studentId, sessionId);
+    if (!baseData) return null;
+
+    // Re-fetch results to get term field
+    const allResults = await Result.find({ tenantId, student: studentId })
+      .populate({
+        path: 'exam',
+        select: 'name subject class section date totalMarks passingMarks examSeries examType term'
+      })
+      .populate('student', 'name fullName rollNumber admissionNumber class section dateOfBirth fatherOrHusbandName guardianName skippedSubjects')
+      .lean();
+
+    const session = await AcademicSession.findOne({ _id: sessionId, tenantId }).lean();
+    const validResults = allResults.filter(r => r.exam);
+
+    // Filter by session date range or fallback
+    const inDateRange = (r) => {
+      const d = new Date(r.exam.date);
+      return d >= session.startDate && d <= session.endDate;
+    };
+    let filtered = validResults.filter(r => r.isPublished && inDateRange(r));
+    if (!filtered.length) filtered = validResults.filter(r => inDateRange(r));
+    if (!filtered.length) filtered = validResults.filter(r => r.isPublished);
+    if (!filtered.length) filtered = validResults;
+
+    // Exclude skipped subjects
+    const studentDoc = validResults[0]?.student;
+    const skipped = studentDoc?.skippedSubjects || [];
+    if (skipped.length) filtered = filtered.filter(r => !skipped.includes(r.exam.subject));
+    if (!filtered.length) return null;
+
+    // Group by term
+    const term1Results = filtered.filter(r => (r.exam.term || 'Term 1') === 'Term 1');
+    const term2Results = filtered.filter(r => r.exam.term === 'Term 2');
+
+    // Get unique exam types per term
+    const t1ExamTypes = [...new Set(term1Results.map(r => r.exam.examSeries))];
+    const t2ExamTypes = [...new Set(term2Results.map(r => r.exam.examSeries))];
+
+    // Build term exam definitions with max marks
+    const buildExamDefs = (results, types) => types.map(type => {
+      const sample = results.find(r => r.exam.examSeries === type);
+      return { name: type, maxMarks: sample?.exam?.totalMarks || 100 };
+    });
+
+    const term1Exams = buildExamDefs(term1Results, t1ExamTypes);
+    const term2Exams = buildExamDefs(term2Results, t2ExamTypes);
+
+    // Build subject rows
+    const subjectSet = [...new Set(filtered.map(r => r.exam.subject))];
+
+    const subjectRows = subjectSet.map(subject => {
+      const marks = {};
+      let t1Total = 0, t1Max = 0, t2Total = 0, t2Max = 0;
+
+      for (const r of filtered.filter(res => res.exam.subject === subject)) {
+        const term = r.exam.term || 'Term 1';
+        const series = r.exam.examSeries;
+        marks[series] = r.marksObtained;
+
+        if (term === 'Term 1') { t1Total += r.marksObtained; t1Max += r.exam.totalMarks; }
+        else { t2Total += r.marksObtained; t2Max += r.exam.totalMarks; }
+      }
+
+      const t1Pct = t1Max > 0 ? Math.round((t1Total / t1Max) * 100 * 10) / 10 : 0;
+      const t2Pct = t2Max > 0 ? Math.round((t2Total / t2Max) * 100 * 10) / 10 : 0;
+
+      return {
+        subject, marks,
+        term1Total: t1Total, term1Max: t1Max, term1Pct, term1Grade: calculateGrade(t1Pct),
+        term2Total: t2Total, term2Max: t2Max, term2Pct, term2Grade: calculateGrade(t2Pct),
+        overallPct: (t1Max + t2Max) > 0 ? Math.round(((t1Total + t2Total) / (t1Max + t2Max)) * 100 * 10) / 10 : 0,
+        isPassed: ((t1Max + t2Max) > 0 ? ((t1Total + t2Total) / (t1Max + t2Max)) * 100 : 0) >= 33
+      };
+    });
+
+    // Grand totals
+    const gT1Total = subjectRows.reduce((a, r) => a + r.term1Total, 0);
+    const gT1Max = subjectRows.reduce((a, r) => a + r.term1Max, 0);
+    const gT2Total = subjectRows.reduce((a, r) => a + r.term2Total, 0);
+    const gT2Max = subjectRows.reduce((a, r) => a + r.term2Max, 0);
+    const gT1Pct = gT1Max > 0 ? Math.round((gT1Total / gT1Max) * 100 * 10) / 10 : 0;
+    const gT2Pct = gT2Max > 0 ? Math.round((gT2Total / gT2Max) * 100 * 10) / 10 : 0;
+    const gOverallPct = (gT1Max + gT2Max) > 0 ? Math.round(((gT1Total + gT2Total) / (gT1Max + gT2Max)) * 100 * 10) / 10 : 0;
+    const overallPassed = subjectRows.every(r => r.isPassed);
+
+    const settings = await Settings.findOne({ tenantId });
+
+    return {
+      school: buildSchoolData(settings),
+      student: {
+        ...buildStudentData(studentDoc, filtered[0]?.exam?.class, filtered[0]?.exam?.section),
+        fatherName: studentDoc?.fatherOrHusbandName || '',
+        motherName: ''
+      },
+      session: { name: session.name },
+      term1: { exams: term1Exams },
+      term2: { exams: term2Exams },
+      subjectRows,
+      coScholastic: [],
+      summary: {
+        term1Total: gT1Total, term1Max: gT1Max, term1Percentage: gT1Pct, term1Grade: calculateGrade(gT1Pct),
+        term2Total: gT2Total, term2Max: gT2Max, term2Percentage: gT2Pct, term2Grade: calculateGrade(gT2Pct),
+        overallPercentage: gOverallPct, overallGrade: calculateGrade(gOverallPct),
+        overallPassed
+      },
+      remarks: '',
+      result: overallPassed ? 'Promoted' : 'Not Promoted',
       signatures: {
         principal: settings?.institution?.principalSignature || null,
         class_teacher: null
