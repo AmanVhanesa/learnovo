@@ -1099,25 +1099,26 @@ const Exams = () => {
                     })
                     : rcStudents;
 
-                const handleIndividualDownload = async (studentId, studentName, type = 'regular') => {
-                    const key = `${studentId}-${type}`;
+                const handleIndividualDownload = async (studentId, studentName) => {
+                    const key = `${studentId}-download`;
                     setRcDownloading(prev => ({ ...prev, [key]: true }));
                     try {
-                        let blob;
-                        if (type === 'blank') {
-                            blob = await examsService.downloadBlankReportCardPDF(studentId, {});
-                        } else {
-                            blob = await examsService.downloadReportCardPDF(studentId, {});
+                        const sessionRes = await academicSessionsService.getActive();
+                        const session = sessionRes?.data || sessionRes;
+                        if (!session?._id) {
+                            toast.error('No active academic session found.');
+                            return;
                         }
+                        const blob = await examsService.downloadFinalReportCardPDF(studentId, session._id);
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
-                        a.download = `${type === 'blank' ? 'Blank_' : ''}Report_Card_${(studentName || 'Student').replace(/\s+/g, '_')}.pdf`;
+                        a.download = `Report_Card_${(studentName || 'Student').replace(/\s+/g, '_')}.pdf`;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
-                        toast.success(`${type === 'blank' ? 'Blank r' : 'R'}eport card downloaded`);
+                        toast.success('Report card downloaded');
                     } catch (err) {
                         let msg = 'Failed to download report card';
                         try {
@@ -1131,7 +1132,6 @@ const Exams = () => {
                             }
                         } catch { /* use default */ }
                         toast.error(msg);
-                        console.error('Download error:', err);
                     } finally {
                         setRcDownloading(prev => ({ ...prev, [key]: false }));
                     }
@@ -1179,70 +1179,37 @@ const Exams = () => {
                         )}
                     </div>
 
-                    {/* Custom Report Card — always visible */}
-                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-5 hover:shadow-lg transition-shadow">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2.5 rounded-xl bg-violet-100 dark:bg-violet-500/20">
-                                    <Edit className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Report Card</h4>
-                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Manually fill in subjects, marks & exam details to generate a report card</p>
-                                </div>
-                            </div>
-                            <button
-                                className="btn gap-2 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-500/20 border border-violet-200 dark:border-violet-500/20 shrink-0"
-                                onClick={() => setShowCustomReportCard(true)}
-                            >
-                                <Edit className="h-4 w-4" /> Create Custom
-                            </button>
-                        </div>
-                    </div>
-
                     {/* Bulk Download Actions */}
                     {rcClass && rcSection && rcSectionId && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-5 hover:shadow-lg transition-shadow">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="p-2.5 rounded-xl bg-teal-100 dark:bg-teal-500/20">
-                                        <Download className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">All Report Cards</h4>
-                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">With marks filled in</p>
-                                    </div>
-                                </div>
-                                <button className="btn btn-primary w-full gap-2" onClick={() => handleBulkDownload(rcSectionId, rcClass, 'regular')}>
-                                    <Download className="h-4 w-4" /> Download All
-                                </button>
-                            </div>
-                            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-5 hover:shadow-lg transition-shadow">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-500/20">
-                                        <FileText className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Blank Report Cards</h4>
-                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Without marks</p>
-                                    </div>
-                                </div>
-                                <button className="btn w-full gap-2 bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#38383A] border border-gray-200 dark:border-[#38383A]" onClick={() => handleBulkDownload(rcSectionId, rcClass, 'blank')}>
-                                    <FileText className="h-4 w-4" /> Download Blank
-                                </button>
-                            </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {/* Full Year Report Card */}
                             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-5 hover:shadow-lg transition-shadow">
                                 <div className="flex items-center gap-3 mb-3">
                                     <div className="p-2.5 rounded-xl bg-emerald-100 dark:bg-emerald-500/20">
                                         <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                                     </div>
                                     <div>
-                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Cumulative</h4>
-                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">All exams combined</p>
+                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Full Year Report Card</h4>
+                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Term 1 + Term 2 combined results</p>
                                     </div>
                                 </div>
                                 <button className="btn w-full gap-2 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/20" onClick={() => handleCumulativeDownload(rcSectionId)}>
-                                    <BarChart3 className="h-4 w-4" /> Download Cumulative
+                                    <Download className="h-4 w-4" /> Download All (Bulk)
+                                </button>
+                            </div>
+                            {/* Custom Report Card */}
+                            <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-5 hover:shadow-lg transition-shadow">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="p-2.5 rounded-xl bg-violet-100 dark:bg-violet-500/20">
+                                        <Edit className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Report Card</h4>
+                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Single exam, cumulative, or two-term</p>
+                                    </div>
+                                </div>
+                                <button className="btn w-full gap-2 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-500/20 border border-violet-200 dark:border-violet-500/20" onClick={() => setShowCustomReportCard(true)}>
+                                    <Edit className="h-4 w-4" /> Create Custom
                                 </button>
                             </div>
                         </div>
@@ -1311,7 +1278,7 @@ const Exams = () => {
                                                     <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">{sname}</td>
                                                     <td className="px-5 py-3 text-gray-500 dark:text-[#8E8E93] text-xs font-mono">{student.admissionNumber || '—'}</td>
                                                     <td className="px-5 py-3">
-                                                        <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                                                        <div className="flex items-center gap-1.5 justify-end">
                                                             <button
                                                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10 hover:bg-primary-100 dark:hover:bg-primary-500/20 transition-colors"
                                                                 onClick={() => setResultCardTarget({ studentId: sid, studentName: sname, examSeries: '' })}
@@ -1320,20 +1287,12 @@ const Exams = () => {
                                                                 View
                                                             </button>
                                                             <button
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-500/10 hover:bg-teal-100 dark:hover:bg-teal-500/20 transition-colors disabled:opacity-50"
-                                                                onClick={() => handleIndividualDownload(sid, sname, 'regular')}
-                                                                disabled={rcDownloading[`${sid}-regular`]}
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                                                onClick={() => handleIndividualDownload(sid, sname)}
+                                                                disabled={rcDownloading[`${sid}-download`]}
                                                             >
                                                                 <Download className="h-3.5 w-3.5" />
-                                                                {rcDownloading[`${sid}-regular`] ? 'Downloading...' : 'PDF'}
-                                                            </button>
-                                                            <button
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-[#2C2C2E] hover:bg-gray-200 dark:hover:bg-[#38383A] transition-colors disabled:opacity-50"
-                                                                onClick={() => handleIndividualDownload(sid, sname, 'blank')}
-                                                                disabled={rcDownloading[`${sid}-blank`]}
-                                                            >
-                                                                <FileText className="h-3.5 w-3.5" />
-                                                                {rcDownloading[`${sid}-blank`] ? 'Downloading...' : 'Blank'}
+                                                                {rcDownloading[`${sid}-download`] ? '...' : 'Download'}
                                                             </button>
                                                         </div>
                                                     </td>
