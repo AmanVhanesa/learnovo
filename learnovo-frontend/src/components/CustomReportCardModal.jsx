@@ -43,7 +43,8 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
     /* ── Manual student fields ── */
     const [studentForm, setStudentForm] = useState({
         name: '', admissionNumber: '', class: '', section: '',
-        rollNumber: '', dob: '', guardianName: ''
+        rollNumber: '', dob: '', guardianName: '',
+        fatherName: '', motherName: ''
     });
 
     /* ── Academic sessions ── */
@@ -85,6 +86,18 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
     const [cumulativeSubjects, setCumulativeSubjects] = useState([
         { name: '', totalMarksPerExam: 100, passingPercentage: 40, marks: {} }
     ]);
+
+    /* ── Two-Term mode ── */
+    const [term1Exams, setTerm1Exams] = useState([{ name: 'UT1', maxMarks: 40 }, { name: 'SA1', maxMarks: 60 }]);
+    const [term2Exams, setTerm2Exams] = useState([{ name: 'UT2', maxMarks: 40 }, { name: 'SA2', maxMarks: 60 }]);
+    const [twoTermSubjects, setTwoTermSubjects] = useState([{ name: '', passingPercentage: 33, marks: {} }]);
+    const [coScholastic, setCoScholastic] = useState([
+        { area: 'Work Education', term1Grade: '', term2Grade: '' },
+        { area: 'Art Education', term1Grade: '', term2Grade: '' },
+        { area: 'Health & Physical Education', term1Grade: '', term2Grade: '' },
+        { area: 'Discipline', term1Grade: '', term2Grade: '' }
+    ]);
+    const [resultText, setResultText] = useState('Promoted');
 
     /* ── General ── */
     const [remarks, setRemarks] = useState('');
@@ -178,7 +191,9 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                     section: payload.student?.section || '',
                     rollNumber: payload.student?.rollNumber || '',
                     dob: payload.student?.dob || '',
-                    guardianName: payload.student?.guardianName || ''
+                    guardianName: payload.student?.guardianName || '',
+                    fatherName: payload.student?.fatherName || '',
+                    motherName: payload.student?.motherName || ''
                 });
             }
 
@@ -193,6 +208,21 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                     passingMarks: s.passingMarks || 33,
                     marksObtained: s.marksObtained ?? ''
                 })));
+            } else if (payload.reportType === 'two-term') {
+                setTerm1Exams(payload.term1?.exams || [{ name: 'UT1', maxMarks: 40 }, { name: 'SA1', maxMarks: 60 }]);
+                setTerm2Exams(payload.term2?.exams || [{ name: 'UT2', maxMarks: 40 }, { name: 'SA2', maxMarks: 60 }]);
+                setTwoTermSubjects((payload.subjects || []).map(s => ({
+                    name: s.name || '',
+                    passingPercentage: s.passingPercentage || 33,
+                    marks: s.marks || {}
+                })));
+                setCoScholastic(payload.coScholastic || [
+                    { area: 'Work Education', term1Grade: '', term2Grade: '' },
+                    { area: 'Art Education', term1Grade: '', term2Grade: '' },
+                    { area: 'Health & Physical Education', term1Grade: '', term2Grade: '' },
+                    { area: 'Discipline', term1Grade: '', term2Grade: '' }
+                ]);
+                setResultText(payload.result || 'Promoted');
             } else {
                 setExams((payload.exams || []).map(e => ({ name: e.name || '', examSeries: e.examSeries || 'Midterm' })));
                 setCumulativeSubjects((payload.subjects || []).map(s => ({
@@ -364,6 +394,12 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                 passingMarks: 33,
                 marksObtained: ''
             })));
+        } else if (reportType === 'two-term') {
+            setTwoTermSubjects(active.map(s => ({
+                name: s.name || s.subjectCode || '',
+                passingPercentage: 33,
+                marks: {}
+            })));
         } else {
             setCumulativeSubjects(active.map(s => ({
                 name: s.name || s.subjectCode || '',
@@ -462,6 +498,16 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                     errs[`subject_${i}_marks`] = 'Marks cannot be negative';
                 }
             }
+        } else if (reportType === 'two-term') {
+            // Two-term validation
+            const allExams = [...term1Exams, ...term2Exams].filter(e => e.name.trim());
+            if (allExams.length < 2) errs.exams = 'Add at least 1 exam per term';
+
+            const examNames = allExams.map(e => e.name.trim().toLowerCase());
+            if (new Set(examNames).size !== examNames.length) errs.exams = 'Exam names must be unique across both terms';
+
+            const validSubs = twoTermSubjects.filter(s => s.name.trim());
+            if (validSubs.length === 0) errs.twoTermSubjects = 'Add at least one subject';
         } else {
             // Cumulative validation
             const validExams = exams.filter(e => e.name.trim());
@@ -546,6 +592,35 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                     subjects: filledSubjects,
                     remarks
                 };
+            } else if (reportType === 'two-term') {
+                // Two-term payload
+                const validT1 = term1Exams.filter(e => e.name.trim()).map(e => ({ name: e.name.trim(), maxMarks: Number(e.maxMarks) || 0 }));
+                const validT2 = term2Exams.filter(e => e.name.trim()).map(e => ({ name: e.name.trim(), maxMarks: Number(e.maxMarks) || 0 }));
+                const validSubs = twoTermSubjects.filter(s => s.name.trim()).map(s => ({
+                    name: s.name.trim(),
+                    passingPercentage: Number(s.passingPercentage) || 33,
+                    marks: Object.fromEntries(
+                        [...validT1, ...validT2].map(e => [e.name, s.marks[e.name] !== '' && s.marks[e.name] !== undefined ? Number(s.marks[e.name]) : null])
+                    )
+                }));
+
+                const validCoSch = coScholastic.filter(c => c.area.trim() && (c.term1Grade || c.term2Grade));
+
+                payload = {
+                    reportType: 'two-term',
+                    student: {
+                        ...studentPayload,
+                        fatherName: studentForm.fatherName || '',
+                        motherName: studentForm.motherName || ''
+                    },
+                    term1: { exams: validT1 },
+                    term2: { exams: validT2 },
+                    subjects: validSubs,
+                    coScholastic: validCoSch,
+                    sessionName: selectedSession?.name || '',
+                    remarks,
+                    result: resultText
+                };
             } else {
                 // Cumulative payload
                 const validExams = exams.filter(e => e.name.trim()).map(e => ({
@@ -620,7 +695,7 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                             Custom Report Card
                         </h3>
                         <p className="text-xs text-gray-400 dark:text-[#636366] mt-0.5">
-                            Generate a single exam or cumulative multi-exam report card PDF
+                            Generate a single exam, cumulative, or two-term report card PDF
                         </p>
                     </div>
                     <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors" onClick={onClose}>
@@ -660,6 +735,18 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                             >
                                 <Layers className="h-4 w-4" />
                                 Cumulative (Multi-Exam)
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setReportType('two-term')}
+                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                                    reportType === 'two-term'
+                                        ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-400 border-primary-300 dark:border-primary-500/30'
+                                        : 'bg-white dark:bg-[#2C2C2E] text-gray-500 dark:text-[#8E8E93] border-gray-200 dark:border-[#38383A] hover:border-gray-300'
+                                }`}
+                            >
+                                <Layers className="h-4 w-4" />
+                                Two-Term
                             </button>
                         </div>
                     </div>
@@ -825,6 +912,18 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                                         onChange={e => setStudentForm(p => ({ ...p, guardianName: e.target.value }))}
                                     />
                                 </div>
+                                {reportType === 'two-term' && (
+                                    <>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">Father's Name</label>
+                                            <input type="text" className="input text-sm" value={studentForm.fatherName || ''} onChange={e => setStudentForm(prev => ({ ...prev, fatherName: e.target.value }))} placeholder="Father's Name" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">Mother's Name</label>
+                                            <input type="text" className="input text-sm" value={studentForm.motherName || ''} onChange={e => setStudentForm(prev => ({ ...prev, motherName: e.target.value }))} placeholder="Mother's Name" />
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </SectionBlock>
                     )}
@@ -1169,6 +1268,154 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                         </>
                     )}
 
+                    {/* ═══════════════════════════════════════════════════════════
+                        TWO-TERM MODE
+                    ═══════════════════════════════════════════════════════════ */}
+                    {reportType === 'two-term' && (
+                        <>
+                            {/* ── Academic Session ── */}
+                            <SectionBlock icon={<GraduationCap className="h-4 w-4" />} title="Academic Session">
+                                <div className="max-w-sm">
+                                    <label className="label mb-1 block text-gray-700 dark:text-[#8E8E93]">Select Session</label>
+                                    <Select
+                                        value={selectedSessionId}
+                                        onChange={e => setSelectedSessionId(e.target.value)}
+                                        disabled={sessionsLoading}
+                                        placeholder={sessionsLoading ? 'Loading...' : 'Select Session'}
+                                        options={[
+                                            { value: '', label: 'Select Session' },
+                                            ...sessions.map(s => ({
+                                                value: s._id,
+                                                label: `${s.name}${s.isActive ? ' (Active)' : ''}`
+                                            }))
+                                        ]}
+                                    />
+                                </div>
+                            </SectionBlock>
+
+                            {/* ── Term Configuration ── */}
+                            <SectionBlock title="Term Configuration" icon={<Layers className="h-4 w-4" />}>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {/* Term 1 */}
+                                    <div className="p-3 bg-blue-50/50 dark:bg-blue-500/5 rounded-xl border border-blue-200/50 dark:border-blue-500/20">
+                                        <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide">Term 1</h4>
+                                        {term1Exams.map((exam, idx) => (
+                                            <div key={idx} className="flex gap-2 mb-2 items-center">
+                                                <input type="text" className="input text-sm flex-1" placeholder="Exam name" value={exam.name} onChange={e => setTerm1Exams(prev => prev.map((ex, i) => i === idx ? { ...ex, name: e.target.value } : ex))} />
+                                                <input type="number" className="input text-sm w-20 text-center" placeholder="Max" value={exam.maxMarks} onChange={e => setTerm1Exams(prev => prev.map((ex, i) => i === idx ? { ...ex, maxMarks: e.target.value } : ex))} />
+                                                {term1Exams.length > 1 && <button type="button" onClick={() => setTerm1Exams(prev => prev.filter((_, i) => i !== idx))} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>}
+                                            </div>
+                                        ))}
+                                        <button type="button" onClick={() => setTerm1Exams(prev => [...prev, { name: '', maxMarks: 0 }])} className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 mt-1"><Plus className="h-3 w-3" /> Add Exam</button>
+                                    </div>
+                                    {/* Term 2 */}
+                                    <div className="p-3 bg-emerald-50/50 dark:bg-emerald-500/5 rounded-xl border border-emerald-200/50 dark:border-emerald-500/20">
+                                        <h4 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wide">Term 2</h4>
+                                        {term2Exams.map((exam, idx) => (
+                                            <div key={idx} className="flex gap-2 mb-2 items-center">
+                                                <input type="text" className="input text-sm flex-1" placeholder="Exam name" value={exam.name} onChange={e => setTerm2Exams(prev => prev.map((ex, i) => i === idx ? { ...ex, name: e.target.value } : ex))} />
+                                                <input type="number" className="input text-sm w-20 text-center" placeholder="Max" value={exam.maxMarks} onChange={e => setTerm2Exams(prev => prev.map((ex, i) => i === idx ? { ...ex, maxMarks: e.target.value } : ex))} />
+                                                {term2Exams.length > 1 && <button type="button" onClick={() => setTerm2Exams(prev => prev.filter((_, i) => i !== idx))} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>}
+                                            </div>
+                                        ))}
+                                        <button type="button" onClick={() => setTerm2Exams(prev => [...prev, { name: '', maxMarks: 0 }])} className="text-xs text-emerald-500 hover:text-emerald-700 flex items-center gap-1 mt-1"><Plus className="h-3 w-3" /> Add Exam</button>
+                                    </div>
+                                </div>
+                                {errors.exams && <p className="text-xs text-red-500 mt-2">{errors.exams}</p>}
+                            </SectionBlock>
+
+                            {/* ── Two-Term Subjects & Marks ── */}
+                            <SectionBlock icon={<BookOpen className="h-4 w-4" />} title="Subjects & Marks">
+                                <div className="flex items-center justify-between mb-3">
+                                    <p className="text-xs text-gray-400 dark:text-[#636366]">
+                                        {twoTermSubjects.length} subject{twoTermSubjects.length !== 1 ? 's' : ''}
+                                    </p>
+                                    <button type="button" onClick={populateFromSystem} className="text-xs text-primary-500 hover:text-primary-700 font-medium">Load subjects from system</button>
+                                </div>
+                                <div className="overflow-x-auto -mx-4 px-4">
+                                    <table className="w-full text-sm border-collapse min-w-[600px]">
+                                        <thead>
+                                            <tr>
+                                                <th className="text-left text-[10px] font-semibold text-gray-400 dark:text-[#636366] uppercase pb-1 px-1" rowSpan={2}>Subject</th>
+                                                {term1Exams.filter(e => e.name.trim()).map((e, i) => <th key={`t1h-${i}`} className="text-center text-[10px] font-semibold text-blue-500 uppercase pb-1 px-1">{e.name}<br/><span className="text-[9px] text-gray-400">({e.maxMarks})</span></th>)}
+                                                <th className="text-center text-[10px] font-semibold text-blue-600 uppercase pb-1 px-1">T1</th>
+                                                {term2Exams.filter(e => e.name.trim()).map((e, i) => <th key={`t2h-${i}`} className="text-center text-[10px] font-semibold text-emerald-500 uppercase pb-1 px-1">{e.name}<br/><span className="text-[9px] text-gray-400">({e.maxMarks})</span></th>)}
+                                                <th className="text-center text-[10px] font-semibold text-emerald-600 uppercase pb-1 px-1">T2</th>
+                                                <th className="text-center text-[10px] font-semibold text-gray-500 uppercase pb-1 px-1 w-12"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {twoTermSubjects.map((sub, si) => {
+                                                const t1Exs = term1Exams.filter(e => e.name.trim());
+                                                const t2Exs = term2Exams.filter(e => e.name.trim());
+                                                const t1Total = t1Exs.reduce((a, e) => a + (Number(sub.marks[e.name]) || 0), 0);
+                                                const t1Max = t1Exs.reduce((a, e) => a + (Number(e.maxMarks) || 0), 0);
+                                                const t2Total = t2Exs.reduce((a, e) => a + (Number(sub.marks[e.name]) || 0), 0);
+                                                const t2Max = t2Exs.reduce((a, e) => a + (Number(e.maxMarks) || 0), 0);
+                                                return (
+                                                    <tr key={si}>
+                                                        <td className="px-1 py-1">
+                                                            <SubjectComboInput
+                                                                value={sub.name}
+                                                                onChange={val => setTwoTermSubjects(prev => prev.map((s, i) => i === si ? { ...s, name: val } : s))}
+                                                                subjectsList={filteredSubjectsList}
+                                                                placeholder="Subject"
+                                                                className="min-w-[120px]"
+                                                            />
+                                                        </td>
+                                                        {t1Exs.map((e, ei) => (
+                                                            <td key={`t1-${ei}`} className="px-1 py-1">
+                                                                <input type="number" min="0" max={e.maxMarks} className="input text-sm text-center w-full" placeholder="-" value={sub.marks[e.name] ?? ''} onChange={ev => setTwoTermSubjects(prev => prev.map((s, i) => i === si ? { ...s, marks: { ...s.marks, [e.name]: ev.target.value } } : s))} />
+                                                            </td>
+                                                        ))}
+                                                        <td className="px-1 py-1 text-center text-xs font-semibold text-blue-600">{t1Max > 0 ? `${t1Total}/${t1Max}` : '-'}</td>
+                                                        {t2Exs.map((e, ei) => (
+                                                            <td key={`t2-${ei}`} className="px-1 py-1">
+                                                                <input type="number" min="0" max={e.maxMarks} className="input text-sm text-center w-full" placeholder="-" value={sub.marks[e.name] ?? ''} onChange={ev => setTwoTermSubjects(prev => prev.map((s, i) => i === si ? { ...s, marks: { ...s.marks, [e.name]: ev.target.value } } : s))} />
+                                                            </td>
+                                                        ))}
+                                                        <td className="px-1 py-1 text-center text-xs font-semibold text-emerald-600">{t2Max > 0 ? `${t2Total}/${t2Max}` : '-'}</td>
+                                                        <td className="px-1 py-1 text-center">
+                                                            <button type="button" onClick={() => { if (twoTermSubjects.length > 1) setTwoTermSubjects(prev => prev.filter((_, i) => i !== si)); }} className="p-1 text-gray-300 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <button type="button" onClick={() => setTwoTermSubjects(prev => [...prev, { name: '', passingPercentage: 33, marks: {} }])} className="mt-2 text-xs text-primary-500 hover:text-primary-700 font-medium flex items-center gap-1"><Plus className="h-3.5 w-3.5" /> Add Subject</button>
+                                {errors.twoTermSubjects && <p className="text-xs text-red-500 mt-1">{errors.twoTermSubjects}</p>}
+                            </SectionBlock>
+
+                            {/* ── Co-Scholastic Areas ── */}
+                            <SectionBlock title="Co-Scholastic Areas (Optional)" icon={<GraduationCap className="h-4 w-4" />}>
+                                {coScholastic.map((item, idx) => (
+                                    <div key={idx} className="grid grid-cols-[1fr_80px_80px] gap-2 mb-2 items-center">
+                                        <input type="text" className="input text-sm" value={item.area} onChange={e => setCoScholastic(prev => prev.map((c, i) => i === idx ? { ...c, area: e.target.value } : c))} placeholder="Area name" />
+                                        <select className="input text-sm text-center" value={item.term1Grade} onChange={e => setCoScholastic(prev => prev.map((c, i) => i === idx ? { ...c, term1Grade: e.target.value } : c))}>
+                                            <option value="">T1</option>
+                                            <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option>
+                                        </select>
+                                        <select className="input text-sm text-center" value={item.term2Grade} onChange={e => setCoScholastic(prev => prev.map((c, i) => i === idx ? { ...c, term2Grade: e.target.value } : c))}>
+                                            <option value="">T2</option>
+                                            <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option>
+                                        </select>
+                                    </div>
+                                ))}
+                            </SectionBlock>
+
+                            {/* ── Result ── */}
+                            <SectionBlock title="Result" icon={<GraduationCap className="h-4 w-4" />}>
+                                <select className="input text-sm" value={resultText} onChange={e => setResultText(e.target.value)}>
+                                    <option value="Promoted">Promoted</option>
+                                    <option value="Not Promoted">Not Promoted</option>
+                                    <option value="Detained">Detained</option>
+                                </select>
+                            </SectionBlock>
+                        </>
+                    )}
+
                     {/* ── Remarks ── */}
                     <SectionBlock icon={<MessageSquare className="h-4 w-4" />} title="Remarks (Optional)">
                         <div className="flex flex-wrap gap-1.5 mb-3">
@@ -1388,8 +1635,10 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                                                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                                                         record.reportType === 'cumulative'
                                                             ? 'bg-purple-50 text-purple-600 dark:bg-purple-500/10 dark:text-purple-400'
+                                                            : record.reportType === 'two-term'
+                                                            ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
                                                             : 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
-                                                    }`}>{record.reportType === 'cumulative' ? 'Cumulative' : 'Single'}</span>
+                                                    }`}>{record.reportType === 'cumulative' ? 'Cumulative' : record.reportType === 'two-term' ? 'Two-Term' : 'Single'}</span>
                                                     <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
                                                         record.result === 'PASS'
                                                             ? 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400'

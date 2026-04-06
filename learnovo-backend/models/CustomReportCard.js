@@ -31,7 +31,7 @@ const customReportCardSchema = new mongoose.Schema({
   },
   reportType: {
     type: String,
-    enum: ['single', 'cumulative'],
+    enum: ['single', 'cumulative', 'two-term'],
     required: true
   },
   examInfo: {
@@ -52,7 +52,6 @@ const customReportCardSchema = new mongoose.Schema({
   },
   result: {
     type: String,
-    enum: ['PASS', 'FAIL'],
     default: 'FAIL'
   },
   remarks: {

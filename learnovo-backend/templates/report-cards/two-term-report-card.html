@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Card — {{student_name}}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+  :root {
+    --rc-primary: {{brand_color}};
+    --rc-primary-light: {{brand_color_light}};
+    --rc-text-primary: #111827;
+    --rc-text-secondary: #4B5563;
+    --rc-text-muted: #6B7280;
+    --rc-bg-subtle: #F9FAFB;
+    --rc-border: #D1D5DB;
+    --rc-border-light: #E5E7EB;
+    --rc-grade-excellent: #059669;
+    --rc-grade-good: #2563EB;
+    --rc-grade-average: #D97706;
+    --rc-grade-poor: #DC2626;
+    --rc-pass: #059669;
+    --rc-fail: #DC2626;
+    --rc-term1-bg: #EFF6FF;
+    --rc-term2-bg: #ECFDF5;
+  }
+
+  @page { size: A4; margin: 10mm 15mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: #FFFFFF;
+    color: var(--rc-text-primary);
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    width: 180mm;
+    overflow: hidden;
+  }
+
+  .page {
+    width: 180mm;
+    background: #FFFFFF; padding: 0; margin: 0; position: relative;
+    page-break-inside: avoid; page-break-after: avoid;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header { position: relative; text-align: center; padding: 0 0 8px; margin-bottom: 0; }
+  .logo-wrap {
+    position: absolute; left: 0; top: 0;
+    width: 80px; height: 80px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; overflow: hidden;
+  }
+  .logo-wrap img, .logo-wrap svg { width: 80px; height: 80px; object-fit: contain; }
+  .school-logo { width: 80px; height: 80px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+  .school-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .school-logo-fallback {
+    width: 80px; height: 80px; border-radius: 8px;
+    background: var(--rc-primary);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; flex-shrink: 0;
+  }
+
+  .school-info { text-align: center; }
+  .school-name {
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-size: 20px; font-weight: 800; color: #1F6F6D;
+    letter-spacing: 1.5px; line-height: 1.15; text-transform: uppercase;
+    word-wrap: break-word; overflow-wrap: break-word;
+  }
+  .school-address { font-size: 11px; color: #374151; font-weight: 500; margin-top: 3px; line-height: 1.3; }
+  .school-contact { font-size: 10px; color: #374151; font-weight: 500; margin-top: 2px; }
+  .aff-row { display: flex; justify-content: center; gap: 16px; margin-top: 4px; flex-wrap: wrap; }
+  .aff-line { font-size: 10px; color: #374151; font-weight: 500; line-height: 1.4; }
+  .aff-line b { font-weight: 700; color: #111827; }
+
+  .accent-line { height: 1.5px; background: #9CA3AF; margin: 8px 0 10px; border: none; }
+
+  /* ── TITLE ROW ── */
+  .report-title-row {
+    text-align: center; margin-bottom: 10px;
+  }
+  .report-title {
+    font-size: 13px; font-weight: 700; color: var(--rc-primary);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  /* ── STUDENT INFO CARD ── */
+  .student-card {
+    background: var(--rc-bg-subtle); border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 10px;
+  }
+  .student-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px 16px; }
+  .info-label {
+    font-size: 9px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 1px;
+  }
+  .info-value { font-size: 12px; font-weight: 600; color: var(--rc-text-primary); }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--rc-text-muted); margin-bottom: 6px;
+  }
+
+  /* ── MARKS TABLE ── */
+  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
+
+  /* Two-row header */
+  .marks-table thead th {
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.03em; color: var(--rc-text-primary);
+    padding: 5px 2px; text-align: center;
+    border-bottom: 1.5px solid var(--rc-border);
+    overflow: hidden; word-wrap: break-word;
+  }
+  .marks-table thead th.subject-col { text-align: left; width: 18%; }
+  .marks-table thead th.term1-group {
+    background: var(--rc-term1-bg); border-bottom: 2px solid #93C5FD;
+  }
+  .marks-table thead th.term2-group {
+    background: var(--rc-term2-bg); border-bottom: 2px solid #6EE7B7;
+  }
+  .marks-table thead th.term1-sub {
+    background: rgba(219, 234, 254, 0.4);
+  }
+  .marks-table thead th.term2-sub {
+    background: rgba(209, 250, 229, 0.4);
+  }
+
+  /* Body */
+  .marks-table tbody td {
+    font-size: 10px; color: var(--rc-text-primary);
+    padding: 5px 2px; text-align: center;
+    border-bottom: 0.5px solid var(--rc-border-light); font-weight: 500;
+    overflow: hidden;
+  }
+  .marks-table tbody tr:nth-child(even) { background: rgba(249, 250, 251, 0.5); }
+  .marks-table tbody td.subject-cell {
+    text-align: left; font-weight: 600; color: var(--rc-text-primary);
+    font-size: 9px; word-wrap: break-word; overflow-wrap: break-word;
+  }
+  .marks-table tbody td.no-data { color: #D1D5DB; }
+
+  /* Grade display */
+  .grade-display { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; }
+  .grade-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+  .grade-dot.excellent { background: var(--rc-grade-excellent); }
+  .grade-dot.good { background: var(--rc-grade-good); }
+  .grade-dot.average { background: var(--rc-grade-average); }
+  .grade-dot.poor { background: var(--rc-grade-poor); }
+  .pass-text { color: var(--rc-pass); font-weight: 600; font-size: 10px; }
+  .fail-text { color: var(--rc-fail); font-weight: 600; font-size: 10px; }
+
+  /* Grand Total Row */
+  .marks-table tfoot td {
+    font-size: 10px; font-weight: 700; color: var(--rc-text-primary);
+    padding: 6px 2px; text-align: center;
+    border-top: 1.5px solid var(--rc-primary); background: var(--rc-primary-light);
+  }
+  .marks-table tfoot td.subject-cell { text-align: left; }
+
+  /* ── SUMMARY BANNER ── */
+  .summary-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--rc-bg-subtle); border-radius: 8px;
+    padding: 8px 14px; margin-bottom: 8px; gap: 8px;
+  }
+  .summary-block { text-align: center; flex: 1; }
+  .summary-block-title {
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 3px;
+  }
+  .summary-block-content {
+    font-size: 10px; font-weight: 600; color: var(--rc-text-primary); line-height: 1.5;
+  }
+  .summary-divider {
+    width: 1px; height: 30px; background: var(--rc-border-light); flex-shrink: 0;
+  }
+
+  /* ── RESULT BANNER ── */
+  .result-banner {
+    border-radius: 0 8px 8px 0; padding: 10px 16px;
+    margin-bottom: 8px; display: flex;
+    align-items: center; justify-content: space-between;
+  }
+  .result-banner.pass { border-left: 3px solid var(--rc-pass); background: rgba(5, 150, 105, 0.04); }
+  .result-banner.fail { border-left: 3px solid var(--rc-fail); background: rgba(220, 38, 38, 0.04); }
+  .result-status { display: flex; align-items: center; gap: 8px; }
+  .result-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .result-dot.pass { background: var(--rc-pass); }
+  .result-dot.fail { background: var(--rc-fail); }
+  .result-label { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+  .result-label.pass { color: var(--rc-pass); }
+  .result-label.fail { color: var(--rc-fail); }
+  .result-details { text-align: right; }
+  .result-perf { font-size: 11px; color: var(--rc-text-secondary); }
+  .result-stats { font-size: 10px; color: var(--rc-text-muted); }
+
+  /* ── CO-SCHOLASTIC ── */
+  .co-scholastic-section { margin-bottom: 8px; }
+
+  /* ── REMARKS + RESULT ── */
+  .remarks-result-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 8px; gap: 20px;
+  }
+  .remarks-block { flex: 2; }
+  .remarks-label {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 3px;
+  }
+  .remarks-text {
+    font-size: 11px; color: var(--rc-text-secondary); line-height: 1.5;
+    padding: 6px 0; border-bottom: 0.5px solid var(--rc-border-light);
+    min-height: 24px; font-style: italic;
+  }
+  .result-block { flex: 1; text-align: right; }
+  .result-inline-label {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 3px;
+  }
+  .result-inline-value {
+    font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+  }
+
+  /* ── SIGNATURES ── */
+  .signatures { display: flex; justify-content: space-between; margin-bottom: 10px; padding-top: 4px; }
+  .sig-block { text-align: center; width: 140px; }
+  .sig-line {
+    width: 100%; height: 1px; background: var(--rc-border);
+    margin-bottom: 6px; margin-top: 40px; position: relative;
+  }
+  .sig-img {
+    position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+    max-height: 50px; max-width: 130px; object-fit: contain;
+  }
+  .sig-label { font-size: 10px; font-weight: 600; color: var(--rc-text-secondary); }
+  .sig-sublabel { font-size: 8px; color: var(--rc-text-muted); margin-top: 1px; }
+
+  /* ── FOOTER ── */
+  .footer { text-align: center; padding-top: 8px; border-top: 0.5px solid var(--rc-border-light); }
+  .footer-text { font-size: 9px; color: var(--rc-text-muted); letter-spacing: 0.02em; font-style: italic; }
+
+  @media print { body { background: white; } .page { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo-wrap"><!-- LOGO_PLACEHOLDER --></div>
+    <div class="school-info">
+      <div class="school-name">{{school_name}}</div>
+      <div class="school-address">{{school_address}}</div>
+      <div class="school-contact">Phone: {{school_phone}} &nbsp;|&nbsp; Email: {{school_email}}</div>
+      <div class="aff-row">
+        <div class="aff-line">Affiliation No: <b>{{affiliation_no}}</b></div>
+        <div class="aff-line">School Code: <b>{{school_code}}</b></div>
+        <div class="aff-line">UDISE: <b>{{udise_no}}</b></div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="accent-line">
+
+  <!-- TITLE -->
+  <div class="report-title-row">
+    <div class="report-title">Report Card &mdash; Session {{session_name}}</div>
+  </div>
+
+  <!-- STUDENT INFO -->
+  <div class="student-card">
+    <div class="student-grid">
+      <div class="info-field">
+        <div class="info-label">Student Name</div>
+        <div class="info-value">{{student_name}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Date of Birth</div>
+        <div class="info-value">{{dob}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Admission No.</div>
+        <div class="info-value">{{adm_number}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Roll Number</div>
+        <div class="info-value">{{roll_number}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Father's Name</div>
+        <div class="info-value">{{father_name}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Mother's Name</div>
+        <div class="info-value">{{mother_name}}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-label">Class / Section</div>
+        <div class="info-value">{{class_section}}</div>
+      </div>
+      <div class="info-field"></div>
+    </div>
+  </div>
+
+  <!-- SCHOLASTIC AREAS -->
+  <div class="section-label">Scholastic Areas</div>
+
+  <table class="marks-table">
+    <thead>
+      <tr>
+        <th class="subject-col" rowspan="2">Subject</th>
+        <th class="term1-group" colspan="{{term1_colspan}}">Term 1</th>
+        <th class="term2-group" colspan="{{term2_colspan}}">Term 2</th>
+      </tr>
+      <tr>
+        {{term1_exam_headers}}
+        <th class="term1-sub">Total</th>
+        <th class="term1-sub">Grade</th>
+        {{term2_exam_headers}}
+        <th class="term2-sub">Total</th>
+        <th class="term2-sub">Grade</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{subject_rows}}
+    </tbody>
+    <tfoot>
+      {{grand_total_row}}
+    </tfoot>
+  </table>
+
+  <!-- SUMMARY -->
+  <div class="summary-row">
+    <div class="summary-block">
+      <div class="summary-block-title">Term 1</div>
+      <div class="summary-block-content">
+        Total: {{term1_total}} &nbsp;|&nbsp; Percentage: {{term1_percentage}} &nbsp;|&nbsp; Grade: {{term1_grade}}
+      </div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-block">
+      <div class="summary-block-title">Term 2</div>
+      <div class="summary-block-content">
+        Total: {{term2_total}} &nbsp;|&nbsp; Percentage: {{term2_percentage}} &nbsp;|&nbsp; Grade: {{term2_grade}}
+      </div>
+    </div>
+    <div class="summary-divider"></div>
+    <div class="summary-block">
+      <div class="summary-block-title">Overall</div>
+      <div class="summary-block-content">
+        {{overall_percentage}} &nbsp;|&nbsp; Grade: {{overall_grade}}
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT BANNER -->
+  <div class="result-banner {{result_banner_class}}">
+    <div class="result-status">
+      <div class="result-dot {{result_banner_class}}"></div>
+      <div class="result-label {{result_banner_class}}">{{result_text}}</div>
+    </div>
+    <div class="result-details">
+      <div class="result-perf">{{result_detail}}</div>
+    </div>
+  </div>
+
+  <!-- CO_SCHOLASTIC_SECTION -->
+
+  <!-- REMARKS + RESULT -->
+  <div class="remarks-result-row">
+    <div class="remarks-block">
+      <div class="remarks-label">Class Teacher's Remarks</div>
+      <div class="remarks-text">{{remarks_text}}</div>
+    </div>
+    <div class="result-block">
+      <div class="result-inline-label">Result</div>
+      <div class="result-inline-value">{{result_status}}</div>
+    </div>
+  </div>
+
+  <!-- SIGNATURES -->
+  <div class="signatures">
+    <div class="sig-block">
+      <div class="sig-line"><!-- CLASS_TEACHER_SIGNATURE_PLACEHOLDER --></div>
+      <div class="sig-label">Class Teacher</div>
+      <div class="sig-sublabel">Signature &amp; Seal</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line"><!-- EXAM_CELL_SIGNATURE_PLACEHOLDER --></div>
+      <div class="sig-label">Exam Cell Incharge</div>
+      <div class="sig-sublabel">Signature &amp; Seal</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-line"><!-- PRINCIPAL_SIGNATURE_PLACEHOLDER --></div>
+      <div class="sig-label">Principal</div>
+      <div class="sig-sublabel">Signature &amp; Seal</div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-text">This is a computer-generated report card issued by {{school_name}} &middot; Powered by Learnovo</div>
+  </div>
+
+</div>
+</body>
+</html>

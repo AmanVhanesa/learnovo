@@ -375,6 +375,149 @@ function buildFinalReportCardPlaceholders(data) {
   };
 }
 
+// ── Two-Term Report Card helpers ──
+
+function calcGrade(pct) {
+  if (pct >= 90) return 'A+';
+  if (pct >= 80) return 'A';
+  if (pct >= 70) return 'B';
+  if (pct >= 60) return 'C';
+  if (pct >= 50) return 'D';
+  return 'F';
+}
+
+function buildTwoTermPlaceholders(data) {
+  const { school, student, session, term1, term2, subjectRows, coScholastic, summary, remarks, result } = data;
+  const brandColor = school.brand_color || school.brandColor || '#1E3A5F';
+
+  // Term exam headers
+  const t1Exams = term1.exams || [];
+  const t2Exams = term2.exams || [];
+
+  const term1ExamHeaders = t1Exams.map(e =>
+    `<th class="num term1-sub">${escapeHtml(e.name)}<br><span style="font-weight:400;font-size:7px;color:#6B7280">(${e.maxMarks})</span></th>`
+  ).join('');
+
+  const term2ExamHeaders = t2Exams.map(e =>
+    `<th class="num term2-sub">${escapeHtml(e.name)}<br><span style="font-weight:400;font-size:7px;color:#6B7280">(${e.maxMarks})</span></th>`
+  ).join('');
+
+  // Subject rows
+  const subjectRowsHtml = subjectRows.map(row => {
+    const t1Cells = t1Exams.map(e => {
+      const v = row.marks[e.name];
+      return v !== undefined && v !== null && v !== '' ? `<td>${v}</td>` : '<td class="no-data">\u2014</td>';
+    }).join('');
+
+    const t2Cells = t2Exams.map(e => {
+      const v = row.marks[e.name];
+      return v !== undefined && v !== null && v !== '' ? `<td>${v}</td>` : '<td class="no-data">\u2014</td>';
+    }).join('');
+
+    const t1gc = getGradeClass(row.term1Grade);
+    const t2gc = getGradeClass(row.term2Grade);
+
+    return `<tr>
+      <td class="subject-cell">${escapeHtml(row.subject)}</td>
+      ${t1Cells}
+      <td style="font-weight:700">${row.term1Total}</td>
+      <td><span class="grade-display"><span class="grade-dot ${t1gc}"></span> ${escapeHtml(row.term1Grade)}</span></td>
+      ${t2Cells}
+      <td style="font-weight:700">${row.term2Total}</td>
+      <td><span class="grade-display"><span class="grade-dot ${t2gc}"></span> ${escapeHtml(row.term2Grade)}</span></td>
+    </tr>`;
+  }).join('\n');
+
+  // Grand total row
+  const t1GrandCells = t1Exams.map(e => {
+    const total = subjectRows.reduce((a, r) => a + (Number(r.marks[e.name]) || 0), 0);
+    return `<td style="font-weight:700">${total}</td>`;
+  }).join('');
+
+  const t2GrandCells = t2Exams.map(e => {
+    const total = subjectRows.reduce((a, r) => a + (Number(r.marks[e.name]) || 0), 0);
+    return `<td style="font-weight:700">${total}</td>`;
+  }).join('');
+
+  const ogc = getGradeClass(summary.overallGrade);
+
+  const grandTotalRow = `<tr>
+    <td class="subject-cell">Grand Total</td>
+    ${t1GrandCells}
+    <td style="font-weight:700">${summary.term1Total}</td>
+    <td><span class="grade-display"><span class="grade-dot ${getGradeClass(summary.term1Grade)}"></span> ${summary.term1Grade}</span></td>
+    ${t2GrandCells}
+    <td style="font-weight:700">${summary.term2Total}</td>
+    <td><span class="grade-display"><span class="grade-dot ${getGradeClass(summary.term2Grade)}"></span> ${summary.term2Grade}</span></td>
+  </tr>`;
+
+  // Co-Scholastic section
+  let coScholasticHtml = '';
+  if (coScholastic && coScholastic.length > 0 && coScholastic.some(c => c.term1Grade || c.term2Grade)) {
+    const rows = coScholastic.filter(c => c.area).map(c =>
+      `<tr><td style="text-align:left;padding:4px 8px;font-size:10px">${escapeHtml(c.area)}</td><td style="text-align:center;padding:4px;font-size:10px;font-weight:600">${escapeHtml(c.term1Grade || '\u2014')}</td><td style="text-align:center;padding:4px;font-size:10px;font-weight:600">${escapeHtml(c.term2Grade || '\u2014')}</td></tr>`
+    ).join('');
+    coScholasticHtml = `
+      <div style="margin-bottom:12px">
+        <div class="section-label">Co-Scholastic Areas</div>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+          <thead><tr>
+            <th style="text-align:left;padding:4px 8px;font-size:8px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:60%">Area</th>
+            <th style="text-align:center;padding:4px;font-size:8px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">Term 1</th>
+            <th style="text-align:center;padding:4px;font-size:8px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">Term 2</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  const dob = student.dob
+    ? new Date(student.dob).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
+    : '\u2014';
+
+  const isPassed = summary.overallPassed;
+
+  return {
+    brand_color: brandColor,
+    brand_color_light: `${brandColor}0A`,
+    school_name: school.name || '',
+    school_address: school.address || '',
+    school_phone: school.phone || '',
+    school_email: school.email || '',
+    affiliation_no: school.affiliation || '',
+    school_code: school.schoolCode || '',
+    udise_no: school.udise || '',
+    session_name: session.name || '',
+    student_name: student.name || '',
+    adm_number: student.admissionNumber || '\u2014',
+    class_section: `${student.class || ''}${student.section ? ' \u2014 ' + student.section : ''}`,
+    roll_number: student.rollNumber || '\u2014',
+    dob,
+    father_name: student.fatherName || '\u2014',
+    mother_name: student.motherName || '\u2014',
+    term1_colspan: String(t1Exams.length + 2),
+    term2_colspan: String(t2Exams.length + 2),
+    term1_exam_headers: term1ExamHeaders,
+    term2_exam_headers: term2ExamHeaders,
+    subject_rows: subjectRowsHtml,
+    grand_total_row: grandTotalRow,
+    term1_total: `${summary.term1Total} / ${summary.term1Max}`,
+    term1_percentage: `${summary.term1Percentage}%`,
+    term1_grade: summary.term1Grade,
+    term2_total: `${summary.term2Total} / ${summary.term2Max}`,
+    term2_percentage: `${summary.term2Percentage}%`,
+    term2_grade: summary.term2Grade,
+    overall_percentage: `${summary.overallPercentage}%`,
+    overall_grade: summary.overallGrade,
+    result_banner_class: isPassed ? 'pass' : 'fail',
+    result_text: isPassed ? 'PASSED' : 'FAILED',
+    result_detail: `Overall: ${summary.overallPercentage}% \u00B7 Grade: ${summary.overallGrade}`,
+    co_scholastic_html: coScholasticHtml,
+    remarks_text: remarks || '',
+    result_status: result || (isPassed ? 'Promoted' : 'Not Promoted')
+  };
+}
+
 function buildSubjectRow(subject) {
   const gradeClass = getGradeClass(subject.grade);
   const resultClass = subject.isPassed ? 'pass-text' : 'fail-text';
@@ -765,6 +908,64 @@ const pdfService = {
     html = await injectSignature(html, '<!-- CLASS_TEACHER_SIGNATURE_PLACEHOLDER -->', data.signatures?.class_teacher);
     html = injectAttendanceSection(html, data.attendance);
     html = injectRemarksSection(html, null);
+
+    // Strip external font requests for speed
+    html = stripExternalFonts(html);
+
+    let browser, page;
+    try {
+      browser = await getBrowser();
+      page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const pdfUint8 = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 }
+      });
+      return Buffer.from(pdfUint8);
+    } catch (err) {
+      if (err.message && (err.message.includes('Target closed') || err.message.includes('Protocol error') || err.message.includes('Session closed'))) {
+        console.error('[pdfService] Browser crashed, resetting instance');
+        browserInstance = null;
+        activePages = 0;
+      }
+      throw err;
+    } finally {
+      if (page) { try { await page.close(); } catch { /* ignore */ } }
+      releaseBrowser();
+    }
+  },
+
+  /**
+   * Generate a two-term report card PDF.
+   */
+  generateTwoTermReportCard: async(data) => {
+    const templatePath = path.join(__dirname, '..', 'templates', 'report-cards', 'two-term-report-card.html');
+    let html = getCachedTemplate(templatePath);
+
+    const placeholders = buildTwoTermPlaceholders(data);
+
+    // Inject raw HTML placeholders before fillTemplate escapes them
+    const rawKeys = ['term1_exam_headers', 'term2_exam_headers', 'subject_rows', 'grand_total_row'];
+    rawKeys.forEach(key => {
+      if (placeholders[key]) {
+        html = html.replace(`{{${key}}}`, placeholders[key]);
+        delete placeholders[key];
+      }
+    });
+
+    // Inject co-scholastic section
+    html = html.replace('<!-- CO_SCHOLASTIC_SECTION -->', placeholders.co_scholastic_html || '');
+    delete placeholders.co_scholastic_html;
+
+    html = fillTemplate(html, placeholders);
+
+    // Inject images
+    const brandColor = data.school?.brand_color || data.school?.brandColor || '#1E3A5F';
+    html = await injectReportCardLogo(html, data.school?.logo_url || data.school?.logo, brandColor);
+    html = await injectSignature(html, '<!-- PRINCIPAL_SIGNATURE_PLACEHOLDER -->', data.signatures?.principal);
+    html = await injectSignature(html, '<!-- CLASS_TEACHER_SIGNATURE_PLACEHOLDER -->', data.signatures?.class_teacher);
 
     // Strip external font requests for speed
     html = stripExternalFonts(html);

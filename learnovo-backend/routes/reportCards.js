@@ -430,6 +430,99 @@ router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, re
       const studentName = (studentData.name || 'Student').replace(/\s+/g, '_');
       filename = `Custom_Cumulative_Report_Card_${studentName}.pdf`;
 
+    } else if (reportType === 'two-term') {
+      // ─── TWO-TERM Report Card ───
+      const { term1, term2, subjects, coScholastic, sessionName } = req.body;
+      const resultText = req.body.result || '';
+
+      if (!term1?.exams?.length || !term2?.exams?.length) {
+        return res.status(400).json({ success: false, message: 'Both term1 and term2 must have exams array' });
+      }
+      if (!subjects || !Array.isArray(subjects) || subjects.length === 0) {
+        return res.status(400).json({ success: false, message: 'subjects (non-empty array) is required' });
+      }
+
+      const t1Exams = term1.exams;
+      const t2Exams = term2.exams;
+
+      // Build per-subject computed data
+      const subjectRows = subjects.map(sub => {
+        const marks = sub.marks || {};
+        let t1Total = 0, t1Max = 0, t2Total = 0, t2Max = 0;
+
+        t1Exams.forEach(e => {
+          const v = Number(marks[e.name]);
+          if (!isNaN(v) && marks[e.name] !== '' && marks[e.name] !== null && marks[e.name] !== undefined) {
+            t1Total += v;
+            t1Max += Number(e.maxMarks) || 0;
+          }
+        });
+        t2Exams.forEach(e => {
+          const v = Number(marks[e.name]);
+          if (!isNaN(v) && marks[e.name] !== '' && marks[e.name] !== null && marks[e.name] !== undefined) {
+            t2Total += v;
+            t2Max += Number(e.maxMarks) || 0;
+          }
+        });
+
+        const t1Pct = t1Max > 0 ? Math.round((t1Total / t1Max) * 100 * 10) / 10 : 0;
+        const t2Pct = t2Max > 0 ? Math.round((t2Total / t2Max) * 100 * 10) / 10 : 0;
+        const overallTotal = t1Total + t2Total;
+        const overallMax = t1Max + t2Max;
+        const overallPct = overallMax > 0 ? Math.round((overallTotal / overallMax) * 100 * 10) / 10 : 0;
+
+        return {
+          subject: sub.name,
+          marks,
+          term1Total: t1Total, term1Max: t1Max, term1Pct, term1Grade: calculateGrade(t1Pct),
+          term2Total: t2Total, term2Max: t2Max, term2Pct, term2Grade: calculateGrade(t2Pct),
+          overallPct, overallGrade: calculateGrade(overallPct),
+          isPassed: overallPct >= (Number(sub.passingPercentage) || 33)
+        };
+      });
+
+      // Grand totals
+      const gT1Total = subjectRows.reduce((a, r) => a + r.term1Total, 0);
+      const gT1Max = subjectRows.reduce((a, r) => a + r.term1Max, 0);
+      const gT2Total = subjectRows.reduce((a, r) => a + r.term2Total, 0);
+      const gT2Max = subjectRows.reduce((a, r) => a + r.term2Max, 0);
+      const gT1Pct = gT1Max > 0 ? Math.round((gT1Total / gT1Max) * 100 * 10) / 10 : 0;
+      const gT2Pct = gT2Max > 0 ? Math.round((gT2Total / gT2Max) * 100 * 10) / 10 : 0;
+      const gOverallTotal = gT1Total + gT2Total;
+      const gOverallMax = gT1Max + gT2Max;
+      const gOverallPct = gOverallMax > 0 ? Math.round((gOverallTotal / gOverallMax) * 100 * 10) / 10 : 0;
+      const overallPassed = subjectRows.every(r => r.isPassed);
+
+      const pdfData = {
+        school: schoolData,
+        student: {
+          ...studentData,
+          fatherName: student.fatherName || studentData.fatherOrHusbandName || '',
+          motherName: student.motherName || ''
+        },
+        session: { name: sessionName || '' },
+        term1: { exams: t1Exams },
+        term2: { exams: t2Exams },
+        subjectRows,
+        coScholastic: coScholastic || [],
+        summary: {
+          term1Total: gT1Total, term1Max: gT1Max, term1Percentage: gT1Pct, term1Grade: calculateGrade(gT1Pct),
+          term2Total: gT2Total, term2Max: gT2Max, term2Percentage: gT2Pct, term2Grade: calculateGrade(gT2Pct),
+          overallPercentage: gOverallPct, overallGrade: calculateGrade(gOverallPct),
+          overallPassed
+        },
+        remarks: remarks || '',
+        result: resultText || (overallPassed ? 'Promoted' : 'Not Promoted'),
+        signatures: {
+          principal: settings?.institution?.principalSignature || null,
+          class_teacher: null
+        }
+      };
+
+      pdfBuffer = await getPdfService().generateTwoTermReportCard(pdfData);
+      const studentName = (studentData.name || 'Student').replace(/\s+/g, '_');
+      filename = `Two_Term_Report_Card_${studentName}.pdf`;
+
     } else {
       // ─── SINGLE Exam Report Card ───
       const { exam, subjects } = req.body;
@@ -540,6 +633,24 @@ router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, re
         return tm > 0 && (to / tm * 100) >= (Number(s.passingPercentage) || 40);
       }) ? 'PASS' : 'FAIL';
       examInfoStr = `Cumulative — ${(examsList || []).map(e => e.name).join(', ')}`;
+    } else if (reportType === 'two-term') {
+      const { term1: t1, term2: t2, subjects: subs } = req.body;
+      const t1Names = (t1?.exams || []).map(e => e.name).join(', ');
+      const t2Names = (t2?.exams || []).map(e => e.name).join(', ');
+      examInfoStr = `Two-Term — T1: ${t1Names} | T2: ${t2Names}`;
+      // Compute overall
+      let gMax = 0, gObt = 0;
+      (subs || []).forEach(s => {
+        (t1?.exams || []).concat(t2?.exams || []).forEach(e => {
+          const v = Number(s.marks?.[e.name]);
+          if (!isNaN(v) && s.marks?.[e.name] !== '' && s.marks?.[e.name] !== null && s.marks?.[e.name] !== undefined) {
+            gObt += v; gMax += Number(e.maxMarks) || 0;
+          }
+        });
+      });
+      overallPct = gMax > 0 ? Math.round((gObt / gMax) * 100 * 10) / 10 : 0;
+      overallGrd = calculateGrade(overallPct);
+      resultStr = req.body.result || (overallPct >= 33 ? 'PASS' : 'FAIL');
     } else {
       const { exam: ex, subjects: subs } = req.body;
       const gt = (subs || []).reduce((a, s) => a + (Number(s.totalMarks) || 0), 0);
