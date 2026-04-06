@@ -25,7 +25,7 @@
     --rc-fail: #DC2626;
   }
 
-  @page { size: A4; margin: 12mm 10mm; }
+  @page { size: A4; margin: 10mm 15mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -34,12 +34,12 @@
     color: var(--rc-text-primary);
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    width: 190mm; /* A4 (210mm) minus 10mm left + 10mm right margins */
+    width: 180mm;
     overflow: hidden;
   }
 
   .page {
-    width: 190mm;
+    width: 180mm;
     background: #FFFFFF; padding: 0; margin: 0; position: relative;
     page-break-inside: avoid; page-break-after: avoid;
     overflow: hidden;
@@ -66,8 +66,9 @@
   .school-info { text-align: center; }
   .school-name {
     font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-    font-size: 22px; font-weight: 800; color: #1F6F6D;
-    letter-spacing: 1.5px; line-height: 1.1; text-transform: uppercase;
+    font-size: 19px; font-weight: 800; color: #1F6F6D;
+    letter-spacing: 1px; line-height: 1.15; text-transform: uppercase;
+    word-wrap: break-word; overflow-wrap: break-word;
   }
   .school-address { font-size: 11px; color: #374151; font-weight: 500; margin-top: 3px; line-height: 1.4; }
   .school-contact { font-size: 11px; color: #374151; font-weight: 500; margin-top: 2px; }
@@ -127,6 +128,7 @@
   .marks-table tbody tr:nth-child(even) { background: rgba(249, 250, 251, 0.5); }
   .marks-table tbody td.subject-cell {
     text-align: left; font-weight: 600; color: var(--rc-text-primary);
+    font-size: 9px; word-wrap: break-word; overflow-wrap: break-word;
   }
   .marks-table tbody td.no-data { color: #D1D5DB; }
 
