@@ -158,9 +158,9 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
 
   /* Signatures */
   .sig-sec { padding: 0 20px 6px; flex-shrink: 0; }
-  .sig-row { display: flex; justify-content: space-between; align-items: flex-end; height: 80px; }
-  .sig-col { text-align: center; width: 170px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-  .sig-img { max-height: 70px; max-width: 160px; margin: 0 auto 4px; object-fit: contain; display: block; }
+  .sig-row { display: flex; justify-content: space-between; align-items: flex-end; height: 110px; }
+  .sig-col { text-align: center; width: 210px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  .sig-img { max-height: 100px; max-width: 200px; margin: 0 auto 4px; object-fit: contain; display: block; }
   .sig-col .sig-line { width: 80px; height: 1px; background: #9ca3af; margin: 0 auto 2px; }
   .sig-col .sig-label { font-size: 8px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.6px; }
 
