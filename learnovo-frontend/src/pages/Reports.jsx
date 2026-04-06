@@ -10,6 +10,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import api from '../services/authService'
 import { studentsService } from '../services/studentsService'
 import { invoicesService, feesReportsService } from '../services/feesService'
+import { sortClassObjects } from '../utils/classOrder'
 import { exportPDF, exportExcel } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 
@@ -77,7 +78,7 @@ const Reports = () => {
 
   const { data: classes = [] } = useQuery({
     queryKey: ['reports-classes'],
-    queryFn: async () => { const r = await api.get('/classes'); return r.data?.data || [] },
+    queryFn: async () => { const r = await api.get('/classes'); return sortClassObjects(r.data?.data || [], 'name') },
   })
 
   const { data: dashboard = null, isLoading: loadingDashboard, error: dashboardError, refetch: refetchDashboard } = useQuery({

@@ -8,6 +8,7 @@ import { attendanceService } from '../../services/attendanceService';
 import { teacherAssignmentsService } from '../../services/academicsService';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
+import { sortClassObjects } from '../../utils/classOrder';
 
 const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     const { user } = useAuth();
@@ -112,7 +113,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                     subjectsService.list(),
                     teacherAssignmentsService.list({ teacherId: user._id })
                 ]);
-                setClasses(classesRes?.data || []);
+                setClasses(sortClassObjects(classesRes?.data || [], 'name'));
                 const allSubjects = subjectsRes.success ? (subjectsRes.data || []) : [];
                 const mySubjectIds = new Set((assignmentsRes.data || []).map(a => (a.subjectId?._id || a.subjectId)));
                 setSubjects(allSubjects.filter(s => mySubjectIds.has(s._id)));
@@ -121,7 +122,7 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                     classesService.list(),
                     subjectsService.list()
                 ]);
-                if (classesRes.success) setClasses(classesRes.data || []);
+                if (classesRes.success) setClasses(sortClassObjects(classesRes.data || [], 'name'));
                 if (subjectsRes.success) setSubjects(subjectsRes.data || []);
             }
         } catch (error) {

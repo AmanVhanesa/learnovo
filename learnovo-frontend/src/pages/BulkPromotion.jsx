@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentsService } from '../services/studentsService';
 import { Search, TrendingUp, TrendingDown, AlertTriangle, Loader2, CheckSquare, Square, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { sortClasses } from '../utils/classOrder';
 
 const ACADEMIC_YEAR_REGEX = /^\d{4}-\d{4}$/;
 
@@ -44,7 +45,7 @@ const BulkPromotion = () => {
             const response = await studentsService.getFilters();
             if (response.success) {
                 return {
-                    classes: response.data.classes || [],
+                    classes: sortClasses(response.data.classes || []),
                     sections: response.data.sections || []
                 };
             }

@@ -7,6 +7,7 @@ import { classesService } from '../services/classesService';
 import { subjectsService } from '../services/subjectsService';
 import { attendanceService } from '../services/attendanceService';
 import { teacherAssignmentsService } from '../services/academicsService';
+import { sortClassObjects } from '../utils/classOrder';
 import HomeworkForm from '../components/homework/HomeworkForm';
 import HomeworkDetailsModal from '../components/homework/HomeworkDetailsModal';
 import HomeworkSubmissionForm from '../components/homework/HomeworkSubmissionForm';
@@ -39,10 +40,10 @@ const Homework = () => {
         queryFn: async () => {
             if (user?.role === 'teacher') {
                 const res = await attendanceService.getTeacherClasses();
-                return res?.data || [];
+                return sortClassObjects(res?.data || [], 'name');
             }
             const res = await classesService.list();
-            return res.success ? (res.data || []) : [];
+            return sortClassObjects(res.success ? (res.data || []) : [], 'name');
         },
     });
 

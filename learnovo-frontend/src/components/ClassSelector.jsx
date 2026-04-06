@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { School, ChevronDown, Check } from 'lucide-react'
 import { classesService } from '../services/classesService'
 import { useAuth } from '../contexts/AuthContext'
+import { sortClassObjects } from '../utils/classOrder'
 
 const ClassSelector = ({ selectedClass, onClassChange, className = '' }) => {
   const { user } = useAuth()
@@ -65,7 +66,7 @@ const ClassSelector = ({ selectedClass, onClassChange, className = '' }) => {
         return classItem.subjects?.some(subject => subject.teacher?._id === user?.id)
       })
 
-      setClasses(teacherClasses)
+      setClasses(sortClassObjects(teacherClasses, 'name'))
 
       if (teacherClasses.length > 0 && !selectedClass) {
         onClassChange(teacherClasses[0])

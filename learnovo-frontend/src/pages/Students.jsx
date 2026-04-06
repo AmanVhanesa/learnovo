@@ -15,6 +15,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { SERVER_URL } from '../constants/config'
 import { formatDate } from '../utils/formatDate'
 import { getMatchedField } from '../utils/searchRelevance'
+import { sortClasses } from '../utils/classOrder'
 
 const StudentPhotoCell = ({ student }) => {
   const [imgFailed, setImgFailed] = React.useState(false)
@@ -133,7 +134,7 @@ const Students = () => {
       const params = {}
       if (classFilter) params.class = classFilter
       const response = await studentsService.getFilters(params)
-      if (response.success) return response.data
+      if (response.success) return { ...response.data, classes: sortClasses(response.data.classes || []) }
       return { classes: [], sections: [], academicYears: [], drivers: [] }
     },
     staleTime: 5 * 60 * 1000,

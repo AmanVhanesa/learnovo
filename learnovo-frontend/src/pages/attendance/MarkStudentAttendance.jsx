@@ -5,6 +5,7 @@ import Select from '../../components/ui/Select'
 import { useAuth } from '../../contexts/AuthContext'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
+import { sortClassObjects } from '../../utils/classOrder'
 
 const statusConfig = {
   present: { label: 'P', color: 'bg-green-100 text-green-800 border-green-300', activeColor: 'bg-green-500 text-white border-green-500' },
@@ -73,10 +74,10 @@ const MarkStudentAttendance = () => {
       let response
       if (user?.role === 'admin') {
         response = await attendanceService.getAllClasses()
-        setClasses(response?.data || [])
+        setClasses(sortClassObjects(response?.data || [], 'name'))
       } else {
         response = await attendanceService.getTeacherClasses()
-        setClasses(response?.data || [])
+        setClasses(sortClassObjects(response?.data || [], 'name'))
       }
     } catch (error) {
       setClasses([])

@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { attendanceService } from '../../services/attendanceService'
 import toast from 'react-hot-toast'
 import { highQualityPrint } from '../../utils/highQualityPrint'
+import { sortClassObjects } from '../../utils/classOrder'
 
 const statusCodes = {
   present: { code: 'P', color: 'text-green-600' },
@@ -40,7 +41,7 @@ const MonthlyReport = () => {
       } else {
         response = await attendanceService.getTeacherClasses()
       }
-      setClasses(response?.data || [])
+      setClasses(sortClassObjects(response?.data || [], 'name'))
     } catch (error) {
     }
   }

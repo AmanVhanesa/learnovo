@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { allocationsService } from '../../services/feesService'
 import { classesService } from '../../services/academicsService'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { sortClassObjects } from '../../utils/classOrder'
 
 const PAYMENT_PLANS = [
   { value: 'monthly', label: 'Monthly (12 invoices)' },
@@ -30,7 +31,7 @@ const AnnualAllocationsTab = ({ activeSession }) => {
   // Fetch classes
   const { data: classes = [] } = useQuery({
     queryKey: ['alloc-classes'],
-    queryFn: async () => { const res = await classesService.list(); return res.data || [] },
+    queryFn: async () => { const res = await classesService.list(); return sortClassObjects(res.data || [], 'name') },
   })
 
   // Fetch allocations

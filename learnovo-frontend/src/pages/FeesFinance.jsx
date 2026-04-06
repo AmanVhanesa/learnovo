@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { formatCurrency } from '../utils/formatCurrency'
 import { formatDate } from '../utils/formatDate'
 import { sortByRelevance } from '../utils/searchRelevance'
+import { sortClassObjects } from '../utils/classOrder'
 
 import toast from 'react-hot-toast'
 
@@ -116,7 +117,7 @@ const FeesFinance = () => {
 
   const { data: classes = [] } = useQuery({
     queryKey: ['fees-classes'],
-    queryFn: async () => { const res = await classesService.list(); return res.data || [] },
+    queryFn: async () => { const res = await classesService.list(); return sortClassObjects(res.data || [], 'name') },
     enabled: !!activeSession && (activeTab === 'feeStructure' || activeTab === 'invoices'),
   })
 
