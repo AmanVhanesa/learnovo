@@ -25,7 +25,7 @@
     --rc-fail: #DC2626;
   }
 
-  @page { size: A4; margin: 0; }
+  @page { size: A4; margin: 12mm 10mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -34,12 +34,15 @@
     color: var(--rc-text-primary);
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    width: 190mm; /* A4 (210mm) minus 10mm left + 10mm right margins */
+    overflow: hidden;
   }
 
   .page {
-    width: 100%;
+    width: 190mm;
     background: #FFFFFF; padding: 0; margin: 0; position: relative;
     page-break-inside: avoid; page-break-after: avoid;
+    overflow: hidden;
   }
 
   /* ── HEADER ── */
@@ -105,19 +108,21 @@
   }
 
   /* ── MARKS TABLE ── */
-  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; table-layout: auto; }
+  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; table-layout: fixed; }
   .marks-table thead th {
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.06em; color: var(--rc-text-primary);
-    padding: 7px 5px; text-align: center;
+    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--rc-text-primary);
+    padding: 6px 2px; text-align: center;
     border-bottom: 1.5px solid var(--rc-border);
+    overflow: hidden; word-wrap: break-word;
   }
-  .marks-table thead th.subject-col { text-align: left; }
+  .marks-table thead th.subject-col { text-align: left; width: 22%; }
   .marks-table thead th.num { text-align: center; }
   .marks-table tbody td {
-    font-size: 11px; color: var(--rc-text-primary);
-    padding: 7px 5px; text-align: center;
+    font-size: 10px; color: var(--rc-text-primary);
+    padding: 6px 2px; text-align: center;
     border-bottom: 0.5px solid var(--rc-border-light); font-weight: 500;
+    overflow: hidden;
   }
   .marks-table tbody tr:nth-child(even) { background: rgba(249, 250, 251, 0.5); }
   .marks-table tbody td.subject-cell {
@@ -137,8 +142,8 @@
 
   /* Grand Total Row */
   .marks-table tfoot td {
-    font-size: 12px; font-weight: 700; color: var(--rc-text-primary);
-    padding: 8px 5px; text-align: center;
+    font-size: 10px; font-weight: 700; color: var(--rc-text-primary);
+    padding: 7px 2px; text-align: center;
     border-top: 1.5px solid var(--rc-primary); background: var(--rc-primary-light);
   }
   .marks-table tfoot td.subject-cell { text-align: left; }
@@ -209,7 +214,7 @@
   .footer { text-align: center; padding-top: 8px; border-top: 0.5px solid var(--rc-border-light); }
   .footer-text { font-size: 9px; color: var(--rc-text-muted); letter-spacing: 0.02em; font-style: italic; }
 
-  @media print { body { background: white; } .page { padding: 0; width: 100%; } }
+  @media print { body { background: white; } .page { padding: 0; } }
 </style>
 </head>
 <body>
