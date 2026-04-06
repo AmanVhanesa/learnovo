@@ -169,7 +169,12 @@ const settingsSchema = new mongoose.Schema({
       requireFeesClear: { type: Boolean, default: false },
       excludeTCIssued: { type: Boolean, default: true },
       allowMidYearPromotion: { type: Boolean, default: true }
-    }
+    },
+    // Co-Scholastic areas for report cards (e.g. Work Education, Art, Discipline)
+    coScholasticAreas: [{
+      area: { type: String, required: true, trim: true },
+      isActive: { type: Boolean, default: true }
+    }]
   },
   // Fee Settings
   fees: {

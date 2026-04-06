@@ -85,5 +85,17 @@ export const settingsService = {
   updateTheme: async (themeData) => {
     const response = await api.put('/settings/theme', themeData)
     return response.data
+  },
+
+  // Get co-scholastic areas
+  getCoScholastic: async () => {
+    const response = await api.get('/settings/co-scholastic')
+    return response.data
+  },
+
+  // Update co-scholastic areas
+  updateCoScholastic: async (areas) => {
+    const response = await api.put('/settings/co-scholastic', { areas })
+    return response.data
   }
 }

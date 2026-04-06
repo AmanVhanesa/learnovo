@@ -395,6 +395,42 @@ router.put('/theme', protect, authorize('admin'), [
   }
 });
 
+// @desc    Get/Update co-scholastic areas for report cards
+// @route   GET /api/settings/co-scholastic
+// @access  Private (Admin)
+router.get('/co-scholastic', protect, authorize('admin'), async(req, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const settings = await Settings.getSettings(tenantId);
+    res.json({ success: true, data: settings.academic?.coScholasticAreas || [] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
+// @route   PUT /api/settings/co-scholastic
+router.put('/co-scholastic', protect, authorize('admin'), async(req, res) => {
+  try {
+    const tenantId = getTenantId(req);
+    const settings = await Settings.getSettings(tenantId);
+    const { areas } = req.body;
+
+    if (!Array.isArray(areas)) {
+      return res.status(400).json({ success: false, message: 'areas must be an array' });
+    }
+
+    settings.academic.coScholasticAreas = areas.filter(a => a.area?.trim()).map(a => ({
+      area: a.area.trim(),
+      isActive: a.isActive !== false
+    }));
+
+    await settings.save();
+    res.json({ success: true, message: 'Co-scholastic areas updated', data: settings.academic.coScholasticAreas });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
 // @desc    Upload institution logo
 // @route   POST /api/settings/upload-logo
 // @access  Private (Admin)

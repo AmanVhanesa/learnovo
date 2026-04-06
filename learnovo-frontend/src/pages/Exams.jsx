@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
+import { settingsService } from '../services/settingsService';
 import { subjectsService } from '../services/subjectsService';
 import { classSubjectsService } from '../services/academicsService';
 import { teachersService } from '../services/teachersService';
@@ -1221,6 +1222,9 @@ const Exams = () => {
                         </div>
                     )}
 
+                    {/* Co-Scholastic Areas Config */}
+                    <CoScholasticConfig />
+
                     {/* Individual Student Report Cards with Search */}
                     {rcClass && rcSection && rcSectionId && (
                         <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
@@ -1682,5 +1686,87 @@ const FieldError = ({ msg }) =>
             <AlertCircle className="h-3 w-3" /> {msg}
         </p>
     ) : null;
+
+/* ── Co-Scholastic Areas Configuration (inline in Report Cards tab) ── */
+const CoScholasticConfig = () => {
+    const queryClient = useQueryClient();
+    const [editing, setEditing] = useState(false);
+    const [areas, setAreas] = useState([]);
+
+    const { data: savedAreas = [] } = useQuery({
+        queryKey: ['co-scholastic-areas'],
+        queryFn: async () => {
+            const res = await settingsService.getCoScholastic();
+            return res?.data || [];
+        }
+    });
+
+    const handleEdit = () => {
+        setAreas(savedAreas.length > 0
+            ? savedAreas.map(a => ({ area: a.area, isActive: a.isActive !== false }))
+            : [
+                { area: 'Work Education', isActive: true },
+                { area: 'Art Education', isActive: true },
+                { area: 'Health & Physical Education', isActive: true },
+                { area: 'Discipline', isActive: true }
+            ]
+        );
+        setEditing(true);
+    };
+
+    const handleSave = async () => {
+        try {
+            await settingsService.updateCoScholastic(areas.filter(a => a.area.trim()));
+            queryClient.invalidateQueries({ queryKey: ['co-scholastic-areas'] });
+            setEditing(false);
+            toast.success('Co-scholastic areas updated');
+        } catch {
+            toast.error('Failed to save');
+        }
+    };
+
+    return (
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] p-5">
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-amber-500" />
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Co-Scholastic Areas</h4>
+                    <span className="text-xs text-gray-400">({savedAreas.length} areas)</span>
+                </div>
+                {!editing ? (
+                    <button onClick={handleEdit} className="text-xs text-primary-500 hover:text-primary-700 font-medium">
+                        {savedAreas.length > 0 ? 'Edit' : 'Configure'}
+                    </button>
+                ) : (
+                    <div className="flex gap-2">
+                        <button onClick={() => setEditing(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                        <button onClick={handleSave} className="text-xs text-primary-500 hover:text-primary-700 font-medium">Save</button>
+                    </div>
+                )}
+            </div>
+            {!editing ? (
+                savedAreas.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                        {savedAreas.map((a, i) => (
+                            <span key={i} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200/50 dark:border-amber-500/20">{a.area}</span>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-xs text-gray-400">No co-scholastic areas configured. Click "Configure" to add areas like Work Education, Art, Discipline etc. These will appear on all report cards.</p>
+                )
+            ) : (
+                <div className="space-y-2">
+                    {areas.map((a, idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                            <input type="text" className="input text-sm flex-1" value={a.area} onChange={e => setAreas(prev => prev.map((x, i) => i === idx ? { ...x, area: e.target.value } : x))} placeholder="Area name" />
+                            <button onClick={() => setAreas(prev => prev.filter((_, i) => i !== idx))} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                    ))}
+                    <button onClick={() => setAreas(prev => [...prev, { area: '', isActive: true }])} className="text-xs text-primary-500 hover:text-primary-700 flex items-center gap-1"><Plus className="h-3 w-3" /> Add Area</button>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export default Exams;

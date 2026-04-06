@@ -477,7 +477,9 @@ const reportCardService = {
       term1: { exams: term1Exams },
       term2: { exams: term2Exams },
       subjectRows,
-      coScholastic: [],
+      coScholastic: (settings?.academic?.coScholasticAreas || [])
+        .filter(a => a.isActive !== false && a.area)
+        .map(a => ({ area: a.area, term1Grade: 'A', term2Grade: 'A' })),
       summary: {
         term1Total: gT1Total, term1Max: gT1Max, term1Percentage: gT1Pct, term1Grade: calculateGrade(gT1Pct),
         term2Total: gT2Total, term2Max: gT2Max, term2Percentage: gT2Pct, term2Grade: calculateGrade(gT2Pct),
