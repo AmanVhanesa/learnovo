@@ -22,6 +22,7 @@ import { useAuth } from '../contexts/AuthContext';
 import Select from '../components/ui/Select';
 import DatePicker from '../components/ui/DatePicker';
 import TimePicker from '../components/ui/TimePicker';
+import { getClassOrder, sortClassObjects } from '../utils/classOrder';
 
 const STATUS_COLORS = {
     Scheduled: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400',
@@ -207,13 +208,15 @@ const Exams = () => {
         staleTime: 2 * 60 * 1000,
     });
 
-    const { data: availableClasses = [] } = useQuery({
+    const { data: availableClassesRaw = [] } = useQuery({
         queryKey: ['exams-classes'],
         queryFn: async () => {
             const res = await classesService.list();
             return res.data || [];
         },
     });
+
+    const availableClasses = useMemo(() => sortClassObjects(availableClassesRaw, 'grade'), [availableClassesRaw]);
 
     const { data: teachers = [] } = useQuery({
         queryKey: ['exams-teachers'],
@@ -331,11 +334,7 @@ const Exams = () => {
         ['Term 1', 'Term 2'].forEach(term => {
             if (!map[term]) return;
             sorted[term] = {};
-            Object.keys(map[term]).sort((a, b) => {
-                const na = Number(a), nb = Number(b);
-                if (!isNaN(na) && !isNaN(nb)) return na - nb;
-                return a.localeCompare(b);
-            }).forEach(cls => {
+            Object.keys(map[term]).sort((a, b) => getClassOrder(a) - getClassOrder(b)).forEach(cls => {
                 sorted[term][cls] = {};
                 Object.keys(map[term][cls]).sort().forEach(sec => {
                     sorted[term][cls][sec] = {};
