@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Menu, Search, LogOut, Settings, ChevronDown, Sun, Moon } from 'lucide-react'
+import { Menu, Search, LogOut, Settings, ChevronDown, Sun, Moon, RefreshCw } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useUserDisplay } from '../hooks/useUserDisplay'
@@ -40,8 +41,10 @@ const Header = ({ onToggleSidebar }) => {
   const { photoUrl, displayName, initials, role } = useUserDisplay()
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const dropdownRef = useRef(null)
 
   useClickOutside(dropdownRef, useCallback(() => setProfileOpen(false), []))
@@ -54,6 +57,12 @@ const Header = ({ onToggleSidebar }) => {
       setSearchQuery('')
     }
   }, [location.pathname])
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await queryClient.invalidateQueries()
+    setTimeout(() => setIsRefreshing(false), 600)
+  }
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -103,6 +112,15 @@ const Header = ({ onToggleSidebar }) => {
 
           {/* Child/sibling switcher */}
           <ChildSwitcher />
+
+          {/* Refresh button */}
+          <button
+            onClick={handleRefresh}
+            className="p-2 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-[#8E8E93] dark:hover:text-white dark:hover:bg-[#2C2C2E] transition-colors focus:outline-none"
+            aria-label="Refresh"
+          >
+            <RefreshCw className={`h-5 w-5 transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
 
           {/* Dark/Light mode toggle */}
           <button

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, Search, Settings, LogOut, ChevronDown, Sun, Moon } from 'lucide-react'
+import { Menu, Search, Settings, LogOut, ChevronDown, Sun, Moon, RefreshCw } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useUserDisplay } from '../hooks/useUserDisplay'
@@ -14,10 +15,18 @@ const MobileHeader = ({ onMenuClick }) => {
   const { theme, toggleMode } = useTheme()
   const { photoUrl, displayName, initials, role } = useUserDisplay()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [profileOpen, setProfileOpen] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const dropdownRef = useRef(null)
 
   useClickOutside(dropdownRef, useCallback(() => setProfileOpen(false), []))
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await queryClient.invalidateQueries()
+    setTimeout(() => setIsRefreshing(false), 600)
+  }
 
   const handleLogout = () => {
     logout()
@@ -48,6 +57,14 @@ const MobileHeader = ({ onMenuClick }) => {
         <div className="flex items-center space-x-0.5 flex-shrink-0">
           {/* Child/sibling switcher */}
           <ChildSwitcher />
+
+          <button
+            onClick={handleRefresh}
+            className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#2C2C2E] focus:outline-none"
+            aria-label="Refresh"
+          >
+            <RefreshCw className={`h-5 w-5 text-gray-600 dark:text-[#8E8E93] transition-transform ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
 
           <button
             onClick={() => navigate('/app/search')}
