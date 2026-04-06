@@ -48,7 +48,7 @@ const Homework = () => {
     });
 
     const { data: subjects = [] } = useQuery({
-        queryKey: ['homework-subjects', user?.role],
+        queryKey: ['homework-subjects', user?.role, classes],
         queryFn: async () => {
             if (user?.role === 'teacher') {
                 const [subjectsRes, assignmentsRes] = await Promise.all([
@@ -57,7 +57,23 @@ const Homework = () => {
                 ]);
                 const allSubjects = subjectsRes.success ? (subjectsRes.data || []) : [];
                 const mySubjectIds = new Set((assignmentsRes.data || []).map(a => (a.subjectId?._id || a.subjectId)));
-                return allSubjects.filter(s => mySubjectIds.has(s._id));
+                let filtered = allSubjects.filter(s => mySubjectIds.has(s._id));
+                // Fallback: use subjects from teacher's class data
+                if (filtered.length === 0 && classes.length > 0) {
+                    const classSubjectIds = new Set();
+                    classes.forEach(cls => (cls.subjects || []).forEach(s => {
+                        if (s._id) classSubjectIds.add(s._id.toString());
+                    }));
+                    filtered = allSubjects.filter(s => classSubjectIds.has(s._id));
+                    if (filtered.length === 0) {
+                        const subjectMap = new Map();
+                        classes.forEach(cls => (cls.subjects || []).forEach(s => {
+                            if (s._id && s.name) subjectMap.set(s._id, s);
+                        }));
+                        filtered = Array.from(subjectMap.values());
+                    }
+                }
+                return filtered;
             }
             const res = await subjectsService.list();
             return res.success ? (res.data || []) : [];

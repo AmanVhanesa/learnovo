@@ -113,10 +113,34 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                     subjectsService.list(),
                     teacherAssignmentsService.list({ teacherId: user._id })
                 ]);
-                setClasses(sortClassObjects(classesRes?.data || [], 'name'));
+                const teacherClasses = sortClassObjects(classesRes?.data || [], 'name');
+                setClasses(teacherClasses);
+
                 const allSubjects = subjectsRes.success ? (subjectsRes.data || []) : [];
                 const mySubjectIds = new Set((assignmentsRes.data || []).map(a => (a.subjectId?._id || a.subjectId)));
-                setSubjects(allSubjects.filter(s => mySubjectIds.has(s._id)));
+                let filteredSubjects = allSubjects.filter(s => mySubjectIds.has(s._id));
+
+                // Fallback: if no TeacherSubjectAssignment records, use subjects from class data
+                if (filteredSubjects.length === 0 && teacherClasses.length > 0) {
+                    const classSubjectIds = new Set();
+                    teacherClasses.forEach(cls => {
+                        (cls.subjects || []).forEach(s => {
+                            if (s._id) classSubjectIds.add(s._id.toString());
+                        });
+                    });
+                    filteredSubjects = allSubjects.filter(s => classSubjectIds.has(s._id));
+                    // If still empty, use all subjects from class data directly
+                    if (filteredSubjects.length === 0) {
+                        const subjectMap = new Map();
+                        teacherClasses.forEach(cls => {
+                            (cls.subjects || []).forEach(s => {
+                                if (s._id && s.name) subjectMap.set(s._id, s);
+                            });
+                        });
+                        filteredSubjects = Array.from(subjectMap.values());
+                    }
+                }
+                setSubjects(filteredSubjects);
             } else {
                 const [classesRes, subjectsRes] = await Promise.all([
                     classesService.list(),
