@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Calendar, BookOpen, Users, UserPlus, Plus, Check, Lock, Unlock, Power, Trash2, Edit, X } from 'lucide-react'
+import { Calendar, BookOpen, Users, UserPlus, Plus, Check, Lock, Unlock, Power, Trash2, Edit, X, ChevronDown, GraduationCap } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { academicSessionsService, classesService, subjectsService, classSubjectsService, teacherAssignmentsService } from '../services/academicsService'
 import { employeesService } from '../services/employeesService'
@@ -473,135 +473,138 @@ const AcademicsManagement = () => {
                                 <p className="text-gray-500 dark:text-[#8E8E93]">No subjects found</p>
                             </div>
                         ) : (() => {
-                            // Group subjects by type
-                            const typeGroups = { 'Theory': [], 'Practical': [], 'Both': [] };
-                            subjects.forEach(s => {
-                                const t = s.type || 'Theory';
-                                if (!typeGroups[t]) typeGroups[t] = [];
-                                typeGroups[t].push(s);
-                            });
-                            const typeColors = {
-                                'Theory': { bg: 'bg-blue-50 dark:bg-[#1a2533]', border: 'border-blue-200 dark:border-[#2a4066]', badge: 'bg-blue-100 text-blue-700 dark:bg-[#1a2533] dark:text-blue-400', icon: '📖' },
-                                'Practical': { bg: 'bg-green-50 dark:bg-[#1a332a]', border: 'border-green-200 dark:border-[#2a5a42]', badge: 'bg-green-100 text-green-700 dark:bg-[#1a332a] dark:text-green-400', icon: '🔬' },
-                                'Both': { bg: 'bg-purple-50 dark:bg-[#271a33]', border: 'border-purple-200 dark:border-[#4a2a66]', badge: 'bg-purple-100 text-purple-700 dark:bg-[#271a33] dark:text-purple-400', icon: '📚' }
-                            };
-                            const activeTypes = Object.keys(typeGroups).filter(t => typeGroups[t].length > 0);
+                            // Build class → subjects mapping
+                            const classSubjectMap = {}
+                            classSubjects.forEach(cs => {
+                                const clsId = cs.classId?._id
+                                const clsName = cs.classId?.name
+                                const subj = cs.subjectId
+                                if (!clsId || !subj) return
+                                if (!classSubjectMap[clsId]) classSubjectMap[clsId] = { name: clsName, subjects: [] }
+                                classSubjectMap[clsId].subjects.push(subj)
+                            })
+                            // Classes with subjects (sorted by class order)
+                            const classesWithSubjects = classes
+                                .filter(cls => classSubjectMap[cls._id])
+                                .map(cls => ({ ...cls, assignedSubjects: classSubjectMap[cls._id].subjects }))
+                            // Subjects not assigned to any class
+                            const assignedSubjectIds = new Set(classSubjects.map(cs => cs.subjectId?._id).filter(Boolean))
+                            const unassignedSubjects = subjects.filter(s => !assignedSubjectIds.has(s._id))
 
                             return (
-                                <div className="space-y-6">
+                                <div className="space-y-3">
                                     {/* Summary bar */}
-                                    <div className="flex flex-wrap gap-3">
+                                    <div className="flex flex-wrap gap-3 mb-4">
                                         <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-[#2C2C2E] rounded-full text-sm">
                                             <span className="font-semibold text-gray-800 dark:text-white">{subjects.length}</span>
-                                            <span className="text-gray-500 dark:text-[#8E8E93]">Total</span>
+                                            <span className="text-gray-500 dark:text-[#8E8E93]">Total Subjects</span>
                                         </div>
-                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-[#1a332a] rounded-full text-sm">
-                                            <span className="font-semibold text-green-700 dark:text-green-400">{subjects.filter(s => s.isActive).length}</span>
-                                            <span className="text-green-600 dark:text-green-500">Active</span>
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 dark:bg-[#1a332e] rounded-full text-sm">
+                                            <span className="font-semibold text-teal-700 dark:text-teal-400">{classesWithSubjects.length}</span>
+                                            <span className="text-teal-600 dark:text-teal-500">Classes</span>
                                         </div>
-                                        {subjects.filter(s => !s.isActive).length > 0 && (
-                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-[#2C2C2E] rounded-full text-sm">
-                                                <span className="font-semibold text-gray-500 dark:text-[#8E8E93]">{subjects.filter(s => !s.isActive).length}</span>
-                                                <span className="text-gray-400 dark:text-[#636366]">Inactive</span>
-                                            </div>
-                                        )}
                                     </div>
 
-                                    {/* Grouped by type */}
-                                    {activeTypes.map(type => {
-                                        const colors = typeColors[type] || typeColors['Theory'];
-                                        const groupSubjects = typeGroups[type];
-
-                                        return (
-                                            <div key={type}>
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    <span className="text-lg">{colors.icon}</span>
-                                                    <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] uppercase tracking-wide">{type}</h3>
-                                                    <span className="text-xs text-gray-400 dark:text-[#636366]">({groupSubjects.length})</span>
+                                    {/* Classes with their subjects */}
+                                    {classesWithSubjects.map(cls => (
+                                        <details key={cls._id} className="group border border-gray-200 dark:border-[#38383A] rounded-2xl overflow-hidden" open>
+                                            <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none bg-gray-50 dark:bg-[#1C1C1E] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-9 w-9 rounded-xl bg-teal-100 dark:bg-teal-500/20 flex items-center justify-center">
+                                                        <GraduationCap className="h-4.5 w-4.5 text-teal-600 dark:text-teal-400" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-semibold text-gray-900 dark:text-white text-sm">{cls.name}</h3>
+                                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{cls.assignedSubjects.length} subject{cls.assignedSubjects.length !== 1 ? 's' : ''}</p>
+                                                    </div>
                                                 </div>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                                                    {groupSubjects.map(subject => (
+                                                <ChevronDown className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-180" />
+                                            </summary>
+                                            <div className="px-4 py-3 border-t border-gray-100 dark:border-[#38383A]">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                                                    {cls.assignedSubjects.map(subject => (
                                                         <div
                                                             key={subject._id}
-                                                            className={`relative border rounded-2xl p-4 transition-all hover:shadow-md dark:hover:shadow-none dark:hover:border-[#48484A] ${subject.isActive ? colors.border + ' ' + colors.bg : 'border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] opacity-60'}`}
+                                                            className={`relative border rounded-xl p-3 transition-all hover:shadow-sm ${subject.isActive ? 'border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E]' : 'border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] opacity-60'}`}
                                                         >
-                                                            {/* Top row: name + actions */}
-                                                            <div className="flex items-start justify-between gap-2 mb-2">
+                                                            <div className="flex items-start justify-between gap-2">
                                                                 <div className="min-w-0 flex-1">
-                                                                    <h4 className="font-semibold text-gray-900 dark:text-white truncate">{subject.name}</h4>
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="font-mono text-xs text-gray-500 dark:text-[#8E8E93]">{subject.subjectCode}</span>
-                                                                        {subject.isOptional && (
-                                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Optional</span>
-                                                                        )}
+                                                                    <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">{subject.name}</h4>
+                                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                                        <span className="font-mono text-[11px] text-gray-400 dark:text-[#636366]">{subject.subjectCode}</span>
+                                                                        <span className="text-[10px] text-gray-400 dark:text-[#636366]">
+                                                                            {subject.type === 'Practical' ? '🔬' : subject.type === 'Both' ? '📚' : '📖'} {subject.type}
+                                                                        </span>
                                                                     </div>
                                                                 </div>
                                                                 {user?.role === 'admin' && (
                                                                     <div className="flex gap-0.5 flex-shrink-0">
-                                                                        <button
-                                                                            onClick={() => { setEditingSubject(subject); setShowSubjectForm(true) }}
-                                                                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-[#1a2533] rounded"
-                                                                            title="Edit"
-                                                                        >
-                                                                            <Edit className="h-3.5 w-3.5" />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleToggleSubject(subject._id)}
-                                                                            className="p-1 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-[#332d1a] rounded"
-                                                                            title={subject.isActive ? 'Deactivate' : 'Activate'}
-                                                                        >
-                                                                            <Power className="h-3.5 w-3.5" />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => handleDeleteSubject(subject._id)}
-                                                                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-[#331a1a] rounded"
-                                                                            title="Delete"
-                                                                        >
-                                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                                        </button>
+                                                                        <button onClick={() => { setEditingSubject(subject); setShowSubjectForm(true) }} className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-[#1a2533] rounded" title="Edit"><Edit className="h-3 w-3" /></button>
+                                                                        <button onClick={() => handleToggleSubject(subject._id)} className="p-1 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-[#332d1a] rounded" title={subject.isActive ? 'Deactivate' : 'Activate'}><Power className="h-3 w-3" /></button>
+                                                                        <button onClick={() => handleDeleteSubject(subject._id)} className="p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-[#331a1a] rounded" title="Delete"><Trash2 className="h-3 w-3" /></button>
                                                                     </div>
                                                                 )}
                                                             </div>
-
-                                                            {/* Marks info */}
-                                                            <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-[#8E8E93]">
-                                                                <span>Max: <strong className="text-gray-800 dark:text-white">{subject.maxMarks || 100}</strong></span>
+                                                            <div className="flex items-center gap-2 mt-1.5 text-[11px] text-gray-500 dark:text-[#8E8E93]">
+                                                                <span>Max: <strong className="text-gray-700 dark:text-gray-300">{subject.maxMarks || 100}</strong></span>
                                                                 <span className="text-gray-300 dark:text-[#636366]">|</span>
-                                                                <span>Pass: <strong className="text-gray-800 dark:text-white">{subject.passingMarks || 33}</strong></span>
+                                                                <span>Pass: <strong className="text-gray-700 dark:text-gray-300">{subject.passingMarks || 33}</strong></span>
+                                                                {subject.isOptional && <span className="px-1 py-0.5 rounded text-[9px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">Optional</span>}
                                                             </div>
-
-                                                            {/* Assigned classes */}
-                                                            {(() => {
-                                                                const assignedClasses = classSubjects
-                                                                    .filter(cs => cs.subjectId?._id === subject._id)
-                                                                    .map(cs => cs.classId?.name)
-                                                                    .filter(Boolean)
-                                                                if (assignedClasses.length === 0) return (
-                                                                    <p className="mt-2 text-[10px] text-gray-400 dark:text-[#636366] italic">No classes assigned</p>
-                                                                )
-                                                                return (
-                                                                    <div className="mt-2 flex flex-wrap gap-1">
-                                                                        {assignedClasses.map(name => (
-                                                                            <span key={name} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-[#38383A] text-gray-600 dark:text-[#8E8E93]">
-                                                                                {name}
-                                                                            </span>
-                                                                        ))}
-                                                                    </div>
-                                                                )
-                                                            })()}
-
-                                                            {/* Status badge */}
                                                             {!subject.isActive && (
-                                                                <span className="absolute top-2 right-2 inline-flex px-1.5 py-0.5 text-[10px] font-semibold rounded bg-gray-200 dark:bg-[#38383A] text-gray-600 dark:text-[#8E8E93]">
-                                                                    Inactive
-                                                                </span>
+                                                                <span className="absolute top-2 right-2 inline-flex px-1.5 py-0.5 text-[9px] font-semibold rounded bg-gray-200 dark:bg-[#38383A] text-gray-500 dark:text-[#8E8E93]">Inactive</span>
                                                             )}
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        </details>
+                                    ))}
+
+                                    {/* Unassigned subjects */}
+                                    {unassignedSubjects.length > 0 && (
+                                        <details className="group border border-dashed border-gray-300 dark:border-[#48484A] rounded-2xl overflow-hidden">
+                                            <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none bg-gray-50/50 dark:bg-[#1C1C1E] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-9 w-9 rounded-xl bg-gray-100 dark:bg-[#38383A] flex items-center justify-center">
+                                                        <BookOpen className="h-4.5 w-4.5 text-gray-400 dark:text-[#8E8E93]" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-semibold text-gray-600 dark:text-[#8E8E93] text-sm">Unassigned Subjects</h3>
+                                                        <p className="text-xs text-gray-400 dark:text-[#636366]">{unassignedSubjects.length} subject{unassignedSubjects.length !== 1 ? 's' : ''} not assigned to any class</p>
+                                                    </div>
+                                                </div>
+                                                <ChevronDown className="h-4 w-4 text-gray-400 transition-transform group-open:rotate-180" />
+                                            </summary>
+                                            <div className="px-4 py-3 border-t border-gray-100 dark:border-[#38383A]">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                                                    {unassignedSubjects.map(subject => (
+                                                        <div key={subject._id} className="border border-dashed border-gray-200 dark:border-[#48484A] rounded-xl p-3 bg-white dark:bg-[#1C1C1E]">
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className="min-w-0 flex-1">
+                                                                    <h4 className="font-medium text-sm text-gray-900 dark:text-white truncate">{subject.name}</h4>
+                                                                    <span className="font-mono text-[11px] text-gray-400 dark:text-[#636366]">{subject.subjectCode}</span>
+                                                                </div>
+                                                                {user?.role === 'admin' && (
+                                                                    <div className="flex gap-0.5 flex-shrink-0">
+                                                                        <button onClick={() => { setEditingSubject(subject); setShowSubjectForm(true) }} className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-[#1a2533] rounded" title="Edit"><Edit className="h-3 w-3" /></button>
+                                                                        <button onClick={() => handleDeleteSubject(subject._id)} className="p-1 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-[#331a1a] rounded" title="Delete"><Trash2 className="h-3 w-3" /></button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </details>
+                                    )}
+
+                                    {/* No assignments at all */}
+                                    {classesWithSubjects.length === 0 && unassignedSubjects.length === 0 && (
+                                        <div className="text-center py-8 text-gray-500 dark:text-[#8E8E93]">
+                                            <p>No class-subject assignments found for the active session.</p>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })()}
