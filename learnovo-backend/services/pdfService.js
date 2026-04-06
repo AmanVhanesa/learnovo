@@ -514,7 +514,8 @@ function buildTwoTermPlaceholders(data) {
     result_detail: `Overall: ${summary.overallPercentage}% \u00B7 Grade: ${summary.overallGrade}`,
     co_scholastic_html: coScholasticHtml,
     remarks_text: remarks || '',
-    result_status: result || (isPassed ? 'Promoted' : 'Not Promoted')
+    result_status: result || (isPassed ? 'Promoted' : 'Not Promoted'),
+    result_status_class: (result || '').toLowerCase().includes('not') || (result || '').toLowerCase().includes('detained') || !isPassed ? 'not-promoted' : 'promoted'
   };
 }
 
