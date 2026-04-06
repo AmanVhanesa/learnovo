@@ -623,13 +623,25 @@ router.get('/custom/history', protect, authorize('admin', 'teacher'), async(req,
       ];
     }
 
+    const { getPresignedUrl } = require('../utils/s3PresignedUrl');
+
     const total = await CustomReportCard.countDocuments(filter);
     const records = await CustomReportCard.find(filter)
       .sort({ createdAt: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit))
-      .select('-payloadSnapshot -pdfKey')
+      .select('-payloadSnapshot')
       .lean();
+
+    // Replace raw S3 URLs with pre-signed URLs
+    for (const record of records) {
+      if (record.pdfKey) {
+        try {
+          record.pdfUrl = await getPresignedUrl(record.pdfKey);
+        } catch { /* keep original url as fallback */ }
+      }
+      delete record.pdfKey;
+    }
 
     res.json({
       success: true,
@@ -652,6 +664,7 @@ router.get('/custom/history', protect, authorize('admin', 'teacher'), async(req,
 router.get('/custom/:id/download', protect, authorize('admin', 'teacher'), async(req, res, next) => {
   try {
     const CustomReportCard = require('../models/CustomReportCard');
+    const { getPresignedUrl } = require('../utils/s3PresignedUrl');
     const record = await CustomReportCard.findOne({
       _id: req.params.id,
       tenantId: req.user.tenantId
@@ -661,8 +674,11 @@ router.get('/custom/:id/download', protect, authorize('admin', 'teacher'), async
       return res.status(404).json({ success: false, message: 'Report card not found' });
     }
 
-    // Redirect to S3 URL
-    res.redirect(record.pdfUrl);
+    // Redirect to pre-signed S3 URL
+    const signedUrl = record.pdfKey
+      ? await getPresignedUrl(record.pdfKey)
+      : record.pdfUrl;
+    res.redirect(signedUrl);
   } catch (error) {
     next(error);
   }
