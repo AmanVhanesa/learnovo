@@ -198,9 +198,9 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
 
   /* ═══ SIGNATURES ═══ */
   .sig-section { padding: 0 18px; flex-shrink: 0; margin-top: 10px; }
-  .sig-row { display: flex; justify-content: space-between; align-items: flex-end; height: 50px; }
-  .sig-col { text-align: center; width: 110px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-  .sig-img { max-height: 38px; max-width: 90px; margin: 0 auto 2px; object-fit: contain; display: block; }
+  .sig-row { display: flex; justify-content: space-between; align-items: flex-end; height: 80px; }
+  .sig-col { text-align: center; width: 170px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  .sig-img { max-height: 70px; max-width: 160px; margin: 0 auto 4px; object-fit: contain; display: block; }
   .sig-col .sig-line { width: 75px; height: 1px; background: #9ca3af; margin: 0 auto 3px; }
   .sig-col .sig-label { font-size: 8.5px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.5px; }
   .sig-sub { font-size: 7px; color: #6b7280; margin-top: 1px; }

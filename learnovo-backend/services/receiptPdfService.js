@@ -48,8 +48,8 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
     </tr>`).join('');
 
   /* ─────────────────────────────────────────────────────────────
-     Half-A4 layout: 794 × 562 px  (A4 width × half A4 height)
-     This prints on the top half of A4 — cut the paper to reuse.
+     A4 portrait layout: 794 × 1123 px
+     Receipt content fills the top portion of the page.
      ───────────────────────────────────────────────────────────── */
   return `<!DOCTYPE html>
 <html lang="en">
@@ -60,21 +60,21 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
   @page { size: A4 portrait; margin: 0; }
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    width: 794px; height: 562px;
+    width: 794px; height: 1123px;
     font-family: 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
     color: #111827; background: #f9fafb;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
     text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased;
   }
   .page {
-    width: 794px; height: 562px; position: relative;
+    width: 794px; min-height: 562px; position: relative;
     overflow: hidden; background: #f9fafb;
   }
   .card {
-    position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
-    background: #fff; border-radius: 10px;
+    margin: 10px; background: #fff; border-radius: 10px;
     box-shadow: 0 2px 18px rgba(0,0,0,0.07);
     overflow: hidden; display: flex; flex-direction: column;
+    position: relative;
   }
 
   /* Decorative shapes */
@@ -158,9 +158,9 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
 
   /* Signatures */
   .sig-sec { padding: 0 20px 6px; flex-shrink: 0; }
-  .sig-row { display: flex; justify-content: space-between; align-items: flex-end; height: 50px; }
-  .sig-col { text-align: center; width: 120px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-  .sig-img { max-height: 40px; max-width: 110px; margin: 0 auto 2px; object-fit: contain; display: block; }
+  .sig-row { display: flex; justify-content: space-between; align-items: flex-end; height: 80px; }
+  .sig-col { text-align: center; width: 170px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  .sig-img { max-height: 70px; max-width: 160px; margin: 0 auto 4px; object-fit: contain; display: block; }
   .sig-col .sig-line { width: 80px; height: 1px; background: #9ca3af; margin: 0 auto 2px; }
   .sig-col .sig-label { font-size: 8px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.6px; }
 
@@ -272,12 +272,12 @@ async function generateReceiptPdf(payment, schoolData) {
   const page = await browser.newPage();
 
   try {
-    // Half-A4: full width, half height
-    await page.setViewport({ width: 794, height: 562, deviceScaleFactor: 3 });
+    // A4 portrait
+    await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 3 });
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
     await page.evaluateHandle('document.fonts.ready');
     const pdfUint8 = await page.pdf({
-      width: '210mm', height: '148.5mm',
+      format: 'A4',
       printBackground: true, preferCSSPageSize: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 }
     });
@@ -312,9 +312,9 @@ async function generateReceiptHtml(payment, schoolData) {
   html = html.replace('<body>', `<body>${  toolbarHtml}`);
   html = html.replace('.page {', '.page { margin-top: 50px; ');
 
-  // Override @page for browser print — half A4, zero margins
+  // Override @page for browser print — A4 portrait
   html = html.replace('@page { size: A4 portrait; margin: 0; }',
-    '@page { size: 210mm 148.5mm; margin: 0; } @media print { #toolbar { display: none !important; } .page { margin-top: 0 !important; } }');
+    '@page { size: A4 portrait; margin: 0; } @media print { #toolbar { display: none !important; } .page { margin-top: 0 !important; } }');
 
   return html;
 }
