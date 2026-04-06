@@ -2,6 +2,8 @@ const express = require('express');
 const { body, query } = require('express-validator');
 const User = require('../models/User');
 const Class = require('../models/Class');
+const Section = require('../models/Section');
+const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const planGate = require('../middleware/planGate');
@@ -204,10 +206,11 @@ router.delete('/:id', protect, authorize('admin'), async(req, res) => {
 router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
   try {
     const teacherId = req.user._id;
+    const tenantId = req.user.tenantId;
 
-    // Find all classes where this teacher is assigned
-    const classes = await Class.find({
-      tenantId: req.user.tenantId,
+    // Strategy 1: Find classes via Class.classTeacher or Class.subjects[].teacher
+    const classesFromModel = await Class.find({
+      tenantId,
       $or: [
         { classTeacher: teacherId },
         { 'subjects.teacher': teacherId }
@@ -215,19 +218,97 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
       isActive: true
     })
       .populate('classTeacher', 'name email')
+      .populate('subjects.subject', 'name subjectCode')
       .populate('subjects.teacher', 'name email')
       .select('name grade academicYear classTeacher subjects isActive')
       .sort({ name: 1 });
 
-    // Transform to include subject information
-    const classesWithSubjects = classes.map(classDoc => {
-      const subjects = classDoc.subjects
+    // Strategy 2: Find classes via TeacherSubjectAssignment
+    const teacherAssignments = await TeacherSubjectAssignment.find({
+      tenantId,
+      teacherId,
+      isActive: true
+    })
+      .populate('classId', 'name grade academicYear isActive')
+      .populate('subjectId', 'name subjectCode')
+      .populate('sectionId', 'name');
+
+    // Collect class IDs from TeacherSubjectAssignment that weren't found in Strategy 1
+    const classIdsFromModel = new Set(classesFromModel.map(c => c._id.toString()));
+    const extraClassIds = new Set();
+    teacherAssignments.forEach(a => {
+      if (a.classId && a.classId._id && !classIdsFromModel.has(a.classId._id.toString())) {
+        extraClassIds.add(a.classId._id.toString());
+      }
+    });
+
+    // Fetch any additional classes from TeacherSubjectAssignment
+    let extraClasses = [];
+    if (extraClassIds.size > 0) {
+      extraClasses = await Class.find({
+        _id: { $in: Array.from(extraClassIds) },
+        tenantId,
+        isActive: true
+      })
+        .populate('classTeacher', 'name email')
+        .populate('subjects.subject', 'name subjectCode')
+        .populate('subjects.teacher', 'name email')
+        .select('name grade academicYear classTeacher subjects isActive')
+        .sort({ name: 1 });
+    }
+
+    const allClasses = [...classesFromModel, ...extraClasses];
+
+    // Fetch sections for all found classes
+    const classIds = allClasses.map(c => c._id);
+    const sections = await Section.find({ classId: { $in: classIds }, tenantId })
+      .populate('sectionTeacher', 'name fullName email')
+      .sort({ name: 1 });
+
+    // Group sections by classId
+    const sectionsByClass = {};
+    sections.forEach(sec => {
+      const cid = sec.classId.toString();
+      if (!sectionsByClass[cid]) sectionsByClass[cid] = [];
+      sectionsByClass[cid].push(sec);
+    });
+
+    // Build subject info from TeacherSubjectAssignment keyed by classId
+    const assignmentSubjectsByClass = {};
+    teacherAssignments.forEach(a => {
+      if (a.classId && a.subjectId) {
+        const cid = a.classId._id.toString();
+        if (!assignmentSubjectsByClass[cid]) assignmentSubjectsByClass[cid] = [];
+        assignmentSubjectsByClass[cid].push({
+          _id: a.subjectId._id,
+          name: a.subjectId.name,
+          subjectCode: a.subjectId.subjectCode,
+          section: a.sectionId || null
+        });
+      }
+    });
+
+    // Transform classes to include sections and subject information
+    const classesWithDetails = allClasses.map(classDoc => {
+      // Get subjects from embedded Class.subjects for this teacher
+      const embeddedSubjects = (classDoc.subjects || [])
         .filter(sub => sub.teacher && sub.teacher._id.toString() === teacherId.toString())
         .map(sub => ({
           _id: sub.subject?._id || null,
           name: sub.subject?.name || 'Not specified',
+          subjectCode: sub.subject?.subjectCode || '',
           teacher: sub.teacher
         }));
+
+      // Merge with subjects from TeacherSubjectAssignment (deduplicate)
+      const assignmentSubjects = assignmentSubjectsByClass[classDoc._id.toString()] || [];
+      const subjectIds = new Set(embeddedSubjects.filter(s => s._id).map(s => s._id.toString()));
+      assignmentSubjects.forEach(as => {
+        if (!subjectIds.has(as._id.toString())) {
+          embeddedSubjects.push(as);
+          subjectIds.add(as._id.toString());
+        }
+      });
 
       return {
         _id: classDoc._id,
@@ -235,15 +316,16 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
         grade: classDoc.grade,
         academicYear: classDoc.academicYear,
         classTeacher: classDoc.classTeacher,
-        subjects,
+        subjects: embeddedSubjects,
+        sections: sectionsByClass[classDoc._id.toString()] || [],
         isActive: classDoc.isActive
       };
     });
 
     res.json({
       success: true,
-      data: classesWithSubjects,
-      count: classesWithSubjects.length
+      data: classesWithDetails,
+      count: classesWithDetails.length
     });
   } catch (error) {
     console.error('Get my classes error:', error);
