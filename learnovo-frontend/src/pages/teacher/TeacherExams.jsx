@@ -27,24 +27,19 @@ const STATUS_RING = {
   Cancelled: 'ring-1 ring-red-200 dark:ring-red-500/30',
 }
 
-const EXAM_SERIES = ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom']
+const EXAM_SERIES = ['UT1', 'UT2', 'SA1', 'SA2', 'Custom']
 const EXAM_TYPES = ['Written', 'Practical', 'Oral']
 const EXAM_MODES = ['Offline', 'Online']
 
 const SERIES_CONFIG = {
-  FA1: { label: 'FA 1', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
-  FA2: { label: 'FA 2', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
-  FA3: { label: 'FA 3', color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20' },
-  FA4: { label: 'FA 4', color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20' },
+  UT1: { label: 'Unit Test 1', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
   SA1: { label: 'SA 1', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/20' },
-  SA2: { label: 'SA 2', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/20' },
-  'Unit Test': { label: 'Unit Test', color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-500/10', border: 'border-teal-200 dark:border-teal-500/20' },
-  Midterm: { label: 'Midterm', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-200 dark:border-orange-500/20' },
-  Final: { label: 'Final', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20' },
+  UT2: { label: 'Unit Test 2', color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-500/10', border: 'border-teal-200 dark:border-teal-500/20' },
+  SA2: { label: 'SA 2', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-200 dark:border-orange-500/20' },
   Custom: { label: 'Custom', color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-500/10', border: 'border-gray-200 dark:border-gray-500/20' },
 }
 
-const SERIES_ORDER = ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom']
+const SERIES_ORDER = ['UT1', 'SA1', 'UT2', 'SA2', 'Custom']
 function seriesSortKey(s) { const idx = SERIES_ORDER.indexOf(s); return idx >= 0 ? idx : 999 }
 
 function calcDuration(start, end) {

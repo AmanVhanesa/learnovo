@@ -10,7 +10,7 @@ import { studentsService } from '../services/studentsService';
 import toast from 'react-hot-toast';
 import Select from './ui/Select';
 
-const EXAM_SERIES_OPTIONS = ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom'];
+const EXAM_SERIES_OPTIONS = ['UT1', 'SA1', 'UT2', 'SA2', 'Custom'];
 
 const EMPTY_SUBJECT = { name: '', totalMarks: 100, passingMarks: 33, marksObtained: '' };
 
