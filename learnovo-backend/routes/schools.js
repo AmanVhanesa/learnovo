@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -6,6 +7,7 @@ const Tenant = require('../models/Tenant');
 const User = require('../models/User');
 const { logger } = require('../middleware/errorHandler');
 const emailService = require('../services/emailService');
+const { PLANS } = require('../utils/planConfig');
 
 const router = express.Router();
 
@@ -38,7 +40,10 @@ router.post('/register', [
       });
     }
 
-    const { schoolName, email, password, schoolCode, subdomain, phone, address } = req.body;
+    const {
+      schoolName, email, password, schoolCode, subdomain, phone, address,
+      plan, billingCycle, paymentId, orderId, signature
+    } = req.body;
 
     // Auto-generate subdomain from schoolCode if not provided
     const finalSubdomain = subdomain ? subdomain.toLowerCase() : schoolCode.toLowerCase();
@@ -59,19 +64,77 @@ router.post('/register', [
       });
     }
 
+    // Determine subscription based on payment
+    let subscriptionData = {
+      plan: 'free',
+      status: 'trial',
+      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days
+    };
+
+    const isPaidPlan = plan && plan !== 'free' && PLANS[plan];
+
+    if (isPaidPlan) {
+      // Verify payment for paid plans
+      if (!orderId || !paymentId || !signature) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment verification data is required for paid plans'
+        });
+      }
+
+      // Verify Razorpay signature (skip for mock orders)
+      if (!orderId.startsWith('mock_order_')) {
+        if (!process.env.RAZORPAY_KEY_SECRET) {
+          return res.status(500).json({
+            success: false,
+            message: 'Payment gateway not configured'
+          });
+        }
+
+        const text = `${orderId}|${paymentId}`;
+        const generatedSignature = crypto
+          .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+          .update(text)
+          .digest('hex');
+
+        if (generatedSignature !== signature) {
+          return res.status(400).json({
+            success: false,
+            message: 'Payment verification failed: Invalid signature'
+          });
+        }
+      }
+
+      const selectedPlan = PLANS[plan];
+      const cycle = billingCycle || 'monthly';
+      const billingCycleInDays = cycle === 'yearly' ? 365 : 30;
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + billingCycleInDays);
+
+      subscriptionData = {
+        plan,
+        status: 'active',
+        maxStudents: selectedPlan.limits.students,
+        maxTeachers: selectedPlan.limits.teachers,
+        startDate: new Date(),
+        endDate,
+        price: cycle === 'yearly' && selectedPlan.yearlyPrice
+          ? selectedPlan.yearlyPrice
+          : selectedPlan.price,
+        billingCycle: cycle,
+        paymentId: paymentId || orderId
+      };
+    }
+
     // Create tenant
     const tenantData = {
       schoolName: schoolName.trim(),
       email: email.toLowerCase(),
       schoolCode: schoolCode.toLowerCase(),
-      subdomain: finalSubdomain, // Use generated or provided subdomain
+      subdomain: finalSubdomain,
       phone: phone?.trim(),
       address: address || {},
-      subscription: {
-        plan: 'free',
-        status: 'trial',
-        trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 days
-      }
+      subscription: subscriptionData
     };
 
     const tenant = await Tenant.create(tenantData);

@@ -38,6 +38,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import TermsAndConditions from './pages/TermsAndConditions'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import AccountLocked from './pages/AccountLocked'
 
 // ── Super admin pages
 const SuperAdminLogin = lazy(() => import('./pages/superadmin/Login'))
@@ -232,6 +233,7 @@ function App() {
                     <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
                     <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                     <Route path="/payment/status" element={<PaymentStatus />} />
+                    <Route path="/account-locked" element={<AccountLocked />} />
                     <Route path="/app" element={
                       <ProtectedRoute>
                         <NotificationProvider>

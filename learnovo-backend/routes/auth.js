@@ -416,7 +416,13 @@ router.get('/me', protect, async(req, res) => {
           schoolCode: tenantDoc.schoolCode,
           subdomain: tenantDoc.subdomain,
           primaryColor: tenantDoc.primaryColor,
-          secondaryColor: tenantDoc.secondaryColor
+          secondaryColor: tenantDoc.secondaryColor,
+          subscription: {
+            plan: tenantDoc.subscription?.plan,
+            status: tenantDoc.subscription?.status,
+            trialEndsAt: tenantDoc.subscription?.trialEndsAt,
+            endDate: tenantDoc.subscription?.endDate
+          }
         };
       }
     }

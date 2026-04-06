@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Tenant = require('../models/Tenant');
 
 // Protect routes - require authentication
 exports.protect = async(req, res, next) => {
@@ -43,6 +44,43 @@ exports.protect = async(req, res, next) => {
           success: false,
           message: 'Account has been deactivated.'
         });
+      }
+
+      // Check tenant subscription status
+      // Skip for: superadmin, payment routes (so locked users can still pay), subscription status route
+      const isPaymentRoute = req.originalUrl.startsWith('/api/payments')
+        || req.originalUrl.startsWith('/api/subscription')
+        || req.originalUrl === '/api/auth/me';
+      if (user.role !== 'superadmin' && user.tenantId && !isPaymentRoute) {
+        const tenant = await Tenant.findById(user.tenantId).select('subscription').lean();
+        if (tenant) {
+          const { status, trialEndsAt } = tenant.subscription || {};
+
+          // Check if trial has expired (real-time check, cron is backup)
+          if (status === 'trial' && trialEndsAt && new Date() > new Date(trialEndsAt)) {
+            return res.status(403).json({
+              success: false,
+              code: 'TRIAL_EXPIRED',
+              message: 'Your 14-day free trial has expired. Please upgrade to a paid plan to continue using Learnovo.'
+            });
+          }
+
+          if (status === 'suspended') {
+            return res.status(403).json({
+              success: false,
+              code: 'ACCOUNT_SUSPENDED',
+              message: 'Your account has been suspended. Please upgrade to a paid plan to reactivate your account.'
+            });
+          }
+
+          if (status === 'cancelled') {
+            return res.status(403).json({
+              success: false,
+              code: 'SUBSCRIPTION_CANCELLED',
+              message: 'Your subscription has been cancelled. Please renew to continue.'
+            });
+          }
+        }
       }
 
       // Grant access to protected route

@@ -51,6 +51,18 @@ export const tenantService = {
     }
   },
 
+  // Get available subscription plans
+  getPlans: async () => {
+    const response = await api.get('/payments/plans')
+    return response.data
+  },
+
+  // Create a Razorpay order for registration payment
+  createRegistrationOrder: async ({ plan, billingCycle }) => {
+    const response = await api.post('/payments/create-registration-order', { plan, billingCycle })
+    return response.data
+  },
+
   // Check availability of school code, subdomain, or email
   checkAvailability: async (params) => {
     const queryString = new URLSearchParams(params).toString()

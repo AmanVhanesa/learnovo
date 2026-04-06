@@ -47,7 +47,7 @@ api.interceptors.request.use(
   }
 )
 
-// Handle token expiration
+// Handle token expiration and account lock
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -56,6 +56,27 @@ api.interceptors.response.use(
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
+
+    // Redirect to account locked page on trial expired or suspended
+    if (error.response?.status === 403) {
+      const code = error.response.data?.code
+      if (code === 'TRIAL_EXPIRED' || code === 'ACCOUNT_SUSPENDED' || code === 'SUBSCRIPTION_CANCELLED') {
+        // Update tenant subscription status in localStorage
+        try {
+          const tenant = JSON.parse(localStorage.getItem('tenant') || '{}')
+          if (tenant.subscription) {
+            tenant.subscription.status = code === 'TRIAL_EXPIRED' ? 'trial' : 'suspended'
+          }
+          localStorage.setItem('tenant', JSON.stringify(tenant))
+        } catch { /* ignore */ }
+
+        // Only redirect if not already on the locked page
+        if (!window.location.pathname.includes('/account-locked')) {
+          window.location.href = '/account-locked'
+        }
+      }
+    }
+
     return Promise.reject(error)
   }
 )

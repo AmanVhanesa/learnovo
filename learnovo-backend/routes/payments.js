@@ -59,6 +59,84 @@ router.get('/plans', (req, res) => {
   });
 });
 
+// @desc    Create payment order for new school registration (no auth required)
+// @route   POST /api/payments/create-registration-order
+// @access  Public
+router.post('/create-registration-order', async (req, res) => {
+  try {
+    const { plan, billingCycle } = req.body;
+
+    if (!plan || !SUBSCRIPTION_PLANS[plan]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid plan selected'
+      });
+    }
+
+    if (plan === 'enterprise') {
+      return res.status(400).json({
+        success: false,
+        message: 'Enterprise plan requires contacting sales'
+      });
+    }
+
+    const selectedPlan = SUBSCRIPTION_PLANS[plan];
+    const cycle = billingCycle || 'monthly';
+    const amount = cycle === 'yearly' && PLANS[plan].yearlyPrice
+      ? PLANS[plan].yearlyPrice
+      : selectedPlan.price * (cycle === 'yearly' ? 12 : 1);
+
+    // If Razorpay is not configured, return mock response
+    if (!razorpayInstance) {
+      return res.json({
+        success: true,
+        message: 'Payment gateway not configured. Using mock order.',
+        data: {
+          orderId: `mock_order_${Date.now()}`,
+          amount: amount * 100,
+          currency: 'INR',
+          plan,
+          billingCycle: cycle,
+          mock: true
+        }
+      });
+    }
+
+    // Create Razorpay order
+    const options = {
+      amount: amount * 100, // in paise
+      currency: 'INR',
+      receipt: `reg_${Date.now()}`,
+      notes: {
+        type: 'registration',
+        plan,
+        billingCycle: cycle
+      }
+    };
+
+    const order = await razorpayInstance.orders.create(options);
+
+    res.json({
+      success: true,
+      data: {
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        plan,
+        billingCycle: cycle,
+        keyId: process.env.RAZORPAY_KEY_ID
+      }
+    });
+  } catch (error) {
+    console.error('Create registration order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment order',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 // @desc    Create payment order
 // @route   POST /api/payments/create-order
 // @access  Private (Admin)

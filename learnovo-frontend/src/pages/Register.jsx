@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, CheckCircle, XCircle, ArrowRight, ArrowLeft, RefreshCw } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { Eye, EyeOff, CheckCircle, XCircle, ArrowRight, ArrowLeft, RefreshCw, Crown, Zap, Star, Check } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../contexts/ThemeContext'
 import { tenantService } from '../services/tenantService'
 import { HeroGeometric } from '../components/ui/ShapeLandingHero'
@@ -36,6 +36,56 @@ const Register = () => {
   const [errors, setErrors] = useState({})
   const [availability, setAvailability] = useState({})
   const [checkingAvailability, setCheckingAvailability] = useState({})
+  const [step, setStep] = useState(1) // 1 = school info, 2 = plan selection
+  const [selectedPlan, setSelectedPlan] = useState('free')
+  const [billingCycle, setBillingCycle] = useState('monthly')
+  const [paymentProcessing, setPaymentProcessing] = useState(false)
+
+  const PLAN_OPTIONS = [
+    {
+      id: 'free',
+      name: 'Free Trial',
+      price: 0,
+      period: '14 days',
+      icon: Star,
+      color: '#8E8E93',
+      features: ['Up to 50 students', '5 teachers', 'Core academics', 'Attendance tracking', 'Timetable & Homework'],
+      description: 'Perfect for getting started'
+    },
+    {
+      id: 'basic',
+      name: 'Basic',
+      price: 2999,
+      yearlyPrice: Math.round(2999 * 12 * 0.8),
+      period: '/month',
+      icon: Zap,
+      color: '#3EC4B1',
+      popular: true,
+      features: ['Up to 500 students', '30 teachers', 'Grades & Exams', 'Fees & Finance', 'CSV Import', 'Parent Portal'],
+      description: 'Great for small schools'
+    },
+    {
+      id: 'pro',
+      name: 'Pro',
+      price: 6999,
+      yearlyPrice: Math.round(6999 * 12 * 0.8),
+      period: '/month',
+      icon: Crown,
+      color: '#F59E0B',
+      features: ['Up to 2,000 students', '100 teachers', 'Advanced Analytics', 'Payment Gateway', 'SMS & WhatsApp', 'Priority Support'],
+      description: 'For growing institutions'
+    }
+  ]
+
+  // Load Razorpay checkout script
+  useEffect(() => {
+    if (document.getElementById('razorpay-checkout-script')) return
+    const script = document.createElement('script')
+    script.id = 'razorpay-checkout-script'
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    document.body.appendChild(script)
+  }, [])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -207,33 +257,37 @@ const Register = () => {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-
-    if (!validateForm()) {
-      return
+  const buildRegistrationData = (paymentDetails = {}) => {
+    const data = {
+      schoolName: formData.schoolName.trim(),
+      email: formData.email.trim(),
+      password: formData.password,
+      schoolCode: formData.schoolCode.trim(),
+      subdomain: formData.subdomain.trim() || undefined,
+      phone: formData.phone.trim() || '',
+      address: formData.address.street ? {
+        street: formData.address.street.trim(),
+        city: formData.address.city.trim(),
+        state: formData.address.state.trim(),
+        country: formData.address.country.trim(),
+        zipCode: formData.address.zipCode.trim()
+      } : undefined
     }
 
-    setIsLoading(true)
-    setErrors({})
+    if (selectedPlan !== 'free') {
+      data.plan = selectedPlan
+      data.billingCycle = billingCycle
+      data.orderId = paymentDetails.orderId
+      data.paymentId = paymentDetails.paymentId
+      data.signature = paymentDetails.signature
+    }
 
+    return data
+  }
+
+  const completeRegistration = async (paymentDetails = {}) => {
     try {
-      const registrationData = {
-        schoolName: formData.schoolName.trim(),
-        email: formData.email.trim(),
-        password: formData.password,
-        schoolCode: formData.schoolCode.trim(),
-        subdomain: formData.subdomain.trim() || undefined,
-        phone: formData.phone.trim() || '',
-        address: formData.address.street ? {
-          street: formData.address.street.trim(),
-          city: formData.address.city.trim(),
-          state: formData.address.state.trim(),
-          country: formData.address.country.trim(),
-          zipCode: formData.address.zipCode.trim()
-        } : undefined
-      }
-
+      const registrationData = buildRegistrationData(paymentDetails)
       const data = await tenantService.register(registrationData)
 
       if (data.success) {
@@ -243,6 +297,136 @@ const Register = () => {
         navigate('/app/dashboard')
       } else {
         setErrors({ submit: data.message })
+      }
+    } catch (error) {
+      let errorMessage = 'Registration failed. Please try again.'
+
+      if (error.response?.data) {
+        if (error.response.data.errors && Array.isArray(error.response.data.errors)) {
+          const backendErrors = {}
+          error.response.data.errors.forEach(err => {
+            const fieldName = err.field || err.path || err.param
+            backendErrors[fieldName] = err.message || err.msg
+          })
+          setErrors(backendErrors)
+          setStep(1) // Go back to form step to show field errors
+          return
+        }
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message
+        } else if (error.response.data.error) {
+          errorMessage = error.response.data.error
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+
+      setErrors({ submit: errorMessage })
+    }
+  }
+
+  const handlePayment = async () => {
+    setPaymentProcessing(true)
+    setErrors({})
+
+    try {
+      // Create Razorpay order
+      const orderData = await tenantService.createRegistrationOrder({
+        plan: selectedPlan,
+        billingCycle
+      })
+
+      if (!orderData.success) {
+        setErrors({ submit: orderData.message || 'Failed to create payment order' })
+        return
+      }
+
+      const { orderId, amount, currency, keyId, mock } = orderData.data
+
+      // Mock payment (dev mode — Razorpay not configured)
+      if (mock) {
+        await completeRegistration({
+          orderId,
+          paymentId: `mock_pay_${Date.now()}`,
+          signature: 'mock_signature'
+        })
+        return
+      }
+
+      // Open Razorpay checkout popup
+      const options = {
+        key: keyId,
+        amount,
+        currency: currency || 'INR',
+        name: 'Learnovo',
+        description: `${selectedPlan.charAt(0).toUpperCase() + selectedPlan.slice(1)} Plan - ${billingCycle === 'yearly' ? 'Annual' : 'Monthly'}`,
+        order_id: orderId,
+        handler: async (response) => {
+          // Payment successful — complete registration
+          try {
+            await completeRegistration({
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature
+            })
+          } catch {
+            setErrors({ submit: 'Payment was successful but registration failed. Please contact support.' })
+          } finally {
+            setPaymentProcessing(false)
+          }
+        },
+        prefill: {
+          name: formData.schoolName.trim(),
+          email: formData.email.trim(),
+          contact: formData.phone.trim()
+        },
+        theme: {
+          color: '#3EC4B1'
+        },
+        modal: {
+          ondismiss: () => {
+            setPaymentProcessing(false)
+          }
+        }
+      }
+
+      const rzp = new window.Razorpay(options)
+      rzp.on('payment.failed', (response) => {
+        setErrors({ submit: response.error?.description || 'Payment failed. Please try again.' })
+        setPaymentProcessing(false)
+      })
+      rzp.open()
+    } catch (error) {
+      const msg = error.response?.data?.message || error.message || 'Payment initialization failed'
+      setErrors({ submit: msg })
+      setPaymentProcessing(false)
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!validateForm()) {
+      return
+    }
+
+    // Move to plan selection step
+    setStep(2)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handlePlanSubmit = async () => {
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      if (selectedPlan === 'free') {
+        // Free trial — register directly
+        await completeRegistration()
+      } else {
+        // Paid plan — initiate payment
+        await handlePayment()
+        return // handlePayment manages its own loading state
       }
     } catch (error) {
       let errorMessage = 'Registration failed. Please try again.'
@@ -295,9 +479,9 @@ const Register = () => {
         className="hidden lg:block lg:w-5/12 xl:w-1/2 relative"
       >
         <HeroGeometric
-          title1="Create your"
-          title2="school."
-          description="Start your free 14-day trial. Set up your school in minutes — no credit card required."
+          title1={step === 1 ? 'Create your' : 'Choose your'}
+          title2={step === 1 ? 'school.' : 'plan.'}
+          description={step === 1 ? 'Set up your school in minutes. Choose a free trial or a paid plan.' : 'Pick the plan that fits your school. Upgrade or downgrade anytime.'}
         >
           {/* Feature pills */}
           <div className="flex flex-wrap gap-2 justify-center">
@@ -368,12 +552,30 @@ const Register = () => {
             className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-lg shadow-teal-100/40 dark:shadow-black/20 border border-gray-100 dark:border-[#38383A] px-6 sm:px-7 py-6 sm:py-7"
           >
 
-            {/* Heading */}
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Create your school account</h2>
-              <p className="text-gray-400 dark:text-[#8E8E93] text-[13px] mt-1">Start your free 14-day trial today</p>
+            {/* Step indicator */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex items-center gap-2">
+                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= 1 ? 'bg-[#3EC4B1] text-white' : 'bg-gray-200 dark:bg-[#38383A] text-gray-500'}`}>1</div>
+                <span className="text-[12px] font-medium text-gray-600 dark:text-[#8E8E93] hidden sm:inline">School Info</span>
+              </div>
+              <div className="flex-1 h-px bg-gray-200 dark:bg-[#38383A]" />
+              <div className="flex items-center gap-2">
+                <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= 2 ? 'bg-[#3EC4B1] text-white' : 'bg-gray-200 dark:bg-[#38383A] text-gray-500'}`}>2</div>
+                <span className="text-[12px] font-medium text-gray-600 dark:text-[#8E8E93] hidden sm:inline">Choose Plan</span>
+              </div>
             </div>
 
+            {/* Heading */}
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+                {step === 1 ? 'Create your school account' : 'Choose your plan'}
+              </h2>
+              <p className="text-gray-400 dark:text-[#8E8E93] text-[13px] mt-1">
+                {step === 1 ? 'Fill in your school details to get started' : 'Select a plan that fits your school'}
+              </p>
+            </div>
+
+            {step === 1 && (
             <form className="space-y-5" onSubmit={handleSubmit}>
 
               {/* -- School Information -- */}
@@ -754,7 +956,7 @@ const Register = () => {
                 </div>
               )}
 
-              {/* Submit — sticky on scroll */}
+              {/* Next step button */}
               <div className="sticky bottom-0 pt-3 pb-1 -mx-6 sm:-mx-7 px-6 sm:px-7"
                 style={isDark
                   ? { background: 'linear-gradient(to top, #1C1C1E 70%, transparent)' }
@@ -763,21 +965,173 @@ const Register = () => {
               >
                 <button
                   type="submit"
-                  disabled={isLoading}
                   className="w-full py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 dark:hover:shadow-teal-900/40 active:scale-95 disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
                   style={{ background: 'linear-gradient(135deg, #3EC4B1 0%, #0ea5a3 60%, #0b8f8f 100%)' }}
                 >
-                  {isLoading ? (
+                  Choose a Plan
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+            )}
+
+            {/* Step 2: Plan Selection */}
+            {step === 2 && (
+            <div className="space-y-5">
+
+              {/* Billing cycle toggle */}
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-all ${
+                    billingCycle === 'monthly'
+                      ? 'bg-[#3EC4B1] text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-500 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle('yearly')}
+                  className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-all inline-flex items-center gap-1.5 ${
+                    billingCycle === 'yearly'
+                      ? 'bg-[#3EC4B1] text-white shadow-md'
+                      : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-500 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'
+                  }`}
+                >
+                  Yearly
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-600 dark:text-green-400">
+                    Save 20%
+                  </span>
+                </button>
+              </div>
+
+              {/* Plan cards */}
+              <div className="space-y-3">
+                {PLAN_OPTIONS.map((plan) => {
+                  const isSelected = selectedPlan === plan.id
+                  const displayPrice = plan.id === 'free'
+                    ? 0
+                    : billingCycle === 'yearly'
+                      ? Math.round((plan.yearlyPrice || plan.price * 12) / 12)
+                      : plan.price
+                  const totalYearly = plan.yearlyPrice || plan.price * 12
+                  const Icon = plan.icon
+
+                  return (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => setSelectedPlan(plan.id)}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 relative ${
+                        isSelected
+                          ? 'border-[#3EC4B1] bg-[#3EC4B1]/5 dark:bg-[#3EC4B1]/10 shadow-md'
+                          : 'border-gray-200 dark:border-[#38383A] hover:border-gray-300 dark:hover:border-[#48484A] bg-white dark:bg-[#2C2C2E]'
+                      }`}
+                    >
+                      {plan.popular && (
+                        <span className="absolute -top-2.5 right-4 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#3EC4B1] text-white">
+                          Most Popular
+                        </span>
+                      )}
+                      <div className="flex items-start gap-3">
+                        <div
+                          className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: `${plan.color}15`, color: plan.color }}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-[15px] font-bold text-gray-900 dark:text-white">{plan.name}</h3>
+                            <div className="text-right">
+                              {plan.id === 'free' ? (
+                                <span className="text-[15px] font-bold text-gray-900 dark:text-white">Free</span>
+                              ) : (
+                                <>
+                                  <span className="text-[15px] font-bold text-gray-900 dark:text-white">
+                                    ₹{displayPrice.toLocaleString('en-IN')}
+                                  </span>
+                                  <span className="text-[11px] text-gray-400 dark:text-[#636366]">/mo</span>
+                                  {billingCycle === 'yearly' && (
+                                    <p className="text-[10px] text-gray-400 dark:text-[#636366]">
+                                      ₹{totalYearly.toLocaleString('en-IN')}/yr
+                                    </p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-[11px] text-gray-400 dark:text-[#636366] mt-0.5">{plan.description}</p>
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                            {plan.features.map((f) => (
+                              <span key={f} className="text-[11px] text-gray-500 dark:text-[#8E8E93] flex items-center gap-1">
+                                <Check className="h-3 w-3 text-[#3EC4B1] flex-shrink-0" />
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 mt-1">
+                          <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                            isSelected
+                              ? 'border-[#3EC4B1] bg-[#3EC4B1]'
+                              : 'border-gray-300 dark:border-[#48484A]'
+                          }`}>
+                            {isSelected && (
+                              <Check className="h-3 w-3 text-white" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Error display */}
+              {errors.submit && (
+                <div className="rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 px-3.5 py-2.5">
+                  <p className="text-[13px] font-medium text-red-600 dark:text-red-400">{errors.submit}</p>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setStep(1); setErrors({}) }}
+                  className="px-5 py-2.5 rounded-full text-sm font-medium text-gray-600 dark:text-[#8E8E93] bg-gray-100 dark:bg-[#2C2C2E] hover:bg-gray-200 dark:hover:bg-[#3A3A3C] transition-colors inline-flex items-center gap-1.5"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePlanSubmit}
+                  disabled={isLoading || paymentProcessing}
+                  className="flex-1 py-2.5 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-teal-200/60 dark:hover:shadow-teal-900/40 active:scale-95 disabled:opacity-50 disabled:pointer-events-none inline-flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #3EC4B1 0%, #0ea5a3 60%, #0b8f8f 100%)' }}
+                >
+                  {(isLoading || paymentProcessing) ? (
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : selectedPlan === 'free' ? (
+                    <>
+                      Start Free Trial
+                      <ArrowRight className="w-4 h-4" />
+                    </>
                   ) : (
                     <>
-                      Create School Account
+                      Pay & Create Account
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
               </div>
-            </form>
+            </div>
+            )}
           </motion.div>
 
           {/* Sign in link */}

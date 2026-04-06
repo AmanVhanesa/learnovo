@@ -354,6 +354,13 @@ if (isPrimaryInstance) {
   } catch (e) {
     console.error('Failed to start announcement expiry job:', e);
   }
+
+  try {
+    const trialExpiryJob = require('./jobs/trialExpiryJob');
+    trialExpiryJob.startJob();
+  } catch (e) {
+    console.error('Failed to start trial expiry job:', e);
+  }
 } else {
   console.log(`Skipping cron jobs on PM2 instance ${process.env.NODE_APP_INSTANCE}`);
 }
