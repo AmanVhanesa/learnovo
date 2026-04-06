@@ -136,6 +136,16 @@ const AcademicsManagement = () => {
         onSuccess: () => { toast.success('Subject status updated'); queryClient.invalidateQueries({ queryKey: ['academic-subjects'] }); queryClient.invalidateQueries({ queryKey: ['academic-assignments'] }) },
         onError: () => { toast.error('Failed to update subject status') },
     })
+    const deleteClassSubjectMutation = useMutation({
+        mutationFn: (id) => classSubjectsService.remove(id),
+        onSuccess: () => { toast.success('Subject assignment removed'); queryClient.invalidateQueries({ queryKey: ['academic-assignments'] }) },
+        onError: (error) => { toast.error(error.response?.data?.message || 'Failed to remove assignment') },
+    })
+    const deleteTeacherAssignmentMutation = useMutation({
+        mutationFn: (id) => teacherAssignmentsService.remove(id),
+        onSuccess: () => { toast.success('Teacher assignment removed'); queryClient.invalidateQueries({ queryKey: ['academic-assignments'] }) },
+        onError: (error) => { toast.error(error.response?.data?.message || 'Failed to remove teacher assignment') },
+    })
 
     const handleActivateSession = async (id) => { activateSessionMutation.mutate(id) }
     const handleLockSession = async (id, lock) => { lockSessionMutation.mutate({ id, lock }) }
@@ -152,6 +162,18 @@ const AcademicsManagement = () => {
         deleteSubjectMutation.mutate(id)
     }
     const handleToggleSubject = async (id) => { toggleSubjectMutation.mutate(id) }
+    const handleDeleteClassSubject = async (csId, assignments) => {
+        if (!confirm('Are you sure you want to remove this subject assignment? This will also remove any teacher assignments for this subject in this class.')) return
+        // Delete associated teacher assignments first
+        for (const ta of assignments) {
+            await teacherAssignmentsService.remove(ta._id).catch(() => {})
+        }
+        deleteClassSubjectMutation.mutate(csId)
+    }
+    const handleDeleteTeacherAssignment = async (taId) => {
+        if (!confirm('Are you sure you want to remove this teacher from this subject?')) return
+        deleteTeacherAssignmentMutation.mutate(taId)
+    }
 
     const tabs = [
         { id: 'sessions', label: 'Academic Sessions', icon: Calendar },
@@ -641,12 +663,18 @@ const AcademicsManagement = () => {
 
                                 <div className="space-y-6">
                                     {classes.map((cls) => {
-                                        const clsSubjects = classSubjects.filter(cs => cs.classId?._id === cls._id)
+                                        // Filter out orphaned records where subject was deleted
+                                        const clsSubjects = classSubjects.filter(cs => cs.classId?._id === cls._id && cs.subjectId?._id)
                                         if (clsSubjects.length === 0) return null
+
+                                        // Display class name smartly - avoid redundant "Nursery - Nursery"
+                                        const classDisplayName = cls.name === cls.grade || cls.name === `Class ${cls.grade}`
+                                            ? `${cls.name}`
+                                            : `${cls.name} - ${formatGrade(cls.grade)}`
 
                                         return (
                                             <div key={cls._id} className="border border-gray-200 dark:border-[#38383A] dark:bg-[#2C2C2E] rounded-2xl p-4">
-                                                <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">{cls.name} - {cls.grade}</h3>
+                                                <h3 className="text-md font-semibold text-gray-900 dark:text-white mb-3">{classDisplayName}</h3>
                                                 <div className="space-y-2">
                                                     {clsSubjects.map((cs) => {
                                                         const assignments = teacherAssignments.filter(ta =>
@@ -655,18 +683,46 @@ const AcademicsManagement = () => {
 
                                                         return (
                                                             <div key={cs._id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 dark:bg-[#1C1C1E] rounded-lg gap-2">
-                                                                <div className="flex-1">
+                                                                <div className="flex-1 min-w-0">
                                                                     <p className="font-medium text-gray-900 dark:text-white">{cs.subjectId?.name}</p>
                                                                     <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
                                                                         {assignments.length > 0 ? (
-                                                                            <>Teachers: {assignments.map(a => a.teacherId?.name).join(', ')}</>
+                                                                            <span className="flex flex-wrap items-center gap-1">
+                                                                                <span>Teachers:</span>
+                                                                                {assignments.map((a, idx) => (
+                                                                                    <span key={a._id} className="inline-flex items-center gap-1">
+                                                                                        <span>{a.teacherId?.name || 'Unknown'}</span>
+                                                                                        {user?.role === 'admin' && (
+                                                                                            <button
+                                                                                                onClick={() => handleDeleteTeacherAssignment(a._id)}
+                                                                                                className="text-red-400 hover:text-red-600 p-0.5"
+                                                                                                title="Remove teacher"
+                                                                                            >
+                                                                                                <X className="h-3 w-3" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                        {idx < assignments.length - 1 && <span>,</span>}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </span>
                                                                         ) : (
                                                                             <span className="text-red-600 dark:text-red-400">No teacher assigned</span>
                                                                         )}
                                                                     </p>
                                                                 </div>
-                                                                <div className="text-sm text-gray-600 dark:text-[#8E8E93]">
-                                                                    Max: {cs.maxMarks} | Pass: {cs.passingMarks}
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-sm text-gray-600 dark:text-[#8E8E93] whitespace-nowrap">
+                                                                        Max: {cs.maxMarks} | Pass: {cs.passingMarks}
+                                                                    </span>
+                                                                    {user?.role === 'admin' && (
+                                                                        <button
+                                                                            onClick={() => handleDeleteClassSubject(cs._id, assignments)}
+                                                                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                                                                            title="Remove subject from class"
+                                                                        >
+                                                                            <Trash2 className="h-4 w-4" />
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         )
@@ -676,7 +732,7 @@ const AcademicsManagement = () => {
                                         )
                                     })}
 
-                                    {classSubjects.length === 0 && (
+                                    {classSubjects.filter(cs => cs.subjectId?._id).length === 0 && (
                                         <div className="text-center py-12">
                                             <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                             <p className="text-gray-500 dark:text-[#8E8E93]">No subject assignments found</p>
@@ -735,6 +791,7 @@ const AcademicsManagement = () => {
                     subjects={subjects}
                     teachers={teachers}
                     activeSession={activeSession}
+                    classSubjects={classSubjects}
                     onClose={() => setShowAssignmentForm(false)}
                     onSuccess={() => {
                         setShowAssignmentForm(false)
@@ -1285,7 +1342,7 @@ const SubjectFormModal = ({ subject, classes = [], activeSession, onClose, onSuc
 }
 
 // Assignment Form Modal
-const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClose, onSuccess }) => {
+const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, classSubjects = [], onClose, onSuccess }) => {
     const [form, setForm] = useState({
         classId: '',
         subjectId: '',
@@ -1294,6 +1351,14 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
         passingMarks: 33
     })
     const [isSaving, setIsSaving] = useState(false)
+
+    // Get subjects already assigned to the selected class
+    const assignedSubjectIds = form.classId
+        ? new Set(classSubjects.filter(cs => cs.classId?._id === form.classId && cs.subjectId?._id).map(cs => cs.subjectId._id))
+        : new Set()
+
+    // Filter available subjects (active + not already assigned to selected class)
+    const availableSubjects = subjects.filter(s => s.isActive && !assignedSubjectIds.has(s._id))
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -1347,13 +1412,13 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
                             <select
                                 className="input"
                                 value={form.classId}
-                                onChange={(e) => setForm({ ...form, classId: e.target.value })}
+                                onChange={(e) => setForm({ ...form, classId: e.target.value, subjectId: '' })}
                                 required
                             >
                                 <option value="">Select Class</option>
                                 {classes.map((cls) => (
                                     <option key={cls._id} value={cls._id}>
-                                        {cls.name} - {cls.grade}
+                                        {cls.name}{cls.name !== cls.grade && cls.name !== `Class ${cls.grade}` ? ` - ${formatGrade(cls.grade)}` : ''}
                                     </option>
                                 ))}
                             </select>
@@ -1376,12 +1441,18 @@ const AssignmentFormModal = ({ classes, subjects, teachers, activeSession, onClo
                                 required
                             >
                                 <option value="">Select Subject</option>
-                                {subjects.filter(s => s.isActive).map((subject) => (
+                                {availableSubjects.map((subject) => (
                                     <option key={subject._id} value={subject._id}>
                                         {subject.name}
                                     </option>
                                 ))}
+                                {form.classId && availableSubjects.length === 0 && (
+                                    <option disabled>All subjects already assigned</option>
+                                )}
                             </select>
+                            {form.classId && availableSubjects.length === 0 && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">All active subjects are already assigned to this class</p>
+                            )}
                         </div>
 
                         <div>
