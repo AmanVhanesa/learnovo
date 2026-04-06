@@ -773,12 +773,13 @@ const pdfService = {
     try {
       browser = await getBrowser();
       page = await browser.newPage();
+      await page.setViewport({ width: 794, height: 1123 }); // A4 at 96dpi
       await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
       const pdfUint8 = await page.pdf({
         format: 'A4',
         printBackground: true,
-        preferCSSPageSize: true,
-        margin: { top: 0, right: 0, bottom: 0, left: 0 }
+        preferCSSPageSize: false,
+        margin: { top: '10mm', right: '12mm', bottom: '10mm', left: '12mm' }
       });
       return Buffer.from(pdfUint8);
     } catch (err) {
