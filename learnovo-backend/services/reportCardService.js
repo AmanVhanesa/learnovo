@@ -435,8 +435,11 @@ const reportCardService = {
         const series = r.exam.examSeries;
         marks[series] = r.marksObtained;
 
-        if (term === 'Term 1') { t1Total += r.marksObtained; t1Max += r.exam.totalMarks; }
-        else { t2Total += r.marksObtained; t2Max += r.exam.totalMarks; }
+        if (term === 'Term 1') {
+          t1Total += r.marksObtained; t1Max += r.exam.totalMarks;
+        } else {
+          t2Total += r.marksObtained; t2Max += r.exam.totalMarks;
+        }
       }
 
       const t1Pct = t1Max > 0 ? Math.round((t1Total / t1Max) * 100 * 10) / 10 : 0;

@@ -12,7 +12,9 @@ async function toBase64DataUri(url) {
     if (buf.length < 100) return '';
     const mime = response.headers['content-type'] || 'image/png';
     return `data:${mime};base64,${buf.toString('base64')}`;
-  } catch { return ''; }
+  } catch {
+    return '';
+  }
 }
 
 function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
@@ -307,7 +309,7 @@ async function generateReceiptHtml(payment, schoolData) {
     </div>`;
 
   // Add toolbar right after <body>, add padding-top so content isn't hidden behind toolbar
-  html = html.replace('<body>', '<body>' + toolbarHtml);
+  html = html.replace('<body>', `<body>${  toolbarHtml}`);
   html = html.replace('.page {', '.page { margin-top: 50px; ');
 
   // Override @page for browser print — half A4, zero margins

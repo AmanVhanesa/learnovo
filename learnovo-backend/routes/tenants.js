@@ -427,7 +427,7 @@ router.get('/public/:subdomain', async(req, res) => {
 // @desc    Dynamic PWA manifest for a tenant (school name + logo on install)
 // @route   GET /api/tenants/manifest/:subdomain
 // @access  Public
-router.get('/manifest/:subdomain', async (req, res) => {
+router.get('/manifest/:subdomain', async(req, res) => {
   try {
     const { subdomain } = req.params;
     const tenant = await Tenant.findOne({
@@ -453,13 +453,13 @@ router.get('/manifest/:subdomain', async (req, res) => {
     // Build icons array — use school logo if available, else default PWA icons
     const icons = logo
       ? [
-          { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: logo, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-        ]
+        { src: logo, sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: logo, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+      ]
       : [
-          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
-        ];
+        { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+      ];
 
     const shortCode = (tenant.schoolCode || tenant.subdomain || 'APP').toUpperCase();
 

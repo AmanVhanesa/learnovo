@@ -1548,7 +1548,9 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
 
     // Mark admission fee paid
     if (invoice.status === 'Paid' && invoice.billingPeriod?.displayText === 'Admission Fee') {
-      try { await User.updateOne({ _id: studentId, tenantId }, { $set: { admissionFeePaid: true } }); } catch (_) { /* non-fatal */ }
+      try {
+        await User.updateOne({ _id: studentId, tenantId }, { $set: { admissionFeePaid: true } });
+      } catch (_) { /* non-fatal */ }
     }
 
     // Auto-sync to Finance module

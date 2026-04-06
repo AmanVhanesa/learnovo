@@ -698,7 +698,7 @@ router.post('/bulk-transfer', protect, authorize('admin'), [
           monthlyFee: monthlyFee != null ? monthlyFee : existing.monthlyFee,
           startDate: new Date(),
           isActive: true,
-          notes: `Transferred from previous route`,
+          notes: 'Transferred from previous route',
           createdBy: req.user._id
         });
 

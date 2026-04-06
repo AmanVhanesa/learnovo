@@ -12,7 +12,7 @@ const ClassSubject = require('../models/ClassSubject');
 const AcademicSession = require('../models/AcademicSession');
 const pdfService = require('../services/pdfService');
 const { format } = require('date-fns');
-const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ImageRun, HeadingLevel } = require('docx');
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ImageRun } = require('docx');
 const axios = require('axios');
 const fs = require('fs');
 const nodePath = require('path');
@@ -605,7 +605,9 @@ exports.downloadCertificateWord = async(req, res) => {
     const filename = `${cert.type}_${cert.certificateNumber.replace(/\//g, '-')}.docx`;
     res.download(tmpPath, filename, (err) => {
       // Clean up temp file after download
-      try { fs.unlinkSync(tmpPath); } catch (_) { /* ignore */ }
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch (_) { /* ignore */ }
       if (err && !res.headersSent) {
         res.status(500).json({ message: 'Error sending Word document' });
       }

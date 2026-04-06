@@ -33,7 +33,7 @@ router.get('/export', protect, authorize('admin', 'accountant'), async(req, res)
       const sectionName = fs.sectionId?.name || 'All Sections';
       const sessionName = fs.academicSessionId?.name || '';
       const status = fs.isActive ? 'Active' : 'Inactive';
-      const lateFee = fs.lateFeeConfig?.enabled ? `${fs.lateFeeConfig.type === 'percentage' ? fs.lateFeeConfig.amount + '%' : fs.lateFeeConfig.amount} after ${fs.lateFeeConfig.gracePeriodDays} days` : 'Disabled';
+      const lateFee = fs.lateFeeConfig?.enabled ? `${fs.lateFeeConfig.type === 'percentage' ? `${fs.lateFeeConfig.amount  }%` : fs.lateFeeConfig.amount} after ${fs.lateFeeConfig.gracePeriodDays} days` : 'Disabled';
 
       if (fs.feeHeads && fs.feeHeads.length > 0) {
         for (const head of fs.feeHeads) {

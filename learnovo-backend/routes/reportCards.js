@@ -26,7 +26,7 @@ const examPlanGates = [planGate.requireActiveSubscription, planGate.checkGradesA
 // @desc    Download blank report card PDF for a student (empty marks for hand-filling)
 // @route   GET /api/report-cards/:studentId/blank/pdf
 // @access  Private (admin, teacher)
-router.get('/:studentId/blank/pdf', protect, examPlanGates, authorize('admin', 'teacher'), async(req, res, next) => {
+router.get('/:studentId/blank/pdf', protect, examPlanGates, authorize('admin', 'teacher'), async(req, res, _next) => {
   try {
     const { studentId } = req.params;
     const { examSeries, class: className } = req.query;
@@ -313,7 +313,7 @@ function calculateGrade(percentage) {
 // @desc    Generate a custom report card PDF from manually provided data
 // @route   POST /api/report-cards/custom/pdf
 // @access  Private (admin, teacher)
-router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, res, next) => {
+router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, res, _next) => {
   try {
     const { student, reportType, remarks } = req.body;
 
@@ -619,18 +619,26 @@ router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, re
     // Determine summary values for metadata
     let overallPct = 0, overallGrd = '', resultStr = 'FAIL', examInfoStr = '';
     if (reportType === 'cumulative') {
-      const { exams: examsList, sessionName: sn, academicYear: ay } = req.body;
+      const { exams: examsList } = req.body;
       const subjectRows2 = req.body.subjects || [];
       const grandMax = subjectRows2.reduce((a, s) => {
-        let m = 0; Object.values(s.marks || {}).forEach(v => { if (v !== null) m += Number(s.totalMarksPerExam) || 100; }); return a + m;
+        let m = 0; Object.values(s.marks || {}).forEach(v => {
+          if (v !== null) m += Number(s.totalMarksPerExam) || 100;
+        }); return a + m;
       }, 0);
       const grandObt = subjectRows2.reduce((a, s) => {
-        let m = 0; Object.values(s.marks || {}).forEach(v => { if (v !== null) m += Number(v); }); return a + m;
+        let m = 0; Object.values(s.marks || {}).forEach(v => {
+          if (v !== null) m += Number(v);
+        }); return a + m;
       }, 0);
       overallPct = grandMax > 0 ? Math.round((grandObt / grandMax) * 100 * 10) / 10 : 0;
       overallGrd = calculateGrade(overallPct);
       resultStr = subjectRows2.length > 0 && subjectRows2.every(s => {
-        let tm = 0, to = 0; Object.values(s.marks || {}).forEach(v => { if (v !== null) { tm += Number(s.totalMarksPerExam) || 100; to += Number(v); } });
+        let tm = 0, to = 0; Object.values(s.marks || {}).forEach(v => {
+          if (v !== null) {
+            tm += Number(s.totalMarksPerExam) || 100; to += Number(v);
+          }
+        });
         return tm > 0 && (to / tm * 100) >= (Number(s.passingPercentage) || 40);
       }) ? 'PASS' : 'FAIL';
       examInfoStr = `Cumulative — ${(examsList || []).map(e => e.name).join(', ')}`;
@@ -659,7 +667,7 @@ router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, re
       overallPct = gt > 0 ? Math.round((go / gt) * 100 * 10) / 10 : 0;
       overallGrd = calculateGrade(overallPct);
       resultStr = (subs || []).every(s => (Number(s.marksObtained) || 0) >= (Number(s.passingMarks) || Math.ceil((Number(s.totalMarks) || 0) * 0.33))) ? 'PASS' : 'FAIL';
-      examInfoStr = `${ex?.examSeries || 'Custom'}${ex?.name ? ' — ' + ex.name : ''}`;
+      examInfoStr = `${ex?.examSeries || 'Custom'}${ex?.name ? ` — ${  ex.name}` : ''}`;
     }
 
     const record = await CustomReportCard.create({

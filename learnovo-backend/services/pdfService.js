@@ -377,15 +377,6 @@ function buildFinalReportCardPlaceholders(data) {
 
 // ── Two-Term Report Card helpers ──
 
-function calcGrade(pct) {
-  if (pct >= 90) return 'A+';
-  if (pct >= 80) return 'A';
-  if (pct >= 70) return 'B';
-  if (pct >= 60) return 'C';
-  if (pct >= 50) return 'D';
-  return 'F';
-}
-
 function buildTwoTermPlaceholders(data) {
   const { school, student, session, term1, term2, subjectRows, coScholastic, summary, remarks, result } = data;
   const brandColor = school.brand_color || school.brandColor || '#1E3A5F';
@@ -439,8 +430,6 @@ function buildTwoTermPlaceholders(data) {
     return `<td style="font-weight:700">${total}</td>`;
   }).join('');
 
-  const ogc = getGradeClass(summary.overallGrade);
-
   const grandTotalRow = `<tr>
     <td class="subject-cell">Grand Total</td>
     ${t1GrandCells}
@@ -490,7 +479,7 @@ function buildTwoTermPlaceholders(data) {
     session_name: session.name || '',
     student_name: student.name || '',
     adm_number: student.admissionNumber || '\u2014',
-    class_section: `${student.class || ''}${student.section ? ' \u2014 ' + student.section : ''}`,
+    class_section: `${student.class || ''}${student.section ? ` \u2014 ${  student.section}` : ''}`,
     roll_number: student.rollNumber || '\u2014',
     dob,
     father_name: student.fatherName || '\u2014',
@@ -791,7 +780,9 @@ const pdfService = {
       throw err;
     } finally {
       if (page) {
-        try { await page.close(); } catch { /* ignore */ }
+        try {
+          await page.close();
+        } catch { /* ignore */ }
       }
       releaseBrowser();
     }
@@ -878,7 +869,11 @@ const pdfService = {
       }
       throw err;
     } finally {
-      if (page) { try { await page.close(); } catch { /* ignore */ } }
+      if (page) {
+        try {
+          await page.close();
+        } catch { /* ignore */ }
+      }
       releaseBrowser();
     }
   },
@@ -933,7 +928,11 @@ const pdfService = {
       }
       throw err;
     } finally {
-      if (page) { try { await page.close(); } catch { /* ignore */ } }
+      if (page) {
+        try {
+          await page.close();
+        } catch { /* ignore */ }
+      }
       releaseBrowser();
     }
   },
@@ -991,7 +990,11 @@ const pdfService = {
       }
       throw err;
     } finally {
-      if (page) { try { await page.close(); } catch { /* ignore */ } }
+      if (page) {
+        try {
+          await page.close();
+        } catch { /* ignore */ }
+      }
       releaseBrowser();
     }
   },
