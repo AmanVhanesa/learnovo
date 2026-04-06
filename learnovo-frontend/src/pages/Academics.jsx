@@ -473,15 +473,20 @@ const AcademicsManagement = () => {
                                 <p className="text-gray-500 dark:text-[#8E8E93]">No subjects found</p>
                             </div>
                         ) : (() => {
-                            // Build class → subjects mapping
+                            // Build a lookup for full subject data
+                            const subjectById = {}
+                            subjects.forEach(s => { subjectById[s._id] = s })
+
+                            // Build class → subjects mapping using full subject data
                             const classSubjectMap = {}
                             classSubjects.forEach(cs => {
                                 const clsId = cs.classId?._id
                                 const clsName = cs.classId?.name
-                                const subj = cs.subjectId
-                                if (!clsId || !subj) return
+                                const subjId = cs.subjectId?._id
+                                if (!clsId || !subjId) return
+                                const fullSubject = subjectById[subjId] || cs.subjectId
                                 if (!classSubjectMap[clsId]) classSubjectMap[clsId] = { name: clsName, subjects: [] }
-                                classSubjectMap[clsId].subjects.push(subj)
+                                classSubjectMap[clsId].subjects.push(fullSubject)
                             })
                             // Classes with subjects (sorted by class order)
                             const classesWithSubjects = classes
