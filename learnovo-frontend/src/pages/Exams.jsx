@@ -37,28 +37,39 @@ const STATUS_RING = {
     Cancelled: 'ring-1 ring-red-200 dark:ring-red-500/30',
 };
 
-const EXAM_SERIES = ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom'];
+const TERMS = ['Term 1', 'Term 2'];
+
+const TERM_EXAM_TYPES = {
+    'Term 1': ['UT1', 'SA1', 'Custom'],
+    'Term 2': ['UT2', 'SA2', 'Custom']
+};
+
+const EXAM_SERIES = ['UT1', 'UT2', 'SA1', 'SA2', 'Custom', 'FA1', 'FA2', 'FA3', 'FA4', 'Unit Test', 'Midterm', 'Final'];
 const EXAM_TYPES = ['Written', 'Practical', 'Oral'];
 const EXAM_MODES = ['Offline', 'Online'];
 const EXAM_STATUSES = ['Scheduled', 'Ongoing', 'Completed', 'Cancelled'];
 
 /* ── Exam series display config ── */
 const SERIES_CONFIG = {
-    FA1: { label: 'FA 1 — Formative Assessment 1', short: 'FA1', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
-    FA2: { label: 'FA 2 — Formative Assessment 2', short: 'FA2', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
-    FA3: { label: 'FA 3 — Formative Assessment 3', short: 'FA3', color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20' },
-    FA4: { label: 'FA 4 — Formative Assessment 4', short: 'FA4', color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20' },
-    SA1: { label: 'SA 1 — Summative Assessment 1', short: 'SA1', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/20' },
-    SA2: { label: 'SA 2 — Summative Assessment 2', short: 'SA2', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/20' },
-    'Unit Test': { label: 'Unit Test', short: 'UT', color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-500/10', border: 'border-teal-200 dark:border-teal-500/20' },
-    Midterm: { label: 'Midterm Examination', short: 'Mid', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-200 dark:border-orange-500/20' },
-    Final: { label: 'Final Examination', short: 'Final', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20' },
+    UT1: { label: 'Unit Test 1', short: 'UT1', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
+    SA1: { label: 'Summative Assessment 1', short: 'SA1', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/20' },
+    UT2: { label: 'Unit Test 2', short: 'UT2', color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-500/10', border: 'border-teal-200 dark:border-teal-500/20' },
+    SA2: { label: 'Summative Assessment 2', short: 'SA2', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-200 dark:border-orange-500/20' },
     Custom: { label: 'Custom Exam', short: 'Custom', color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-500/10', border: 'border-gray-200 dark:border-gray-500/20' },
+    // Keep legacy entries for backwards compat display
+    FA1: { label: 'FA 1', short: 'FA1', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
+    FA2: { label: 'FA 2', short: 'FA2', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
+    FA3: { label: 'FA 3', short: 'FA3', color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20' },
+    FA4: { label: 'FA 4', short: 'FA4', color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10', border: 'border-cyan-200 dark:border-cyan-500/20' },
+    'Unit Test': { label: 'Unit Test', short: 'UT', color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-500/10', border: 'border-teal-200 dark:border-teal-500/20' },
+    Midterm: { label: 'Midterm', short: 'Mid', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-200 dark:border-orange-500/20' },
+    Final: { label: 'Final', short: 'Final', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10', border: 'border-rose-200 dark:border-rose-500/20' },
 };
 
 const EMPTY_FORM = {
     name: '',
-    examSeries: 'Midterm',
+    term: 'Term 1',
+    examSeries: 'UT1',
     class: '',
     classId: '',
     section: '',
@@ -87,7 +98,7 @@ function calcDuration(start, end) {
 }
 
 /* ── Exam series sort order ── */
-const SERIES_ORDER = ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom'];
+const SERIES_ORDER = ['UT1', 'SA1', 'UT2', 'SA2', 'Custom', 'FA1', 'FA2', 'FA3', 'FA4', 'Unit Test', 'Midterm', 'Final'];
 function seriesSortKey(s) {
     const idx = SERIES_ORDER.indexOf(s);
     return idx >= 0 ? idx : 999;
@@ -111,6 +122,7 @@ const Exams = () => {
     /* ── Filter state ── */
     const [filterStatus, setFilterStatus] = useState('');
     const [filterClass, setFilterClass] = useState('');
+    const [filterTerm, setFilterTerm] = useState('');
     const [searchText, setSearchText] = useState('');
     const [examSeriesFilter, setExamSeriesFilter] = useState('');
 
@@ -290,6 +302,7 @@ const Exams = () => {
     const filteredExams = useMemo(() => exams.filter(e => {
         if (filterStatus && e.status !== filterStatus) return false;
         if (filterClass && e.class !== filterClass) return false;
+        if (filterTerm && (e.term || 'Term 1') !== filterTerm) return false;
         if (examSeriesFilter && e.examSeries !== examSeriesFilter) return false;
         if (searchText) {
             const q = searchText.toLowerCase();
@@ -297,32 +310,38 @@ const Exams = () => {
                 (e.subject || '').toLowerCase().includes(q);
         }
         return true;
-    }), [exams, filterStatus, filterClass, examSeriesFilter, searchText]);
+    }), [exams, filterStatus, filterClass, filterTerm, examSeriesFilter, searchText]);
 
-    /* ── Group: { class → { section → { examSeries → exam[] } } } ── */
+    /* ── Group: { term → { class → { section → { examSeries → exam[] } } } } ── */
     const groupedExams = useMemo(() => {
         const map = {};
         filteredExams.forEach(e => {
+            const term = e.term || 'Term 1';
             const cls = e.class || 'Unknown';
             const sec = e.section || 'All';
             const series = e.examSeries || 'Custom';
-            if (!map[cls]) map[cls] = {};
-            if (!map[cls][sec]) map[cls][sec] = {};
-            if (!map[cls][sec][series]) map[cls][sec][series] = [];
-            map[cls][sec][series].push(e);
+            if (!map[term]) map[term] = {};
+            if (!map[term][cls]) map[term][cls] = {};
+            if (!map[term][cls][sec]) map[term][cls][sec] = {};
+            if (!map[term][cls][sec][series]) map[term][cls][sec][series] = [];
+            map[term][cls][sec][series].push(e);
         });
-        // Sort classes numerically/alphabetically
+        // Sort
         const sorted = {};
-        Object.keys(map).sort((a, b) => {
-            const na = Number(a), nb = Number(b);
-            if (!isNaN(na) && !isNaN(nb)) return na - nb;
-            return a.localeCompare(b);
-        }).forEach(cls => {
-            sorted[cls] = {};
-            Object.keys(map[cls]).sort().forEach(sec => {
-                sorted[cls][sec] = {};
-                Object.keys(map[cls][sec]).sort((a, b) => seriesSortKey(a) - seriesSortKey(b)).forEach(series => {
-                    sorted[cls][sec][series] = map[cls][sec][series].sort((a, b) => new Date(b.date) - new Date(a.date));
+        ['Term 1', 'Term 2'].forEach(term => {
+            if (!map[term]) return;
+            sorted[term] = {};
+            Object.keys(map[term]).sort((a, b) => {
+                const na = Number(a), nb = Number(b);
+                if (!isNaN(na) && !isNaN(nb)) return na - nb;
+                return a.localeCompare(b);
+            }).forEach(cls => {
+                sorted[term][cls] = {};
+                Object.keys(map[term][cls]).sort().forEach(sec => {
+                    sorted[term][cls][sec] = {};
+                    Object.keys(map[term][cls][sec]).sort((a, b) => seriesSortKey(a) - seriesSortKey(b)).forEach(series => {
+                        sorted[term][cls][sec][series] = map[term][cls][sec][series].sort((a, b) => new Date(b.date) - new Date(a.date));
+                    });
                 });
             });
         });
@@ -421,7 +440,8 @@ const Exams = () => {
         setEditing(exam);
         setForm({
             name: exam.name || '',
-            examSeries: exam.examSeries || 'Midterm',
+            term: exam.term || 'Term 1',
+            examSeries: exam.examSeries || 'UT1',
             class: exam.class || '',
             classId: exam.classId || '',
             section: exam.section || '',
@@ -811,6 +831,17 @@ const Exams = () => {
                                 />
                             </div>
                             <Select
+                                className="w-full sm:w-auto sm:min-w-[120px]"
+                                value={filterTerm}
+                                onChange={e => setFilterTerm(e.target.value)}
+                                placeholder="All Terms"
+                                options={[
+                                    { value: '', label: 'All Terms' },
+                                    { value: 'Term 1', label: 'Term 1' },
+                                    { value: 'Term 2', label: 'Term 2' }
+                                ]}
+                            />
+                            <Select
                                 className="w-full sm:w-auto sm:min-w-[140px]"
                                 value={filterClass}
                                 onChange={e => setFilterClass(e.target.value)}
@@ -843,7 +874,7 @@ const Exams = () => {
                         </div>
                     </div>
 
-                    {/* ── Grouped Exam List: Class > Section > Exam Series ── */}
+                    {/* ── Grouped Exam List: Term > Class > Section > Exam Series ── */}
                     <div className="space-y-4">
                         {loading ? (
                             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass flex justify-center items-center py-16">
@@ -855,8 +886,21 @@ const Exams = () => {
                                 <p className="font-medium">No exams found</p>
                                 <p className="text-sm mt-1">Schedule your first exam to get started.</p>
                             </div>
-                        ) : Object.entries(groupedExams).map(([cls, sectionMap]) => {
-                            const isClassCollapsed = collapsedClasses.has(cls);
+                        ) : Object.entries(groupedExams).map(([term, classes]) => (
+                            <div key={term} className="mb-6">
+                                {/* Term Header */}
+                                <div className={`flex items-center gap-3 mb-3 px-2 py-2 rounded-lg ${term === 'Term 1' ? 'bg-blue-50/50 dark:bg-blue-500/5' : 'bg-emerald-50/50 dark:bg-emerald-500/5'}`}>
+                                    <div className={`w-2 h-8 rounded-full ${term === 'Term 1' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                                    <h3 className={`text-base font-bold ${term === 'Term 1' ? 'text-blue-700 dark:text-blue-400' : 'text-emerald-700 dark:text-emerald-400'}`}>{term}</h3>
+                                    <span className="text-xs text-gray-400">
+                                        {Object.values(classes).reduce((a, secs) => a + Object.values(secs).reduce((b, series) => b + Object.values(series).reduce((c, exams) => c + exams.length, 0), 0), 0)} exams
+                                    </span>
+                                </div>
+
+                                {/* Classes within this term */}
+                                <div className="space-y-4">
+                                {Object.entries(classes).map(([cls, sectionMap]) => {
+                            const isClassCollapsed = collapsedClasses.has(`${term}-${cls}`);
                             const totalInClass = Object.values(sectionMap).reduce((a, seriesMap) =>
                                 a + Object.values(seriesMap).reduce((b, arr) => b + arr.length, 0), 0);
                             return (
@@ -864,7 +908,7 @@ const Exams = () => {
                                     {/* Class header */}
                                     <button
                                         className="w-full flex items-center justify-between px-5 py-3.5 bg-gray-50 dark:bg-[#2C2C2E] hover:bg-gray-100 dark:hover:bg-[#38383A] transition-colors border-b border-gray-200 dark:border-[#38383A]"
-                                        onClick={() => toggleClass(cls)}
+                                        onClick={() => toggleClass(`${term}-${cls}`)}
                                     >
                                         <div className="flex items-center gap-3">
                                             {isClassCollapsed
@@ -1026,6 +1070,9 @@ const Exams = () => {
                                 </div>
                             );
                         })}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </>
             )}
@@ -1331,30 +1378,66 @@ const Exams = () => {
                         {/* Scrollable body */}
                         <form onSubmit={handleCreate} className="overflow-y-auto flex-1 px-4 sm:px-6 py-5 space-y-6">
 
-                            {/* ── Section 1: Exam Pattern (Series) — Prominent first step ── */}
-                            <ModalSection icon={<Layers className="h-4 w-4" />} title="Exam Pattern">
-                                <p className="text-xs text-gray-400 dark:text-[#636366] mb-3">Select the examination pattern this exam belongs to</p>
-                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                                    {EXAM_SERIES.map(series => {
+                            {/* ── Section 1: Term Selection ── */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-white">
+                                    <Layers className="h-4 w-4 text-primary-500" />
+                                    SELECT TERM
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {TERMS.map(term => (
+                                        <button
+                                            key={term}
+                                            type="button"
+                                            onClick={() => {
+                                                setForm(prev => ({
+                                                    ...prev,
+                                                    term,
+                                                    examSeries: TERM_EXAM_TYPES[term][0]
+                                                }));
+                                            }}
+                                            className={`px-4 py-4 rounded-xl text-sm font-bold border-2 transition-all ${
+                                                form.term === term
+                                                    ? term === 'Term 1'
+                                                        ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-500/30 ring-2 ring-blue-200 dark:ring-blue-500/20'
+                                                        : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/30 ring-2 ring-emerald-200 dark:ring-emerald-500/20'
+                                                    : 'bg-white dark:bg-[#2C2C2E] text-gray-500 dark:text-[#8E8E93] border-gray-200 dark:border-[#38383A] hover:border-gray-300'
+                                            }`}
+                                        >
+                                            {term}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* ── Section 1b: Exam Type ── */}
+                            <div className="space-y-3">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-white">
+                                    <GraduationCap className="h-4 w-4 text-primary-500" />
+                                    EXAM TYPE
+                                </div>
+                                <p className="text-xs text-gray-400 dark:text-[#636366]">Select the type of exam for {form.term}</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {(TERM_EXAM_TYPES[form.term] || []).map(series => {
                                         const cfg = SERIES_CONFIG[series] || SERIES_CONFIG.Custom;
-                                        const isSelected = form.examSeries === series;
+                                        const isActive = form.examSeries === series;
                                         return (
                                             <button
                                                 key={series}
                                                 type="button"
-                                                onClick={() => handleField('examSeries', series)}
-                                                className={`px-3 py-2.5 rounded-xl text-xs font-semibold border-2 transition-all ${
-                                                    isSelected
-                                                        ? `${cfg.bg} ${cfg.color} ${cfg.border} ring-2 ring-offset-1 ring-primary-500/30 shadow-sm`
-                                                        : 'border-gray-200 dark:border-[#38383A] text-gray-500 dark:text-[#8E8E93] hover:border-gray-300 dark:hover:border-[#48484A] bg-white dark:bg-[#2C2C2E]'
+                                                onClick={() => setForm(prev => ({ ...prev, examSeries: series }))}
+                                                className={`px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
+                                                    isActive
+                                                        ? `${cfg.bg} ${cfg.color} ${cfg.border} ring-2 ring-offset-1 dark:ring-offset-[#1C1C1E] ${cfg.border}`
+                                                        : 'bg-white dark:bg-[#2C2C2E] text-gray-500 dark:text-[#8E8E93] border-gray-200 dark:border-[#38383A] hover:border-gray-300'
                                                 }`}
                                             >
-                                                {cfg.short || series}
+                                                {cfg.short}
                                             </button>
                                         );
                                     })}
                                 </div>
-                            </ModalSection>
+                            </div>
 
                             {/* ── Section 2: Exam Details ── */}
                             <ModalSection icon={<BookOpen className="h-4 w-4" />} title="Exam Details">

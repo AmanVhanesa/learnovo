@@ -204,6 +204,7 @@ router.get('/', protect, examPlanGates, [
     if (req.query.subject) filter.subject = req.query.subject;
     if (req.query.section && req.user.role !== 'student') filter.section = req.query.section;
     if (req.query.status) filter.status = req.query.status;
+    if (req.query.term) filter.term = req.query.term;
 
     if (req.query.from || req.query.to) {
       filter.date = {};
@@ -638,7 +639,7 @@ router.patch('/:id', protect, examPlanGates, authorize('admin', 'teacher'), asyn
     }
 
     const allowedFields = [
-      'name', 'examSeries', 'class', 'classId', 'section', 'subject',
+      'name', 'term', 'examSeries', 'class', 'classId', 'section', 'subject',
       'date', 'startTime', 'endTime', 'totalMarks', 'passingMarks',
       'examType', 'examMode', 'supervisor', 'examRoom', 'description', 'status'
     ];

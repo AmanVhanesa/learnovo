@@ -12,10 +12,15 @@ const examSchema = new mongoose.Schema({
     required: [true, 'Exam name is required'],
     trim: true
   },
+  term: {
+    type: String,
+    enum: ['Term 1', 'Term 2'],
+    default: 'Term 1'
+  },
   examSeries: {
     type: String,
-    enum: ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom'],
-    default: 'Midterm'
+    enum: ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom', 'UT1', 'UT2'],
+    default: 'UT1'
   },
   class: {
     type: String,
@@ -94,6 +99,7 @@ const examSchema = new mongoose.Schema({
   timestamps: true
 });
 
+examSchema.index({ tenantId: 1, term: 1, class: 1 });
 examSchema.index({ tenantId: 1, class: 1, subject: 1 });
 examSchema.index({ tenantId: 1, class: 1, section: 1, date: 1 });
 examSchema.index({ tenantId: 1, status: 1, date: 1 });
