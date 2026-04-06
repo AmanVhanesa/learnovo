@@ -9,6 +9,7 @@ import {
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
 import { subjectsService } from '../services/subjectsService';
+import { classSubjectsService } from '../services/academicsService';
 import { teachersService } from '../services/teachersService';
 import { studentsService } from '../services/studentsService';
 import { academicSessionsService } from '../services/academicsService';
@@ -284,25 +285,31 @@ const Exams = () => {
         return cls?.sections || [];
     }, [form.classId, availableClasses]);
 
-    /* ── Derived: subjects for the selected class ── */
+    /* ── Derived: subjects for the selected class (from ClassSubject model) ── */
+    const { data: classSubjectsData = [] } = useQuery({
+        queryKey: ['exam-class-subjects', form.classId],
+        queryFn: async () => {
+            if (!form.classId) return [];
+            const res = await classSubjectsService.list({ classId: form.classId });
+            return res?.data || res || [];
+        },
+        enabled: !!form.classId
+    });
+
     const classSubjects = useMemo(() => {
-        if (form.class) {
-            // Try to find class by grade or _id
-            const cls = availableClasses.find(c => String(c._id) === String(form.classId) || c.grade === form.class);
-            if (cls?.subjects?.length) {
-                const assigned = cls.subjects
-                    .filter(s => s.subject && typeof s.subject === 'object' && s.subject.name)
-                    .map(s => ({
-                        _id: s.subject._id,
-                        name: s.subject.name
-                    }));
-                if (assigned.length > 0) return assigned;
-            }
+        if (form.classId && classSubjectsData.length > 0) {
+            const assigned = classSubjectsData
+                .filter(cs => cs.subjectId && typeof cs.subjectId === 'object' && cs.subjectId.name)
+                .map(cs => ({
+                    _id: cs.subjectId._id,
+                    name: cs.subjectId.name
+                }));
+            if (assigned.length > 0) return assigned;
         }
         return allSubjects
             .filter(s => s.isActive !== false)
             .map(s => ({ _id: s._id, name: s.name }));
-    }, [form.class, form.classId, availableClasses, allSubjects]);
+    }, [form.classId, classSubjectsData, allSubjects]);
 
     /* ── Derived: filtered exam list ── */
     const filteredExams = useMemo(() => exams.filter(e => {
