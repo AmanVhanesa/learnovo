@@ -286,20 +286,23 @@ const Exams = () => {
 
     /* ── Derived: subjects for the selected class ── */
     const classSubjects = useMemo(() => {
-        if (form.classId) {
-            const cls = availableClasses.find(c => c._id === form.classId);
-            const assigned = (cls?.subjects || [])
-                .filter(s => s.subject)
-                .map(s => ({
-                    _id: s.subject._id || s.subject,
-                    name: s.subject.name || s.subject.subjectCode || s.subject
-                }));
-            if (assigned.length > 0) return assigned;
+        if (form.class) {
+            // Try to find class by grade or _id
+            const cls = availableClasses.find(c => String(c._id) === String(form.classId) || c.grade === form.class);
+            if (cls?.subjects?.length) {
+                const assigned = cls.subjects
+                    .filter(s => s.subject && typeof s.subject === 'object' && s.subject.name)
+                    .map(s => ({
+                        _id: s.subject._id,
+                        name: s.subject.name
+                    }));
+                if (assigned.length > 0) return assigned;
+            }
         }
         return allSubjects
             .filter(s => s.isActive !== false)
             .map(s => ({ _id: s._id, name: s.name }));
-    }, [form.classId, availableClasses, allSubjects]);
+    }, [form.class, form.classId, availableClasses, allSubjects]);
 
     /* ── Derived: filtered exam list ── */
     const filteredExams = useMemo(() => exams.filter(e => {
