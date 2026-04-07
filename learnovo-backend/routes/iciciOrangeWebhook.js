@@ -243,10 +243,24 @@ router.get('/:tenantCode', (req, res) => {
   if (!ALLOWED_TENANT_CODES.has(tenantCode)) {
     return res.status(404).json({ success: false, message: 'Not found' });
   }
+  // Per-tenant descriptor. The legal merchant on ICICI's books is the
+  // society (Sardar Patel Educational Society for SPIS), with the school
+  // as the operating unit. Bank fraud-checks that browse this URL must
+  // see the same legal name that ICICI has on file for the merchant
+  // account, otherwise the name mismatch can trip their KYC.
+  const TENANT_DESCRIPTORS = {
+    spis: {
+      merchant: 'Sardar Patel Educational Society',
+      operatingUnit: 'SP International School'
+    }
+  };
+  const descriptor = TENANT_DESCRIPTORS[tenantCode];
   return res.status(200).json({
     endpoint: 'ICICI Orange Payment Callback',
-    operator: 'Learnovo (EvoTech Innovation)',
-    merchant: 'SP International School',
+    platform: 'Learnovo — School Management Platform',
+    operator: 'Aman Vhanesa',
+    merchant: descriptor.merchant,
+    operatingUnit: descriptor.operatingUnit,
     tenantSubdomain: `${tenantCode}.learnovoportal.com`,
     method: 'POST',
     auth: 'HTTP Basic Auth',
