@@ -62,7 +62,7 @@ router.get('/plans', (req, res) => {
 // @desc    Create payment order for new school registration (no auth required)
 // @route   POST /api/payments/create-registration-order
 // @access  Public
-router.post('/create-registration-order', async (req, res) => {
+router.post('/create-registration-order', async(req, res) => {
   try {
     const { plan, billingCycle } = req.body;
 
