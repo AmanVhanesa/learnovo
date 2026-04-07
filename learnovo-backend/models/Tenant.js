@@ -143,7 +143,7 @@ const tenantSchema = new mongoose.Schema({
   paymentGateway: {
     provider: {
       type: String,
-      enum: ['none', 'mock', 'icici_eazypay', 'razorpay'],
+      enum: ['none', 'mock', 'icici_eazypay', 'icici_orange', 'razorpay'],
       default: 'none'
     },
     // ICICI EazyPay credentials
@@ -153,6 +153,20 @@ const tenantSchema = new mongoose.Schema({
       subMerchantId: { type: String, default: '' },
       // 9 = all modes, 1 = Net Banking, 2 = Credit Card, 3 = Debit Card, 4 = Cash, 6 = UPI, etc.
       paymode: { type: String, default: '9' }
+    },
+    // ICICI Orange credentials. Distinct product from EazyPay — issued
+    // separately by ICICI when a current account is opened. Field shape
+    // is provisional and will be tightened once the integration spec is
+    // shared. The HTTP Basic Auth credentials used on the inbound
+    // callback live in env vars (ICICI_ORANGE_<TENANT>_CALLBACK_*),
+    // not in the DB, so they cannot be exfiltrated via a Tenant read.
+    iciciOrange: {
+      merchantId: { type: String, default: '' },
+      terminalId: { type: String, default: '' },
+      // Outbound API key/secret if ICICI provides one for initiating
+      // payments from our backend. Encrypted at rest (see hooks below).
+      apiKey: { type: String, default: '' },
+      apiSecret: { type: String, default: '' }
     },
     // Razorpay credentials
     razorpay: {
@@ -205,6 +219,7 @@ tenantSchema.virtual('fullAddress').get(function() {
 
 // ── Payment gateway credential encryption helpers ──
 const SENSITIVE_ICICI_FIELDS = ['merchantId', 'encryptionKey', 'subMerchantId'];
+const SENSITIVE_ICICI_ORANGE_FIELDS = ['merchantId', 'terminalId', 'apiKey', 'apiSecret'];
 const SENSITIVE_RAZORPAY_FIELDS = ['keyId', 'keySecret', 'webhookSecret'];
 
 function isAlreadyEncrypted(value) {
@@ -218,6 +233,13 @@ function encryptGatewayCredentials(pg) {
     for (const field of SENSITIVE_ICICI_FIELDS) {
       if (pg.icici[field] && !isAlreadyEncrypted(pg.icici[field])) {
         pg.icici[field] = encrypt(pg.icici[field]);
+      }
+    }
+  }
+  if (pg.iciciOrange) {
+    for (const field of SENSITIVE_ICICI_ORANGE_FIELDS) {
+      if (pg.iciciOrange[field] && !isAlreadyEncrypted(pg.iciciOrange[field])) {
+        pg.iciciOrange[field] = encrypt(pg.iciciOrange[field]);
       }
     }
   }
@@ -235,6 +257,11 @@ function decryptGatewayCredentials(pg) {
   if (pg.icici) {
     for (const field of SENSITIVE_ICICI_FIELDS) {
       if (pg.icici[field]) pg.icici[field] = decrypt(pg.icici[field]);
+    }
+  }
+  if (pg.iciciOrange) {
+    for (const field of SENSITIVE_ICICI_ORANGE_FIELDS) {
+      if (pg.iciciOrange[field]) pg.iciciOrange[field] = decrypt(pg.iciciOrange[field]);
     }
   }
   if (pg.razorpay) {

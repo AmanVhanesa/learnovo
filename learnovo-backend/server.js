@@ -96,12 +96,24 @@ app.use(express.json({
     // Only save rawBody for webhook/callback routes (to save memory on other routes)
     if (req.originalUrl === '/api/fee-payments/webhook' ||
         req.originalUrl === '/api/student-fees/payment/icici-return' ||
-        req.originalUrl === '/api/student-fees/payment/notify') {
+        req.originalUrl === '/api/student-fees/payment/notify' ||
+        req.originalUrl.startsWith('/api/fee-payments/webhook/icici-orange/')) {
       req.rawBody = buf.toString();
     }
   }
 }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({
+  extended: true,
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    // ICICI Orange callback may arrive as application/x-www-form-urlencoded.
+    // Capture the raw body so the webhook handler can log/inspect the
+    // exact bytes (and verify signatures once ICICI's spec is shared).
+    if (req.originalUrl.startsWith('/api/fee-payments/webhook/icici-orange/')) {
+      req.rawBody = buf.toString();
+    }
+  }
+}));
 
 // Static files - uploads/ directory no longer used (S3 + Cloudinary)
 // Images served from Cloudinary, documents from S3 pre-signed URLs
@@ -269,6 +281,10 @@ app.use('/api/files', require('./routes/files')); // Cloudinary file operations
 app.use('/api/test', require('./routes/test')); // Test endpoints (remove in production)
 
 app.use('/api/payments', require('./routes/payments'));
+// ICICI Orange callback — must be mounted BEFORE the generic /api/fee-payments
+// router so the more-specific path is matched first. SPIS-only; gated by
+// HTTP Basic Auth using env-var credentials provisioned to ICICI.
+app.use('/api/fee-payments/webhook/icici-orange', require('./routes/iciciOrangeWebhook'));
 app.use('/api/fee-payments', require('./routes/feePayments'));
 app.use('/api/subscription', require('./routes/subscription'));
 app.use('/api/exams', require('./routes/exams'));
