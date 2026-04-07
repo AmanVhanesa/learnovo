@@ -3,39 +3,51 @@
  *
  * SCOPE: SPIS production tenant only.
  *
- * Status: SCAFFOLD. ICICI's dev team has provisioned a current account for
- * SP International School and requested a callback URL + Basic Auth
- * credentials. The actual payload format and signature scheme have NOT
- * been shared yet. This file gives ICICI a live, authenticated endpoint
- * to test connectivity against, and captures every incoming request to
- * a structured log so we can reverse-engineer the payload shape from
- * their first test posts. Payment-status processing will be implemented
- * once their integration spec arrives.
+ * Status: PASSIVE RECEIVER. ICICI's "Orange" product is not publicly
+ * documented anywhere we could find — no PDF, no GitHub sample, no
+ * blog post. Based on the onboarding pattern (callback URL + HTTP
+ * Basic Auth credentials issued to ICICI), this is almost certainly
+ * a receive-only webhook from ICICI's Corporate API Suite collections
+ * stack: ICICI POSTs credit notifications to us, no initiation from
+ * our side.
+ *
+ * Until ICICI shares the integration spec, we capture every inbound
+ * request verbatim into ICICIOrangeWebhookLog, dedupe via SHA-256 of
+ * the raw body, and return a clean ACK. A downstream worker will
+ * later read those rows, parse fields once we know the schema, and
+ * map them onto Payment / FeeInvoice / Receipt records.
  *
  * Authentication: HTTP Basic Auth. ICICI sends:
  *     Authorization: Basic base64(domainId:password)
- * We verify against env vars (per-tenant), using a constant-time compare
- * to avoid leaking timing information.
+ * We verify against env vars (per-tenant), using a constant-time
+ * compare to avoid leaking timing information.
  *
  * Required env vars (set on the production VPS only — never committed):
  *     ICICI_ORANGE_SPIS_CALLBACK_USER
  *     ICICI_ORANGE_SPIS_CALLBACK_PASS
  *
- * URL pattern:
- *     POST /api/fee-payments/webhook/icici-orange/:tenantCode
+ * Body parsing: server.js mounts text/xml + application/xml + text/plain
+ * via express.text() on this path prefix. JSON and form-encoded bodies
+ * are handled by the global parsers, which also preserve req.rawBody
+ * for this path. The handler treats all three uniformly via req.rawBody.
  *
- * Currently only :tenantCode === 'spis' is accepted. Any other value
- * returns 404 so we don't accidentally expose this to other tenants
- * before their own credentials are provisioned.
+ * URL pattern:
+ *     POST /api/fee-payments/webhook/icici-orange/:tenantCode  (live)
+ *     GET  /api/fee-payments/webhook/icici-orange/:tenantCode  (verification)
+ *
+ * Currently only :tenantCode === 'spis' is accepted on POST. Any other
+ * value returns 404 so the path's existence is not advertised.
  */
 
 const express = require('express');
 const crypto = require('crypto');
 const { logger } = require('../middleware/errorHandler');
+const Tenant = require('../models/Tenant');
+const ICICIOrangeWebhookLog = require('../models/ICICIOrangeWebhookLog');
 
 const router = express.Router();
 
-// Tenants permitted to use the ICICI Orange callback. Add more entries
+// Tenants permitted to use the ICICI Orange callback. Add entries
 // here only after that tenant's credentials have been provisioned and
 // stored as env vars following the same naming convention.
 const ALLOWED_TENANT_CODES = new Set(['spis']);
@@ -108,6 +120,143 @@ function verifyBasicAuth(req, tenantCode) {
 }
 
 /**
+ * Build the canonical raw-body string from whichever shape Express
+ * managed to parse. The text parser stores the raw XML in req.body
+ * as a string; the json/urlencoded parsers store the parsed object
+ * but the global verify hook also writes req.rawBody. Always prefer
+ * req.rawBody; fall back to a JSON serialisation only if the rawBody
+ * was not captured.
+ */
+function getRawBody(req) {
+  if (typeof req.rawBody === 'string' && req.rawBody.length > 0) {
+    return req.rawBody;
+  }
+  if (typeof req.body === 'string') return req.body;
+  if (req.body && typeof req.body === 'object') {
+    try {
+      return JSON.stringify(req.body);
+    } catch (_err) {
+      return '';
+    }
+  }
+  return '';
+}
+
+/**
+ * SHA-256 hex digest of the raw body. Used as the idempotency key for
+ * dedup against ICICIOrangeWebhookLog. If ICICI retries the exact same
+ * payload, the second insert hits the unique (tenantCode, bodyHash)
+ * index and we ack-without-reprocessing.
+ */
+function hashBody(rawBody) {
+  return crypto.createHash('sha256').update(rawBody || '').digest('hex');
+}
+
+/**
+ * Persist a log row for an inbound webhook. Returns { duplicate: bool,
+ * logId: string|null }. Never throws — a logging failure must not
+ * cause us to return a non-2xx to ICICI (which would trigger retries).
+ */
+async function persistWebhookLog(req, tenantCode, authPassed) {
+  const rawBody = getRawBody(req);
+  const bodyHash = hashBody(rawBody);
+
+  // Best-effort tenantId resolution — don't fail the whole request if
+  // the tenant lookup errors out.
+  let tenantId = null;
+  try {
+    const tenant = await Tenant.findOne({ schoolCode: tenantCode })
+      .select('_id')
+      .lean();
+    if (tenant) tenantId = tenant._id;
+  } catch (err) {
+    logger.warn('ICICI Orange tenant lookup failed during log persist', {
+      requestId: req.requestId,
+      tenantCode,
+      error: err.message
+    });
+  }
+
+  // Curated header subset — full dump would risk persisting bearer
+  // tokens or cookies that don't belong to ICICI but might land here
+  // from a misrouted request.
+  const safeHeaders = {
+    contentType: req.headers['content-type'] || '',
+    userAgent: req.headers['user-agent'] || '',
+    forwardedFor: req.headers['x-forwarded-for'] || '',
+    host: req.headers.host || ''
+  };
+
+  try {
+    const doc = await ICICIOrangeWebhookLog.findOneAndUpdate(
+      { tenantCode, bodyHash },
+      {
+        $setOnInsert: {
+          tenantId,
+          tenantCode,
+          bodyHash,
+          rawBody,
+          parsedBody:
+            typeof req.body === 'object' && req.body !== null ? req.body : null,
+          contentType: safeHeaders.contentType,
+          method: req.method,
+          path: req.originalUrl,
+          query: req.query || null,
+          sourceIp: req.ip || safeHeaders.forwardedFor || '',
+          userAgent: safeHeaders.userAgent,
+          requestId: req.requestId || '',
+          authPassed,
+          receivedAt: new Date()
+        }
+      },
+      { upsert: true, new: false, setDefaultsOnInsert: true }
+    );
+    // findOneAndUpdate with new:false returns the pre-update doc.
+    // null pre-doc means this was a fresh insert (not a duplicate).
+    return { duplicate: Boolean(doc), logId: doc ? doc._id : null };
+  } catch (err) {
+    logger.error('ICICI Orange webhook log persist failed', {
+      requestId: req.requestId,
+      tenantCode,
+      bodyHash,
+      error: err.message,
+      stack: err.stack
+    });
+    return { duplicate: false, logId: null };
+  }
+}
+
+/**
+ * GET /api/fee-payments/webhook/icici-orange/:tenantCode
+ *
+ * Self-identifying verification response. Banks doing anti-fraud /
+ * domain verification often open the callback URL in a browser; if
+ * that returns "Route not found" they will (reasonably) flag it as
+ * suspicious. This handler returns a clean JSON descriptor that names
+ * the operator, the merchant, and the endpoint contract — without
+ * revealing any credentials, payload format, or auth secrets.
+ *
+ * No auth required: the response carries no sensitive information.
+ */
+router.get('/:tenantCode', (req, res) => {
+  const { tenantCode } = req.params;
+  if (!ALLOWED_TENANT_CODES.has(tenantCode)) {
+    return res.status(404).json({ success: false, message: 'Not found' });
+  }
+  return res.status(200).json({
+    endpoint: 'ICICI Orange Payment Callback',
+    operator: 'Learnovo (EvoTech Innovation)',
+    merchant: 'SP International School',
+    tenantSubdomain: `${tenantCode}.learnovoportal.com`,
+    method: 'POST',
+    auth: 'HTTP Basic Auth',
+    contentTypes: ['application/json', 'application/x-www-form-urlencoded', 'text/xml'],
+    status: 'active',
+    note: 'This endpoint accepts payment notifications from ICICI Bank. Browse-via-GET returns this informational descriptor only; live notifications must be POSTed with HTTP Basic Auth credentials issued to ICICI during onboarding.'
+  });
+});
+
+/**
  * POST /api/fee-payments/webhook/icici-orange/:tenantCode
  *
  * Public endpoint (no JWT) — authentication is HTTP Basic Auth via env
@@ -115,7 +264,7 @@ function verifyBasicAuth(req, tenantCode) {
  * BEFORE the generic /api/fee-payments router in server.js so this path
  * is matched first.
  */
-router.post('/:tenantCode', (req, res) => {
+router.post('/:tenantCode', async(req, res) => {
   const { tenantCode } = req.params;
   const requestId = req.requestId;
 
@@ -130,42 +279,50 @@ router.post('/:tenantCode', (req, res) => {
     return res.status(404).json({ success: false, message: 'Not found' });
   }
 
-  // 2. HTTP Basic Auth verification.
-  if (!verifyBasicAuth(req, tenantCode)) {
+  // 2. HTTP Basic Auth verification. We persist BOTH successful and
+  //    failed attempts (the log row carries authPassed) so we can
+  //    spot misconfigured ICICI test fires and recon attempts.
+  const authPassed = verifyBasicAuth(req, tenantCode);
+
+  // 3. Persist the inbound request to the forensic log. Idempotent
+  //    via (tenantCode, bodyHash) unique index — same payload retried
+  //    by ICICI is recorded once.
+  const { duplicate, logId } = await persistWebhookLog(req, tenantCode, authPassed);
+
+  if (!authPassed) {
     logger.warn('ICICI Orange callback auth failed', {
       requestId,
       tenantCode,
       ip: req.ip,
-      hasAuthHeader: Boolean(req.headers.authorization)
+      hasAuthHeader: Boolean(req.headers.authorization),
+      logId
     });
     res.set('WWW-Authenticate', 'Basic realm="ICICI Orange Callback"');
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
 
-  // 3. Capture the full incoming payload for analysis.
-  //    Until ICICI shares the integration spec, we do NOT attempt to
-  //    parse fields or update payment records. We log everything so the
-  //    first real callbacks can be inspected to determine the schema.
+  // 4. Structured live-tail log so the integration team can `pm2 logs`
+  //    while ICICI is testing. The full payload is in Mongo via logId.
   logger.info('ICICI Orange callback received', {
     requestId,
     tenantCode,
+    logId,
+    duplicate,
     contentType: req.headers['content-type'],
-    method: req.method,
-    query: req.query,
-    bodyKeys: req.body && typeof req.body === 'object' ? Object.keys(req.body) : null,
-    body: req.body,
-    rawBody: req.rawBody || null,
-    ip: req.ip,
-    userAgent: req.headers['user-agent']
+    bodyKeys:
+      req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+        ? Object.keys(req.body)
+        : null,
+    rawBodyLength: typeof req.rawBody === 'string' ? req.rawBody.length : 0
   });
 
-  // 4. Acknowledge. Most Indian bank gateways expect a plain 200 OK to
-  //    consider the callback delivered. We return JSON for our own
-  //    debugging; if ICICI's spec later requires a specific response
-  //    body or content-type, change this once.
+  // 5. Acknowledge. Most Indian bank gateways expect a plain 200 with
+  //    a short JSON ACK. We return {status:"OK"} per the integration
+  //    research recommendation; if ICICI's spec later requires a
+  //    different shape, change this once.
   return res.status(200).json({
-    success: true,
-    message: 'Callback received',
+    status: 'OK',
+    message: duplicate ? 'Duplicate (already received)' : 'Callback received',
     requestId
   });
 });

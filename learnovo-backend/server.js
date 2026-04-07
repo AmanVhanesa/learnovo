@@ -284,6 +284,22 @@ app.use('/api/payments', require('./routes/payments'));
 // ICICI Orange callback — must be mounted BEFORE the generic /api/fee-payments
 // router so the more-specific path is matched first. SPIS-only; gated by
 // HTTP Basic Auth using env-var credentials provisioned to ICICI.
+//
+// Path-scoped text parser handles XML payloads (ICICI's older corporate
+// stack often POSTs text/xml or application/xml). JSON and form-encoded
+// bodies are already covered by the global parsers above, which also
+// preserve req.rawBody for this path. The text parser captures rawBody
+// the same way so signature verification can be added later.
+app.use(
+  '/api/fee-payments/webhook/icici-orange',
+  express.text({
+    type: ['text/xml', 'application/xml', 'text/plain'],
+    limit: '1mb',
+    verify: (req, res, buf) => {
+      req.rawBody = buf.toString();
+    }
+  })
+);
 app.use('/api/fee-payments/webhook/icici-orange', require('./routes/iciciOrangeWebhook'));
 app.use('/api/fee-payments', require('./routes/feePayments'));
 app.use('/api/subscription', require('./routes/subscription'));
