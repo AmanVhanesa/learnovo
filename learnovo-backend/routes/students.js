@@ -784,29 +784,6 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
     const tenantId = req.user.tenantId;
     const mongoose = require('mongoose');
 
-    // ── Fix stale indexes ────────────────────────────────────────────────
-    // MongoDB does not auto-rebuild indexes when the schema changes.
-    // If the email unique index was created before sparse:true was added,
-    // null-email inserts conflict (every null treated as the same key).
-    // This one-time check drops and recreates it correctly.
-    try {
-      const indexes = await User.collection.indexes();
-      const emailIdx = indexes.find(idx =>
-        idx.key && idx.key.email === 1 && idx.key.tenantId === 1 && idx.unique === true
-      );
-      if (emailIdx && !emailIdx.sparse) {
-        logger.info('Import: fixing non-sparse email index → dropping & recreating as sparse', { requestId: req.requestId, tenantId });
-        await User.collection.dropIndex(emailIdx.name);
-        await User.collection.createIndex(
-          { email: 1, tenantId: 1 },
-          { unique: true, sparse: true, background: true }
-        );
-        logger.info('Import: email index recreated with sparse:true', { requestId: req.requestId, tenantId });
-      }
-    } catch (indexErr) {
-      logger.warn('Import: index sync check failed (non-fatal)', { requestId: req.requestId, tenantId, error: indexErr.message });
-    }
-
     // ── Subscription limit pre-check ────────────────────────────────────
     const Tenant = require('../models/Tenant');
     const tenant = await Tenant.findById(tenantId).lean();
@@ -991,27 +968,36 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       });
     }
 
-    // ── Fix email unique index: replace sparse with partial filter ──────
+    // ── Fix email unique index: must be partialFilterExpression, not sparse ──
     // MongoDB sparse unique indexes still index explicit `null` values,
-    // causing E11000 errors when multiple students lack emails.
-    // Fix: drop the old index and recreate with partialFilterExpression.
-    // This block is idempotent — once the index is correct it's a no-op.
+    // causing E11000 errors when multiple students lack emails. The schema
+    // now declares the correct partial-filter index, but legacy tenants may
+    // still have a sparse-only index from an older deploy. This block is
+    // idempotent — once the index is correct, it's a no-op.
+    //
+    // IMPORTANT: drop and create are foreground (no background:true). A
+    // background recreate from a previous request can race with a follow-up
+    // drop, leaving MongoDB to reject the new createIndex with "An existing
+    // index has the same name as the requested index".
     try {
       const usersCol = User.collection;
       const indexes = await usersCol.indexes();
       const emailIdx = indexes.find(
         idx => idx.key && idx.key.email === 1 && idx.key.tenantId === 1
       );
-      if (emailIdx && !emailIdx.partialFilterExpression) {
-        // Old sparse or non-partial index — drop and recreate
+      const needsFix = emailIdx && (
+        !emailIdx.partialFilterExpression ||
+        emailIdx.partialFilterExpression?.email?.$type !== 'string'
+      );
+      if (needsFix) {
         logger.info('Import: dropping stale email index and recreating with partial filter', { requestId: req.requestId, tenantId: req.user?.tenantId });
+        // Clean up any docs with email:null first — they'd block partial index creation only if NOT actually null, so this is purely hygiene.
+        await usersCol.updateMany({ email: null }, { $unset: { email: '' } });
         await usersCol.dropIndex(emailIdx.name);
         await usersCol.createIndex(
           { email: 1, tenantId: 1 },
           { unique: true, partialFilterExpression: { email: { $type: 'string' } }, name: 'email_1_tenantId_1' }
         );
-        // Also clean up any existing email: null records
-        await usersCol.updateMany({ email: null }, { $unset: { email: '' } });
         logger.info('Import: email index fixed successfully', { requestId: req.requestId, tenantId: req.user?.tenantId });
       }
     } catch (indexErr) {
