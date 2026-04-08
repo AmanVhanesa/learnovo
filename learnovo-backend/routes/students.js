@@ -1452,6 +1452,9 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       const CHUNK = 100;
       logger.info(`Import: inserting ${docsToInsert.length} new students in ${Math.ceil(docsToInsert.length / CHUNK)} chunks`, { requestId: req.requestId, tenantId: req.user?.tenantId });
 
+      // Track docs that failed to insert so we don't log them as activity.
+      const failedDocs = new Set();
+
       for (let i = 0; i < docsToInsert.length; i += CHUNK) {
         const chunk = docsToInsert.slice(i, i + CHUNK);
         const chunkNum = Math.floor(i / CHUNK) + 1;
@@ -1470,19 +1473,22 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
           if (Array.isArray(writeErrors) && writeErrors.length > 0) {
             writeErrors.forEach(we => {
               results.failed++;
+              const failedDoc = chunk[we.index];
+              if (failedDoc) failedDocs.add(failedDoc);
               const errMsg = we.errmsg || we.err?.errmsg || we.message || 'Unknown insert error';
-              results.errors.push(`Insert error (admNo: ${chunk[we.index]?.admissionNumber || '?'}): ${errMsg}`);
+              results.errors.push(`Insert error (admNo: ${failedDoc?.admissionNumber || '?'}): ${errMsg}`);
             });
           } else if (inserted < chunk.length) {
             // No writeErrors detail — fall back to one-by-one insert
-            const failedDocs = chunk.slice(inserted);
-            logger.info(`Import chunk ${chunkNum}: falling back to individual inserts for ${failedDocs.length} docs`, { requestId: req.requestId, tenantId: req.user?.tenantId });
-            for (const doc of failedDocs) {
+            const remainingDocs = chunk.slice(inserted);
+            logger.info(`Import chunk ${chunkNum}: falling back to individual inserts for ${remainingDocs.length} docs`, { requestId: req.requestId, tenantId: req.user?.tenantId });
+            for (const doc of remainingDocs) {
               try {
                 await User.collection.insertOne(doc);
                 results.success++;
               } catch (singleErr) {
                 results.failed++;
+                failedDocs.add(doc);
                 results.errors.push(`Insert error (admNo: ${doc.admissionNumber || '?'}): ${singleErr.message}`);
               }
             }
@@ -1491,8 +1497,8 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       }
       logger.info(`Import: batch insert complete. Success: ${results.success}, Failed: ${results.failed}`, { requestId: req.requestId, tenantId: req.user?.tenantId });
 
-      // Log students imported with admission dates
-      const withAdmissionDate = docsToInsert.filter(d => d.admissionDate);
+      // Log students imported with admission dates — only those that actually inserted.
+      const withAdmissionDate = docsToInsert.filter(d => d.admissionDate && !failedDocs.has(d));
       if (withAdmissionDate.length > 0) {
         logger.info(`Import: ${withAdmissionDate.length} students imported with admission dates`, { requestId: req.requestId, tenantId: req.user?.tenantId });
         try {
