@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
 import {
-    Users, Plus, Trash2, FileText, FileSpreadsheet, Search
+    Users, Plus, Trash2, FileSpreadsheet, Search
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { studentListService } from '../services/studentListService';
 import CreateStudentListModal from '../components/students/CreateStudentListModal';
 import AddMoreStudentsModal from '../components/students/AddMoreStudentsModal';
-import { exportPDF, exportExcel } from '../utils/exportHelpers';
-import { useSettings } from '../contexts/SettingsContext';
+import ExportColumnPicker from '../components/ExportColumnPicker';
 import { formatDate } from '../utils/formatDate';
 
 const StudentLists = () => {
-    const { settings } = useSettings();
     const queryClient = useQueryClient();
     const [activeListId, setActiveListId] = useState(null);
     const [isCreatingList, setIsCreatingList] = useState(false);
@@ -74,32 +72,33 @@ const StudentLists = () => {
         removeStudentMutation.mutate(studentId);
     };
 
-    const handleExport = async (format) => {
-        if (!activeListData) return;
-        const exportId = `${format}-export`;
-        try {
-            toast.loading(`Generating ${format.toUpperCase()}…`, { id: exportId });
-            const students = activeListData.students;
-            const headers = ['S.No', 'Admission No', 'Student Name', 'Class/Section', 'Phone'];
-            const rows = students.map((s, i) => [
-                i + 1,
-                s.admissionNumber || '-',
-                s.fullName || s.name || '-',
-                `${s.class || '-'} ${s.section ? '- ' + s.section : ''}`.trim(),
-                s.phone || '-'
-            ]);
-            const dateStr = new Date().toISOString().split('T')[0];
-            const safeName = activeListData.name.replace(/\s+/g, '_');
+    const studentListExportColumns = [
+        { key: 'sno', label: 'S.No', group: 'Basic', getValue: (_s, i) => (i ?? 0) + 1 },
+        { key: 'admissionNumber', label: 'Admission No', group: 'Basic', getValue: s => s.admissionNumber || '-' },
+        { key: 'name', label: 'Student Name', group: 'Basic', getValue: s => s.fullName || s.name || '-' },
+        { key: 'class', label: 'Class', group: 'Basic', getValue: s => s.class || '-' },
+        { key: 'section', label: 'Section', group: 'Basic', getValue: s => s.section || '-' },
+        { key: 'rollNumber', label: 'Roll No', group: 'Basic', getValue: s => s.rollNumber || '-' },
+        { key: 'phone', label: 'Phone', group: 'Contact', getValue: s => s.phone || '-' },
+        { key: 'email', label: 'Email', group: 'Contact', getValue: s => s.email || '-' },
+        { key: 'fatherName', label: 'Father Name', group: 'Contact', getValue: s => s.fatherName || '-' },
+        { key: 'motherName', label: 'Mother Name', group: 'Contact', getValue: s => s.motherName || '-' },
+        { key: 'address', label: 'Address', group: 'Contact', getValue: s => s.address || '-' },
+        { key: 'gender', label: 'Gender', group: 'Personal', getValue: s => s.gender || '-' },
+        { key: 'dateOfBirth', label: 'Date of Birth', group: 'Personal', getValue: s => s.dateOfBirth ? formatDate(s.dateOfBirth) : '-' },
+        { key: 'bloodGroup', label: 'Blood Group', group: 'Personal', getValue: s => s.bloodGroup || '-' },
+    ];
 
-            if (format === 'pdf') {
-                await exportPDF(`${safeName}_${dateStr}.pdf`, headers, rows, settings?.institution);
-            } else {
-                exportExcel(`${safeName}_${dateStr}.xlsx`, [headers, ...rows], 'Students');
-            }
-            toast.success(`${format.toUpperCase()} downloaded!`, { id: exportId });
-        } catch (err) {
-            toast.error(`Failed to generate ${format.toUpperCase()}`, { id: exportId });
-        }
+    // Wrap student rows with index for the S.No getter
+    const studentsWithIndex = (activeListData?.students || []).map((s, i) => ({ ...s, __index: i }));
+    const indexedColumns = studentListExportColumns.map(c =>
+        c.key === 'sno' ? { ...c, getValue: s => (s.__index ?? 0) + 1 } : c
+    );
+
+    const studentListExportPresets = {
+        basic: { label: 'Basic', fields: ['sno', 'admissionNumber', 'name', 'class', 'section', 'rollNumber'] },
+        contact: { label: 'Contact', fields: ['admissionNumber', 'name', 'phone', 'fatherName', 'motherName', 'address'] },
+        attendance: { label: 'Attendance Sheet', fields: ['sno', 'admissionNumber', 'name', 'class', 'section'] },
     };
 
     const filteredLists = lists.filter(list =>
@@ -205,18 +204,15 @@ const StudentLists = () => {
                                 </div>
 
                                 <div className="flex flex-wrap gap-2">
-                                    <button
-                                        onClick={() => handleExport('pdf')}
-                                        className="btn btn-outline w-full sm:w-auto"
-                                    >
-                                        <FileText className="w-4 h-4 mr-2 text-red-500" /> PDF
-                                    </button>
-                                    <button
-                                        onClick={() => handleExport('excel')}
-                                        className="btn btn-outline w-full sm:w-auto"
-                                    >
-                                        <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600" /> Excel
-                                    </button>
+                                    <ExportColumnPicker
+                                        data={studentsWithIndex}
+                                        columns={indexedColumns}
+                                        presets={studentListExportPresets}
+                                        filename={activeListData.name || 'student_list'}
+                                        title={`Export — ${activeListData.name}`}
+                                        sheetName="Students"
+                                        buttonClassName="btn btn-outline w-full sm:w-auto"
+                                    />
                                     <button
                                         onClick={() => setIsAddingStudents(true)}
                                         className="btn btn-primary w-full sm:w-auto"

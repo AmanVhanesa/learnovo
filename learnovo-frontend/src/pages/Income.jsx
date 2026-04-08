@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, List, Plus, Tags, BarChart3,
-  Search, X, Download, Edit, Trash2, Eye,
+  Search, X, Edit, Trash2, Eye,
   TrendingUp, IndianRupee, Clock,
   ChevronLeft, ChevronRight, Printer
 } from 'lucide-react'
 import { incomeService, incomeReportsService, incomeCategoriesService } from '../services/incomeService'
+import ExportColumnPicker from '../components/ExportColumnPicker'
 import { formatCurrency } from '../utils/formatCurrency'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -220,19 +221,22 @@ const Income = () => {
     }
   }
 
-  const handleExport = async () => {
-    try {
-      const blob = await incomeReportsService.exportCsv(filters)
-      const url = window.URL.createObjectURL(new Blob([blob]))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'income.csv'
-      a.click()
-      window.URL.revokeObjectURL(url)
-      toast.success('Export downloaded')
-    } catch (error) {
-      toast.error('Export failed')
-    }
+  const incomeExportColumns = [
+    { key: 'date', label: 'Date', group: 'Basic', getValue: i => i.date ? new Date(i.date).toLocaleDateString() : '' },
+    { key: 'title', label: 'Title', group: 'Basic', getValue: i => i.title || '' },
+    { key: 'category', label: 'Category', group: 'Basic', getValue: i => i.category?.name || i.category || '' },
+    { key: 'amount', label: 'Amount', group: 'Basic', getValue: i => i.amount || 0 },
+    { key: 'paymentMethod', label: 'Payment Method', group: 'Payment', getValue: i => i.paymentMethod || '' },
+    { key: 'reference', label: 'Reference', group: 'Payment', getValue: i => i.reference || '' },
+    { key: 'receivedFrom', label: 'Received From', group: 'Payment', getValue: i => i.receivedFrom || '' },
+    { key: 'receivedBy', label: 'Received By', group: 'Audit', getValue: i => i.receivedBy?.name || i.receivedBy || '' },
+    { key: 'addedBy', label: 'Added By', group: 'Audit', getValue: i => i.addedBy?.name || '' },
+    { key: 'description', label: 'Description', group: 'Details', getValue: i => i.description || '' },
+  ]
+
+  const incomeExportPresets = {
+    basic: { label: 'Basic', fields: ['date', 'title', 'category', 'amount'] },
+    accounting: { label: 'Accounting', fields: ['date', 'title', 'category', 'amount', 'paymentMethod', 'reference'] },
   }
 
   const handleSaveCategory = async (data) => {
@@ -496,7 +500,16 @@ const Income = () => {
             )}
             {selectedIds.length === 0 && (<p className="text-xs text-gray-400 dark:text-[#8E8E93]">{pagination.total > 0 ? `${pagination.total} record${pagination.total !== 1 ? 's' : ''} found` : ''}</p>)}
           </div>
-          <button onClick={handleExport} className="btn btn-sm btn-outline"><Download className="h-3.5 w-3.5 mr-1.5" />Export CSV</button>
+          <ExportColumnPicker
+            data={incomes}
+            columns={incomeExportColumns}
+            presets={incomeExportPresets}
+            filename="income"
+            title="Export Income"
+            sheetName="Income"
+            buttonLabel="Export"
+            buttonClassName="btn btn-sm btn-outline"
+          />
         </div>
 
         {/* Table */}
@@ -650,7 +663,16 @@ const Income = () => {
           </select>
           <div className="flex-1" />
           <button onClick={async () => { if (!printRef.current) return; setIsPrintLoading(true); try { await highQualityPrint(printRef.current, 'Income-Report', { scale: 2, format: 'a4', orientation: 'portrait', margin: 10 }); } catch (e) { console.error('Print failed:', e); toast.error('Failed to prepare print.'); } finally { setIsPrintLoading(false); } }} disabled={isPrintLoading} className="btn btn-sm btn-outline"><Printer className="h-3.5 w-3.5 mr-1.5" />{isPrintLoading ? 'Preparing...' : 'Print'}</button>
-          <button onClick={handleExport} className="btn btn-sm btn-outline"><Download className="h-3.5 w-3.5 mr-1.5" />Export CSV</button>
+          <ExportColumnPicker
+            data={incomes}
+            columns={incomeExportColumns}
+            presets={incomeExportPresets}
+            filename="income_report"
+            title="Export Income"
+            sheetName="Income"
+            buttonLabel="Export"
+            buttonClassName="btn btn-sm btn-outline"
+          />
         </div>
 
         {reportLoading ? <LoadingSpinner /> : reportData ? (

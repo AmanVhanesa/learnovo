@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bus, Plus, Edit, Trash2, X, Search, Download } from 'lucide-react';
+import { Bus, Plus, Edit, Trash2, X, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
-import { exportCSV } from '../../utils/exportHelpers';
 import { formatDate } from '../../utils/formatDate';
+import ExportColumnPicker from '../ExportColumnPicker';
 
 const VehiclesTab = ({ onStatsUpdate }) => {
     const [vehicles, setVehicles] = useState([]);
@@ -108,30 +108,33 @@ const VehiclesTab = ({ onStatsUpdate }) => {
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
-                    <button
-                        onClick={() => {
-                            if (vehicles.length === 0) { toast.error('No vehicles to export'); return; }
-                            const rows = [
-                                ['Vehicle Number', 'Type', 'Model', 'Capacity', 'Driver', 'Insurance Expiry', 'Fitness Expiry', 'Pollution Expiry', 'Status']
-                            ].concat(vehicles.map(v => [
-                                v.vehicleNumber || '',
-                                v.type || '',
-                                v.model || '',
-                                v.capacity || '',
-                                v.driver?.name || 'Not Assigned',
-                                v.insuranceExpiry ? formatDate(v.insuranceExpiry) : '',
-                                v.fitnessExpiry ? formatDate(v.fitnessExpiry) : '',
-                                v.pollutionExpiry ? formatDate(v.pollutionExpiry) : '',
-                                v.isActive ? 'Active' : 'Inactive'
-                            ]));
-                            exportCSV('vehicles.csv', rows);
-                            toast.success('Vehicles exported successfully');
+                    <ExportColumnPicker
+                        data={vehicles}
+                        columns={[
+                            { key: 'vehicleNumber', label: 'Vehicle Number', group: 'Basic', getValue: v => v.vehicleNumber || '' },
+                            { key: 'type', label: 'Type', group: 'Basic', getValue: v => v.type || '' },
+                            { key: 'model', label: 'Model', group: 'Basic', getValue: v => v.model || '' },
+                            { key: 'capacity', label: 'Capacity', group: 'Basic', getValue: v => v.capacity || '' },
+                            { key: 'isActive', label: 'Status', group: 'Basic', getValue: v => v.isActive ? 'Active' : 'Inactive' },
+                            { key: 'driver', label: 'Driver', group: 'Assignment', getValue: v => v.driver?.name || 'Not Assigned' },
+                            { key: 'driverPhone', label: 'Driver Phone', group: 'Assignment', getValue: v => v.driver?.phone || '' },
+                            { key: 'manufacturer', label: 'Manufacturer', group: 'Details', getValue: v => v.manufacturer || '' },
+                            { key: 'year', label: 'Year', group: 'Details', getValue: v => v.year || '' },
+                            { key: 'fuelType', label: 'Fuel Type', group: 'Details', getValue: v => v.fuelType || '' },
+                            { key: 'insuranceExpiry', label: 'Insurance Expiry', group: 'Documents', getValue: v => v.insuranceExpiry ? formatDate(v.insuranceExpiry) : '' },
+                            { key: 'fitnessExpiry', label: 'Fitness Expiry', group: 'Documents', getValue: v => v.fitnessExpiry ? formatDate(v.fitnessExpiry) : '' },
+                            { key: 'pollutionExpiry', label: 'Pollution Expiry', group: 'Documents', getValue: v => v.pollutionExpiry ? formatDate(v.pollutionExpiry) : '' },
+                        ]}
+                        presets={{
+                            basic: { label: 'Basic', fields: ['vehicleNumber', 'type', 'model', 'capacity', 'isActive'] },
+                            documents: { label: 'Documents', fields: ['vehicleNumber', 'insuranceExpiry', 'fitnessExpiry', 'pollutionExpiry'] },
+                            assignment: { label: 'Assignment', fields: ['vehicleNumber', 'driver', 'driverPhone', 'capacity'] },
                         }}
-                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
-                    >
-                        <Download className="w-4 h-4" />
-                        Export
-                    </button>
+                        filename="vehicles"
+                        title="Export Vehicles"
+                        sheetName="Vehicles"
+                        buttonClassName="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
+                    />
                     <button
                         onClick={handleAddVehicle}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"

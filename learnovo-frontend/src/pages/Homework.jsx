@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Calendar, BookOpen, Clock, CheckCircle, XCircle, Eye, Edit, Trash2, Filter, Download } from 'lucide-react';
+import { Plus, Search, Calendar, BookOpen, Clock, CheckCircle, XCircle, Eye, Edit, Trash2, Filter } from 'lucide-react';
+import ExportColumnPicker from '../components/ExportColumnPicker';
 import { useAuth } from '../contexts/AuthContext';
 import homeworkService from '../services/homeworkService';
 import { classesService } from '../services/classesService';
@@ -220,25 +221,24 @@ const Homework = () => {
 
     const formatDate = (date) => formatDateShort(date);
 
-    const [exportingHw, setExportingHw] = useState(false);
-    const handleExportHomework = async () => {
-        try {
-            setExportingHw(true);
-            const response = await homeworkService.exportHomework();
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `homework_export_${new Date().toISOString().split('T')[0]}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-            toast.success('Homework exported successfully');
-        } catch (err) {
-            toast.error('Failed to export homework');
-        } finally {
-            setExportingHw(false);
-        }
+    const homeworkExportColumns = [
+        { key: 'title', label: 'Title', group: 'Basic', getValue: h => h.title || '' },
+        { key: 'subject', label: 'Subject', group: 'Basic', getValue: h => h.subject?.name || h.subject || '' },
+        { key: 'class', label: 'Class', group: 'Basic', getValue: h => h.class?.name || h.class || '' },
+        { key: 'section', label: 'Section', group: 'Basic', getValue: h => h.section || '' },
+        { key: 'description', label: 'Description', group: 'Details', getValue: h => h.description || '' },
+        { key: 'instructions', label: 'Instructions', group: 'Details', getValue: h => h.instructions || '' },
+        { key: 'totalMarks', label: 'Total Marks', group: 'Details', getValue: h => h.totalMarks || '' },
+        { key: 'assignedDate', label: 'Assigned Date', group: 'Schedule', getValue: h => h.assignedDate ? formatDate(h.assignedDate) : '' },
+        { key: 'dueDate', label: 'Due Date', group: 'Schedule', getValue: h => h.dueDate ? formatDate(h.dueDate) : '' },
+        { key: 'status', label: 'Status', group: 'Schedule', getValue: h => h.status || '' },
+        { key: 'assignedBy', label: 'Assigned By', group: 'Schedule', getValue: h => h.createdBy?.name || h.assignedBy || '' },
+        { key: 'isActive', label: 'Active', group: 'Schedule', getValue: h => h.isActive ? 'Yes' : 'No' },
+    ];
+
+    const homeworkExportPresets = {
+        basic: { label: 'Basic', fields: ['title', 'subject', 'class', 'dueDate', 'status'] },
+        detailed: { label: 'Detailed', fields: ['title', 'subject', 'class', 'description', 'totalMarks', 'assignedDate', 'dueDate'] },
     };
 
     return (
@@ -257,14 +257,15 @@ const Homework = () => {
                 </div>
                 {isTeacher && (
                     <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <button
-                            onClick={handleExportHomework}
-                            disabled={exportingHw}
-                            className="btn btn-outline flex items-center gap-2 justify-center"
-                        >
-                            <Download className="h-4 w-4" />
-                            {exportingHw ? 'Exporting...' : 'Export'}
-                        </button>
+                        <ExportColumnPicker
+                            data={homework}
+                            columns={homeworkExportColumns}
+                            presets={homeworkExportPresets}
+                            filename="homework"
+                            title="Export Homework"
+                            sheetName="Homework"
+                            buttonClassName="btn btn-outline flex items-center gap-2 justify-center"
+                        />
                         <button
                             onClick={handleCreateHomework}
                             className="btn btn-primary flex items-center gap-2 flex-1 sm:flex-none justify-center"

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Plus, Edit, Trash2, X, Search, Download, ArrowRightLeft } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, X, Search, ArrowRightLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
 import api from '../../services/authService';
 import BulkTransferModal from './BulkTransferModal';
+import ExportColumnPicker from '../ExportColumnPicker';
 
 const AssignmentsTab = ({ onStatsUpdate }) => {
     const [assignments, setAssignments] = useState([]);
@@ -19,7 +20,6 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
     const [subDepartmentFilter, setSubDepartmentFilter] = useState('');
     const [drivers, setDrivers] = useState([]);
     const [subDepartments, setSubDepartments] = useState([]);
-    const [exporting, setExporting] = useState(false);
     const [showBulkTransfer, setShowBulkTransfer] = useState(false);
 
     useEffect(() => {
@@ -80,31 +80,26 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
         }
     };
 
-    const handleExport = async () => {
-        try {
-            setExporting(true);
-            const params = {};
-            if (driverFilter) params.driver = driverFilter;
-            if (subDepartmentFilter) params.subDepartment = subDepartmentFilter;
-            if (statusFilter !== 'all') params.status = statusFilter;
+    const assignmentExportColumns = [
+        { key: 'studentName', label: 'Student Name', group: 'Student', getValue: a => a.student?.fullName || a.student?.name || '' },
+        { key: 'admissionNumber', label: 'Admission No', group: 'Student', getValue: a => a.student?.admissionNumber || '' },
+        { key: 'class', label: 'Class', group: 'Student', getValue: a => a.student?.class || '' },
+        { key: 'section', label: 'Section', group: 'Student', getValue: a => a.student?.section || '' },
+        { key: 'phone', label: 'Phone', group: 'Student', getValue: a => a.student?.phone || '' },
+        { key: 'route', label: 'Route', group: 'Transport', getValue: a => a.route?.routeName || '' },
+        { key: 'routeCode', label: 'Route Code', group: 'Transport', getValue: a => a.route?.routeCode || '' },
+        { key: 'stop', label: 'Stop', group: 'Transport', getValue: a => a.stop || '' },
+        { key: 'transportType', label: 'Transport Type', group: 'Transport', getValue: a => a.transportType || '' },
+        { key: 'driver', label: 'Driver', group: 'Transport', getValue: a => a.route?.driver?.name || '' },
+        { key: 'monthlyFee', label: 'Monthly Fee', group: 'Billing', getValue: a => a.monthlyFee || '' },
+        { key: 'startDate', label: 'Start Date', group: 'Billing', getValue: a => a.startDate ? new Date(a.startDate).toLocaleDateString() : '' },
+        { key: 'isActive', label: 'Status', group: 'Billing', getValue: a => a.isActive ? 'Active' : 'Inactive' },
+    ];
 
-            const response = await api.get('/students/export', {
-                params,
-                responseType: 'blob'
-            });
-
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'students_transport_export.csv');
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-        } catch (error) {
-            toast.error('Failed to export students');
-        } finally {
-            setExporting(false);
-        }
+    const assignmentExportPresets = {
+        basic: { label: 'Basic', fields: ['studentName', 'admissionNumber', 'class', 'route', 'stop'] },
+        contact: { label: 'Contact', fields: ['studentName', 'admissionNumber', 'phone', 'route', 'stop'] },
+        billing: { label: 'Billing', fields: ['studentName', 'admissionNumber', 'route', 'monthlyFee', 'startDate', 'isActive'] },
     };
 
     const handleAddAssignment = () => {
@@ -186,14 +181,16 @@ const AssignmentsTab = ({ onStatsUpdate }) => {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                 </select>
-                <button
-                    onClick={handleExport}
-                    disabled={exporting}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] text-sm"
-                >
-                    <Download className="w-4 h-4" />
-                    {exporting ? 'Exporting...' : 'Export List'}
-                </button>
+                <ExportColumnPicker
+                    data={assignments}
+                    columns={assignmentExportColumns}
+                    presets={assignmentExportPresets}
+                    filename="student_transport"
+                    title="Export Student Transport"
+                    sheetName="Assignments"
+                    buttonLabel="Export List"
+                    buttonClassName="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] text-sm"
+                />
                 <button
                     onClick={() => setShowBulkTransfer(true)}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm"

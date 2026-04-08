@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, X, Edit, Trash2, AlertTriangle, Copy, Check, Download } from 'lucide-react'
+import { Plus, Eye, X, Edit, Trash2, AlertTriangle, Copy, Check } from 'lucide-react'
 import { teachersService } from '../services/teachersService'
-import { exportCSV } from '../utils/exportHelpers'
+import ExportColumnPicker from '../components/ExportColumnPicker'
 import toast from 'react-hot-toast'
 
 const Teachers = () => {
@@ -107,26 +107,25 @@ const Teachers = () => {
     deleteTeacherMutation.mutate(teacher._id || teacher.id)
   }
 
-  const handleExport = () => {
-    if (teachers.length === 0) {
-      toast.error('No teachers to export')
-      return
-    }
-    const rows = [
-      ['Name', 'Email', 'Phone', 'Subject', 'Qualification', 'Assigned Classes', 'Status']
-    ].concat(
-      teachers.map(t => [
-        t.name || '',
-        t.email || '',
-        t.phone || '',
-        Array.isArray(t.subjects) ? t.subjects.join(', ') : (t.subject || ''),
-        t.qualification || '',
-        Array.isArray(t.assignedClasses) ? t.assignedClasses.join(', ') : '',
-        t.status || (t.isActive ? 'Active' : 'Inactive')
-      ])
-    )
-    exportCSV('teachers.csv', rows)
-    toast.success('Teachers exported successfully')
+  const teacherExportColumns = [
+    { key: 'name', label: 'Name', group: 'Basic', getValue: t => t.name || '' },
+    { key: 'employeeId', label: 'Employee ID', group: 'Basic', getValue: t => t.employeeId || '' },
+    { key: 'status', label: 'Status', group: 'Basic', getValue: t => t.status || (t.isActive ? 'Active' : 'Inactive') },
+    { key: 'email', label: 'Email', group: 'Contact', getValue: t => t.email || '' },
+    { key: 'phone', label: 'Phone', group: 'Contact', getValue: t => t.phone || '' },
+    { key: 'address', label: 'Address', group: 'Contact', getValue: t => t.address || '' },
+    { key: 'subjects', label: 'Subjects', group: 'Academic', getValue: t => Array.isArray(t.subjects) ? t.subjects.join(', ') : (t.subject || '') },
+    { key: 'qualification', label: 'Qualification', group: 'Academic', getValue: t => t.qualification || t.qualifications || '' },
+    { key: 'assignedClasses', label: 'Assigned Classes', group: 'Academic', getValue: t => Array.isArray(t.assignedClasses) ? t.assignedClasses.join(', ') : '' },
+    { key: 'experience', label: 'Experience (yrs)', group: 'Academic', getValue: t => t.experience || '' },
+    { key: 'dateOfJoining', label: 'Date of Joining', group: 'Employment', getValue: t => t.dateOfJoining ? new Date(t.dateOfJoining).toLocaleDateString() : '' },
+    { key: 'salary', label: 'Salary', group: 'Employment', getValue: t => t.salary || '' },
+  ]
+
+  const teacherExportPresets = {
+    basic: { label: 'Basic', fields: ['name', 'employeeId', 'subjects', 'status'] },
+    contact: { label: 'Contact', fields: ['name', 'email', 'phone', 'address'] },
+    academic: { label: 'Academic', fields: ['name', 'subjects', 'qualification', 'assignedClasses', 'experience'] },
   }
 
   if (isLoading) {
@@ -142,10 +141,15 @@ const Teachers = () => {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Teacher Management</h1>
         <div className="flex gap-2 w-full sm:w-auto">
-          <button onClick={handleExport} className="btn btn-outline w-full sm:w-auto">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </button>
+          <ExportColumnPicker
+            data={teachers}
+            columns={teacherExportColumns}
+            presets={teacherExportPresets}
+            filename="teachers"
+            title="Export Teachers"
+            sheetName="Teachers"
+            buttonClassName="btn btn-outline w-full sm:w-auto"
+          />
           <button className="btn btn-primary w-full sm:w-auto" onClick={openAdd}>
             <Plus className="h-4 w-4 mr-2" />
             Add Teacher

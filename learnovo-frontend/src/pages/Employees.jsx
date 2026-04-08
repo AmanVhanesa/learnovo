@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Download, Eye, Power, PowerOff, Edit, Key, Users, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Search, Eye, Power, PowerOff, Edit, Key, Users, AlertTriangle, RefreshCw } from 'lucide-react'
 import { employeesService } from '../services/employeesService'
-import { exportCSV } from '../utils/exportHelpers'
 import { formatDate } from '../utils/formatDate'
+import ExportColumnPicker from '../components/ExportColumnPicker'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import EmployeeForm from '../components/employees/EmployeeForm'
@@ -194,24 +194,27 @@ const Employees = () => {
         resetPasswordMutation.mutate({ employeeId: employee._id, newPassword })
     }
 
-    const handleExport = () => {
-        const rows = [
-            ['Employee ID', 'Name', 'Role', 'Phone', 'Email', 'Department', 'Joining Date', 'Salary', 'Status']
-        ].concat(
-            employees.map(e => [
-                e.employeeId || 'N/A',
-                e.name,
-                e.role,
-                e.phone || '',
-                e.email || '',
-                e.department || '',
-                e.dateOfJoining ? formatDate(e.dateOfJoining) : '',
-                e.salary || '',
-                e.isActive ? 'Active' : 'Inactive'
-            ])
-        )
-        exportCSV('employees.csv', rows)
-        toast.success('Employees exported successfully')
+    const employeeExportColumns = useMemo(() => [
+        { key: 'employeeId', label: 'Employee ID', group: 'Basic', getValue: e => e.employeeId || 'N/A' },
+        { key: 'name', label: 'Name', group: 'Basic', getValue: e => e.name || '' },
+        { key: 'role', label: 'Role', group: 'Basic', getValue: e => e.role || '' },
+        { key: 'designation', label: 'Designation', group: 'Basic', getValue: e => e.designation || '' },
+        { key: 'department', label: 'Department', group: 'Basic', getValue: e => e.department || '' },
+        { key: 'isActive', label: 'Status', group: 'Basic', getValue: e => (e.isActive ? 'Active' : 'Inactive') },
+        { key: 'phone', label: 'Phone', group: 'Contact', getValue: e => e.phone || '' },
+        { key: 'email', label: 'Email', group: 'Contact', getValue: e => e.email || '' },
+        { key: 'address', label: 'Address', group: 'Contact', getValue: e => e.address || '' },
+        { key: 'dateOfJoining', label: 'Joining Date', group: 'Employment', getValue: e => e.dateOfJoining ? formatDate(e.dateOfJoining) : '' },
+        { key: 'dateOfBirth', label: 'Date of Birth', group: 'Employment', getValue: e => e.dateOfBirth ? formatDate(e.dateOfBirth) : '' },
+        { key: 'gender', label: 'Gender', group: 'Employment', getValue: e => e.gender || '' },
+        { key: 'salary', label: 'Salary', group: 'Employment', getValue: e => e.salary || '' },
+        { key: 'qualification', label: 'Qualification', group: 'Employment', getValue: e => e.qualification || '' },
+    ], [])
+
+    const employeeExportPresets = {
+        basic: { label: 'Basic Details', fields: ['employeeId', 'name', 'role', 'department', 'isActive'] },
+        contact: { label: 'Contact Info', fields: ['employeeId', 'name', 'phone', 'email', 'address'] },
+        full: { label: 'Full Record', fields: ['employeeId', 'name', 'role', 'designation', 'department', 'phone', 'email', 'address', 'dateOfJoining', 'dateOfBirth', 'gender', 'salary', 'qualification', 'isActive'] },
     }
 
     const clearFilters = () => {
@@ -358,10 +361,15 @@ const Employees = () => {
                             </button>
                         )}
 
-                        <button onClick={handleExport} className="btn btn-outline w-full sm:w-auto col-span-2 sm:col-span-1">
-                            <Download className="h-4 w-4 mr-2" />
-                            Export
-                        </button>
+                        <ExportColumnPicker
+                            data={employees}
+                            columns={employeeExportColumns}
+                            presets={employeeExportPresets}
+                            filename="employees"
+                            title="Export Employees"
+                            sheetName="Employees"
+                            buttonClassName="btn btn-outline w-full sm:w-auto col-span-2 sm:col-span-1"
+                        />
                     </div>
                 </div>
             </div>

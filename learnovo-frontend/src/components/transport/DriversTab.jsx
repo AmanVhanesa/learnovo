@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, User, Download } from 'lucide-react';
+import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
-import { exportCSV } from '../../utils/exportHelpers';
 import { formatDate } from '../../utils/formatDate';
+import ExportColumnPicker from '../ExportColumnPicker';
 
 const DriversTab = ({ onStatsUpdate }) => {
     const [drivers, setDrivers] = useState([]);
@@ -122,31 +122,32 @@ const DriversTab = ({ onStatsUpdate }) => {
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
                     </select>
-                    <button
-                        onClick={() => {
-                            if (drivers.length === 0) { toast.error('No drivers to export'); return; }
-                            const rows = [
-                                ['Driver ID', 'Name', 'Phone', 'Email', 'License Number', 'License Type', 'License Expiry', 'Date of Joining', 'Salary', 'Status']
-                            ].concat(drivers.map(d => [
-                                d.driverId || '',
-                                d.name || '',
-                                d.phone || '',
-                                d.email || '',
-                                d.licenseNumber || '',
-                                d.licenseType || '',
-                                d.licenseExpiry ? formatDate(d.licenseExpiry) : '',
-                                d.dateOfJoining ? formatDate(d.dateOfJoining) : '',
-                                d.salary || '',
-                                d.isActive ? 'Active' : 'Inactive'
-                            ]))
-                            exportCSV('drivers.csv', rows)
-                            toast.success('Drivers exported successfully')
+                    <ExportColumnPicker
+                        data={drivers}
+                        columns={[
+                            { key: 'driverId', label: 'Driver ID', group: 'Basic', getValue: d => d.driverId || '' },
+                            { key: 'name', label: 'Name', group: 'Basic', getValue: d => d.name || '' },
+                            { key: 'isActive', label: 'Status', group: 'Basic', getValue: d => d.isActive ? 'Active' : 'Inactive' },
+                            { key: 'phone', label: 'Phone', group: 'Contact', getValue: d => d.phone || '' },
+                            { key: 'email', label: 'Email', group: 'Contact', getValue: d => d.email || '' },
+                            { key: 'address', label: 'Address', group: 'Contact', getValue: d => d.address || '' },
+                            { key: 'licenseNumber', label: 'License Number', group: 'License', getValue: d => d.licenseNumber || '' },
+                            { key: 'licenseType', label: 'License Type', group: 'License', getValue: d => d.licenseType || '' },
+                            { key: 'licenseExpiry', label: 'License Expiry', group: 'License', getValue: d => d.licenseExpiry ? formatDate(d.licenseExpiry) : '' },
+                            { key: 'dateOfJoining', label: 'Date of Joining', group: 'Employment', getValue: d => d.dateOfJoining ? formatDate(d.dateOfJoining) : '' },
+                            { key: 'salary', label: 'Salary', group: 'Employment', getValue: d => d.salary || '' },
+                            { key: 'experience', label: 'Experience (yrs)', group: 'Employment', getValue: d => d.experience || '' },
+                        ]}
+                        presets={{
+                            basic: { label: 'Basic', fields: ['driverId', 'name', 'phone', 'isActive'] },
+                            contact: { label: 'Contact Info', fields: ['driverId', 'name', 'phone', 'email', 'address'] },
+                            license: { label: 'License Details', fields: ['driverId', 'name', 'licenseNumber', 'licenseType', 'licenseExpiry'] },
                         }}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] flex-1 sm:flex-none"
-                    >
-                        <Download className="w-4 h-4" />
-                        Export
-                    </button>
+                        filename="drivers"
+                        title="Export Drivers"
+                        sheetName="Drivers"
+                        buttonClassName="inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] flex-1 sm:flex-none"
+                    />
                     <button
                         onClick={handleAddDriver}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex-1 sm:flex-none"

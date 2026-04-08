@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, List, Plus, Tags, PiggyBank, BarChart3,
-  Search, X, Download, Check, Ban, Edit, Trash2, Eye,
+  Search, X, Check, Ban, Edit, Trash2, Eye,
   TrendingUp, TrendingDown, AlertTriangle, IndianRupee, Clock,
   ChevronLeft, ChevronRight, Printer
 } from 'lucide-react'
 import { expensesService, expenseReportsService, expenseCategoriesService, expenseBudgetService } from '../services/expensesService'
+import ExportColumnPicker from '../components/ExportColumnPicker'
 import { formatCurrency } from '../utils/formatCurrency'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -278,19 +279,24 @@ const Expenses = () => {
     }
   }
 
-  const handleExport = async () => {
-    try {
-      const blob = await expenseReportsService.exportCsv(filters)
-      const url = window.URL.createObjectURL(new Blob([blob]))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'expenses.csv'
-      a.click()
-      window.URL.revokeObjectURL(url)
-      toast.success('Export downloaded')
-    } catch (error) {
-      toast.error('Export failed')
-    }
+  const expenseExportColumns = [
+    { key: 'date', label: 'Date', group: 'Basic', getValue: e => e.date ? new Date(e.date).toLocaleDateString() : '' },
+    { key: 'title', label: 'Title', group: 'Basic', getValue: e => e.title || '' },
+    { key: 'category', label: 'Category', group: 'Basic', getValue: e => e.category?.name || e.category || '' },
+    { key: 'amount', label: 'Amount', group: 'Basic', getValue: e => e.amount || 0 },
+    { key: 'status', label: 'Status', group: 'Basic', getValue: e => e.status || '' },
+    { key: 'paymentMethod', label: 'Payment Method', group: 'Payment', getValue: e => e.paymentMethod || '' },
+    { key: 'reference', label: 'Reference', group: 'Payment', getValue: e => e.reference || '' },
+    { key: 'vendor', label: 'Vendor', group: 'Payment', getValue: e => e.vendor || '' },
+    { key: 'description', label: 'Description', group: 'Details', getValue: e => e.description || '' },
+    { key: 'addedBy', label: 'Added By', group: 'Audit', getValue: e => e.addedBy?.name || '' },
+    { key: 'approvedBy', label: 'Approved By', group: 'Audit', getValue: e => e.approvedBy?.name || '' },
+  ]
+
+  const expenseExportPresets = {
+    basic: { label: 'Basic', fields: ['date', 'title', 'category', 'amount', 'status'] },
+    accounting: { label: 'Accounting', fields: ['date', 'title', 'category', 'amount', 'paymentMethod', 'reference', 'vendor'] },
+    audit: { label: 'Audit Trail', fields: ['date', 'title', 'amount', 'status', 'addedBy', 'approvedBy'] },
   }
 
   const handleSaveCategory = async (data) => {
@@ -592,7 +598,16 @@ const Expenses = () => {
             )}
             {selectedIds.length === 0 && (<p className="text-xs text-gray-400 dark:text-[#8E8E93]">{pagination.total > 0 ? `${pagination.total} expense${pagination.total !== 1 ? 's' : ''} found` : ''}</p>)}
           </div>
-          <button onClick={handleExport} className="btn btn-sm btn-outline"><Download className="h-3.5 w-3.5 mr-1.5" />Export CSV</button>
+          <ExportColumnPicker
+            data={expenses}
+            columns={expenseExportColumns}
+            presets={expenseExportPresets}
+            filename="expenses"
+            title="Export Expenses"
+            sheetName="Expenses"
+            buttonLabel="Export"
+            buttonClassName="btn btn-sm btn-outline"
+          />
         </div>
 
         {/* Table */}
@@ -844,7 +859,16 @@ const Expenses = () => {
             {/* Print/Export */}
             <div className="flex gap-2">
               <button onClick={async () => { if (!printRef.current) return; setIsPrintLoading(true); try { await highQualityPrint(printRef.current, 'Expense-Report', { scale: 2, format: 'a4', orientation: 'portrait', margin: 10 }); } catch (e) { console.error('Print failed:', e); toast.error('Failed to prepare print.'); } finally { setIsPrintLoading(false); } }} disabled={isPrintLoading} className="btn btn-sm btn-outline"><Printer className="h-3.5 w-3.5 mr-1.5" />{isPrintLoading ? 'Preparing...' : 'Print Report'}</button>
-              <button onClick={handleExport} className="btn btn-sm btn-outline"><Download className="h-3.5 w-3.5 mr-1.5" />Export CSV</button>
+              <ExportColumnPicker
+                data={expenses}
+                columns={expenseExportColumns}
+                presets={expenseExportPresets}
+                filename="expenses_report"
+                title="Export Expenses"
+                sheetName="Expenses"
+                buttonLabel="Export"
+                buttonClassName="btn btn-sm btn-outline"
+              />
             </div>
           </>
         ) : (

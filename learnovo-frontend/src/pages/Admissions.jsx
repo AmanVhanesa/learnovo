@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, CheckCircle, XCircle, X, AlertTriangle, Download } from 'lucide-react'
+import { Plus, Eye, CheckCircle, XCircle, X, AlertTriangle } from 'lucide-react'
 import { admissionsService } from '../services/admissionsService'
 import { formatDate } from '../utils/formatDate'
+import ExportColumnPicker from '../components/ExportColumnPicker'
 import toast from 'react-hot-toast'
 
 const Admissions = () => {
@@ -73,26 +74,29 @@ const Admissions = () => {
     rejectMutation.mutate({ ad, reason })
   }
 
-  const [exporting, setExporting] = useState(false)
+  const admissionExportColumns = [
+    { key: 'applicationNumber', label: 'Application No', group: 'Basic', getValue: a => a.applicationNumber || '' },
+    { key: 'firstName', label: 'First Name', group: 'Basic', getValue: a => a.personalInfo?.firstName || '' },
+    { key: 'lastName', label: 'Last Name', group: 'Basic', getValue: a => a.personalInfo?.lastName || '' },
+    { key: 'dob', label: 'Date of Birth', group: 'Basic', getValue: a => a.personalInfo?.dateOfBirth ? formatDate(a.personalInfo.dateOfBirth) : '' },
+    { key: 'gender', label: 'Gender', group: 'Basic', getValue: a => a.personalInfo?.gender || '' },
+    { key: 'status', label: 'Status', group: 'Basic', getValue: a => a.status || '' },
+    { key: 'email', label: 'Email', group: 'Contact', getValue: a => a.contactInfo?.email || '' },
+    { key: 'phone', label: 'Phone', group: 'Contact', getValue: a => a.contactInfo?.phone || '' },
+    { key: 'city', label: 'City', group: 'Contact', getValue: a => a.contactInfo?.address?.city || '' },
+    { key: 'state', label: 'State', group: 'Contact', getValue: a => a.contactInfo?.address?.state || '' },
+    { key: 'fatherName', label: 'Father Name', group: 'Guardian', getValue: a => a.guardianInfo?.fatherName || '' },
+    { key: 'motherName', label: 'Mother Name', group: 'Guardian', getValue: a => a.guardianInfo?.motherName || '' },
+    { key: 'fatherPhone', label: 'Father Phone', group: 'Guardian', getValue: a => a.guardianInfo?.fatherPhone || '' },
+    { key: 'classApplied', label: 'Class Applied', group: 'Academic', getValue: a => a.academicInfo?.classApplied || '' },
+    { key: 'previousSchool', label: 'Previous School', group: 'Academic', getValue: a => a.academicInfo?.previousSchool || '' },
+    { key: 'createdAt', label: 'Applied On', group: 'Academic', getValue: a => a.createdAt ? formatDate(a.createdAt) : '' },
+  ]
 
-  const handleExport = async () => {
-    try {
-      setExporting(true)
-      const response = await admissionsService.export({ status: statusFilter })
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `admissions_export_${new Date().toISOString().split('T')[0]}.csv`)
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-      toast.success('Admissions exported successfully')
-    } catch (err) {
-      toast.error('Failed to export admissions')
-    } finally {
-      setExporting(false)
-    }
+  const admissionExportPresets = {
+    basic: { label: 'Basic', fields: ['applicationNumber', 'firstName', 'lastName', 'classApplied', 'status'] },
+    contact: { label: 'Contact', fields: ['applicationNumber', 'firstName', 'lastName', 'phone', 'email', 'city'] },
+    guardian: { label: 'Guardian', fields: ['applicationNumber', 'firstName', 'lastName', 'fatherName', 'motherName', 'fatherPhone'] },
   }
 
   const errorMessage = error?.response?.data?.message || (error ? 'Failed to load admissions. Please check your connection and try again.' : null)
@@ -118,14 +122,15 @@ const Admissions = () => {
             <option value="rejected">Rejected</option>
             <option value="waitlisted">Waitlisted</option>
           </select>
-          <button
-            className="btn btn-outline w-full sm:w-auto justify-center gap-2"
-            onClick={handleExport}
-            disabled={exporting || admissions.length === 0}
-          >
-            <Download className="h-4 w-4" />
-            {exporting ? 'Exporting...' : 'Export'}
-          </button>
+          <ExportColumnPicker
+            data={admissions}
+            columns={admissionExportColumns}
+            presets={admissionExportPresets}
+            filename="admissions"
+            title="Export Admissions"
+            sheetName="Admissions"
+            buttonClassName="btn btn-outline w-full sm:w-auto justify-center gap-2"
+          />
           <button className="btn btn-primary w-full sm:w-auto justify-center" onClick={openNew}>
             <Plus className="h-4 w-4 mr-2" />
             New Admission

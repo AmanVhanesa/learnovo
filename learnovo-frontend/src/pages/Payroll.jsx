@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import payrollService from '../services/payrollService';
 import { exportExcel } from '../utils/exportHelpers';
 import { formatCurrency } from '../utils/formatCurrency';
+import ExportColumnPicker from '../components/ExportColumnPicker';
 import GeneratePayrollModal from '../components/payroll/GeneratePayrollModal';
 import AdvanceSalaryModal from '../components/payroll/AdvanceSalaryModal';
 import PayrollDetailsModal from '../components/payroll/PayrollDetailsModal';
@@ -208,63 +209,30 @@ const Payroll = () => {
         }
     };
 
-    // ─── Excel Export ────────────────────────────────────────
-    const handleExportExcel = () => {
-        if (payrollRecords.length === 0) {
-            toast.error('No records to export');
-            return;
-        }
+    // ─── Payroll column picker config ───────────────────────
+    const payrollExportColumns = [
+        { key: 'employeeName', label: 'Employee Name', group: 'Employee', getValue: r => r.employeeId?.name || '' },
+        { key: 'employeeIdCode', label: 'Employee ID', group: 'Employee', getValue: r => r.employeeId?.employeeId || '' },
+        { key: 'designation', label: 'Designation', group: 'Employee', getValue: r => r.employeeId?.designation || '' },
+        { key: 'department', label: 'Department', group: 'Employee', getValue: r => r.employeeId?.department || '' },
+        { key: 'month', label: 'Month', group: 'Period', getValue: r => MONTH_NAMES[r.month - 1] || '' },
+        { key: 'year', label: 'Year', group: 'Period', getValue: r => r.year || '' },
+        { key: 'baseSalary', label: 'Base Salary', group: 'Salary', getValue: r => r.baseSalary || 0 },
+        { key: 'bonuses', label: 'Bonuses', group: 'Salary', getValue: r => r.bonuses || 0 },
+        { key: 'leaveDeduction', label: 'Leave Deductions', group: 'Deductions', getValue: r => r.leaveDeduction || 0 },
+        { key: 'advanceDeduction', label: 'Advance Deductions', group: 'Deductions', getValue: r => r.totalAdvanceDeduction || 0 },
+        { key: 'otherDeductions', label: 'Other Deductions', group: 'Deductions', getValue: r => r.otherDeductions || 0 },
+        { key: 'totalDeductions', label: 'Total Deductions', group: 'Deductions', getValue: r => (r.leaveDeduction || 0) + (r.totalAdvanceDeduction || 0) + (r.otherDeductions || 0) },
+        { key: 'netSalary', label: 'Net Salary', group: 'Salary', getValue: r => r.netSalary || 0 },
+        { key: 'paymentStatus', label: 'Payment Status', group: 'Payment', getValue: r => r.paymentStatus || 'pending' },
+        { key: 'paymentDate', label: 'Payment Date', group: 'Payment', getValue: r => r.paymentDate ? new Date(r.paymentDate).toLocaleDateString() : '' },
+        { key: 'paymentMethod', label: 'Payment Method', group: 'Payment', getValue: r => r.paymentMethod || '' },
+    ];
 
-        const headers = [
-            'Employee Name', 'Employee ID', 'Designation', 'Department',
-            'Month', 'Year', 'Base Salary', 'Bonuses',
-            'Leave Deductions', 'Advance Deductions', 'Other Deductions',
-            'Total Deductions', 'Net Salary', 'Payment Status'
-        ];
-
-        const rows = payrollRecords.map(r => [
-            r.employeeId?.name || '',
-            r.employeeId?.employeeId || '',
-            r.employeeId?.designation || '',
-            r.employeeId?.department || '',
-            MONTH_NAMES[r.month - 1],
-            r.year,
-            r.baseSalary || 0,
-            r.bonuses || 0,
-            r.leaveDeduction || 0,
-            r.totalAdvanceDeduction || 0,
-            r.otherDeductions || 0,
-            (r.leaveDeduction || 0) + (r.totalAdvanceDeduction || 0) + (r.otherDeductions || 0),
-            r.netSalary || 0,
-            r.paymentStatus || 'pending'
-        ]);
-
-        exportExcel(
-            `payroll_${MONTH_NAMES[filters.month - 1]}_${filters.year}.xlsx`,
-            [headers, ...rows],
-            'Payroll'
-        );
-        toast.success('Excel file downloaded');
-        setShowExportMenu(false);
-    };
-
-    // ─── CSV Export (via backend) ─────────────────────────────
-    const handleExportCSV = async () => {
-        try {
-            const response = await payrollService.exportPayrollCSV({ month: filters.month, year: filters.year });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `payroll_${MONTH_NAMES[filters.month - 1]}_${filters.year}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            toast.success('CSV file downloaded');
-            setShowExportMenu(false);
-        } catch {
-            toast.error('Failed to export CSV');
-        }
+    const payrollExportPresets = {
+        basic: { label: 'Basic', fields: ['employeeName', 'employeeIdCode', 'month', 'year', 'netSalary', 'paymentStatus'] },
+        salary: { label: 'Salary Breakdown', fields: ['employeeName', 'employeeIdCode', 'baseSalary', 'bonuses', 'totalDeductions', 'netSalary'] },
+        full: { label: 'Full Record', fields: ['employeeName', 'employeeIdCode', 'designation', 'department', 'month', 'year', 'baseSalary', 'bonuses', 'leaveDeduction', 'advanceDeduction', 'otherDeductions', 'netSalary', 'paymentStatus', 'paymentDate'] },
     };
 
     // ─── Bank Statement Export (NEFT/RTGS format) ───────────
@@ -393,6 +361,16 @@ const Payroll = () => {
                 <div className="flex items-center gap-2">
                     {activeTab === 'payroll' && (
                         <>
+                            {/* Column-selectable export */}
+                            <ExportColumnPicker
+                                data={payrollRecords}
+                                columns={payrollExportColumns}
+                                presets={payrollExportPresets}
+                                filename={`payroll_${MONTH_NAMES[filters.month - 1]}_${filters.year}`}
+                                title="Export Payroll"
+                                sheetName="Payroll"
+                                buttonClassName="btn btn-outline gap-2"
+                            />
                             {/* Export Dropdown */}
                             <div className="relative" ref={exportMenuRef}>
                                 <button
@@ -415,20 +393,6 @@ const Payroll = () => {
                                                 <div className="text-left">
                                                     <div className="font-medium">Monthly Report (PDF)</div>
                                                     <div className="text-[11px] text-gray-400 dark:text-[#636366]">Formatted salary report</div>
-                                                </div>
-                                            </button>
-                                            <button onClick={handleExportExcel} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 dark:text-[#E5E5EA] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
-                                                <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
-                                                <div className="text-left">
-                                                    <div className="font-medium">Payroll Data (Excel)</div>
-                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">Full breakdown with deductions</div>
-                                                </div>
-                                            </button>
-                                            <button onClick={handleExportCSV} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 dark:text-[#E5E5EA] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
-                                                <FileText className="h-4 w-4 text-orange-500" />
-                                                <div className="text-left">
-                                                    <div className="font-medium">Payroll Data (CSV)</div>
-                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">Lightweight CSV for spreadsheets</div>
                                                 </div>
                                             </button>
                                             <div className="border-t border-gray-100 dark:border-[#2C2C2E] my-1" />
