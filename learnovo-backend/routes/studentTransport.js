@@ -330,8 +330,13 @@ router.put('/:id', protect, authorize('admin'), [
       }
     }
 
-    // Update assignment
+    // Update assignment — never allow route changes through this endpoint.
+    // Route changes must go through POST /:id/transfer so the old assignment
+    // is deactivated and a new one is created (preserves audit trail).
     const updatePayload = { ...req.body, updatedBy: req.user._id };
+    delete updatePayload.route;
+    delete updatePayload.student;
+    delete updatePayload.tenantId;
 
     const updatedAssignment = await StudentTransportAssignment.findByIdAndUpdate(
       req.params.id,
@@ -389,6 +394,110 @@ router.delete('/:id', protect, authorize('admin'), async(req, res) => {
     res.status(500).json({
       success: false,
       message: 'Server error while deactivating assignment'
+    });
+  }
+});
+
+// @desc    Transfer a single student to a different route/driver
+// @route   POST /api/student-transport/:id/transfer
+// @access  Private (Admin)
+router.post('/:id/transfer', protect, authorize('admin'), [
+  body('toRouteId').notEmpty().withMessage('Target route is required'),
+  body('toStop').trim().notEmpty().withMessage('Target stop is required'),
+  body('transportType').optional().isIn(['Both', 'Pickup Only', 'Drop Only']).withMessage('Invalid transport type'),
+  body('monthlyFee').optional().isFloat({ min: 0 }).withMessage('Monthly fee must be >= 0'),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { toRouteId, toStop, transportType, monthlyFee, reason } = req.body;
+
+    // Find existing active assignment
+    const existing = await StudentTransportAssignment.findOne({
+      _id: req.params.id,
+      tenantId,
+      isActive: true
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Active assignment not found'
+      });
+    }
+
+    // Validate target route
+    const toRoute = await Route.findOne({
+      _id: toRouteId,
+      tenantId,
+      isActive: true
+    });
+
+    if (!toRoute) {
+      return res.status(400).json({
+        success: false,
+        message: 'Target route not found or inactive'
+      });
+    }
+
+    // Validate target stop exists in target route
+    const stopExists = toRoute.stops.some(
+      s => s.stopName.toLowerCase() === toStop.toLowerCase()
+    );
+
+    if (!stopExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stop does not exist in the target route'
+      });
+    }
+
+    // No-op if same route + stop
+    if (existing.route.toString() === toRouteId &&
+        existing.stop.toLowerCase() === toStop.toLowerCase()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student is already on this route and stop'
+      });
+    }
+
+    // Deactivate the old assignment
+    existing.isActive = false;
+    existing.inactiveReason = reason || 'Transferred to another route';
+    existing.inactivatedAt = new Date();
+    existing.endDate = new Date();
+    existing.updatedBy = req.user._id;
+    await existing.save();
+
+    // Create the new assignment on the target route
+    const newAssignment = await StudentTransportAssignment.create({
+      tenantId,
+      student: existing.student,
+      route: toRouteId,
+      stop: toStop,
+      transportType: transportType || existing.transportType,
+      academicYear: existing.academicYear,
+      monthlyFee: monthlyFee != null ? monthlyFee : existing.monthlyFee,
+      startDate: new Date(),
+      isActive: true,
+      notes: 'Transferred from previous route',
+      createdBy: req.user._id
+    });
+
+    const populated = await StudentTransportAssignment.findById(newAssignment._id)
+      .populate('student', 'name class section admissionNumber')
+      .populate('route', 'routeName routeCode');
+
+    res.json({
+      success: true,
+      message: 'Student transferred successfully',
+      data: populated
+    });
+  } catch (error) {
+    console.error('Transfer assignment error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error during transfer'
     });
   }
 });
@@ -596,8 +705,11 @@ router.post('/bulk-transfer', protect, authorize('admin'), [
   try {
     const {
       admissionNumbers, studentIds, fromRouteId,
-      toRouteId, toStop, transportType, monthlyFee
+      toRouteId, toStop, transportType, monthlyFee, academicYear
     } = req.body;
+
+    // Default academic year for students who don't have an existing assignment to inherit from
+    const defaultAcademicYear = academicYear || new Date().getFullYear().toString();
 
     const tenantId = req.user.tenantId;
 
@@ -649,7 +761,7 @@ router.post('/bulk-transfer', protect, authorize('admin'), [
       return res.status(400).json({ success: false, message: 'No valid students found to transfer' });
     }
 
-    const results = { transferred: [], skipped: [], failed: [] };
+    const results = { transferred: [], assigned: [], skipped: [], failed: [] };
 
     for (const student of studentsToTransfer) {
       try {
@@ -660,53 +772,67 @@ router.post('/bulk-transfer', protect, authorize('admin'), [
           isActive: true
         });
 
-        if (!existing) {
-          results.skipped.push({
+        if (existing) {
+          // Skip if already on the target route+stop
+          if (existing.route.toString() === toRouteId && existing.stop.toLowerCase() === toStop.toLowerCase()) {
+            results.skipped.push({
+              admissionNumber: student.admissionNumber,
+              name: student.name,
+              reason: 'Already on the target route and stop'
+            });
+            continue;
+          }
+
+          // Deactivate old assignment
+          existing.isActive = false;
+          existing.inactiveReason = 'Transferred to another route';
+          existing.inactivatedAt = new Date();
+          existing.endDate = new Date();
+          existing.updatedBy = req.user._id;
+          await existing.save();
+
+          // Create new assignment inheriting fields from the previous one
+          const newAssignment = await StudentTransportAssignment.create({
+            tenantId,
+            student: student._id,
+            route: toRouteId,
+            stop: toStop,
+            transportType: transportType || existing.transportType,
+            academicYear: existing.academicYear,
+            monthlyFee: monthlyFee != null ? monthlyFee : existing.monthlyFee,
+            startDate: new Date(),
+            isActive: true,
+            notes: 'Transferred from previous route',
+            createdBy: req.user._id
+          });
+
+          results.transferred.push({
             admissionNumber: student.admissionNumber,
             name: student.name,
-            reason: 'No active transport assignment'
+            newAssignmentId: newAssignment._id
           });
-          continue;
-        }
+        } else {
+          // No existing assignment — create a fresh one on the target route
+          const newAssignment = await StudentTransportAssignment.create({
+            tenantId,
+            student: student._id,
+            route: toRouteId,
+            stop: toStop,
+            transportType: transportType || 'Both',
+            academicYear: defaultAcademicYear,
+            monthlyFee: monthlyFee != null ? monthlyFee : toRoute.monthlyFee || 0,
+            startDate: new Date(),
+            isActive: true,
+            notes: 'Assigned via bulk transfer',
+            createdBy: req.user._id
+          });
 
-        // Skip if already on the target route+stop
-        if (existing.route.toString() === toRouteId && existing.stop.toLowerCase() === toStop.toLowerCase()) {
-          results.skipped.push({
+          results.assigned.push({
             admissionNumber: student.admissionNumber,
             name: student.name,
-            reason: 'Already on the target route and stop'
+            newAssignmentId: newAssignment._id
           });
-          continue;
         }
-
-        // Deactivate old assignment
-        existing.isActive = false;
-        existing.inactiveReason = 'Transferred to another route';
-        existing.inactivatedAt = new Date();
-        existing.endDate = new Date();
-        existing.updatedBy = req.user._id;
-        await existing.save();
-
-        // Create new assignment on target route
-        const newAssignment = await StudentTransportAssignment.create({
-          tenantId,
-          student: student._id,
-          route: toRouteId,
-          stop: toStop,
-          transportType: transportType || existing.transportType,
-          academicYear: existing.academicYear,
-          monthlyFee: monthlyFee != null ? monthlyFee : existing.monthlyFee,
-          startDate: new Date(),
-          isActive: true,
-          notes: 'Transferred from previous route',
-          createdBy: req.user._id
-        });
-
-        results.transferred.push({
-          admissionNumber: student.admissionNumber,
-          name: student.name,
-          newAssignmentId: newAssignment._id
-        });
       } catch (error) {
         results.failed.push({
           admissionNumber: student.admissionNumber,
@@ -718,7 +844,7 @@ router.post('/bulk-transfer', protect, authorize('admin'), [
 
     res.json({
       success: true,
-      message: `Transfer complete. Transferred: ${results.transferred.length}, Skipped: ${results.skipped.length}, Failed: ${results.failed.length}`,
+      message: `Transfer complete. Transferred: ${results.transferred.length}, Newly assigned: ${results.assigned.length}, Skipped: ${results.skipped.length}, Failed: ${results.failed.length}`,
       data: results
     });
   } catch (error) {

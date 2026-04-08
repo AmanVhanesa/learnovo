@@ -344,6 +344,7 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
     });
     const [loading, setLoading] = useState(false);
     const [selectedRoute, setSelectedRoute] = useState(null);
+    const originalRouteId = assignment?.route?._id || assignment?.route || null;
 
     useEffect(() => {
         if (formData.route) {
@@ -351,6 +352,16 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
             setSelectedRoute(route);
             if (route && !formData.monthlyFee) {
                 setFormData(prev => ({ ...prev, monthlyFee: route.monthlyFee }));
+            }
+            // If user switched to a different route, clear stale stop and reset fee
+            // so they explicitly pick a stop on the new route.
+            if (originalRouteId && formData.route !== originalRouteId && route) {
+                const stillValid = route.stops?.some(
+                    s => s.stopName.toLowerCase() === (formData.stop || '').toLowerCase()
+                );
+                if (!stillValid) {
+                    setFormData(prev => ({ ...prev, stop: '', monthlyFee: route.monthlyFee || '' }));
+                }
             }
         }
     }, [formData.route, routes]);
@@ -366,8 +377,22 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
 
         try {
             if (assignment) {
-                await transportService.updateStudentTransportAssignment(assignment._id, formData);
-                toast.success('Assignment updated successfully');
+                const originalRouteId = assignment.route?._id || assignment.route;
+                const routeChanged = formData.route && formData.route !== originalRouteId;
+
+                if (routeChanged) {
+                    // Route (and therefore driver) changed → transfer to new route
+                    await transportService.transferStudentAssignment(assignment._id, {
+                        toRouteId: formData.route,
+                        toStop: formData.stop,
+                        transportType: formData.transportType,
+                        monthlyFee: formData.monthlyFee ? Number(formData.monthlyFee) : undefined
+                    });
+                    toast.success('Student transferred to new route successfully');
+                } else {
+                    await transportService.updateStudentTransportAssignment(assignment._id, formData);
+                    toast.success('Assignment updated successfully');
+                }
             } else {
                 // Backend expects studentId/routeId, form uses student/route
                 const payload = {
@@ -431,7 +456,9 @@ const AssignmentModal = ({ assignment, students, routes, onClose }) => {
                                 <option value="">Select Route</option>
                                 {routes.map(route => (
                                     <option key={route._id} value={route._id}>
-                                        {route.routeName} - ₹{route.monthlyFee}/month
+                                        {route.routeName}
+                                        {route.assignedDriver?.name ? ` (Driver: ${route.assignedDriver.name})` : ''}
+                                        {' '}- ₹{route.monthlyFee}/month
                                     </option>
                                 ))}
                             </select>

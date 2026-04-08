@@ -159,13 +159,15 @@ const BulkTransferModal = ({ routes, drivers, onClose }) => {
     };
 
     const getStudentsToTransfer = () => {
-        if (inputMode === 'admission') return resolvedStudents.filter(s => s.hasTransport);
+        // Include all resolved students — those without existing transport
+        // will get a fresh assignment created on the target route.
+        if (inputMode === 'admission') return resolvedStudents;
         return driverStudents.filter(s => selectedStudentIds.has(s._id));
     };
 
     const canTransfer = () => {
         if (!toRouteId || !toStop) return false;
-        if (inputMode === 'admission') return resolvedStudents.filter(s => s.hasTransport).length > 0;
+        if (inputMode === 'admission') return resolvedStudents.length > 0;
         return selectedStudentIds.size > 0;
     };
 
@@ -182,7 +184,7 @@ const BulkTransferModal = ({ routes, drivers, onClose }) => {
             };
 
             if (inputMode === 'admission') {
-                payload.admissionNumbers = resolvedStudents.filter(s => s.hasTransport).map(s => s.admissionNumber);
+                payload.admissionNumbers = resolvedStudents.map(s => s.admissionNumber);
             } else {
                 payload.studentIds = Array.from(selectedStudentIds);
             }
@@ -241,6 +243,14 @@ const BulkTransferModal = ({ routes, drivers, onClose }) => {
                                     <p className="text-sm text-red-600 dark:text-red-500">Failed</p>
                                 </div>
                             </div>
+
+                            {results.assigned?.length > 0 && (
+                                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
+                                    <p className="text-sm text-blue-700 dark:text-blue-400">
+                                        <strong>{results.assigned.length}</strong> student(s) had no previous transport — newly assigned to the target route
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Detail lists */}
                             {results.transferred?.length > 0 && (
@@ -354,7 +364,8 @@ const BulkTransferModal = ({ routes, drivers, onClose }) => {
                                     {hasResolved && resolvedStudents.length > 0 && (
                                         <div className="mt-3 border border-gray-200 dark:border-[#38383A] rounded-lg overflow-hidden">
                                             <div className="px-3 py-2 bg-gray-50 dark:bg-[#2C2C2E] text-xs font-medium text-gray-500 dark:text-[#8E8E93]">
-                                                {resolvedStudents.filter(s => s.hasTransport).length} student(s) with active transport
+                                                {resolvedStudents.length} student(s) — {resolvedStudents.filter(s => s.hasTransport).length} will be transferred,{' '}
+                                                {resolvedStudents.filter(s => !s.hasTransport).length} will be newly assigned
                                             </div>
                                             <div className="max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-[#38383A]">
                                                 {resolvedStudents.map((student) => (
@@ -370,7 +381,7 @@ const BulkTransferModal = ({ routes, drivers, onClose }) => {
                                                                     Current: {student.assignment?.route?.routeName} — {student.assignment?.stop}
                                                                 </p>
                                                             ) : (
-                                                                <p className="text-xs text-yellow-600 dark:text-yellow-400">No active transport assignment</p>
+                                                                <p className="text-xs text-blue-600 dark:text-blue-400">No active transport — will be newly assigned</p>
                                                             )}
                                                         </div>
                                                         <button onClick={() => removeResolved(student.admissionNumber)} className="ml-2 text-gray-400 hover:text-red-500">

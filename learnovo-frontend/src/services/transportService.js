@@ -288,6 +288,13 @@ export const resolveStudentsByAdmission = async (admissionNumbers) => {
     return response.data;
 };
 
+export const transferStudentAssignment = async (id, payload) => {
+    const response = await axios.post(`${API_URL}/student-transport/${id}/transfer`, payload, {
+        headers: getAuthHeader()
+    });
+    return response.data;
+};
+
 export const bulkTransferStudents = async (transferData) => {
     const response = await axios.post(`${API_URL}/student-transport/bulk-transfer`, transferData, {
         headers: getAuthHeader()
@@ -337,5 +344,6 @@ export default {
     bulkAssignStudents,
     exportStudentTransportAssignments,
     resolveStudentsByAdmission,
+    transferStudentAssignment,
     bulkTransferStudents
 };
