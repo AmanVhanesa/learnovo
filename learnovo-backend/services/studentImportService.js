@@ -3,6 +3,7 @@ const ImportExportService = require('./importExportService');
 const User = require('../models/User');
 const Class = require('../models/Class');
 const Section = require('../models/Section');
+const AcademicSession = require('../models/AcademicSession');
 /**
  * Student Import Service
  * Handles importing students from CSV/Excel files
@@ -275,20 +276,47 @@ class StudentImportService {
   static async validateBusinessRules(rows, tenantId) {
     const errors = [];
 
-    // Get all classes for this tenant
-    const classes = await Class.find({ tenantId, isActive: true }).lean();
+    // Scope class lookup to the tenant's active academic session so that
+    // duplicate class names from prior years (e.g. an old "1st" alongside
+    // the current "1st") don't collide in the name->class map.
+    const activeSession = await AcademicSession.findOne({ tenantId, isActive: true }).lean();
+    if (!activeSession) {
+      // Surface this as a row-level error on every row so it shows up in the
+      // preview UI rather than crashing the request.
+      rows.forEach((row, index) => {
+        errors.push({
+          row: row._rowNumber || index + 1,
+          rowIndex: index,
+          field: 'currentClass',
+          message: 'No active academic session found for this tenant',
+          value: row.currentClass
+        });
+      });
+      return { errors };
+    }
+
+    // Get classes for this tenant scoped to the active session
+    const classes = await Class.find({
+      tenantId,
+      isActive: true,
+      academicYear: activeSession.name
+    }).lean();
     const classMap = new Map(); // Name -> Class Doc
     classes.forEach(cls => {
       classMap.set(cls.name.toLowerCase(), cls);
     });
 
-    // Get all sections for this tenant
-    // We need to fetch all active sections to validate the combinations
-    const sections = await Section.find({ tenantId, isActive: true }).populate('classId').lean();
+    // Only fetch sections belonging to the current-year classes
+    const classIds = classes.map(c => c._id);
+    const sections = await Section.find({
+      tenantId,
+      isActive: true,
+      classId: { $in: classIds }
+    }).lean();
     const sectionMap = new Map(); // ClassId + SectionName -> Section Doc
     sections.forEach(sec => {
       // Key format: classID_sectionName
-      const key = `${sec.classId._id}_${sec.name}`.toLowerCase();
+      const key = `${sec.classId}_${sec.name}`.toLowerCase();
       sectionMap.set(key, sec);
     });
 
@@ -387,11 +415,24 @@ class StudentImportService {
       errors: []
     };
 
-    // Pre-fetch class & section maps (single DB call each)
-    const [classes, sections] = await Promise.all([
-      Class.find({ tenantId, isActive: true }).lean(),
-      Section.find({ tenantId, isActive: true }).lean()
-    ]);
+    // Scope class/section lookup to the active academic session so prior-year
+    // duplicates of the same class name don't shadow the current ones.
+    const activeSession = await AcademicSession.findOne({ tenantId, isActive: true }).lean();
+    if (!activeSession) {
+      throw new Error('No active academic session found for this tenant');
+    }
+
+    const classes = await Class.find({
+      tenantId,
+      isActive: true,
+      academicYear: activeSession.name
+    }).lean();
+    const classIds = classes.map(c => c._id);
+    const sections = await Section.find({
+      tenantId,
+      isActive: true,
+      classId: { $in: classIds }
+    }).lean();
 
     const classMap = new Map();
     classes.forEach(cls => classMap.set(cls.name.toLowerCase(), cls));
