@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Calendar, Lock, ChevronDown } from 'lucide-react'
+import { Calendar, ChevronDown } from 'lucide-react'
 import { academicSessionsService } from '../services/academicsService'
 
 /**
@@ -45,9 +45,8 @@ const AcademicSessionSelector = ({ selectedSessionId, onSessionChange, className
         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
       </div>
       {selectedSession && !selectedSession.isActive && (
-        <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-1 rounded-full">
-          <Lock className="h-3 w-3" />
-          View Only
+        <span className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded-full">
+          Past Session
         </span>
       )}
     </div>

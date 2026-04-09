@@ -96,7 +96,6 @@ const Expenses = () => {
   })
 
   const currentSession = selectedSession || activeSession
-  const isViewOnly = currentSession && !currentSession.isActive
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ['expense-categories'],
@@ -430,15 +429,13 @@ const Expenses = () => {
             onSessionChange={setSelectedSession}
           />
         </div>
-        {!isViewOnly && (
-          <button
-            onClick={() => { setEditingExpense(null); setShowExpenseForm(true) }}
-            className="btn btn-primary"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Expense
-          </button>
-        )}
+        <button
+          onClick={() => { setEditingExpense(null); setShowExpenseForm(true) }}
+          className="btn btn-primary"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Expense
+        </button>
       </div>
 
       {/* Tabs */}

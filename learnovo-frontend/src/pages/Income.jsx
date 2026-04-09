@@ -86,7 +86,6 @@ const Income = () => {
 
   // Default to active session on first load
   const currentSession = selectedSession || activeSession
-  const isViewOnly = currentSession && !currentSession.isActive
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ['income-categories'],
@@ -355,15 +354,13 @@ const Income = () => {
             onSessionChange={setSelectedSession}
           />
         </div>
-        {!isViewOnly && (
-          <button
-            onClick={() => { setEditingIncome(null); setShowIncomeForm(true) }}
-            className="btn btn-primary"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Income
-          </button>
-        )}
+        <button
+          onClick={() => { setEditingIncome(null); setShowIncomeForm(true) }}
+          className="btn btn-primary"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Income
+        </button>
       </div>
 
       {/* Tabs */}

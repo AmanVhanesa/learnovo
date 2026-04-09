@@ -75,7 +75,6 @@ const Payroll = () => {
     });
 
     const currentSession = selectedSession || activeSession;
-    const isViewOnly = currentSession && !currentSession.isActive;
 
     // ─── Queries ──────────────────────────────────────────────
     const { data: payrollData, isLoading: payrollLoading, isRefetching: payrollRefetching, error: payrollError, refetch: refetchPayroll } = useQuery({
@@ -431,16 +430,14 @@ const Payroll = () => {
                             </div>
                         </>
                     )}
-                    {!isViewOnly && (
-                        <button
-                            onClick={() => activeTab === 'payroll' ? setShowGenerateModal(true) : (() => { setAdvanceModalMode('create'); setShowAdvanceModal(true); })()}
-                            className="btn btn-primary gap-2"
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span className="hidden sm:inline">{activeTab === 'payroll' ? 'Generate Payroll' : 'New Advance'}</span>
-                            <span className="sm:hidden">New</span>
-                        </button>
-                    )}
+                    <button
+                        onClick={() => activeTab === 'payroll' ? setShowGenerateModal(true) : (() => { setAdvanceModalMode('create'); setShowAdvanceModal(true); })()}
+                        className="btn btn-primary gap-2"
+                    >
+                        <Plus className="h-4 w-4" />
+                        <span className="hidden sm:inline">{activeTab === 'payroll' ? 'Generate Payroll' : 'New Advance'}</span>
+                        <span className="sm:hidden">New</span>
+                    </button>
                 </div>
             </div>
 
