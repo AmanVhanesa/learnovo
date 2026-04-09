@@ -23,10 +23,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['learnovo.png', 'logo-icon.png'],
+      includeAssets: ['learnovo.png', 'logo-icon.png', 'robots.txt', 'sitemap.xml'],
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,xml,txt}'],
         navigateFallback: 'index.html',
+        // Don't let the SPA shell intercept SEO files
+        navigateFallbackDenylist: [/^\/robots\.txt$/, /^\/sitemap\.xml$/, /^\/api\//],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3MB
         runtimeCaching: [
           {

@@ -1,0 +1,29 @@
+# Learnovo — robots.txt
+# Root marketing site is fully indexable.
+# Tenant subdomains (e.g. spis.learnovoportal.com) are private school portals
+# and emit a runtime <meta name="robots" content="noindex"> from index.html.
+
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /app/
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /payment/
+Disallow: /account-locked
+
+# Allow major crawlers explicitly
+User-agent: Googlebot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /app/
+Disallow: /api/
+
+Sitemap: https://learnovoportal.com/sitemap.xml
