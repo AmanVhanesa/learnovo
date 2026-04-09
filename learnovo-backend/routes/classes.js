@@ -284,34 +284,56 @@ router.put('/:id', [
       });
     }
 
-    // Handle sections if provided
+    // Handle sections if provided.
+    //
+    // The Academics page groups every Class record sharing the same `grade`
+    // into a single card and flattens their sections together; the edit modal
+    // is seeded from one of those classes (gradeClasses[0]) but contains
+    // sections from ALL classes in that grade. So a "delete" or "edit" the
+    // user makes can target a section that actually lives under a sibling
+    // class in the same grade. We diff against the union of sections under
+    // every class in this grade so cross-class deletes/edits actually take
+    // effect instead of being silently ignored.
     if (sections && Array.isArray(sections)) {
       const tenantId = req.user.tenantId;
       const classId = updatedClass._id;
 
-      // Get existing sections
-      const existingSections = await Section.find({ classId, tenantId });
+      // All classes in this tenant that share the same grade as the updated
+      // class — i.e. every class the UI merged into the same edit modal.
+      const gradeClasses = await Class.find({
+        tenantId,
+        grade: updatedClass.grade
+      }).select('_id').lean();
+      const gradeClassIds = gradeClasses.map(c => c._id);
+
+      // Existing sections across the whole grade group
+      const existingSections = await Section.find({
+        tenantId,
+        classId: { $in: gradeClassIds }
+      });
       const existingIds = existingSections.map(s => s._id.toString());
 
       // Determine which sections to keep, add, or remove
       const incomingSectionIds = sections.filter(s => s._id).map(s => s._id.toString());
       const toRemove = existingIds.filter(id => !incomingSectionIds.includes(id));
 
-      // Remove deleted sections
+      // Remove deleted sections (scoped by tenantId; classId restriction
+      // dropped because the section may belong to a sibling class in the
+      // same grade — _id + tenantId is sufficient).
       if (toRemove.length > 0) {
-        await Section.deleteMany({ _id: { $in: toRemove }, classId, tenantId });
+        await Section.deleteMany({ _id: { $in: toRemove }, tenantId });
       }
 
       // Update existing and create new sections
       for (const s of sections) {
         if (s._id && existingIds.includes(s._id.toString())) {
-          // Update existing
+          // Update existing — preserves whichever class it actually belongs to
           await Section.findByIdAndUpdate(s._id, {
             name: s.name.trim(),
             sectionTeacher: s.sectionTeacher || null
           });
         } else if (s.name && s.name.trim()) {
-          // Create new
+          // Create new — under the class the user opened the modal for
           await Section.create({
             tenantId,
             classId,
