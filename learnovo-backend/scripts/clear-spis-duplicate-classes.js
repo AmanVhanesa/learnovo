@@ -51,10 +51,13 @@ async function run() {
   const classes = await Class.find({ tenantId }).lean();
   console.log(`Total classes for SPIS: ${classes.length}\n`);
 
-  // Identify ghosts
-  const ghosts = classes.filter(c => ORDINAL_RE.test((c.grade || '').trim()));
+  // Identify ghosts: classes whose NAME matches the ordinal pattern ("1ST",
+  // "2ND", ..., "8TH"). The broken importer auto-created these with
+  // name=row.currentClass; their grade field still ended up numeric, so
+  // detection has to be on `name`, not `grade`.
+  const ghosts = classes.filter(c => ORDINAL_RE.test((c.name || '').trim()));
   if (ghosts.length === 0) {
-    console.log('No ghost ordinal-graded classes found. Nothing to do.');
+    console.log('No ghost ordinal-named classes found. Nothing to do.');
     process.exit(0);
   }
 
@@ -64,15 +67,19 @@ async function run() {
   });
   console.log('');
 
-  // Build canonical lookup keyed by numeric grade string
+  // Build canonical lookup keyed by numeric grade. Canonical = same grade,
+  // not a ghost (name doesn't match the ordinal pattern). If multiple
+  // canonicals exist for a grade, prefer the OLDEST (the one created
+  // manually before any import noise).
+  const ghostIds = new Set(ghosts.map(g => g._id.toString()));
   const canonicalByGrade = new Map();
   classes
+    .filter(c => !ghostIds.has(c._id.toString()))
     .filter(c => /^\d+$/.test((c.grade || '').trim()))
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
     .forEach(c => {
-      // First-wins by createdAt? They're already in insertion order from the DB.
-      // If multiple canonicals exist, prefer the one with the most students.
-      const existing = canonicalByGrade.get(c.grade.trim());
-      if (!existing) canonicalByGrade.set(c.grade.trim(), c);
+      const g = c.grade.trim();
+      if (!canonicalByGrade.has(g)) canonicalByGrade.set(g, c);
     });
 
   console.log('=== CANONICAL CLASSES BY GRADE ===');
@@ -82,13 +89,10 @@ async function run() {
   console.log('');
 
   // Refuse if any ghost lacks a canonical match — bail without deleting anything
-  const orphanGhosts = ghosts.filter(g => {
-    const numeric = g.grade.match(ORDINAL_RE)[1];
-    return !canonicalByGrade.has(numeric);
-  });
+  const orphanGhosts = ghosts.filter(g => !canonicalByGrade.has((g.grade || '').trim()));
   if (orphanGhosts.length > 0) {
-    console.error('ABORT: ghost classes have no canonical numeric counterpart:');
-    orphanGhosts.forEach(g => console.error(`  ${g._id} grade="${g.grade}"`));
+    console.error('ABORT: ghost classes have no canonical numeric-grade counterpart:');
+    orphanGhosts.forEach(g => console.error(`  ${g._id} name="${g.name}" grade="${g.grade}"`));
     console.error('Manual review required. No changes made.');
     process.exit(1);
   }
@@ -106,8 +110,7 @@ async function run() {
   };
 
   for (const ghost of ghosts) {
-    const numeric = ghost.grade.match(ORDINAL_RE)[1];
-    const canonical = canonicalByGrade.get(numeric);
+    const canonical = canonicalByGrade.get((ghost.grade || '').trim());
     console.log(`-- Ghost ${ghost._id} ("${ghost.name}") → canonical ${canonical._id} ("${canonical.name}")`);
 
     // Pull ghost sections + canonical sections
