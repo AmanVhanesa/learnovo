@@ -127,15 +127,7 @@ const FeesFinance = () => {
     enabled: !!activeSession && activeTab === 'defaulters',
   })
 
-  const { data: collectionReport } = useQuery({
-    queryKey: ['fees-collection-report'],
-    queryFn: async () => {
-      const endDate = new Date(); const startDate = new Date(); startDate.setDate(1)
-      const res = await feesReportsService.getCollectionReport({ startDate: startDate.toISOString().split('T')[0], endDate: endDate.toISOString().split('T')[0] })
-      return res.data
-    },
-    enabled: !!activeSession && activeTab === 'reports',
-  })
+  // Collection report query removed — ReportsTab now fetches its own data via getCollectionSummary
 
   const { data: allReceipts = [], isLoading: receiptsLoading } = useQuery({
     queryKey: ['fees-receipts', receiptFilters.paymentMethod, receiptFilters.startDate, receiptFilters.endDate, receiptFilters.search],
@@ -311,32 +303,7 @@ const FeesFinance = () => {
     }
   }
 
-  const handleExportCollectionReport = async (fmt) => {
-    const toastId = toast.loading(`Exporting ${fmt.toUpperCase()}...`)
-    try {
-      const endDate = new Date()
-      const startDate = new Date()
-      startDate.setDate(1)
-      const blob = await feesReportsService.exportCollectionReport({
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
-        format: fmt
-      })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `collection_report_${new Date().toISOString().split('T')[0]}.${fmt === 'excel' ? 'xlsx' : 'csv'}`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      toast.dismiss(toastId)
-      toast.success('Exported successfully')
-    } catch {
-      toast.dismiss(toastId)
-      toast.error('Failed to export collection report')
-    }
-  }
+  // Collection report export moved into ReportsTab component
 
   // ── Early returns ──
 
@@ -393,7 +360,7 @@ const FeesFinance = () => {
         {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} />}
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
-        {activeTab === 'reports' && collectionReport && <ReportsTab report={collectionReport} onExport={handleExportCollectionReport} />}
+        {activeTab === 'reports' && <ReportsTab activeSession={activeSession} />}
         {activeTab === 'importFees' && <ImportFeesTab onImport={() => setShowFeeImportModal(true)} />}
       </div>
 
@@ -1145,27 +1112,307 @@ const DisputesTab = ({ data, loading, resolvingDispute, resolveForm, onSetResolv
 
 // ── Reports Tab ──
 
-const ReportsTab = ({ report, onExport }) => (
-  <div className="card p-4 sm:p-6">
-    <div className="flex items-center justify-between mb-6">
-      <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Collection Report (This Month)</h3>
-      <div className="relative group">
-        <button className="btn btn-outline btn-sm flex items-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
-        <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-10 hidden group-hover:block">
-          <button onClick={() => onExport('csv')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
-          <button onClick={() => onExport('excel')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Online']
+const PERIOD_OPTIONS = [
+  { id: 'today', label: 'Today' },
+  { id: 'weekly', label: 'This Week' },
+  { id: 'monthly', label: 'This Month' },
+]
+
+const METHOD_COLORS = {
+  Cash: { bg: 'bg-amber-50 dark:bg-amber-900/20', border: 'border-amber-300 dark:border-amber-700/40', text: 'text-amber-800 dark:text-amber-300', value: 'text-amber-700 dark:text-amber-400', ring: 'ring-amber-400/30' },
+  UPI: { bg: 'bg-purple-50 dark:bg-purple-900/20', border: 'border-purple-200 dark:border-purple-800/30', text: 'text-purple-800 dark:text-purple-300', value: 'text-purple-700 dark:text-purple-400', ring: '' },
+  'Bank Transfer': { bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-200 dark:border-blue-800/30', text: 'text-blue-800 dark:text-blue-300', value: 'text-blue-700 dark:text-blue-400', ring: '' },
+  Cheque: { bg: 'bg-cyan-50 dark:bg-cyan-900/20', border: 'border-cyan-200 dark:border-cyan-800/30', text: 'text-cyan-800 dark:text-cyan-300', value: 'text-cyan-700 dark:text-cyan-400', ring: '' },
+  Card: { bg: 'bg-pink-50 dark:bg-pink-900/20', border: 'border-pink-200 dark:border-pink-800/30', text: 'text-pink-800 dark:text-pink-300', value: 'text-pink-700 dark:text-pink-400', ring: '' },
+  Online: { bg: 'bg-indigo-50 dark:bg-indigo-900/20', border: 'border-indigo-200 dark:border-indigo-800/30', text: 'text-indigo-800 dark:text-indigo-300', value: 'text-indigo-700 dark:text-indigo-400', ring: '' },
+}
+const DEFAULT_METHOD_COLOR = { bg: 'bg-gray-50 dark:bg-[#2C2C2E]', border: 'border-gray-200 dark:border-[#38383A]', text: 'text-gray-800 dark:text-[#8E8E93]', value: 'text-gray-700 dark:text-gray-400', ring: '' }
+
+const ReportsTab = ({ activeSession }) => {
+  const [period, setPeriod] = useState('today')
+  const [methodFilter, setMethodFilter] = useState('')
+  const [showExportMenu, setShowExportMenu] = useState(false)
+
+  const { data: summaryData, isLoading } = useQuery({
+    queryKey: ['fees-collection-summary', period, methodFilter, activeSession?._id],
+    queryFn: async () => {
+      const res = await feesReportsService.getCollectionSummary({ period, paymentMethod: methodFilter || undefined, academicSessionId: activeSession?._id })
+      return res.data
+    },
+    enabled: !!activeSession,
+  })
+
+  const handleExport = async (fmt) => {
+    setShowExportMenu(false)
+    const toastId = toast.loading(`Exporting ${fmt.toUpperCase()}...`)
+    try {
+      const blob = await feesReportsService.exportCollectionSummary({ period, paymentMethod: methodFilter || undefined, format: fmt })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const periodSlug = period || 'monthly'
+      a.download = `collection_summary_${periodSlug}_${new Date().toISOString().split('T')[0]}.${fmt === 'excel' ? 'xlsx' : 'csv'}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.dismiss(toastId)
+      toast.success('Exported successfully')
+    } catch {
+      toast.dismiss(toastId)
+      toast.error('Failed to export')
+    }
+  }
+
+  const periodLabel = PERIOD_OPTIONS.find(p => p.id === period)?.label || 'This Month'
+
+  return (
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header with filters */}
+      <div className="card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Fee Collection Report</h3>
+          <div className="relative">
+            <button onClick={() => setShowExportMenu(!showExportMenu)} className="btn btn-outline btn-sm flex items-center gap-1">
+              <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
+            </button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-20">
+                  <button onClick={() => handleExport('csv')} className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
+                  <button onClick={() => handleExport('excel')} className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Period selector */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {PERIOD_OPTIONS.map(opt => (
+            <button key={opt.id} onClick={() => setPeriod(opt.id)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${period === opt.id ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Method filter */}
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setMethodFilter('')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${!methodFilter ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
+            All Methods
+          </button>
+          {PAYMENT_METHODS.map(m => {
+            const colors = METHOD_COLORS[m] || DEFAULT_METHOD_COLOR
+            return (
+              <button key={m} onClick={() => setMethodFilter(m)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${methodFilter === m ? `${colors.bg} ${colors.text} border ${colors.border} ${colors.ring ? `ring-2 ${colors.ring}` : ''}` : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
+                {m}
+              </button>
+            )
+          })}
         </div>
       </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><LoadingSpinner /></div>
+      ) : !summaryData ? (
+        <EmptyState icon={History} title="No data available" description="No collection data found for the selected period" />
+      ) : (
+        <>
+          {/* Grand Total Card */}
+          <div className="card p-5 sm:p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800/30">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-green-800 dark:text-green-300">Grand Total Collection ({periodLabel})</p>
+                <p className="text-3xl sm:text-4xl font-bold text-green-700 dark:text-green-400 mt-1">{formatCurrency(summaryData.summary?.grandTotal || 0)}</p>
+                <p className="text-sm text-green-600 dark:text-green-400/80 mt-1">{summaryData.summary?.totalCount || 0} payments &middot; Daily Avg: {formatCurrency(summaryData.summary?.dailyAverage || 0)}</p>
+              </div>
+              {methodFilter && (
+                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/60 dark:bg-white/10 text-sm font-medium text-green-800 dark:text-green-300 border border-green-300 dark:border-green-700/40">
+                  Filtered: {methodFilter}
+                  <button onClick={() => setMethodFilter('')} className="ml-1 hover:text-green-600"><X className="h-3.5 w-3.5" /></button>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Method-wise Breakdown Cards */}
+          {!methodFilter && summaryData.methodBreakdown?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Collection by Payment Method</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {summaryData.methodBreakdown.map(mb => {
+                  const colors = METHOD_COLORS[mb.method] || DEFAULT_METHOD_COLOR
+                  const isCash = mb.method === 'Cash'
+                  return (
+                    <div key={mb.method}
+                      className={`p-4 rounded-xl border ${colors.bg} ${colors.border} ${isCash ? `ring-2 ${colors.ring} shadow-md` : ''} transition-all hover:shadow-sm cursor-pointer`}
+                      onClick={() => setMethodFilter(mb.method)}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-sm font-semibold ${colors.text} flex items-center gap-1.5`}>
+                          {isCash && <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-amber-400/20 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold">$</span>}
+                          {mb.method}
+                        </span>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>{mb.percentage}%</span>
+                      </div>
+                      <p className={`text-xl font-bold ${colors.value}`}>{formatCurrency(mb.total)}</p>
+                      <p className={`text-xs mt-1 ${colors.text} opacity-80`}>{mb.count} payment{mb.count !== 1 ? 's' : ''}</p>
+                      {isCash && (
+                        <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700/30">
+                          <p className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 dark:text-amber-400">Cash Collection</p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Method-wise Summary Table */}
+          {!methodFilter && summaryData.methodBreakdown?.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-[#38383A]">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Method-wise Summary</h4>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full divide-y divide-gray-200 dark:divide-[#38383A]">
+                  <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
+                    <tr>
+                      {['Payment Method', 'Transactions', 'Amount', '% Share'].map(h => (
+                        <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
+                    {summaryData.methodBreakdown.map(mb => {
+                      const isCash = mb.method === 'Cash'
+                      return (
+                        <tr key={mb.method} className={`${isCash ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''} hover:bg-gray-50 dark:hover:bg-[#2C2C2E]`}>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className={`text-sm font-medium ${isCash ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white'} flex items-center gap-2`}>
+                              {isCash && <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />}
+                              {mb.method}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{mb.count}</td>
+                          <td className={`px-5 py-3.5 whitespace-nowrap text-sm font-semibold ${isCash ? 'text-amber-700 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(mb.total)}</td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 h-1.5 bg-gray-200 dark:bg-[#38383A] rounded-full overflow-hidden">
+                                <div className={`h-full rounded-full ${isCash ? 'bg-amber-400' : 'bg-green-400'}`} style={{ width: `${Math.min(100, mb.percentage)}%` }} />
+                              </div>
+                              <span className="text-xs text-gray-500 dark:text-[#8E8E93]">{mb.percentage}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {/* Grand Total Row */}
+                    <tr className="bg-gray-100 dark:bg-[#2C2C2E] font-bold">
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-900 dark:text-white">Grand Total</td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-900 dark:text-white">{summaryData.summary?.totalCount || 0}</td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-green-700 dark:text-green-400">{formatCurrency(summaryData.summary?.grandTotal || 0)}</td>
+                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-900 dark:text-white">100%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Day-wise Collection Table */}
+          {summaryData.byDate?.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-[#38383A]">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Day-wise Collection</h4>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[500px] divide-y divide-gray-200 dark:divide-[#38383A]">
+                  <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
+                    <tr>
+                      {['Date', 'Transactions', 'Amount'].map(h => (
+                        <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
+                    {summaryData.byDate.map(d => {
+                      const isToday = d.date === new Date().toISOString().split('T')[0]
+                      return (
+                        <tr key={d.date} className={`${isToday ? 'bg-green-50/50 dark:bg-green-900/10' : ''} hover:bg-gray-50 dark:hover:bg-[#2C2C2E]`}>
+                          <td className="px-5 py-3.5 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                            {new Date(d.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
+                            {isToday && <span className="ml-2 text-[10px] uppercase font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">Today</span>}
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{d.count}</td>
+                          <td className="px-5 py-3.5 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(d.total)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Transactions */}
+          {summaryData.payments?.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-[#38383A]">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Recent Transactions ({periodLabel})</h4>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] divide-y divide-gray-200 dark:divide-[#38383A]">
+                  <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
+                    <tr>
+                      {['Receipt', 'Student', 'Class', 'Amount', 'Method', 'Date', 'Collected By'].map(h => (
+                        <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
+                    {summaryData.payments.map(p => {
+                      const isCash = p.paymentMethod === 'Cash'
+                      return (
+                        <tr key={p._id} className={`${isCash ? 'bg-amber-50/30 dark:bg-amber-900/5' : ''} hover:bg-gray-50 dark:hover:bg-[#2C2C2E]`}>
+                          <td className="px-4 py-3 whitespace-nowrap text-xs font-mono text-gray-600 dark:text-[#8E8E93]">{p.receiptNumber}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{p.studentId?.fullName || p.studentId?.name || 'N/A'}</div>
+                            <div className="text-xs text-gray-500 dark:text-[#8E8E93]">{p.studentId?.admissionNumber || ''}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{p.studentId?.classId?.name || '-'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(p.amount)}</td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isCash ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 ring-1 ring-amber-300/40' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93]'}`}>
+                              {isCash && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
+                              {p.paymentMethod}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '-'}</td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{p.collectedBy?.name || '-'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Empty state when no payments */}
+          {(!summaryData.payments || summaryData.payments.length === 0) && (!summaryData.methodBreakdown || summaryData.methodBreakdown.length === 0) && (
+            <EmptyState icon={DollarSign} title="No collections found" description={`No fee payments collected ${periodLabel.toLowerCase()}`} />
+          )}
+        </>
+      )}
     </div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-      <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800/30 rounded-xl"><p className="text-sm font-medium text-green-900 dark:text-green-300">Total Collected</p><p className="text-2xl font-bold text-green-700 dark:text-green-400 mt-2">{formatCurrency(report.summary.totalAmount)}</p><p className="text-sm text-green-600 dark:text-green-400/80 mt-1">{report.summary.totalCount} payments</p></div>
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-xl"><p className="text-sm font-medium text-blue-900 dark:text-blue-300">Daily Average</p><p className="text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">{formatCurrency(report.summary.totalAmount / (report.byDate?.length || 1))}</p></div>
-    </div>
-    {report.byDate?.length > 0 && (
-      <div className="overflow-x-auto"><table className="w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]"><thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Date', 'Collections', 'Amount'].map(h => <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">{h}</th>)}</tr></thead><tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">{report.byDate.map(d => <tr key={d.date} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{new Date(d.date).toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{d.count}</td><td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(d.amount)}</td></tr>)}</tbody></table></div>
-    )}
-  </div>
-)
+  )
+}
 
 // ── Refunds Tab ──
 

@@ -673,4 +673,264 @@ router.get('/collection-report/export', protect, authorize('admin', 'accountant'
   }
 });
 
+// @desc    Get fee collection summary with method-wise breakdown
+// @route   GET /api/fees/collection-summary
+// @access  Private (Admin, Accountant)
+router.get('/collection-summary', protect, authorize('admin', 'accountant'), async(req, res) => {
+  try {
+    const { period, paymentMethod, academicSessionId } = req.query;
+    const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
+
+    // Calculate date range based on period
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
+    let startDate;
+
+    switch (period) {
+    case 'today':
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case 'weekly': {
+      startDate = new Date(now);
+      const dayOfWeek = startDate.getDay();
+      const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday as start
+      startDate.setDate(startDate.getDate() - diff);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    }
+    case 'monthly':
+    default:
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    }
+
+    const filter = {
+      tenantId,
+      isConfirmed: true,
+      isReversed: false,
+      paymentDate: { $gte: startDate, $lte: endDate }
+    };
+
+    if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
+
+    // Method-wise breakdown aggregation
+    const methodBreakdown = await Payment.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$paymentMethod',
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { total: -1 } }
+    ]);
+
+    // Date-wise breakdown
+    const dateBreakdown = await Payment.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$paymentDate' } },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: -1 } }
+    ]);
+
+    // Date + method breakdown (for detailed table)
+    const dateMethodBreakdown = await Payment.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$paymentDate' } },
+            method: '$paymentMethod'
+          },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.date': -1, '_id.method': 1 } }
+    ]);
+
+    // Get transaction list (paginated)
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 100));
+    const skip = (page - 1) * limit;
+
+    const payments = await Payment.find(filter)
+      .populate('studentId', 'name fullName admissionNumber studentId classId')
+      .populate({ path: 'studentId', populate: { path: 'classId', select: 'name' } })
+      .populate('invoiceId', 'invoiceNumber')
+      .populate('collectedBy', 'name')
+      .sort({ paymentDate: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Totals
+    const grandTotal = sumMoney(methodBreakdown.map(m => m.total));
+    const totalCount = methodBreakdown.reduce((sum, m) => sum + m.count, 0);
+
+    res.json({
+      success: true,
+      data: {
+        period: period || 'monthly',
+        dateRange: { startDate, endDate },
+        summary: {
+          grandTotal,
+          totalCount,
+          dailyAverage: roundToRupee(grandTotal / (dateBreakdown.length || 1))
+        },
+        methodBreakdown: methodBreakdown.map(m => ({
+          method: m._id,
+          total: roundToRupee(m.total),
+          count: m.count,
+          percentage: grandTotal > 0 ? roundToRupee((m.total / grandTotal) * 100) : 0
+        })),
+        byDate: dateBreakdown.map(d => ({
+          date: d._id,
+          total: roundToRupee(d.total),
+          count: d.count
+        })),
+        dateMethodBreakdown: dateMethodBreakdown.map(d => ({
+          date: d._id.date,
+          method: d._id.method,
+          total: roundToRupee(d.total),
+          count: d.count
+        })),
+        payments
+      }
+    });
+  } catch (error) {
+    logger.error('Collection summary error', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching collection summary'
+    });
+  }
+});
+
+// @desc    Export fee collection summary with method-wise breakdown
+// @route   GET /api/fees/collection-summary/export
+// @access  Private (Admin, Accountant)
+router.get('/collection-summary/export', protect, authorize('admin', 'accountant'), async(req, res) => {
+  try {
+    const { period, paymentMethod, format: fmt } = req.query;
+    const tenantId = req.user.tenantId;
+
+    // Calculate date range
+    const now = new Date();
+    const endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
+    let startDate;
+
+    switch (period) {
+    case 'today':
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case 'weekly': {
+      startDate = new Date(now);
+      const dayOfWeek = startDate.getDay();
+      const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      startDate.setDate(startDate.getDate() - diff);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    }
+    case 'monthly':
+    default:
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    }
+
+    const filter = {
+      tenantId,
+      isConfirmed: true,
+      isReversed: false,
+      paymentDate: { $gte: startDate, $lte: endDate }
+    };
+    if (paymentMethod) filter.paymentMethod = paymentMethod;
+
+    const payments = await Payment.find(filter)
+      .populate('studentId', 'name fullName admissionNumber studentId classId')
+      .populate({ path: 'studentId', populate: { path: 'classId', select: 'name' } })
+      .populate('invoiceId', 'invoiceNumber')
+      .populate('collectedBy', 'name')
+      .sort({ paymentDate: -1 })
+      .lean();
+
+    // Method-wise totals for summary rows
+    const methodTotals = {};
+    payments.forEach(p => {
+      const m = p.paymentMethod || 'Unknown';
+      if (!methodTotals[m]) methodTotals[m] = { count: 0, total: 0 };
+      methodTotals[m].count += 1;
+      methodTotals[m].total += toNumber(p.amount);
+    });
+
+    const columns = [
+      { key: 'receiptNumber', header: 'Receipt No.' },
+      { key: 'studentId.admissionNumber', header: 'Admission No.' },
+      { key: 'studentName', header: 'Student Name', format: (v) => v || 'N/A' },
+      { key: 'className', header: 'Class', format: (v) => v || '-' },
+      { key: 'invoiceId.invoiceNumber', header: 'Invoice No.' },
+      { key: 'amount', header: 'Amount', format: (v) => (v != null ? Number(v).toFixed(2) : '0.00') },
+      { key: 'paymentMethod', header: 'Payment Method' },
+      { key: 'paymentDate', header: 'Payment Date', format: (v) => (v ? new Date(v).toLocaleDateString('en-IN') : '') },
+      { key: 'collectedBy.name', header: 'Collected By', format: (v) => v || '-' }
+    ];
+
+    const data = payments.map(p => ({
+      ...p,
+      studentName: p.studentId?.fullName || p.studentId?.name || 'N/A',
+      className: p.studentId?.classId?.name || '-'
+    }));
+
+    // Add summary rows at the end
+    const grandTotal = sumMoney(payments.map(p => p.amount));
+    data.push({ receiptNumber: '', studentName: '', className: '', amount: null, paymentMethod: '', paymentDate: '', 'collectedBy.name': '' });
+    data.push({ receiptNumber: '--- METHOD-WISE SUMMARY ---', studentName: '', className: '', amount: null, paymentMethod: '', paymentDate: '' });
+    Object.entries(methodTotals).forEach(([method, info]) => {
+      data.push({ receiptNumber: method, studentName: `${info.count} payments`, className: '', amount: roundToRupee(info.total), paymentMethod: '', paymentDate: '' });
+    });
+    data.push({ receiptNumber: 'GRAND TOTAL', studentName: `${payments.length} payments`, className: '', amount: roundToRupee(grandTotal), paymentMethod: '', paymentDate: '' });
+
+    const periodLabel = period === 'today' ? 'Today' : period === 'weekly' ? 'This Week' : 'This Month';
+    const methodLabel = paymentMethod ? ` - ${paymentMethod}` : ' - All Methods';
+    const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, `Fee Collection Summary (${periodLabel}${methodLabel})`);
+
+    const today = new Date().toISOString().split('T')[0];
+    let buffer, contentType, ext;
+
+    if (fmt === 'excel') {
+      buffer = ImportExportService.exportToExcel(data, columns, 'Collection Summary', headerInfo);
+      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      ext = 'xlsx';
+    } else {
+      buffer = await ImportExportService.exportToCSV(data, columns, headerInfo);
+      contentType = 'text/csv';
+      ext = 'csv';
+    }
+
+    const periodSlug = period || 'monthly';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename=collection_summary_${periodSlug}_${today}.${ext}`);
+    res.status(200).send(buffer);
+  } catch (error) {
+    logger.error('Collection summary export error', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while exporting collection summary'
+    });
+  }
+});
+
 module.exports = router;

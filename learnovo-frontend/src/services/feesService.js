@@ -289,6 +289,28 @@ export const feesReportsService = {
     const url = `/fees/collection-report/export${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url, { responseType: 'blob' })
     return res.data
+  },
+
+  getCollectionSummary: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.period) params.append('period', filters.period)
+    if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
+
+    const url = `/fees/collection-summary${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url)
+    return res.data
+  },
+
+  exportCollectionSummary: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.period) params.append('period', filters.period)
+    if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
+    params.append('format', filters.format || 'excel')
+
+    const url = `/fees/collection-summary/export${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url, { responseType: 'blob' })
+    return res.data
   }
 }
 
