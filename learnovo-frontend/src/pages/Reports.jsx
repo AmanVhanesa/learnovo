@@ -47,7 +47,7 @@ const MiniBar = ({ label, value, max, color }) => (
     <div className="flex-1 bg-gray-100 dark:bg-[#2C2C2E] rounded-full h-2">
       <div className={`h-2 rounded-full transition-all duration-500 ${color}`} style={{ width: `${max > 0 ? Math.min(100, (value / max) * 100) : 0}%` }} />
     </div>
-    <span className="text-xs font-semibold text-gray-700 dark:text-[#8E8E93] w-10 text-right">{fmtNum(value)}</span>
+    <span className="text-xs font-semibold text-gray-700 dark:text-[#8E8E93] min-w-[4rem] text-right whitespace-nowrap">{fmtNum(value)}</span>
   </div>
 )
 
@@ -338,10 +338,10 @@ const Reports = () => {
                   <MiniBar label="Pending" value={fees.pending} max={fees.total} color="bg-yellow-400" />
                   <MiniBar label="Overdue" value={fees.overdue} max={fees.total} color="bg-red-500" />
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3 text-center">
                   {[{ label: 'Collected', val: fmt(fees.paid), color: 'text-green-600 dark:text-green-400' }, { label: 'Pending', val: fmt(fees.pending), color: 'text-yellow-600 dark:text-yellow-400' }, { label: 'Overdue', val: fmt(fees.overdue), color: 'text-red-600 dark:text-red-400' }].map(s => (
-                    <div key={s.label} className="bg-gray-50 dark:bg-[#2C2C2E] rounded-lg p-3">
-                      <p className={`text-sm font-bold ${s.color}`}>{s.val}</p>
+                    <div key={s.label} className="bg-gray-50 dark:bg-[#2C2C2E] rounded-lg p-2 sm:p-3 min-w-0 overflow-hidden">
+                      <p className={`text-xs sm:text-sm font-bold ${s.color} truncate`}>{s.val}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
                     </div>
                   ))}
