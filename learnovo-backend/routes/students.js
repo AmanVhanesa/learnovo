@@ -834,20 +834,24 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
     const Class = require('../models/Class');
     const Section = require('../models/Section');
 
-    // Scope class lookup to the tenant's active academic session. Without this,
-    // tenants with duplicate class names from prior years (e.g. an old "1st"
-    // alongside the current "1st") would have rows resolve to a stale classId
-    // and the imported students would be invisible on the current Academics page.
+    // Resolve the tenant's active academic session so any auto-created classes
+    // are stamped with the correct year. The active session may use a different
+    // naming convention than Class.academicYear (e.g. "2026-2027" vs "2026"),
+    // so we don't filter classes by it — that would risk matching nothing.
     const activeSession = await AcademicSession.findOne({ tenantId, isActive: true }).lean();
-    if (!activeSession) {
-      return res.status(400).json({
-        success: false,
-        message: 'No active academic session found. Activate one before importing students.'
-      });
-    }
-    const activeYear = activeSession.name;
+    const activeYear = activeSession?.name
+      || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
 
-    let allClasses = await Class.find({ tenantId, academicYear: activeYear }).select('_id name grade').lean();
+    // Sort by createdAt DESC so when duplicate class names exist (e.g. an old
+    // "1st" left behind from a prior academic year sitting next to the current
+    // "1st"), the FIRST hit on a name lookup is the most recently created
+    // class — i.e. the current year's class. Without this sort, prior-year
+    // duplicates can shadow current-year classes and imported students end
+    // up with a stale classId, invisible on the current Academics page.
+    let allClasses = await Class.find({ tenantId })
+      .select('_id name grade createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
     const allDrivers = await Driver.find({ tenantId, isActive: true }).select('_id name').lean();
     const driverCache = new Map(allDrivers.map(d => [d.name.toLowerCase().trim(), d]));
 
@@ -861,11 +865,20 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       }
     }
 
-    // Build a lookup of existing classes (lowercase name/grade → doc)
+    // Build a lookup of existing classes (lowercase name/grade → doc).
+    // allClasses is sorted createdAt DESC, so the first occurrence of any name
+    // is the most recently created (current-year) class. Skip subsequent
+    // duplicates so prior-year leftovers can't overwrite the current entry.
     const existingClassLookup = new Map();
     allClasses.forEach(c => {
-      if (c.name) existingClassLookup.set(c.name.toLowerCase(), c);
-      if (c.grade) existingClassLookup.set(c.grade.toLowerCase(), c);
+      if (c.name) {
+        const k = c.name.toLowerCase();
+        if (!existingClassLookup.has(k)) existingClassLookup.set(k, c);
+      }
+      if (c.grade) {
+        const k = c.grade.toLowerCase();
+        if (!existingClassLookup.has(k)) existingClassLookup.set(k, c);
+      }
     });
 
     const classesToCreate = [];
@@ -900,30 +913,42 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       try {
         const created = await Class.insertMany(classesToCreate, { ordered: false });
         logger.info(`Import: auto-created ${created.length} missing classes`, { requestId: req.requestId, tenantId: req.user?.tenantId });
-        // Refresh — still scoped to the active session
-        allClasses = await Class.find({ tenantId, academicYear: activeYear }).select('_id name grade').lean();
+        // Refresh, preserving createdAt-DESC ordering
+        allClasses = await Class.find({ tenantId })
+          .select('_id name grade createdAt')
+          .sort({ createdAt: -1 })
+          .lean();
       } catch (classErr) {
         // Partial success is fine — re-fetch everything
         logger.warn('Import: class auto-create partial error', { requestId: req.requestId, tenantId: req.user?.tenantId, error: classErr.message });
-        allClasses = await Class.find({ tenantId, academicYear: activeYear }).select('_id name grade').lean();
+        allClasses = await Class.find({ tenantId })
+          .select('_id name grade createdAt')
+          .sort({ createdAt: -1 })
+          .lean();
       }
     }
 
     // ── Auto-create missing sections from import data ─────────────────────
-    // Build a classId lookup from the refreshed class list
+    // Build a classId lookup from the refreshed class list. Same first-wins
+    // semantics as existingClassLookup so the most recently created class
+    // wins on duplicate names.
     const classLookupByName = new Map();
     allClasses.forEach(c => {
-      if (c.name) classLookupByName.set(c.name.toLowerCase(), c);
-      if (c.grade) classLookupByName.set(c.grade.toLowerCase(), c);
+      if (c.name) {
+        const k = c.name.toLowerCase();
+        if (!classLookupByName.has(k)) classLookupByName.set(k, c);
+      }
+      if (c.grade) {
+        const k = c.grade.toLowerCase();
+        if (!classLookupByName.has(k)) classLookupByName.set(k, c);
+      }
     });
 
-    // Pre-fetch sections for current-year classes only (keyed by classId_sectionName)
-    const activeClassIds = allClasses.map(c => c._id);
-    let allSections = await Section.find({
-      tenantId,
-      isActive: true,
-      classId: { $in: activeClassIds }
-    }).select('_id name classId').lean();
+    // Pre-fetch all sections for this tenant (keyed by classId_sectionName).
+    // Stale-year sections may sit in the cache, but the per-row lookup uses
+    // the deduped class lookup so cacheKeys only ever resolve against current
+    // classes — old sections in the map are inert.
+    let allSections = await Section.find({ tenantId, isActive: true }).select('_id name classId').lean();
     const sectionCache = new Map();
     allSections.forEach(sec => {
       const key = `${sec.classId.toString()}_${sec.name.toUpperCase()}`;
@@ -982,12 +1007,8 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       } catch (secErr) {
         logger.warn('Import: section auto-create partial error', { requestId: req.requestId, tenantId: req.user?.tenantId, error: secErr.message });
       }
-      // Refresh sections cache (still scoped to current-year classes)
-      allSections = await Section.find({
-        tenantId,
-        isActive: true,
-        classId: { $in: activeClassIds }
-      }).select('_id name classId').lean();
+      // Refresh sections cache
+      allSections = await Section.find({ tenantId, isActive: true }).select('_id name classId').lean();
       sectionCache.clear();
       allSections.forEach(sec => {
         sectionCache.set(`${sec.classId.toString()}_${sec.name.toUpperCase()}`, sec);
