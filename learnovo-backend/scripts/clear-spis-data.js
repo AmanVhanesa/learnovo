@@ -33,16 +33,56 @@ const Notification = require('../models/Notification');
 let Receipt, PaymentAttempt, FeePaymentOrder, PaymentDispute, FeeAuditLog, PaymentAuditLog;
 let HomeworkSubmission, StudentClassHistory, StudentTransportAssignment, Family;
 
-try { Receipt = require('../models/Receipt'); } catch (e) { console.log('Receipt model not found, skipping'); }
-try { PaymentAttempt = require('../models/PaymentAttempt'); } catch (e) { console.log('PaymentAttempt model not found, skipping'); }
-try { FeePaymentOrder = require('../models/FeePaymentOrder'); } catch (e) { console.log('FeePaymentOrder model not found, skipping'); }
-try { PaymentDispute = require('../models/PaymentDispute'); } catch (e) { console.log('PaymentDispute model not found, skipping'); }
-try { FeeAuditLog = require('../models/FeeAuditLog'); } catch (e) { console.log('FeeAuditLog model not found, skipping'); }
-try { PaymentAuditLog = require('../models/PaymentAuditLog'); } catch (e) { console.log('PaymentAuditLog model not found, skipping'); }
-try { HomeworkSubmission = require('../models/HomeworkSubmission'); } catch (e) { console.log('HomeworkSubmission model not found, skipping'); }
-try { StudentClassHistory = require('../models/StudentClassHistory'); } catch (e) { console.log('StudentClassHistory model not found, skipping'); }
-try { StudentTransportAssignment = require('../models/StudentTransportAssignment'); } catch (e) { console.log('StudentTransportAssignment model not found, skipping'); }
-try { Family = require('../models/Family'); } catch (e) { console.log('Family model not found, skipping'); }
+try {
+  Receipt = require('../models/Receipt');
+} catch (e) {
+  console.log('Receipt model not found, skipping');
+}
+try {
+  PaymentAttempt = require('../models/PaymentAttempt');
+} catch (e) {
+  console.log('PaymentAttempt model not found, skipping');
+}
+try {
+  FeePaymentOrder = require('../models/FeePaymentOrder');
+} catch (e) {
+  console.log('FeePaymentOrder model not found, skipping');
+}
+try {
+  PaymentDispute = require('../models/PaymentDispute');
+} catch (e) {
+  console.log('PaymentDispute model not found, skipping');
+}
+try {
+  FeeAuditLog = require('../models/FeeAuditLog');
+} catch (e) {
+  console.log('FeeAuditLog model not found, skipping');
+}
+try {
+  PaymentAuditLog = require('../models/PaymentAuditLog');
+} catch (e) {
+  console.log('PaymentAuditLog model not found, skipping');
+}
+try {
+  HomeworkSubmission = require('../models/HomeworkSubmission');
+} catch (e) {
+  console.log('HomeworkSubmission model not found, skipping');
+}
+try {
+  StudentClassHistory = require('../models/StudentClassHistory');
+} catch (e) {
+  console.log('StudentClassHistory model not found, skipping');
+}
+try {
+  StudentTransportAssignment = require('../models/StudentTransportAssignment');
+} catch (e) {
+  console.log('StudentTransportAssignment model not found, skipping');
+}
+try {
+  Family = require('../models/Family');
+} catch (e) {
+  console.log('Family model not found, skipping');
+}
 
 async function clearSpisData() {
   try {
@@ -207,7 +247,7 @@ async function clearSpisData() {
     // Step 6: Verify no non-student users were affected
     const remainingEmployees = await User.countDocuments({ tenantId, role: { $ne: 'student' } });
     const remainingStudents = await User.countDocuments({ tenantId, role: 'student' });
-    console.log(`\n=== VERIFICATION ===`);
+    console.log('\n=== VERIFICATION ===');
     console.log(`  Remaining employees/staff: ${remainingEmployees} (should be ${employeeCount})`);
     console.log(`  Remaining students: ${remainingStudents} (should be 0)`);
 
