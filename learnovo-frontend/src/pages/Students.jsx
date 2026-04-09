@@ -8,7 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import StudentForm from '../components/students/StudentForm'
 import ImportModal from '../components/ImportModal'
 import DeactivateStudentModal from '../components/students/DeactivateStudentModal'
-import { exportPDF, exportExcel } from '../utils/exportHelpers'
+import { exportPDF, exportReport } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 import { useSettings } from '../contexts/SettingsContext'
 
@@ -492,9 +492,11 @@ const Students = () => {
       if (selectedFormat === 'pdf') {
         await exportPDF(`students_export_${dateStr}.pdf`, json.headers, json.rows, settings?.institution)
       } else {
-        // Excel: build rows array with headers as first row
-        const excelRows = [json.headers, ...json.rows]
-        exportExcel(`students_export_${dateStr}.xlsx`, excelRows, 'Students')
+        exportReport(`students_export_${dateStr}.xlsx`, {
+          schoolName: settings?.institution?.name,
+          reportTitle: 'Student List',
+          headers: json.headers, rows: json.rows, sheetName: 'Students',
+        })
       }
       toast.success(`${selectedFormat.toUpperCase()} downloaded!`, { id: exportId })
     } catch (err) {

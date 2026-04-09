@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { XCircle, Phone, Download, Users, ChevronDown } from 'lucide-react'
 import DatePicker from '../../components/ui/DatePicker'
 import { attendanceService } from '../../services/attendanceService'
+import { exportReport } from '../../utils/exportHelpers'
+import { useSettings } from '../../contexts/SettingsContext'
 import toast from 'react-hot-toast'
 
 const Absentees = () => {
+  const { settings } = useSettings()
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [activeTab, setActiveTab] = useState('students')
   const [absenteeData, setAbsenteeData] = useState({ absentees: [], grouped: [], totalAbsent: 0 })
@@ -40,18 +43,17 @@ const Absentees = () => {
     }
   }
 
-  const exportCSV = () => {
-    const rows = absenteeData.absentees.map((a, i) =>
-      `${i + 1},"${a.studentName || ''}","${a.admissionNumber || ''}","${a.class || ''} - ${a.section || ''}","${a.phone || ''}"`
-    )
-    const csv = 'S.No,Student Name,Admission No,Class-Section,Parent Phone\n' + rows.join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `absentees_${selectedDate}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+  const handleExport = () => {
+    const headers = ['S.No', 'Student Name', 'Admission No', 'Class-Section', 'Parent Phone']
+    const rows = absenteeData.absentees.map((a, i) => [
+      i + 1, a.studentName || '', a.admissionNumber || '', `${a.class || ''} - ${a.section || ''}`, a.phone || ''
+    ])
+    exportReport(`absentees_${selectedDate}.xlsx`, {
+      schoolName: settings?.institution?.name,
+      reportTitle: `Absentees — ${new Date(selectedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+      headers, rows, sheetName: 'Absentees',
+      summary: [{ label: 'Total Absent', value: absenteeData.totalAbsent }],
+    })
     toast.success('Exported successfully')
   }
 
@@ -70,7 +72,7 @@ const Absentees = () => {
             className="w-auto min-w-[160px]"
           />
           {activeTab === 'students' && absenteeData.absentees.length > 0 && (
-            <button onClick={exportCSV} className="btn btn-outline">
+            <button onClick={handleExport} className="btn btn-outline">
               <Download className="h-4 w-4 mr-2" /> Export
             </button>
           )}

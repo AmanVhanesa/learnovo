@@ -149,9 +149,9 @@ const Reports = () => {
         Action: a.action || '',
       })))
       exportReport(`activity_report_${todayStr}.xlsx`, {
-        schoolData: settings?.institution,
+        schoolName: settings?.institution?.name,
         reportTitle: 'Activity Report',
-        dateRange: `${fmtDate(filters.startDate)} — ${fmtDate(filters.endDate)}`,
+
         headers, rows, sheetName: 'Activities',
         summary: [{ label: 'Total Activities', value: allActivities.length }],
       })
@@ -182,7 +182,7 @@ const Reports = () => {
     const { headers, rows } = objsToAoa(mapped)
     const avgPct = mapped.length > 0 ? (mapped.reduce((s, r) => s + parseFloat(r['Attendance %']), 0) / mapped.length).toFixed(1) : '0.0'
     exportReport(`attendance_report_${filters.startDate}_to_${filters.endDate}.xlsx`, {
-      schoolData: settings?.institution,
+      schoolName: settings?.institution?.name,
       reportTitle: 'Attendance Report',
       dateRange: `${fmtDate(filters.startDate)} — ${fmtDate(filters.endDate)}`,
       headers, rows, sheetName: 'Attendance',
@@ -227,7 +227,7 @@ const Reports = () => {
       })))
       const activeCount = sorted.filter(s => s.isActive).length
       exportReport(`enrollment_report_${todayStr}.xlsx`, {
-        schoolData: settings?.institution,
+        schoolName: settings?.institution?.name,
         reportTitle: 'Student Enrollment Report',
         headers, rows, sheetName: 'Enrollment',
         summary: [
@@ -267,7 +267,7 @@ const Reports = () => {
       const paidAmt = invoices.reduce((s, i) => s + (i.paidAmount || 0), 0)
       const balanceAmt = invoices.reduce((s, i) => s + (i.balanceAmount || 0), 0)
       exportReport(`fee_detailed_report_${todayStr}.xlsx`, {
-        schoolData: settings?.institution,
+        schoolName: settings?.institution?.name,
         reportTitle: 'Fee Collection Report',
         headers, rows, sheetName: 'Fee Collection',
         summary: [
@@ -285,7 +285,7 @@ const Reports = () => {
   const exportOverview = () => {
     if (!dashboard) return
     exportReport(`school_overview_report_${todayStr}.xlsx`, {
-      schoolData: settings?.institution,
+      schoolName: settings?.institution?.name,
       reportTitle: 'School Overview Report',
       headers: ['Category', 'Metric', 'Value'],
       sheetName: 'Overview',

@@ -7,13 +7,13 @@ import { useSettings } from '../contexts/SettingsContext'
 import { useAuth } from '../contexts/AuthContext'
 import { feesService } from '../services/feesService'
 import { studentsService } from '../services/studentsService'
-import { exportCSV } from '../utils/exportHelpers'
+import { exportReport } from '../utils/exportHelpers'
 import { formatDate } from '../utils/formatDate'
 import toast from 'react-hot-toast'
 import { sortByRelevance } from '../utils/searchRelevance'
 
 const Fees = () => {
-  const { formatCurrency } = useSettings()
+  const { settings, formatCurrency } = useSettings()
   const { user } = useAuth()
 
   // Students and parents should use the Student Fees Dashboard (invoice-based)
@@ -435,9 +435,8 @@ const Fees = () => {
               className="btn btn-outline w-full sm:w-auto flex-shrink-0"
               onClick={() => {
                 if (filteredFees.length === 0) { toast.error('No fees to export'); return; }
-                const rows = [
-                  ['Student', 'Admission No', 'Class', 'Fee Type', 'Amount', 'Status', 'Due Date', 'Payment Method', 'Description']
-                ].concat(filteredFees.map(f => [
+                const headers = ['Student', 'Admission No', 'Class', 'Fee Type', 'Amount', 'Status', 'Due Date', 'Payment Method', 'Description']
+                const rows = filteredFees.map(f => [
                   f.student?.name || f.student?.fullName || '',
                   f.student?.admissionNumber || f.student?.studentId || '',
                   f.student?.class || '',
@@ -447,8 +446,12 @@ const Fees = () => {
                   f.dueDate ? formatDate(f.dueDate) : '',
                   f.paymentMethod || '',
                   f.description || ''
-                ]))
-                exportCSV('fees.csv', rows)
+                ])
+                exportReport(`fees_${new Date().toISOString().split('T')[0]}.xlsx`, {
+                  schoolName: settings?.institution?.name,
+                  reportTitle: 'Fee Records',
+                  headers, rows, sheetName: 'Fees',
+                })
                 toast.success('Fees exported successfully')
               }}
             >

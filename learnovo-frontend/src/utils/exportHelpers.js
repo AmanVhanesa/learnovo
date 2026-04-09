@@ -31,61 +31,39 @@ export const exportData = (baseFilename, rows, format = 'csv') => {
 }
 
 /**
- * Export a branded report as Excel with school header, report title, date, and optional summary.
+ * Export a branded report as Excel.
+ * Header is one line: "School Name — Report Title" then "Generated: date".
+ * Same simple format across all exports.
+ *
  * @param {string} filename - e.g. "overview_report_2026-04-09.xlsx"
  * @param {object} options
- * @param {object} options.schoolData - settings.institution (name, address, contact, board, etc.)
+ * @param {string} [options.schoolName] - School/institution name
  * @param {string} options.reportTitle - e.g. "Fee Collection Report"
- * @param {string} [options.dateRange] - e.g. "01 Apr 2026 — 09 Apr 2026"
  * @param {string[]} options.headers - Column header labels
  * @param {Array<string[]|number[]>} options.rows - 2D array of cell values
  * @param {Array<{label: string, value: string|number}>} [options.summary] - Summary key-value pairs shown below data
  * @param {string} [options.sheetName] - Sheet tab name (default: "Report")
  */
-export const exportReport = (filename, { schoolData, reportTitle, dateRange, headers, rows, summary, sheetName = 'Report' }) => {
+export const exportReport = (filename, { schoolName, reportTitle, headers, rows, summary, sheetName = 'Report' }) => {
   const aoa = [];
 
-  // School header rows
-  if (schoolData) {
-    aoa.push([schoolData.name || '']);
-    const addr = schoolData.address;
-    if (addr) {
-      const parts = [addr.street, addr.city, addr.state, addr.pincode].filter(Boolean);
-      if (parts.length) aoa.push([parts.join(', ')]);
-    }
-    const contact = schoolData.contact;
-    if (contact) {
-      const cParts = [];
-      if (contact.phone) cParts.push(`Phone: ${contact.phone}`);
-      if (contact.email) cParts.push(`Email: ${contact.email}`);
-      if (cParts.length) aoa.push([cParts.join(' | ')]);
-    }
-    const affParts = [];
-    if (schoolData.board) affParts.push(`Board: ${schoolData.board}`);
-    if (schoolData.affiliationNumber) affParts.push(`Affiliation No: ${schoolData.affiliationNumber}`);
-    if (schoolData.schoolCode) affParts.push(`School Code: ${schoolData.schoolCode}`);
-    if (affParts.length) aoa.push([affParts.join(' | ')]);
-    if (schoolData.udiseCode) aoa.push([`UDISE No: ${schoolData.udiseCode}`]);
-    aoa.push([]); // blank line after school header
-  }
+  // Row 1: "School Name — Report Title" in one line
+  const title = [schoolName, reportTitle].filter(Boolean).join(' — ')
+  aoa.push([title || 'Report']);
 
-  // Report title
-  if (reportTitle) aoa.push([reportTitle]);
-  if (dateRange) aoa.push([`Period: ${dateRange}`]);
+  // Row 2: Generated timestamp
   aoa.push([`Generated: ${new Date().toLocaleString('en-IN')}`]);
-  aoa.push([]); // blank line before data
 
-  // Data header row index (for bold styling)
-  const headerRowIdx = aoa.length;
+  // Blank row before data
+  aoa.push([]);
+
+  // Column headers + data rows
   aoa.push(headers);
-
-  // Data rows
   rows.forEach(r => aoa.push(r));
 
-  // Summary section
+  // Summary rows at the bottom
   if (summary && summary.length > 0) {
-    aoa.push([]); // blank line
-    aoa.push(['--- SUMMARY ---']);
+    aoa.push([]);
     summary.forEach(s => aoa.push([s.label, s.value]));
   }
 
@@ -93,7 +71,7 @@ export const exportReport = (filename, { schoolData, reportTitle, dateRange, hea
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Column widths — auto-fit based on content
+  // Auto-fit column widths
   const colCount = headers.length;
   const colWidths = [];
   for (let c = 0; c < colCount; c++) {
@@ -106,9 +84,12 @@ export const exportReport = (filename, { schoolData, reportTitle, dateRange, hea
   }
   ws['!cols'] = colWidths;
 
-  // Merge school name across all columns for the first row
-  if (schoolData && colCount > 1) {
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } }];
+  // Merge title row across all columns
+  if (colCount > 1) {
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: colCount - 1 } },
+    ];
   }
 
   XLSX.utils.book_append_sheet(wb, ws, sheetName);

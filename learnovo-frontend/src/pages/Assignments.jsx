@@ -8,12 +8,14 @@ import { classesService } from '../services/classesService'
 import { subjectsService } from '../services/subjectsService'
 import { attendanceService } from '../services/attendanceService'
 import { teacherAssignmentsService } from '../services/academicsService'
-import { exportCSV } from '../utils/exportHelpers'
+import { exportReport } from '../utils/exportHelpers'
+import { useSettings } from '../contexts/SettingsContext'
 import { formatDate } from '../utils/formatDate'
 import toast from 'react-hot-toast'
 
 const Assignments = () => {
   const { user } = useAuth()
+  const { settings } = useSettings()
   const queryClient = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -219,18 +221,15 @@ const Assignments = () => {
   }
 
   const handleExport = () => {
-    const rows = [['Title', 'Class', 'Subject', 'Due Date', 'Status', 'Total Marks']]
-    filteredAssignments.forEach(a => {
-      rows.push([
-        a.title,
-        a.class,
-        a.subject,
-        formatDate(a.dueDate),
-        a.status,
-        a.totalMarks || 100
-      ])
+    const headers = ['Title', 'Class', 'Subject', 'Due Date', 'Status', 'Total Marks']
+    const rows = filteredAssignments.map(a => [
+      a.title, a.class, a.subject, formatDate(a.dueDate), a.status, a.totalMarks || 100
+    ])
+    exportReport(`Assignments_${new Date().toISOString().split('T')[0]}.xlsx`, {
+      schoolName: settings?.institution?.name,
+      reportTitle: 'Assignments',
+      headers, rows, sheetName: 'Assignments',
     })
-    exportCSV(`Assignments_${new Date().toISOString().split('T')[0]}.csv`, rows)
     toast.success('Assignments exported')
   }
 

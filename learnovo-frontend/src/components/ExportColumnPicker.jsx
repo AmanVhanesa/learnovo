@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check, Download, FileText, FileSpreadsheet, FileType } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { exportCSV, exportExcel, exportPDF } from '../utils/exportHelpers';
+import { exportCSV, exportReport, exportPDF } from '../utils/exportHelpers';
 import { useSettings } from '../contexts/SettingsContext';
 
 /**
@@ -121,7 +121,11 @@ const ExportColumnPicker = ({
             toast.loading(`Generating ${selectedFormat.toUpperCase()}…`, { id: toastId });
 
             if (selectedFormat === 'excel' || selectedFormat === 'xlsx') {
-                exportExcel(`${safeBase}_${dateStr}.xlsx`, [headers, ...rows], sheetName);
+                exportReport(`${safeBase}_${dateStr}.xlsx`, {
+                    schoolName: settings?.institution?.name,
+                    reportTitle: title || 'Export',
+                    headers, rows, sheetName,
+                });
             } else if (selectedFormat === 'csv') {
                 exportCSV(`${safeBase}_${dateStr}.csv`, [headers, ...rows]);
             } else if (selectedFormat === 'pdf') {

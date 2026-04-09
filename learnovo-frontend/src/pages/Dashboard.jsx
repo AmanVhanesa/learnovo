@@ -24,7 +24,7 @@ import ChartCard from '../components/ChartCard'
 import SummaryCard from '../components/SummaryCard'
 import Button from '../components/Button'
 import { CardSkeleton, ChartSkeleton } from '../components/LoadingSkeleton'
-import { exportCSV, exportPNGPlaceholder } from '../utils/exportHelpers'
+import { exportReport, exportPNGPlaceholder } from '../utils/exportHelpers'
 import { reportsService } from '../services/reportsService'
 import { backupService } from '../services/backupService'
 import RecentActivities from '../components/RecentActivities'
@@ -87,7 +87,7 @@ const EnrollmentTrendChart = ({ range }) => {
 
 const Dashboard = () => {
   const { user, tenant } = useAuth()
-  const { formatCurrency } = useSettings()
+  const { settings, formatCurrency } = useSettings()
   const navigate = useNavigate()
 
   const defaultStats = {
@@ -488,26 +488,26 @@ const Dashboard = () => {
 
             // Handle export with more data
             const handleExport = () => {
-              const exportData = [
-                ['Metric', 'Value'],
-                [stat.title, String(stat.value)]
-              ]
+              const rows = [[stat.title, String(stat.value)]]
 
-              // Add additional context based on stat type (fee details admin-only)
               if (stat.title.toLowerCase().includes('fee') && stats.fees && user?.role === 'admin') {
-                exportData.push(['Total Fees', stats.fees.total])
-                exportData.push(['Paid Fees', stats.fees.paid])
-                exportData.push(['Pending Fees', stats.fees.pending])
-                exportData.push(['Overdue Fees', stats.fees.overdue])
+                rows.push(['Total Fees', stats.fees.total])
+                rows.push(['Paid Fees', stats.fees.paid])
+                rows.push(['Pending Fees', stats.fees.pending])
+                rows.push(['Overdue Fees', stats.fees.overdue])
               } else if (stat.title.toLowerCase().includes('student') && stats.students) {
-                exportData.push(['Total Students', stats.students.total])
-                exportData.push(['Active Students', stats.students.active])
+                rows.push(['Total Students', stats.students.total])
+                rows.push(['Active Students', stats.students.active])
               } else if (stat.title.toLowerCase().includes('teacher') && stats.teachers) {
-                exportData.push(['Total Teachers', stats.teachers.total])
-                exportData.push(['Active Teachers', stats.teachers.active])
+                rows.push(['Total Teachers', stats.teachers.total])
+                rows.push(['Active Teachers', stats.teachers.active])
               }
 
-              exportCSV(`${stat.title}_${new Date().toISOString().split('T')[0]}.csv`, exportData)
+              exportReport(`${stat.title}_${new Date().toISOString().split('T')[0]}.xlsx`, {
+                schoolName: settings?.institution?.name,
+                reportTitle: stat.title,
+                headers: ['Metric', 'Value'], rows, sheetName: 'Dashboard',
+              })
             }
 
             return (

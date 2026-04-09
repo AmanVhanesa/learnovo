@@ -14,10 +14,11 @@ import {
     CreditCard
 } from 'lucide-react'
 import { reportsService } from '../services/reportsService'
-import { exportCSV } from '../utils/exportHelpers'
-import { useSettings } from '../contexts/SettingsContext' // Assuming this exists for currency
+import { exportReport } from '../utils/exportHelpers'
+import { useSettings } from '../contexts/SettingsContext'
 
 const FeeDetailsModal = ({ isOpen, onClose, initialDate }) => {
+    const { settings } = useSettings()
     const [date, setDate] = useState(initialDate || new Date())
     const [loading, setLoading] = useState(true)
     const [data, setData] = useState({ transactions: [], totalCollected: 0, count: 0 })
@@ -69,27 +70,26 @@ const FeeDetailsModal = ({ isOpen, onClose, initialDate }) => {
     const handleExport = () => {
         if (!data.transactions.length) return
 
-        const exportData = [
-            ['Date', format(date, 'yyyy-MM-dd')],
-            ['Total Collected', data.totalCollected],
-            ['Total Transactions', data.count],
-            [], // Empty row
-            ['Student Name', 'Admission No', 'Class', 'Fee Type', 'Amount', 'Payment Mode', 'Time']
-        ]
+        const headers = ['Student Name', 'Admission No', 'Class', 'Fee Type', 'Amount', 'Payment Mode', 'Time']
+        const rows = data.transactions.map(txn => [
+            txn.student?.name || 'Unknown',
+            txn.student?.admissionNumber || '-',
+            txn.student?.class || '-',
+            txn.feeType,
+            txn.amount,
+            txn.paymentMethod,
+            format(new Date(txn.paidDate), 'h:mm a')
+        ])
 
-        data.transactions.forEach(txn => {
-            exportData.push([
-                txn.student?.name || 'Unknown',
-                txn.student?.admissionNumber || '-',
-                txn.student?.class || '-',
-                txn.feeType,
-                txn.amount,
-                txn.paymentMethod,
-                format(new Date(txn.paidDate), 'h:mm a')
-            ])
+        exportReport(`Fee_Report_${format(date, 'yyyy-MM-dd')}.xlsx`, {
+            schoolName: settings?.institution?.name,
+            reportTitle: `Fee Collection — ${format(date, 'dd MMM yyyy')}`,
+            headers, rows, sheetName: 'Fee Collection',
+            summary: [
+                { label: 'Total Collected', value: data.totalCollected },
+                { label: 'Total Transactions', value: data.count },
+            ],
         })
-
-        exportCSV(`Fee_Report_${format(date, 'yyyy-MM-dd')}.csv`, exportData)
     }
 
     if (!isOpen) return null

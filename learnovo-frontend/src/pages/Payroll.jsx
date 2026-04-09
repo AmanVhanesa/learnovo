@@ -8,8 +8,9 @@ import {
 import toast from 'react-hot-toast';
 import payrollService from '../services/payrollService';
 import { academicSessionsService } from '../services/academicsService';
-import { exportExcel } from '../utils/exportHelpers';
+import { exportReport } from '../utils/exportHelpers';
 import { formatCurrency } from '../utils/formatCurrency';
+import { useSettings } from '../contexts/SettingsContext';
 import ExportColumnPicker from '../components/ExportColumnPicker';
 import GeneratePayrollModal from '../components/payroll/GeneratePayrollModal';
 import AdvanceSalaryModal from '../components/payroll/AdvanceSalaryModal';
@@ -26,6 +27,7 @@ const MONTH_NAMES = [
 ];
 
 const Payroll = () => {
+    const { settings } = useSettings();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState('payroll');
     const [searchTerm, setSearchTerm] = useState('');
@@ -283,19 +285,20 @@ const Payroll = () => {
             ];
         });
 
-        // Summary row
         const totalAmount = paidRecords.reduce((sum, r) => sum + (r.netSalary || 0), 0);
-        rows.push([]);
-        rows.push(['', '', '', '', '', 'Total', totalAmount, '', '', '']);
-        rows.push([]);
-        rows.push(['Payment Date:', new Date().toLocaleDateString('en-IN'), '', '', '', '', '', '', '', '']);
-        rows.push(['Period:', `${MONTH_NAMES[filters.month - 1]} ${filters.year}`, '', '', '', '', '', '', '', '']);
-        rows.push(['Total Beneficiaries:', paidRecords.length, '', '', '', '', '', '', '', '']);
 
-        exportExcel(
+        exportReport(
             `bank_salary_transfer_${MONTH_NAMES[filters.month - 1]}_${filters.year}.xlsx`,
-            [headers, ...rows],
-            'Bank Transfer'
+            {
+                schoolName: settings?.institution?.name,
+                reportTitle: `Bank Salary Transfer — ${MONTH_NAMES[filters.month - 1]} ${filters.year}`,
+                headers, rows, sheetName: 'Bank Transfer',
+                summary: [
+                    { label: 'Total Amount', value: totalAmount },
+                    { label: 'Total Beneficiaries', value: paidRecords.length },
+                    { label: 'Payment Date', value: new Date().toLocaleDateString('en-IN') },
+                ],
+            }
         );
         toast.success('Bank transfer file downloaded');
         setShowExportMenu(false);
