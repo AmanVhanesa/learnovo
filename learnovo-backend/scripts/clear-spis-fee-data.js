@@ -1,23 +1,26 @@
 /**
- * Clear all fee-related data for SPIS tenant.
+ * Clear all fee-related data AND students for SPIS tenant.
  *
- * Deletes: FeeInvoices, Payments, Receipts, AnnualFeeAllocations,
+ * Deletes: Students, FeeInvoices, Payments, Receipts, AnnualFeeAllocations,
  *          StudentBalances, PaymentAttempts, FeeAuditLogs,
  *          and auto-synced Income records (from fee payments).
  *
- * Does NOT delete: Students, FeeStructures, AcademicSessions, Expenses.
+ * Does NOT delete: FeeStructures, AcademicSessions, Classes, Sections,
+ *                  Employees, Expenses, Settings.
  *
  * SPIS PRODUCTION ONLY — hardcoded to schoolCode: 'spis'.
  *
  * Usage:
  *   node scripts/clear-spis-fee-data.js --dry-run
  *   node scripts/clear-spis-fee-data.js
+ *   node scripts/clear-spis-fee-data.js --keep-students   # Only clear fee data
  */
 
 require('dotenv').config({ path: './config.env' });
 const mongoose = require('mongoose');
 
 const Tenant = require('../models/Tenant');
+const User = require('../models/User');
 const FeeInvoice = require('../models/FeeInvoice');
 const Payment = require('../models/Payment');
 const Receipt = require('../models/Receipt');
@@ -31,6 +34,7 @@ const SCHOOL_CODE = 'spis';
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
+  const keepStudents = process.argv.includes('--keep-students');
 
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('Connected to MongoDB');
@@ -44,9 +48,11 @@ async function main() {
   console.log(`Tenant: ${tenant.schoolName} (${tenant.schoolCode})\n`);
 
   const filter = { tenantId };
+  const studentFilter = { tenantId, role: 'student' };
 
   // Count what will be deleted
   const counts = {
+    students: keepStudents ? 0 : await User.countDocuments(studentFilter),
     invoices: await FeeInvoice.countDocuments(filter),
     payments: await Payment.countDocuments(filter),
     receipts: await Receipt.countDocuments(filter),
@@ -58,6 +64,11 @@ async function main() {
   };
 
   console.log('Records to delete:');
+  if (!keepStudents) {
+    console.log(`  Students:              ${counts.students}`);
+  } else {
+    console.log('  Students:              KEPT (--keep-students)');
+  }
   console.log(`  Fee Invoices:          ${counts.invoices}`);
   console.log(`  Payments:              ${counts.payments}`);
   console.log(`  Receipts:              ${counts.receipts}`);
@@ -75,7 +86,7 @@ async function main() {
 
   console.log('\nDeleting...');
 
-  const results = await Promise.all([
+  const deleteOps = [
     FeeInvoice.deleteMany(filter),
     Payment.deleteMany(filter),
     Receipt.deleteMany(filter),
@@ -84,14 +95,21 @@ async function main() {
     PaymentAttempt.deleteMany(filter),
     FeeAuditLog.deleteMany(filter),
     Income.deleteMany({ ...filter, source: 'fee_payment' })
-  ]);
-
+  ];
   const labels = ['Invoices', 'Payments', 'Receipts', 'Allocations', 'Balances', 'Attempts', 'AuditLogs', 'Income'];
+
+  if (!keepStudents) {
+    deleteOps.unshift(User.deleteMany(studentFilter));
+    labels.unshift('Students');
+  }
+
+  const results = await Promise.all(deleteOps);
+
   results.forEach((r, i) => {
     console.log(`  ${labels[i]} deleted: ${r.deletedCount}`);
   });
 
-  console.log('\nDone. Fee data cleared for SPIS.');
+  console.log('\nDone. Data cleared for SPIS.');
   await mongoose.disconnect();
 }
 
