@@ -762,6 +762,7 @@ const AcademicsManagement = () => {
                 <ClassFormModal
                     classData={editingClass}
                     teachers={teachers}
+                    sessions={sessions}
                     activeSession={activeSession}
                     onClose={() => setShowClassForm(false)}
                     onSuccess={() => {
@@ -938,14 +939,17 @@ const SessionFormModal = ({ session, onClose, onSuccess }) => {
 }
 
 // Class Form Modal
-const ClassFormModal = ({ classData, teachers, activeSession, onClose, onSuccess }) => {
+const ClassFormModal = ({ classData, teachers, sessions = [], activeSession, onClose, onSuccess }) => {
     const [form, setForm] = useState({
         name: classData?.name || '',
         grade: classData?.grade || '',
-        // Always force the academic year onto the active session so Class.academicYear
-        // can't drift from AcademicSession.name and silently break student-import
-        // class lookups. Editing an old class also rewrites it onto the active year.
-        academicYear: activeSession?.name || classData?.academicYear || '',
+        // Default to the class's existing year (when editing), then active
+        // session, then the first available session. Bound to a select below
+        // so Class.academicYear stays aligned with AcademicSession.name.
+        academicYear: classData?.academicYear
+            || activeSession?.name
+            || sessions[0]?.name
+            || '',
     })
     // Each section: { name: string, sectionTeacher: string (teacher _id) }
     const [sections, setSections] = useState(
@@ -1049,19 +1053,22 @@ const ClassFormModal = ({ classData, teachers, activeSession, onClose, onSuccess
                             </select>
                         </div>
 
-                        {/* Academic Year — locked to active session */}
+                        {/* Academic Year — bound to AcademicSession list */}
                         <div>
                             <label className="label">Academic Year *</label>
-                            {activeSession ? (
+                            {sessions.length > 0 ? (
                                 <select
                                     className="input"
                                     value={form.academicYear}
                                     onChange={(e) => setForm({ ...form, academicYear: e.target.value })}
                                     required
                                 >
-                                    <option value={activeSession.name}>
-                                        {activeSession.name} (Active)
-                                    </option>
+                                    <option value="">Select Academic Year</option>
+                                    {sessions.map(s => (
+                                        <option key={s._id} value={s.name}>
+                                            {s.name}{s.isActive ? ' (Active)' : ''}
+                                        </option>
+                                    ))}
                                 </select>
                             ) : (
                                 <input
