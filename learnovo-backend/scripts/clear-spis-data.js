@@ -28,6 +28,8 @@ const Fee = require('../models/Fee');
 const Result = require('../models/Result');
 const Attendance = require('../models/Attendance');
 const Notification = require('../models/Notification');
+const Income = require('../models/Income');
+const Expense = require('../models/Expense');
 
 // Models that may or may not exist - load safely
 let Receipt, PaymentAttempt, FeePaymentOrder, PaymentDispute, FeeAuditLog, PaymentAuditLog;
@@ -200,6 +202,15 @@ async function clearSpisData() {
 
     r = await Fee.deleteMany({ tenantId });
     results['Legacy Fees'] = r.deletedCount;
+
+    // Auto-synced finance records (powered by financeAutoSyncService).
+    // These are created from fee payments / payroll, so they're transaction
+    // residue not category/budget config — safe to wipe alongside fees.
+    r = await Income.deleteMany({ tenantId });
+    results['Income (auto-synced)'] = r.deletedCount;
+
+    r = await Expense.deleteMany({ tenantId });
+    results['Expense (auto-synced)'] = r.deletedCount;
 
     // Academic data
     r = await Result.deleteMany({ tenantId });
