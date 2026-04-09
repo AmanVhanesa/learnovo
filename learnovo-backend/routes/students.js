@@ -892,6 +892,13 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
           ? ext.charAt(0).toUpperCase() + ext.slice(1) : ext;
         if (norm !== rawName) candidates.push(norm);
       }
+      // Strip ordinal suffix: "1ST" → "1" (and try "Class 1" too)
+      const ordinalMatch = rawName.match(/^(\d+)\s*(st|nd|rd|th)$/i);
+      if (ordinalMatch) {
+        const numeric = ordinalMatch[1];
+        candidates.push(numeric);
+        candidates.push(`Class ${numeric}`);
+      }
       const found = candidates.some(c => existingClassLookup.has(c.toLowerCase()));
       if (!found) {
         // Determine a display name & grade for the new class. academicYear is
@@ -970,6 +977,12 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
           const norm = ['nursery', 'lkg', 'ukg'].includes(ext)
             ? ext.charAt(0).toUpperCase() + ext.slice(1) : ext;
           if (norm !== rawClass) candidates.push(norm);
+        }
+        // Strip ordinal suffix: "1ST" → "1"
+        const om = rawClass.match(/^(\d+)\s*(st|nd|rd|th)$/i);
+        if (om) {
+          candidates.push(om[1]);
+          candidates.push(`Class ${om[1]}`);
         }
         let classDoc = null;
         for (const cand of candidates) {
@@ -1246,6 +1259,17 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
               ? extracted.charAt(0).toUpperCase() + extracted.slice(1)
               : extracted;
             if (normalized !== rawClassValue) classValuesToTry.push(normalized);
+          }
+
+          // Strip ordinal suffix so "1ST" / "2ND" / "3RD" / "8TH" can match
+          // a Class.grade stored as a plain number ("1", "2", "3", "8").
+          const ordinalMatch = rawClassValue.match(/^(\d+)\s*(st|nd|rd|th)$/i);
+          if (ordinalMatch) {
+            const numeric = ordinalMatch[1];
+            if (!classValuesToTry.includes(numeric)) classValuesToTry.push(numeric);
+            // Also try "Class N" form in case the DB uses that as the name
+            const classNForm = `Class ${numeric}`;
+            if (!classValuesToTry.includes(classNForm)) classValuesToTry.push(classNForm);
           }
 
           // --- Class lookup using pre-fetched allClasses (no per-row DB query) ---
