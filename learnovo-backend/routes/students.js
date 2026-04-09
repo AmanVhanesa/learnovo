@@ -833,7 +833,21 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
     // Pre-cache all classes and drivers for this tenant to avoid N+1 queries in the loop
     const Class = require('../models/Class');
     const Section = require('../models/Section');
-    let allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
+
+    // Scope class lookup to the tenant's active academic session. Without this,
+    // tenants with duplicate class names from prior years (e.g. an old "1st"
+    // alongside the current "1st") would have rows resolve to a stale classId
+    // and the imported students would be invisible on the current Academics page.
+    const activeSession = await AcademicSession.findOne({ tenantId, isActive: true }).lean();
+    if (!activeSession) {
+      return res.status(400).json({
+        success: false,
+        message: 'No active academic session found. Activate one before importing students.'
+      });
+    }
+    const activeYear = activeSession.name;
+
+    let allClasses = await Class.find({ tenantId, academicYear: activeYear }).select('_id name grade').lean();
     const allDrivers = await Driver.find({ tenantId, isActive: true }).select('_id name').lean();
     const driverCache = new Map(allDrivers.map(d => [d.name.toLowerCase().trim(), d]));
 
@@ -867,11 +881,14 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       }
       const found = candidates.some(c => existingClassLookup.has(c.toLowerCase()));
       if (!found) {
-        // Determine a display name & grade for the new class
+        // Determine a display name & grade for the new class. academicYear is
+        // required by the Class schema and must match the active session so
+        // these auto-created classes show up in the current Academics view.
         classesToCreate.push({
           tenantId,
           name: rawName,
           grade: rawName,
+          academicYear: activeYear,
           isActive: true,
           createdAt: new Date(),
           updatedAt: new Date()
@@ -883,12 +900,12 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       try {
         const created = await Class.insertMany(classesToCreate, { ordered: false });
         logger.info(`Import: auto-created ${created.length} missing classes`, { requestId: req.requestId, tenantId: req.user?.tenantId });
-        // Refresh the full class list
-        allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
+        // Refresh — still scoped to the active session
+        allClasses = await Class.find({ tenantId, academicYear: activeYear }).select('_id name grade').lean();
       } catch (classErr) {
         // Partial success is fine — re-fetch everything
         logger.warn('Import: class auto-create partial error', { requestId: req.requestId, tenantId: req.user?.tenantId, error: classErr.message });
-        allClasses = await Class.find({ tenantId }).select('_id name grade').lean();
+        allClasses = await Class.find({ tenantId, academicYear: activeYear }).select('_id name grade').lean();
       }
     }
 
@@ -900,8 +917,13 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       if (c.grade) classLookupByName.set(c.grade.toLowerCase(), c);
     });
 
-    // Pre-fetch all sections for this tenant (keyed by classId_sectionName)
-    let allSections = await Section.find({ tenantId, isActive: true }).select('_id name classId').lean();
+    // Pre-fetch sections for current-year classes only (keyed by classId_sectionName)
+    const activeClassIds = allClasses.map(c => c._id);
+    let allSections = await Section.find({
+      tenantId,
+      isActive: true,
+      classId: { $in: activeClassIds }
+    }).select('_id name classId').lean();
     const sectionCache = new Map();
     allSections.forEach(sec => {
       const key = `${sec.classId.toString()}_${sec.name.toUpperCase()}`;
@@ -960,8 +982,12 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
       } catch (secErr) {
         logger.warn('Import: section auto-create partial error', { requestId: req.requestId, tenantId: req.user?.tenantId, error: secErr.message });
       }
-      // Refresh sections cache
-      allSections = await Section.find({ tenantId, isActive: true }).select('_id name classId').lean();
+      // Refresh sections cache (still scoped to current-year classes)
+      allSections = await Section.find({
+        tenantId,
+        isActive: true,
+        classId: { $in: activeClassIds }
+      }).select('_id name classId').lean();
       sectionCache.clear();
       allSections.forEach(sec => {
         sectionCache.set(`${sec.classId.toString()}_${sec.name.toUpperCase()}`, sec);
