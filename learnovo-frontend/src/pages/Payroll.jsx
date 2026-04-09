@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Eye, Edit2, Trash2, FileText, Plus, Download, Wallet, ArrowUpRight,
     IndianRupee, Users, CheckCircle, Clock, ChevronDown, FileSpreadsheet,
-    Building2, Search, AlertTriangle, RefreshCw
+    Building2, Search, AlertTriangle, RefreshCw, Calendar
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import payrollService from '../services/payrollService';
+import { academicSessionsService } from '../services/academicsService';
 import { exportExcel } from '../utils/exportHelpers';
 import { formatCurrency } from '../utils/formatCurrency';
 import ExportColumnPicker from '../components/ExportColumnPicker';
@@ -14,6 +15,7 @@ import GeneratePayrollModal from '../components/payroll/GeneratePayrollModal';
 import AdvanceSalaryModal from '../components/payroll/AdvanceSalaryModal';
 import PayrollDetailsModal from '../components/payroll/PayrollDetailsModal';
 import EditPayrollModal from '../components/payroll/EditPayrollModal';
+import AcademicSessionSelector from '../components/AcademicSessionSelector';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import KpiCard from '../components/KpiCard';
@@ -64,11 +66,22 @@ const Payroll = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // ─── Active Session ────────────────────────────────────────
+    const [selectedSession, setSelectedSession] = useState(null);
+
+    const { data: activeSession, isLoading: sessionLoading } = useQuery({
+        queryKey: ['payroll-active-session'],
+        queryFn: async () => { const res = await academicSessionsService.getActive(); return res.data },
+    });
+
+    const currentSession = selectedSession || activeSession;
+    const isViewOnly = currentSession && !currentSession.isActive;
+
     // ─── Queries ──────────────────────────────────────────────
     const { data: payrollData, isLoading: payrollLoading, isRefetching: payrollRefetching, error: payrollError, refetch: refetchPayroll } = useQuery({
-        queryKey: ['payroll-records', filters],
-        queryFn: () => payrollService.getPayrollRecords(filters),
-        enabled: activeTab === 'payroll',
+        queryKey: ['payroll-records', filters, currentSession?._id],
+        queryFn: () => payrollService.getPayrollRecords({ ...filters, academicSessionId: currentSession?._id }),
+        enabled: !!currentSession && activeTab === 'payroll',
     });
 
     const payrollRecords = payrollData?.data || [];
@@ -348,15 +361,24 @@ const Payroll = () => {
         );
     };
 
+    if (sessionLoading) return <LoadingSpinner />;
+    if (!currentSession) return <EmptyState icon={Calendar} title="No active academic session" description="Please activate an academic session first" />;
+
     return (
         <div className="space-y-6">
             {/* ═══ Header ═══ */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Payroll Management</h1>
-                    <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">
-                        {MONTH_NAMES[filters.month - 1]} {filters.year} &middot; Manage salaries, advances & exports
-                    </p>
+                    <div className="flex items-center gap-3 mt-0.5">
+                        <p className="text-sm text-gray-500 dark:text-[#8E8E93]">
+                            {MONTH_NAMES[filters.month - 1]} {filters.year}
+                        </p>
+                        <AcademicSessionSelector
+                            selectedSessionId={currentSession._id}
+                            onSessionChange={setSelectedSession}
+                        />
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
                     {activeTab === 'payroll' && (
@@ -409,14 +431,16 @@ const Payroll = () => {
                             </div>
                         </>
                     )}
-                    <button
-                        onClick={() => activeTab === 'payroll' ? setShowGenerateModal(true) : (() => { setAdvanceModalMode('create'); setShowAdvanceModal(true); })()}
-                        className="btn btn-primary gap-2"
-                    >
-                        <Plus className="h-4 w-4" />
-                        <span className="hidden sm:inline">{activeTab === 'payroll' ? 'Generate Payroll' : 'New Advance'}</span>
-                        <span className="sm:hidden">New</span>
-                    </button>
+                    {!isViewOnly && (
+                        <button
+                            onClick={() => activeTab === 'payroll' ? setShowGenerateModal(true) : (() => { setAdvanceModalMode('create'); setShowAdvanceModal(true); })()}
+                            className="btn btn-primary gap-2"
+                        >
+                            <Plus className="h-4 w-4" />
+                            <span className="hidden sm:inline">{activeTab === 'payroll' ? 'Generate Payroll' : 'New Advance'}</span>
+                            <span className="sm:hidden">New</span>
+                        </button>
+                    )}
                 </div>
             </div>
 

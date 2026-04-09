@@ -23,6 +23,12 @@ const paymentDisputeSchema = new mongoose.Schema({
     index: true
   },
 
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
+
   // Link to specific stuck/failed attempt (optional if disputing unknown charge)
   paymentAttemptId: {
     type: mongoose.Schema.Types.ObjectId,

@@ -68,7 +68,8 @@ router.get('/export', protect, authorize('admin', 'accountant'), async(req, res)
       { key: 'status', header: 'Status' }
     ];
 
-    const csvBuffer = await ImportExportService.exportToCSV(rows, columns);
+    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, 'Fee Structure List');
+    const csvBuffer = await ImportExportService.exportToCSV(rows, columns, headerInfo);
     const filename = `fee_structures_export_${new Date().toISOString().split('T')[0]}.csv`;
 
     res.setHeader('Content-Type', 'text/csv');

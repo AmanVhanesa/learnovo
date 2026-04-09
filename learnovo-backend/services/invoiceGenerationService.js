@@ -96,9 +96,9 @@ async function buildApplicableFeeHeads(tenantId, student, feeStructure) {
     if (headType === 'one_time') {
       // Check admission fee exclusions
       if (head.isAdmissionFee) {
-        if (student.isImported) {
+        if (student.isImported && student.studentType === 'old') {
           headEntry.isIncluded = false;
-          headEntry.exclusionReason = 'Imported student — exempt from admission fee';
+          headEntry.exclusionReason = 'Old student — exempt from admission fee';
         } else if (student.admissionFeePaid) {
           headEntry.isIncluded = false;
           headEntry.exclusionReason = 'Admission fee already paid';
@@ -659,6 +659,7 @@ async function previewInvoiceGeneration({
       admissionNumber: student.admissionNumber || student.studentId,
       class: student.class || '',
       isImported: student.isImported || false,
+      studentType: student.studentType || 'new',
       isNew: !student.isImported && !student.admissionFeePaid,
       recurringTotal: totalRecurring,
       oneTimeTotal: totalOneTime,

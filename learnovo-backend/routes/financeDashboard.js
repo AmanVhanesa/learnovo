@@ -15,6 +15,7 @@ router.use(protect, authorize('admin'));
 router.get('/dashboard', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
+    const { academicSessionId } = req.query;
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -29,6 +30,11 @@ router.get('/dashboard', async(req, res, next) => {
 
     const incomeFilter = { tenantId, isDeleted: false };
     const expenseFilter = { tenantId, isDeleted: false };
+    if (academicSessionId) {
+      const sessionOid = new mongoose.Types.ObjectId(academicSessionId);
+      incomeFilter.academicSessionId = sessionOid;
+      expenseFilter.academicSessionId = sessionOid;
+    }
 
     const [
       incomeThisMonth,
@@ -122,15 +128,24 @@ router.get('/dashboard', async(req, res, next) => {
 router.get('/monthly-comparison', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
+    const { academicSessionId } = req.query;
     const months = parseInt(req.query.months) || 6;
     const now = new Date();
 
     // Calculate start date (N months ago)
     const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
 
+    const incFilter = { tenantId, isDeleted: false, incomeDate: { $gte: startDate } };
+    const expFilter = { tenantId, isDeleted: false, expenseDate: { $gte: startDate } };
+    if (academicSessionId) {
+      const sessionOid = new mongoose.Types.ObjectId(academicSessionId);
+      incFilter.academicSessionId = sessionOid;
+      expFilter.academicSessionId = sessionOid;
+    }
+
     const [incomeMonthly, expenseMonthly] = await Promise.all([
       Income.aggregate([
-        { $match: { tenantId, isDeleted: false, incomeDate: { $gte: startDate } } },
+        { $match: incFilter },
         {
           $group: {
             _id: { year: { $year: '$incomeDate' }, month: { $month: '$incomeDate' } },
@@ -140,7 +155,7 @@ router.get('/monthly-comparison', async(req, res, next) => {
         { $sort: { '_id.year': 1, '_id.month': 1 } }
       ]),
       Expense.aggregate([
-        { $match: { tenantId, isDeleted: false, expenseDate: { $gte: startDate } } },
+        { $match: expFilter },
         {
           $group: {
             _id: { year: { $year: '$expenseDate' }, month: { $month: '$expenseDate' } },
@@ -180,8 +195,9 @@ router.get('/monthly-comparison', async(req, res, next) => {
 // Expense breakdown by category for pie/donut chart
 router.get('/expense-breakdown', async(req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, academicSessionId } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
+    if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
 
     if (startDate || endDate) {
       filter.expenseDate = {};
@@ -229,7 +245,7 @@ router.get('/expense-breakdown', async(req, res, next) => {
 // Combined finance report for export (PDF/CSV)
 router.get('/report', async(req, res, next) => {
   try {
-    const { startDate, endDate, format = 'json' } = req.query;
+    const { startDate, endDate, format = 'json', academicSessionId } = req.query;
     const tenantId = req.user.tenantId;
 
     const dateFilter = {};
@@ -238,6 +254,10 @@ router.get('/report', async(req, res, next) => {
 
     const incomeFilter = { tenantId, isDeleted: false };
     const expenseFilter = { tenantId, isDeleted: false };
+    if (academicSessionId) {
+      incomeFilter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
+      expenseFilter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
+    }
     if (startDate || endDate) {
       incomeFilter.incomeDate = dateFilter;
       expenseFilter.expenseDate = dateFilter;
@@ -342,8 +362,9 @@ router.get('/report', async(req, res, next) => {
 // Income breakdown by category for pie/donut chart
 router.get('/income-breakdown', async(req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, academicSessionId } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
+    if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
 
     if (startDate || endDate) {
       filter.incomeDate = {};
@@ -392,16 +413,25 @@ router.get('/income-breakdown', async(req, res, next) => {
 router.get('/fee-collection-rate', async(req, res, next) => {
   try {
     const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
+    const { academicSessionId } = req.query;
+
+    const invoiceFilter = { tenantId, status: { $ne: 'Cancelled' } };
+    const paymentFilter = { tenantId, isConfirmed: true, isReversed: { $ne: true } };
+    if (academicSessionId) {
+      const sessionOid = new mongoose.Types.ObjectId(academicSessionId);
+      invoiceFilter.academicSessionId = sessionOid;
+      paymentFilter.academicSessionId = sessionOid;
+    }
 
     // Total invoiced (all non-cancelled invoices)
     const invoicedAgg = await FeeInvoice.aggregate([
-      { $match: { tenantId, status: { $ne: 'Cancelled' } } },
+      { $match: invoiceFilter },
       { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }
     ]);
 
     // Total collected (confirmed, non-reversed payments)
     const collectedAgg = await Payment.aggregate([
-      { $match: { tenantId, isConfirmed: true, isReversed: { $ne: true } } },
+      { $match: paymentFilter },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
 

@@ -4,10 +4,10 @@ const MONTH_NAMES = [
 ]
 
 const QUARTER_LABELS = {
-  1: 'Jan-Mar',
-  2: 'Apr-Jun',
-  3: 'Jul-Sep',
-  4: 'Oct-Dec',
+  1: 'Apr-Jun',
+  2: 'Jul-Sep',
+  3: 'Oct-Dec',
+  4: 'Jan-Mar',
 }
 
 export function buildBillingPeriod(frequency, { billingMonth, billingQuarter, billingYear }) {

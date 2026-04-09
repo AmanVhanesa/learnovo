@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const { body, query, param } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
@@ -12,9 +13,10 @@ router.use(protect, authorize('admin'));
 // ── GET /api/income/summary/monthly ──────────────────────────────────────────
 router.get('/summary/monthly', async(req, res, next) => {
   try {
-    const { academicYear } = req.query;
+    const { academicYear, academicSessionId } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
-    if (academicYear) filter.academicYear = academicYear;
+    if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
+    else if (academicYear) filter.academicYear = academicYear;
 
     const monthlyData = await Income.aggregate([
       { $match: filter },
@@ -37,8 +39,9 @@ router.get('/summary/monthly', async(req, res, next) => {
 // ── GET /api/income/summary/category ─────────────────────────────────────────
 router.get('/summary/category', async(req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, academicSessionId } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
+    if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
     if (startDate || endDate) {
       filter.incomeDate = {};
       if (startDate) filter.incomeDate.$gte = new Date(startDate);
@@ -86,6 +89,7 @@ router.get('/summary/category', async(req, res, next) => {
 router.get('/summary/dashboard', async(req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
+    const { academicSessionId } = req.query;
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -99,6 +103,7 @@ router.get('/summary/dashboard', async(req, res, next) => {
     const monthEnd = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
 
     const baseFilter = { tenantId, isDeleted: false };
+    if (academicSessionId) baseFilter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
 
     const [monthTotal, yearTotal, totalCount] = await Promise.all([
       Income.aggregate([
@@ -129,8 +134,9 @@ router.get('/summary/dashboard', async(req, res, next) => {
 // ── GET /api/income/export ───────────────────────────────────────────────────
 router.get('/export', async(req, res, next) => {
   try {
-    const { startDate, endDate, category, paymentMethod } = req.query;
+    const { startDate, endDate, category, paymentMethod, academicSessionId } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
+    if (academicSessionId) filter.academicSessionId = academicSessionId;
 
     if (startDate || endDate) {
       filter.incomeDate = {};
@@ -146,6 +152,10 @@ router.get('/export', async(req, res, next) => {
       .sort({ incomeDate: -1 })
       .lean();
 
+    // Get school name for header
+    const ImportExportService = require('../services/importExportService');
+    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, 'Income Report');
+
     const headers = ['Date', 'Title', 'Category', 'Amount', 'Payment Method', 'Reference', 'Received By', 'Added By', 'Description'];
     const rows = incomes.map(i => [
       new Date(i.incomeDate).toLocaleDateString('en-IN'),
@@ -159,7 +169,13 @@ router.get('/export', async(req, res, next) => {
       `"${(i.description || '').replace(/"/g, '""')}"`
     ]);
 
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const reportHeader = [];
+    if (headerInfo.schoolName) reportHeader.push(`"${headerInfo.schoolName}"`);
+    reportHeader.push('"Income Report"');
+    reportHeader.push(`"${headerInfo.dateTime}"`);
+    reportHeader.push('');
+
+    const csv = [...reportHeader, headers.join(','), ...rows.map(r => r.join(','))].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=income.csv');
@@ -177,9 +193,10 @@ router.get('/', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
-    const { page = 1, limit = 20, category, paymentMethod, startDate, endDate, search, sortBy = 'incomeDate', sortOrder = 'desc', source } = req.query;
+    const { page = 1, limit = 20, category, paymentMethod, startDate, endDate, search, sortBy = 'incomeDate', sortOrder = 'desc', source, academicSessionId } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
 
+    if (academicSessionId) filter.academicSessionId = academicSessionId;
     if (category) filter.category = category;
     if (paymentMethod) filter.paymentMethod = paymentMethod;
     // Source filter: 'manual' | 'fee_collection' | 'all' (default: all)
@@ -260,7 +277,7 @@ router.post('/', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
-    const { category, title, amount, incomeDate, paymentMethod, paymentReference, receivedBy, description, receiptUrl, academicYear } = req.body;
+    const { category, title, amount, incomeDate, paymentMethod, paymentReference, receivedBy, description, receiptUrl, academicYear, academicSessionId } = req.body;
 
     const income = await Income.create({
       tenantId: req.user.tenantId,
@@ -274,6 +291,7 @@ router.post('/', [
       description,
       receiptUrl,
       academicYear,
+      academicSessionId: academicSessionId || undefined,
       addedBy: req.user._id
     });
 
@@ -308,7 +326,7 @@ router.put('/:id', [
       return res.status(403).json({ success: false, message: 'System-generated income records cannot be edited. This record was auto-created from a fee payment.', requestId: req.requestId });
     }
 
-    const { category, title, amount, incomeDate, paymentMethod, paymentReference, receivedBy, description, receiptUrl, academicYear } = req.body;
+    const { category, title, amount, incomeDate, paymentMethod, paymentReference, receivedBy, description, receiptUrl, academicYear, academicSessionId } = req.body;
     if (category !== undefined) income.category = category;
     if (title !== undefined) income.title = title;
     if (amount !== undefined) income.amount = amount;
@@ -319,6 +337,7 @@ router.put('/:id', [
     if (description !== undefined) income.description = description;
     if (receiptUrl !== undefined) income.receiptUrl = receiptUrl;
     if (academicYear !== undefined) income.academicYear = academicYear;
+    if (academicSessionId !== undefined) income.academicSessionId = academicSessionId;
 
     await income.save();
 

@@ -110,13 +110,14 @@ function normalizePaymentMethod(method) {
  * @param {ObjectId} params.addedBy - User who collected/verified
  * @param {string}   [params.paymentReference] - Transaction/receipt reference
  * @param {string}   [params.referenceModel] - 'Payment' | 'PaymentAttempt' | 'FeePaymentOrder'
+ * @param {ObjectId} [params.academicSessionId] - Academic session for session-wise filtering
  */
 async function syncFeePaymentToIncome(params) {
   try {
     const {
       tenantId, paymentId, amount, paymentDate,
       paymentMethod, studentName, invoiceNumber,
-      addedBy, paymentReference, referenceModel
+      addedBy, paymentReference, referenceModel, academicSessionId
     } = params;
 
     // Idempotency: check if already synced
@@ -145,6 +146,7 @@ async function syncFeePaymentToIncome(params) {
       paymentReference: paymentReference || undefined,
       addedBy,
       academicYear: getAcademicYear(paymentDate || new Date()),
+      academicSessionId: academicSessionId || undefined,
       referenceType: 'fee_payment',
       referenceId: paymentId,
       referenceModel: referenceModel || null,
@@ -178,13 +180,14 @@ async function syncFeePaymentToIncome(params) {
  * @param {string}   params.employeeName - For description
  * @param {ObjectId} params.addedBy - Admin who marked as paid
  * @param {string}   [params.paymentReference]
+ * @param {ObjectId} [params.academicSessionId] - Academic session for session-wise filtering
  */
 async function syncPayrollToExpense(params) {
   try {
     const {
       tenantId, payrollId, netSalary, paymentDate,
       paymentMethod, month, year, employeeName,
-      addedBy, paymentReference
+      addedBy, paymentReference, academicSessionId
     } = params;
 
     // Idempotency: check if already synced
@@ -218,6 +221,7 @@ async function syncPayrollToExpense(params) {
       status: 'Approved', // Auto-created expenses are pre-approved
       approvedBy: addedBy,
       academicYear: getAcademicYear(paymentDate || new Date()),
+      academicSessionId: academicSessionId || undefined,
       referenceType: 'payroll',
       referenceId: payrollId,
       referenceModel: 'Payroll',

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -7,10 +7,12 @@ import {
   Calendar, List, Target
 } from 'lucide-react'
 import { financeDashboardService } from '../services/financeDashboardService'
+import { academicSessionsService } from '../services/academicsService'
 import { formatCurrency } from '../utils/formatCurrency'
 import toast from 'react-hot-toast'
 import { highQualityPrint } from '../utils/highQualityPrint'
 
+import AcademicSessionSelector from '../components/AcademicSessionSelector'
 import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
 import KpiCard from '../components/KpiCard'
@@ -32,49 +34,65 @@ const FinanceDashboard = () => {
   const [isPrintLoading, setIsPrintLoading] = useState(false)
   const printRef = useRef(null)
 
+  // Active academic session
+  const [selectedSession, setSelectedSession] = useState(null)
+
+  const { data: activeSession, isLoading: sessionLoading } = useQuery({
+    queryKey: ['finance-active-session'],
+    queryFn: async () => { const res = await academicSessionsService.getActive(); return res.data },
+  })
+
+  const currentSession = selectedSession || activeSession
+  const sessionFilter = currentSession ? { academicSessionId: currentSession._id } : {}
+
   // Dashboard data
   const { data: dashData, isLoading: dashLoading } = useQuery({
-    queryKey: ['finance-dashboard'],
+    queryKey: ['finance-dashboard', currentSession?._id],
     queryFn: async () => {
-      const res = await financeDashboardService.getDashboard()
+      const res = await financeDashboardService.getDashboard(sessionFilter)
       return res.data
-    }
+    },
+    enabled: !!currentSession
   })
 
   // Monthly comparison
   const { data: comparisonData = [] } = useQuery({
-    queryKey: ['finance-comparison', reportRange],
+    queryKey: ['finance-comparison', reportRange, currentSession?._id],
     queryFn: async () => {
-      const res = await financeDashboardService.getMonthlyComparison(parseInt(reportRange))
+      const res = await financeDashboardService.getMonthlyComparison(parseInt(reportRange), sessionFilter)
       return res.data || []
-    }
+    },
+    enabled: !!currentSession
   })
 
   // Expense breakdown
   const { data: expenseBreakdown = [] } = useQuery({
-    queryKey: ['finance-expense-breakdown'],
+    queryKey: ['finance-expense-breakdown', currentSession?._id],
     queryFn: async () => {
-      const res = await financeDashboardService.getExpenseBreakdown()
+      const res = await financeDashboardService.getExpenseBreakdown(sessionFilter)
       return res.data || []
-    }
+    },
+    enabled: !!currentSession
   })
 
   // Income breakdown
   const { data: incomeBreakdown = [] } = useQuery({
-    queryKey: ['finance-income-breakdown'],
+    queryKey: ['finance-income-breakdown', currentSession?._id],
     queryFn: async () => {
-      const res = await financeDashboardService.getIncomeBreakdown()
+      const res = await financeDashboardService.getIncomeBreakdown(sessionFilter)
       return res.data || []
-    }
+    },
+    enabled: !!currentSession
   })
 
   // Fee collection rate
   const { data: feeCollectionRate } = useQuery({
-    queryKey: ['finance-fee-collection-rate'],
+    queryKey: ['finance-fee-collection-rate', currentSession?._id],
     queryFn: async () => {
-      const res = await financeDashboardService.getFeeCollectionRate()
+      const res = await financeDashboardService.getFeeCollectionRate(sessionFilter)
       return res.data
-    }
+    },
+    enabled: !!currentSession
   })
 
   // Export combined report
@@ -83,7 +101,7 @@ const FinanceDashboard = () => {
       const now = new Date()
       const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
       const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
-      const blob = await financeDashboardService.getReport({ startDate, endDate, format: 'csv' })
+      const blob = await financeDashboardService.getReport({ startDate, endDate, format: 'csv', academicSessionId: currentSession?._id })
       const url = window.URL.createObjectURL(new Blob([blob]))
       const a = document.createElement('a')
       a.href = url
@@ -96,7 +114,8 @@ const FinanceDashboard = () => {
     }
   }
 
-  if (dashLoading) return <LoadingSpinner />
+  if (sessionLoading || dashLoading) return <LoadingSpinner />
+  if (!currentSession) return <EmptyState icon={Calendar} title="No active academic session" description="Please activate an academic session first" />
 
   // Chart data: Income vs Expense comparison
   const comparisonChartData = {
@@ -152,7 +171,10 @@ const FinanceDashboard = () => {
       <div className="page-header mb-6">
         <div>
           <h1 className="page-title">Finance Dashboard</h1>
-          <p className="page-subtitle">Overview of income, expenses, and net balance</p>
+          <AcademicSessionSelector
+            selectedSessionId={currentSession._id}
+            onSessionChange={setSelectedSession}
+          />
         </div>
         <div className="flex gap-2">
           <button onClick={async () => { if (!printRef.current) return; setIsPrintLoading(true); try { await highQualityPrint(printRef.current, 'Finance-Dashboard', { scale: 2, format: 'a4', orientation: 'landscape', margin: 10 }); } catch (e) { console.error('Print failed:', e); toast.error('Failed to prepare print.'); } finally { setIsPrintLoading(false); } }} disabled={isPrintLoading} className="btn btn-outline"><Printer className="h-4 w-4 mr-2" />{isPrintLoading ? 'Preparing...' : 'Print'}</button>

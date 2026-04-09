@@ -29,6 +29,12 @@ const paymentAttemptSchema = new mongoose.Schema({
     index: true
   },
 
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
+
   // Combined payment: multiple invoices paid in one transaction
   invoiceIds: [{
     type: mongoose.Schema.Types.ObjectId,

@@ -124,7 +124,8 @@ const payrollService = {
             leaveDeduction,
             netSalary,
             generatedBy,
-            generatedAt: new Date()
+            generatedAt: new Date(),
+            academicSessionId: options.academicSessionId || undefined
           };
 
           console.log(`Creating payroll for ${employee.name} with data:`, JSON.stringify(payrollData, null, 2));

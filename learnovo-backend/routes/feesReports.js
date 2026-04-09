@@ -33,6 +33,8 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
       isReversed: false
     };
 
+    if (sessionObjectId) collectedFilter.academicSessionId = sessionObjectId;
+
     if (startDate || endDate) {
       collectedFilter.paymentDate = {};
       if (startDate) collectedFilter.paymentDate.$gte = new Date(startDate);
@@ -51,15 +53,16 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
     thisMonthStart.setDate(1);
     thisMonthStart.setHours(0, 0, 0, 0);
 
+    const thisMonthFilter = {
+      tenantId,
+      isConfirmed: true,
+      isReversed: false,
+      paymentDate: { $gte: thisMonthStart }
+    };
+    if (sessionObjectId) thisMonthFilter.academicSessionId = sessionObjectId;
+
     const thisMonthAgg = await Payment.aggregate([
-      {
-        $match: {
-          tenantId,
-          isConfirmed: true,
-          isReversed: false,
-          paymentDate: { $gte: thisMonthStart }
-        }
-      },
+      { $match: thisMonthFilter },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]);
 
@@ -83,24 +86,24 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
     const totalPending = pendingAgg.length > 0 ? pendingAgg[0].total : 0;
 
     // Overdue Amount
+    const overdueFilter = { tenantId, status: 'Overdue' };
+    if (sessionObjectId) overdueFilter.academicSessionId = sessionObjectId;
     const overdueAgg = await FeeInvoice.aggregate([
-      {
-        $match: {
-          tenantId,
-          status: 'Overdue'
-        }
-      },
+      { $match: overdueFilter },
       { $group: { _id: null, total: { $sum: '$balanceAmount' } } }
     ]);
 
     const totalOverdue = overdueAgg.length > 0 ? overdueAgg[0].total : 0;
 
     // Recent Payments
-    const recentPayments = await Payment.find({
+    const recentPaymentsFilter = {
       tenantId,
       isConfirmed: true,
       isReversed: false
-    })
+    };
+    if (sessionObjectId) recentPaymentsFilter.academicSessionId = sessionObjectId;
+
+    const recentPayments = await Payment.find(recentPaymentsFilter)
       .populate('studentId', 'name fullName studentId admissionNumber')
       .populate('invoiceId', 'invoiceNumber')
       .populate('collectedBy', 'name')
@@ -108,20 +111,19 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
       .limit(10);
 
     // Payment Method Breakdown
+    const methodFilter = {
+      tenantId,
+      isConfirmed: true,
+      isReversed: false
+    };
+    if (sessionObjectId) methodFilter.academicSessionId = sessionObjectId;
+    if (startDate || endDate) {
+      methodFilter.paymentDate = {};
+      if (startDate) methodFilter.paymentDate.$gte = new Date(startDate);
+      if (endDate) methodFilter.paymentDate.$lte = new Date(endDate);
+    }
     const methodBreakdown = await Payment.aggregate([
-      {
-        $match: {
-          tenantId,
-          isConfirmed: true,
-          isReversed: false,
-          ...(startDate || endDate ? {
-            paymentDate: {
-              ...(startDate ? { $gte: new Date(startDate) } : {}),
-              ...(endDate ? { $lte: new Date(endDate) } : {})
-            }
-          } : {})
-        }
-      },
+      { $match: methodFilter },
       {
         $group: {
           _id: '$paymentMethod',
@@ -256,13 +258,15 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, 
 // @access  Private (Admin, Accountant)
 router.get('/collection-report', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
-    const { startDate, endDate, classId, paymentMethod } = req.query;
+    const { startDate, endDate, classId, paymentMethod, academicSessionId } = req.query;
 
     const filter = {
       tenantId: req.user.tenantId,
       isConfirmed: true,
       isReversed: false
     };
+
+    if (academicSessionId) filter.academicSessionId = academicSessionId;
 
     if (startDate || endDate) {
       filter.paymentDate = {};
@@ -401,11 +405,14 @@ router.get('/class-wise-report', protect, authorize('admin', 'accountant'), asyn
       .populate('classId', 'name grade')
       .lean();
 
-    const payments = await Payment.find({
+    const paymentFilter = {
       tenantId: req.user.tenantId,
       isConfirmed: true,
       isReversed: false
-    }).populate({
+    };
+    if (academicSessionId) paymentFilter.academicSessionId = academicSessionId;
+
+    const payments = await Payment.find(paymentFilter).populate({
       path: 'invoiceId',
       populate: { path: 'classId', select: 'name grade' }
     }).lean();
@@ -536,14 +543,15 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
     }));
 
     const today = new Date().toISOString().split('T')[0];
+    const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, 'Fee Receipts Report');
     let buffer, contentType, ext;
 
     if (fmt === 'excel') {
-      buffer = ImportExportService.exportToExcel(data, columns, 'Receipts');
+      buffer = ImportExportService.exportToExcel(data, columns, 'Receipts', headerInfo);
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       ext = 'xlsx';
     } else {
-      buffer = await ImportExportService.exportToCSV(data, columns);
+      buffer = await ImportExportService.exportToCSV(data, columns, headerInfo);
       contentType = 'text/csv';
       ext = 'csv';
     }
@@ -640,14 +648,15 @@ router.get('/collection-report/export', protect, authorize('admin', 'accountant'
     }));
 
     const today = new Date().toISOString().split('T')[0];
+    const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, 'Fee Collection Report');
     let buffer, contentType, ext;
 
     if (fmt === 'excel') {
-      buffer = ImportExportService.exportToExcel(data, columns, 'Collection Report');
+      buffer = ImportExportService.exportToExcel(data, columns, 'Collection Report', headerInfo);
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       ext = 'xlsx';
     } else {
-      buffer = await ImportExportService.exportToCSV(data, columns);
+      buffer = await ImportExportService.exportToCSV(data, columns, headerInfo);
       contentType = 'text/csv';
       ext = 'csv';
     }

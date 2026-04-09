@@ -36,7 +36,8 @@ router.get('/export', protect, authorize('admin'), async(req, res) => {
       { key: 'createdAt', header: 'Applied On', format: (val) => val ? new Date(val).toLocaleDateString() : '' }
     ];
 
-    const csvBuffer = await ImportExportService.exportToCSV(admissions, columns);
+    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, 'Admissions List');
+    const csvBuffer = await ImportExportService.exportToCSV(admissions, columns, headerInfo);
     const filename = `admissions_export_${new Date().toISOString().split('T')[0]}.csv`;
 
     res.setHeader('Content-Type', 'text/csv');

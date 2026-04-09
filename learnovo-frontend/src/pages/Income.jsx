@@ -3,10 +3,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, List, Plus, Tags, BarChart3,
   Search, X, Edit, Trash2, Eye,
-  TrendingUp, IndianRupee, Clock,
+  TrendingUp, IndianRupee, Clock, Calendar,
   ChevronLeft, ChevronRight, Printer
 } from 'lucide-react'
 import { incomeService, incomeReportsService, incomeCategoriesService } from '../services/incomeService'
+import { academicSessionsService } from '../services/academicsService'
 import ExportColumnPicker from '../components/ExportColumnPicker'
 import { formatCurrency } from '../utils/formatCurrency'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,6 +18,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import EmptyState from '../components/EmptyState'
 import KpiCard from '../components/KpiCard'
 
+import AcademicSessionSelector from '../components/AcademicSessionSelector'
 import IncomeFormModal from '../components/income/IncomeFormModal'
 import IncomeDetailModal from '../components/income/IncomeDetailModal'
 import CategoryFormModal from '../components/income/CategoryFormModal'
@@ -75,6 +77,17 @@ const Income = () => {
 
   // ── Queries ────────────────────────────────────────────────────────────
 
+  const [selectedSession, setSelectedSession] = useState(null)
+
+  const { data: activeSession, isLoading: sessionLoading } = useQuery({
+    queryKey: ['income-active-session'],
+    queryFn: async () => { const res = await academicSessionsService.getActive(); return res.data },
+  })
+
+  // Default to active session on first load
+  const currentSession = selectedSession || activeSession
+  const isViewOnly = currentSession && !currentSession.isActive
+
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ['income-categories'],
     queryFn: async () => {
@@ -83,17 +96,18 @@ const Income = () => {
     },
   })
 
-  const isLoading = categoriesLoading
+  const isLoading = sessionLoading || categoriesLoading
 
   // Dashboard data
   const { data: dashboardQueryData } = useQuery({
-    queryKey: ['income-dashboard'],
+    queryKey: ['income-dashboard', currentSession?._id],
     queryFn: async () => {
+      const sessionFilter = { academicSessionId: currentSession._id }
       const [dashRes, monthRes, catRes, recentRes] = await Promise.all([
-        incomeReportsService.getDashboard(),
-        incomeReportsService.getMonthly(),
-        incomeReportsService.getByCategory(),
-        incomeService.list({ limit: 10, sortBy: 'incomeDate', sortOrder: 'desc' })
+        incomeReportsService.getDashboard(sessionFilter),
+        incomeReportsService.getMonthly(sessionFilter),
+        incomeReportsService.getByCategory(sessionFilter),
+        incomeService.list({ limit: 10, sortBy: 'incomeDate', sortOrder: 'desc', academicSessionId: currentSession._id })
       ])
       return {
         dashboardData: dashRes.data,
@@ -102,7 +116,7 @@ const Income = () => {
         recentIncome: recentRes.data || []
       }
     },
-    enabled: activeTab === 'dashboard',
+    enabled: !!currentSession && activeTab === 'dashboard',
   })
 
   const dashboardData = dashboardQueryData?.dashboardData || null
@@ -112,12 +126,12 @@ const Income = () => {
 
   // Income list
   const { data: incomeListData, isLoading: listLoading } = useQuery({
-    queryKey: ['income-list', debouncedFilters, pagination.page, pagination.limit],
+    queryKey: ['income-list', debouncedFilters, pagination.page, pagination.limit, currentSession?._id],
     queryFn: async () => {
-      const res = await incomeService.list({ ...debouncedFilters, page: pagination.page, limit: pagination.limit })
+      const res = await incomeService.list({ ...debouncedFilters, page: pagination.page, limit: pagination.limit, academicSessionId: currentSession?._id })
       return { incomes: res.data || [], pagination: res.pagination || { page: 1, limit: 20, total: 0, pages: 0 } }
     },
-    enabled: activeTab === 'list',
+    enabled: !!currentSession && activeTab === 'list',
     placeholderData: (prev) => prev,
   })
 
@@ -135,14 +149,14 @@ const Income = () => {
 
   // Reports
   const { data: reportsQueryData, isLoading: reportLoading } = useQuery({
-    queryKey: ['income-reports', reportMonth, reportYear],
+    queryKey: ['income-reports', reportMonth, reportYear, currentSession?._id],
     queryFn: async () => {
       const startDate = new Date(reportYear, reportMonth - 1, 1).toISOString()
       const endDate = new Date(reportYear, reportMonth, 0, 23, 59, 59).toISOString()
 
       const [catRes, listRes] = await Promise.all([
-        incomeReportsService.getByCategory({ startDate, endDate }),
-        incomeService.list({ startDate, endDate, limit: 100 })
+        incomeReportsService.getByCategory({ startDate, endDate, academicSessionId: currentSession?._id }),
+        incomeService.list({ startDate, endDate, limit: 100, academicSessionId: currentSession?._id })
       ])
       const reportCategoryData = catRes.data || []
       const incomesList = listRes.data || []
@@ -160,7 +174,7 @@ const Income = () => {
       const prevEndDate = new Date(reportYear, reportMonth - 1, 0, 23, 59, 59).toISOString()
       let prevTotal = 0
       try {
-        const prevCatRes = await incomeReportsService.getByCategory({ startDate: prevStartDate, endDate: prevEndDate })
+        const prevCatRes = await incomeReportsService.getByCategory({ startDate: prevStartDate, endDate: prevEndDate, academicSessionId: currentSession?._id })
         prevTotal = (prevCatRes.data || []).reduce((s, c) => s + c.total, 0)
       } catch {}
 
@@ -171,7 +185,7 @@ const Income = () => {
         reportCategoryData
       }
     },
-    enabled: activeTab === 'reports',
+    enabled: !!currentSession && activeTab === 'reports',
   })
 
   const reportData = reportsQueryData?.reportData || null
@@ -185,7 +199,7 @@ const Income = () => {
         await incomeService.update(editingIncome._id, data)
         toast.success('Income updated')
       } else {
-        await incomeService.create(data)
+        await incomeService.create({ ...data, academicSessionId: currentSession?._id })
         toast.success('Income added')
       }
       setShowIncomeForm(false)
@@ -301,6 +315,7 @@ const Income = () => {
   }
 
   if (isLoading) return <LoadingSpinner />
+  if (!currentSession) return <EmptyState icon={Calendar} title="No active academic session" description="Please activate an academic session first" />
 
   // Charts data
   const monthlyChartData = {
@@ -335,15 +350,20 @@ const Income = () => {
       <div className="page-header mb-6">
         <div>
           <h1 className="page-title">Income Management</h1>
-          <p className="page-subtitle">Track and manage school income</p>
+          <AcademicSessionSelector
+            selectedSessionId={currentSession._id}
+            onSessionChange={setSelectedSession}
+          />
         </div>
-        <button
-          onClick={() => { setEditingIncome(null); setShowIncomeForm(true) }}
-          className="btn btn-primary"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Income
-        </button>
+        {!isViewOnly && (
+          <button
+            onClick={() => { setEditingIncome(null); setShowIncomeForm(true) }}
+            className="btn btn-primary"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Income
+          </button>
+        )}
       </div>
 
       {/* Tabs */}

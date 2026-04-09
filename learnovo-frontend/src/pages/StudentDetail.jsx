@@ -452,6 +452,20 @@ const StudentDetail = () => {
                                         : 'N/A'}
                                 </p>
                             </div>
+                            {student.studentType && (
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Student Type</p>
+                                    <p className="text-sm font-medium mt-1">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                            student.studentType === 'new'
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                        }`}>
+                                            {student.studentType === 'new' ? 'New Admission' : 'Old Student'}
+                                        </span>
+                                    </p>
+                                </div>
+                            )}
                             <div>
                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Studied For</p>
                                 <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
@@ -619,10 +633,10 @@ const StudentDetail = () => {
                 {activeTab === 'fees' && (
                     <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Fee Details</h3>
-                        {student.isImported && (
+                        {student.isImported && student.studentType !== 'new' && (
                             <div className="flex items-center gap-2 p-3 mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-lg">
                                 <svg className="h-4 w-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
-                                <p className="text-xs text-blue-700 dark:text-blue-400">Admission fee not applicable (imported student)</p>
+                                <p className="text-xs text-blue-700 dark:text-blue-400">Admission fee not applicable (old student)</p>
                             </div>
                         )}
                         {student.fees && student.fees.length > 0 ? (

@@ -26,11 +26,17 @@ const expenseBudgetSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Budget amount is required'],
     min: [0, 'Budget amount cannot be negative']
+  },
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
   }
 }, {
   timestamps: true
 });
 
 expenseBudgetSchema.index({ tenantId: 1, category: 1, month: 1, year: 1 }, { unique: true });
+expenseBudgetSchema.index({ tenantId: 1, academicSessionId: 1 });
 
 module.exports = mongoose.model('ExpenseBudget', expenseBudgetSchema);

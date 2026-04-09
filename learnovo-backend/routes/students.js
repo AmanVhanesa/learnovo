@@ -332,6 +332,7 @@ router.get('/import/template', protect, authorize('admin'), planGate.requireActi
       'address',
       'penNumber', 'subDepartment', 'driverName',
       'isActive', 'deactivatedAt', 'removalDate', 'removalReason', 'removalNotes',
+      'studentType',
       // Optional: firstName, middleName, lastName for backward compatibility
       'firstName', 'middleName', 'lastName'
     ];
@@ -339,8 +340,8 @@ router.get('/import/template', protect, authorize('admin'), planGate.requireActi
     // Create header row
     const csvContent = `${fields.join(',')  }\n` +
       // Add sample rows — one active, one inactive
-      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,10,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,active,,,,,,,' + '\n' +
-      'Jane Smith,jane@example.com,9876543210,2009-08-20,female,ADM002,2,9,B,2024-2025,2023-04-01,8,B+,General,,Father Name,9876543212,,Mother Name,9876543213,,,456 Oak Ave,,,inactive,2025-03-15,2025-03-15,Transferred,Moved to another city,,,';
+      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,10,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,active,,,,,new,,,' + '\n' +
+      'Jane Smith,jane@example.com,9876543210,2009-08-20,female,ADM002,2,9,B,2024-2025,2023-04-01,8,B+,General,,Father Name,9876543212,,Mother Name,9876543213,,,456 Oak Ave,,,inactive,2025-03-15,2025-03-15,Transferred,Moved to another city,old,,,';
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.csv');
@@ -368,6 +369,7 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
       'address',
       'penNumber', 'subDepartment', 'driverName',
       'isActive', 'deactivatedAt', 'removalDate', 'removalReason', 'removalNotes',
+      'studentType',
       'firstName', 'middleName', 'lastName'
     ];
 
@@ -405,6 +407,7 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
       'removalDate': '',
       'removalReason': '',
       'removalNotes': '',
+      'studentType': 'new',
       'firstName': '',
       'middleName': '',
       'lastName': ''
@@ -443,6 +446,7 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
       'removalDate': '2025-03-15',
       'removalReason': 'Transferred',
       'removalNotes': 'Moved to another city',
+      'studentType': 'old',
       'firstName': '',
       'middleName': '',
       'lastName': ''
@@ -584,7 +588,11 @@ router.post('/import/preview', protect, authorize('admin'), planGate.requireActi
         'udisecode': 'udiseCode',
         'udise_code': 'udiseCode',
         'dateofjoining': 'dateOfJoining',
-        'date_of_joining': 'dateOfJoining'
+        'date_of_joining': 'dateOfJoining',
+        // Student type (old / new admission)
+        'studenttype': 'studentType',
+        'student_type': 'studentType',
+        'type': 'studentType'
       };
 
       // Normalize each field
@@ -1202,7 +1210,8 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
           fatherOrHusbandName: guardians.find(g => g.relation === 'Father')?.name || undefined,
           udiseCode: defaultUdiseCode,
           isActive: true,
-          isImported: true
+          isImported: true,
+          studentType: (row.studentType || '').toLowerCase() === 'old' ? 'old' : 'new'
         };
 
         // CRITICAL: Ensure fullName is ALWAYS set (required for students)
@@ -1885,10 +1894,20 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
       })
     );
 
+    // Get school name for report header
+    const ImportExportService = require('../services/importExportService');
+    const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, 'Student List');
+
     // ── CSV ─────────────────────────────────────────────────────────────────
     if (format === 'csv') {
       const csvQuote = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const reportHeader = [];
+      if (headerInfo.schoolName) reportHeader.push(`"${headerInfo.schoolName}"`);
+      reportHeader.push('"Student List"');
+      reportHeader.push(`"${headerInfo.dateTime}"`);
+      reportHeader.push('');
       const csvRows = [
+        ...reportHeader,
         headerLabels.map(csvQuote).join(','),
         ...rawRows.map(row => row.map(csvQuote).join(','))
       ];
@@ -1900,8 +1919,21 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
     // ── Excel (.xlsx) ────────────────────────────────────────────────────────
     if (format === 'excel') {
       const xlsx = require('xlsx');
-      const wsData = [headerLabels, ...rawRows];
+      const topRows = [];
+      if (headerInfo.schoolName) topRows.push([headerInfo.schoolName]);
+      topRows.push(['Student List']);
+      topRows.push([headerInfo.dateTime]);
+      topRows.push([]);
+      const wsData = [...topRows, headerLabels, ...rawRows];
       const ws = xlsx.utils.aoa_to_sheet(wsData);
+
+      // Merge header info rows across all columns
+      if (headerLabels.length > 1) {
+        ws['!merges'] = [];
+        for (let i = 0; i < topRows.length - 1; i++) {
+          ws['!merges'].push({ s: { r: i, c: 0 }, e: { r: i, c: headerLabels.length - 1 } });
+        }
+      }
 
       // Auto column widths
       const colWidths = headerLabels.map((h, i) => ({
@@ -1920,7 +1952,13 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
 
     // ── TXT (tab-delimited) ──────────────────────────────────────────────────
     if (format === 'txt') {
+      const txtHeader = [];
+      if (headerInfo.schoolName) txtHeader.push(headerInfo.schoolName);
+      txtHeader.push('Student List');
+      txtHeader.push(headerInfo.dateTime);
+      txtHeader.push('-'.repeat(50));
       const txtRows = [
+        ...txtHeader,
         headerLabels.join('\t'),
         ...rawRows.map(row => row.join('\t'))
       ];
@@ -1938,7 +1976,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
         });
         return obj;
       });
-      return res.status(200).json({ success: true, headers: headerLabels, rows: rawRows, data: result });
+      return res.status(200).json({ success: true, headers: headerLabels, rows: rawRows, data: result, schoolName: headerInfo.schoolName });
     }
 
     res.status(400).json({ success: false, message: `Unsupported format: ${format}` });

@@ -41,6 +41,12 @@ const paymentSchema = new mongoose.Schema({
     index: true
   },
 
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
+
   // Payment Details
   amount: {
     type: Number,

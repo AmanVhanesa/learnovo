@@ -238,8 +238,19 @@ async function persistWebhookLog(req, tenantCode, authPassed) {
  *
  * No auth required: the response carries no sensitive information.
  */
+/**
+ * Normalise a tenantCode path param. Strips surrounding whitespace
+ * (including stray %0A / %0D / %20 from copy-paste mishaps in test
+ * tools like Postman or Insomnia) and lowercases. The whitelist is
+ * stored lowercase, so this guarantees a deterministic match.
+ */
+function normaliseTenantCode(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.trim().toLowerCase();
+}
+
 router.get('/:tenantCode', (req, res) => {
-  const { tenantCode } = req.params;
+  const tenantCode = normaliseTenantCode(req.params.tenantCode);
   if (!ALLOWED_TENANT_CODES.has(tenantCode)) {
     return res.status(404).json({ success: false, message: 'Not found' });
   }
@@ -279,7 +290,7 @@ router.get('/:tenantCode', (req, res) => {
  * is matched first.
  */
 router.post('/:tenantCode', async(req, res) => {
-  const { tenantCode } = req.params;
+  const tenantCode = normaliseTenantCode(req.params.tenantCode);
   const requestId = req.requestId;
 
   // 1. Tenant gate — only whitelisted tenants are accepted. Return 404

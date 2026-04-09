@@ -66,6 +66,11 @@ const expenseSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
   // Cross-module reference for auto-created records (payroll, etc.)
   referenceType: {
     type: String,
@@ -98,6 +103,7 @@ expenseSchema.index({ tenantId: 1, category: 1 });
 expenseSchema.index({ tenantId: 1, expenseDate: -1 });
 expenseSchema.index({ tenantId: 1, isDeleted: 1 });
 expenseSchema.index({ tenantId: 1, academicYear: 1 });
+expenseSchema.index({ tenantId: 1, academicSessionId: 1 });
 expenseSchema.index({ tenantId: 1, referenceType: 1, referenceId: 1 }, { sparse: true });
 expenseSchema.index({ tenantId: 1, isSystemGenerated: 1 });
 

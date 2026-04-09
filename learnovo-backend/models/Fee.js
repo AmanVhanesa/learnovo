@@ -90,6 +90,11 @@ const feeSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
   term: {
     type: String,
     enum: ['1st_term', '2nd_term', '3rd_term', 'annual'],

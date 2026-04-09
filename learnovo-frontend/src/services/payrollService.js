@@ -13,6 +13,7 @@ const payrollService = {
             if (filters.year) params.append('year', filters.year);
             if (filters.employeeId) params.append('employeeId', filters.employeeId);
             if (filters.status) params.append('status', filters.status);
+            if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId);
 
             const response = await api.get(`/payroll?${params.toString()}`);
             return response.data;

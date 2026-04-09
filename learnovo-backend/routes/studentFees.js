@@ -931,7 +931,7 @@ router.post('/admin/verify-payment/:attemptId', protect, authorize('admin', 'acc
     // Auto-sync to Finance module (non-blocking, outside transaction)
     try {
       const student = await User.findById(attempt.studentId).select('name fullName').lean();
-      const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber').lean();
+      const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber academicSessionId').lean();
       await syncFeePaymentToIncome({
         tenantId: req.user.tenantId,
         paymentId: attempt._id,
@@ -942,7 +942,8 @@ router.post('/admin/verify-payment/:attemptId', protect, authorize('admin', 'acc
         invoiceNumber: inv?.invoiceNumber,
         addedBy: req.user._id,
         paymentReference: attempt.transactionRefId,
-        referenceModel: 'PaymentAttempt'
+        referenceModel: 'PaymentAttempt',
+        academicSessionId: inv?.academicSessionId
       });
     } catch (syncErr) {
       console.error('[Finance-AutoSync] admin verify sync failed (non-fatal):', syncErr.message);
@@ -1031,7 +1032,7 @@ router.post('/payment/notify', async(req, res) => {
       if (newStatus === 'SUCCESS') {
         try {
           const student = await User.findById(attempt.studentId).select('name fullName').lean();
-          const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber').lean();
+          const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber academicSessionId').lean();
           await syncFeePaymentToIncome({
             tenantId: attempt.tenantId,
             paymentId: attempt._id,
@@ -1042,7 +1043,8 @@ router.post('/payment/notify', async(req, res) => {
             invoiceNumber: inv?.invoiceNumber,
             addedBy: attempt.studentId,
             paymentReference: attempt.gatewayRefId,
-            referenceModel: 'PaymentAttempt'
+            referenceModel: 'PaymentAttempt',
+            academicSessionId: inv?.academicSessionId
           });
         } catch (syncErr) {
           console.error('[Finance-AutoSync] notify webhook sync failed (non-fatal):', syncErr.message);
@@ -1138,7 +1140,7 @@ router.post('/payment/razorpay-verify', protect, authorize('student'), async(req
       // Auto-sync to Finance module (non-blocking)
       try {
         const student = await User.findById(attempt.studentId).select('name fullName').lean();
-        const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber').lean();
+        const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber academicSessionId').lean();
         await syncFeePaymentToIncome({
           tenantId: attempt.tenantId,
           paymentId: attempt._id,
@@ -1149,7 +1151,8 @@ router.post('/payment/razorpay-verify', protect, authorize('student'), async(req
           invoiceNumber: inv?.invoiceNumber,
           addedBy: attempt.studentId,
           paymentReference: razorpay_payment_id,
-          referenceModel: 'PaymentAttempt'
+          referenceModel: 'PaymentAttempt',
+          academicSessionId: inv?.academicSessionId
         });
       } catch (syncErr) {
         console.error('[Finance-AutoSync] Razorpay verify sync failed (non-fatal):', syncErr.message);
@@ -1260,7 +1263,7 @@ router.post('/payment/icici-return', express.urlencoded({ extended: true }), asy
         // Auto-sync to Finance module (non-blocking, outside transaction)
         try {
           const student = await User.findById(attempt.studentId).select('name fullName').lean();
-          const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber').lean();
+          const inv = await FeeInvoice.findById(attempt.invoiceId).select('invoiceNumber academicSessionId').lean();
           await syncFeePaymentToIncome({
             tenantId: attempt.tenantId,
             paymentId: attempt._id,
@@ -1271,7 +1274,8 @@ router.post('/payment/icici-return', express.urlencoded({ extended: true }), asy
             invoiceNumber: inv?.invoiceNumber,
             addedBy: attempt.studentId,
             paymentReference: parsed.uniqueRefNumber,
-            referenceModel: 'PaymentAttempt'
+            referenceModel: 'PaymentAttempt',
+            academicSessionId: inv?.academicSessionId
           });
         } catch (syncErr) {
           console.error('[Finance-AutoSync] ICICI return sync failed (non-fatal):', syncErr.message);

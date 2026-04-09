@@ -283,6 +283,7 @@ exports.verifyPayment = async(req, res, next) => {
       receiptNumber,
       studentId: paymentOrder.studentId,
       invoiceId: paymentOrder.invoiceId,
+      academicSessionId: invoice?.academicSessionId,
       amount: paymentOrder.amount,
       paymentMethod: 'Online',
       paymentDate: new Date(),
@@ -310,7 +311,8 @@ exports.verifyPayment = async(req, res, next) => {
         invoiceNumber: invoice?.invoiceNumber,
         addedBy: req.user._id,
         paymentReference: razorpay_payment_id,
-        referenceModel: 'FeePaymentOrder'
+        referenceModel: 'FeePaymentOrder',
+        academicSessionId: invoice?.academicSessionId
       });
     } catch (syncErr) {
       logger.error('[Finance-AutoSync] verifyPayment sync failed (non-fatal)', syncErr);
@@ -445,6 +447,7 @@ exports.handleWebhook = async(req, res) => {
           receiptNumber,
           studentId: paymentOrder.studentId,
           invoiceId: paymentOrder.invoiceId,
+          academicSessionId: invoice?.academicSessionId,
           amount: paymentOrder.amount,
           paymentMethod: 'Online',
           paymentDate: new Date(),
@@ -472,7 +475,8 @@ exports.handleWebhook = async(req, res) => {
             invoiceNumber: invoice?.invoiceNumber,
             addedBy: paymentOrder.paidBy,
             paymentReference: paymentId,
-            referenceModel: 'FeePaymentOrder'
+            referenceModel: 'FeePaymentOrder',
+            academicSessionId: invoice?.academicSessionId
           });
         } catch (syncErr) {
           logger.error('[Finance-AutoSync] webhook sync failed (non-fatal)', syncErr);

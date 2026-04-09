@@ -2108,10 +2108,10 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                 }
             } else if (feeFrequency === 'Quarterly') {
                 const quarterMonths = {
-                    1: 'Jan-Mar',
-                    2: 'Apr-Jun',
-                    3: 'Jul-Sep',
-                    4: 'Oct-Dec'
+                    1: 'Apr-Jun',
+                    2: 'Jul-Sep',
+                    3: 'Oct-Dec',
+                    4: 'Jan-Mar'
                 }
                 billingPeriod = {
                     quarter: form.billingQuarter,
@@ -2239,10 +2239,10 @@ const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSucce
                                                 value={form.billingQuarter}
                                                 onChange={(e) => setForm({ ...form, billingQuarter: parseInt(e.target.value) })}
                                             >
-                                                <option value="1">Q1 (Jan-Mar)</option>
-                                                <option value="2">Q2 (Apr-Jun)</option>
-                                                <option value="3">Q3 (Jul-Sep)</option>
-                                                <option value="4">Q4 (Oct-Dec)</option>
+                                                <option value="1">Q1 (Apr-Jun)</option>
+                                                <option value="2">Q2 (Jul-Sep)</option>
+                                                <option value="3">Q3 (Oct-Dec)</option>
+                                                <option value="4">Q4 (Jan-Mar)</option>
                                             </select>
                                         </div>
                                         <div>
@@ -2357,10 +2357,10 @@ const BulkInvoiceForm = ({ classes, feeStructures, activeSession, onSuccess }) =
                 }
             } else if (feeFrequency === 'Quarterly') {
                 const quarterMonths = {
-                    1: 'Jan-Mar',
-                    2: 'Apr-Jun',
-                    3: 'Jul-Sep',
-                    4: 'Oct-Dec'
+                    1: 'Apr-Jun',
+                    2: 'Jul-Sep',
+                    3: 'Oct-Dec',
+                    4: 'Jan-Mar'
                 }
                 billingPeriod = {
                     quarter: form.billingQuarter,
@@ -2486,10 +2486,10 @@ const BulkInvoiceForm = ({ classes, feeStructures, activeSession, onSuccess }) =
                                     value={form.billingQuarter}
                                     onChange={(e) => setForm({ ...form, billingQuarter: parseInt(e.target.value) })}
                                 >
-                                    <option value="1">Q1 (Jan-Mar)</option>
-                                    <option value="2">Q2 (Apr-Jun)</option>
-                                    <option value="3">Q3 (Jul-Sep)</option>
-                                    <option value="4">Q4 (Oct-Dec)</option>
+                                    <option value="1">Q1 (Apr-Jun)</option>
+                                    <option value="2">Q2 (Jul-Sep)</option>
+                                    <option value="3">Q3 (Oct-Dec)</option>
+                                    <option value="4">Q4 (Jan-Mar)</option>
                                 </select>
                             </div>
                             <div>

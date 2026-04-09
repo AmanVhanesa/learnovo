@@ -443,16 +443,16 @@ function generatePeriodsForPlan(plan, year) {
 
   case 'quarterly':
     return [
-      { quarter: 1, year: currentYear, displayText: `Q1 ${currentYear} (Jan-Mar)` },
-      { quarter: 2, year: currentYear, displayText: `Q2 ${currentYear} (Apr-Jun)` },
-      { quarter: 3, year: currentYear, displayText: `Q3 ${currentYear} (Jul-Sep)` },
-      { quarter: 4, year: currentYear, displayText: `Q4 ${currentYear} (Oct-Dec)` }
+      { quarter: 1, year: currentYear, displayText: `Q1 ${currentYear} (Apr-Jun)` },
+      { quarter: 2, year: currentYear, displayText: `Q2 ${currentYear} (Jul-Sep)` },
+      { quarter: 3, year: currentYear, displayText: `Q3 ${currentYear} (Oct-Dec)` },
+      { quarter: 4, year: currentYear + 1, displayText: `Q4 ${currentYear + 1} (Jan-Mar)` }
     ];
 
   case 'half-yearly':
     return [
-      { quarter: 1, year: currentYear, displayText: `H1 ${currentYear} (Jan-Jun)` },
-      { quarter: 3, year: currentYear, displayText: `H2 ${currentYear} (Jul-Dec)` }
+      { quarter: 1, year: currentYear, displayText: `H1 ${currentYear} (Apr-Sep)` },
+      { quarter: 3, year: currentYear, displayText: `H2 ${currentYear} (Oct-Mar)` }
     ];
 
   case 'annual':
@@ -462,10 +462,10 @@ function generatePeriodsForPlan(plan, year) {
 
   default:
     return [
-      { quarter: 1, year: currentYear, displayText: `Q1 ${currentYear} (Jan-Mar)` },
-      { quarter: 2, year: currentYear, displayText: `Q2 ${currentYear} (Apr-Jun)` },
-      { quarter: 3, year: currentYear, displayText: `Q3 ${currentYear} (Jul-Sep)` },
-      { quarter: 4, year: currentYear, displayText: `Q4 ${currentYear} (Oct-Dec)` }
+      { quarter: 1, year: currentYear, displayText: `Q1 ${currentYear} (Apr-Jun)` },
+      { quarter: 2, year: currentYear, displayText: `Q2 ${currentYear} (Jul-Sep)` },
+      { quarter: 3, year: currentYear, displayText: `Q3 ${currentYear} (Oct-Dec)` },
+      { quarter: 4, year: currentYear + 1, displayText: `Q4 ${currentYear + 1} (Jan-Mar)` }
     ];
   }
 }
@@ -1005,7 +1005,8 @@ router.post('/mid-year', protect, authorize('admin'), [
     const applicablePeriods = allPeriods.filter(period => {
       if (period.month) return period.month >= admissionMonth;
       if (period.quarter) {
-        const quarterStartMonth = (period.quarter - 1) * 3 + 1;
+        // Academic quarters: Q1=Apr(4), Q2=Jul(7), Q3=Oct(10), Q4=Jan(1)
+        const quarterStartMonth = period.quarter <= 3 ? (period.quarter - 1) * 3 + 4 : 1;
         return quarterStartMonth + 2 >= admissionMonth; // Include if quarter overlaps
       }
       return true; // annual / one-time

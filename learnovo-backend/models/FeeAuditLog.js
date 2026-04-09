@@ -47,6 +47,13 @@ const feeAuditLogSchema = new mongoose.Schema({
     index: true
   },
 
+  // Academic Session
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
+
   // User Details
   userId: {
     type: mongoose.Schema.Types.ObjectId,

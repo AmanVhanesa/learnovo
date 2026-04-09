@@ -577,8 +577,17 @@ router.get('/students/export', protect, async(req, res) => {
       });
     });
 
+    // Get school name for header
+    const ImportExportService = require('../services/importExportService');
+    const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, `Attendance Report — ${classDoc?.name || 'Class'} (${month}/${year})`);
+
     // Build CSV
-    let csv = 'S.No,Student Name,Admission No';
+    let csv = '';
+    if (headerInfo.schoolName) csv += `"${headerInfo.schoolName}"\n`;
+    csv += `"Attendance Report — ${classDoc?.name || 'Class'} (${month}/${year})"\n`;
+    csv += `"${headerInfo.dateTime}"\n\n`;
+
+    csv += 'S.No,Student Name,Admission No';
     for (let d = 1; d <= daysInMonth; d++) csv += `,${d}`;
     csv += ',Total Present,Total Absent,Attendance %\n';
 

@@ -31,6 +31,12 @@ const receiptSchema = new mongoose.Schema({
     index: true
   },
 
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
+
   // Auto-generated receipt number via Counter model (unique per tenant)
   receiptNumber: {
     type: String,

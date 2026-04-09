@@ -342,17 +342,26 @@ feeInvoiceSchema.statics.calculateBillingPeriod = function(date, frequency) {
       displayText: `${this.getMonthName(month)} ${year}`
     };
   } else if (frequency === 'Quarterly') {
-    const quarter = Math.ceil(month / 3);
-    const quarterMonths = {
-      1: 'Jan-Mar',
-      2: 'Apr-Jun',
-      3: 'Jul-Sep',
-      4: 'Oct-Dec'
+    // Academic-year quarters: Q1=Apr-Jun, Q2=Jul-Sep, Q3=Oct-Dec, Q4=Jan-Mar
+    const academicQuarterMap = {
+      1: { quarter: 4, months: 'Jan-Mar' },  // Jan-Mar = Q4 of previous academic year
+      2: { quarter: 4, months: 'Jan-Mar' },
+      3: { quarter: 4, months: 'Jan-Mar' },
+      4: { quarter: 1, months: 'Apr-Jun' },
+      5: { quarter: 1, months: 'Apr-Jun' },
+      6: { quarter: 1, months: 'Apr-Jun' },
+      7: { quarter: 2, months: 'Jul-Sep' },
+      8: { quarter: 2, months: 'Jul-Sep' },
+      9: { quarter: 2, months: 'Jul-Sep' },
+      10: { quarter: 3, months: 'Oct-Dec' },
+      11: { quarter: 3, months: 'Oct-Dec' },
+      12: { quarter: 3, months: 'Oct-Dec' }
     };
+    const { quarter, months } = academicQuarterMap[month];
     return {
       quarter,
       year,
-      displayText: `Q${quarter} ${year} (${quarterMonths[quarter]})`
+      displayText: `Q${quarter} ${year} (${months})`
     };
   } else if (frequency === 'Annual') {
     return {

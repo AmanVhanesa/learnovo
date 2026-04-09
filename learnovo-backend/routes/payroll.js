@@ -17,6 +17,7 @@ const router = express.Router();
 router.get('/export', protect, authorize('admin'), async(req, res) => {
   try {
     const filter = { tenantId: req.user.tenantId, isDeleted: { $ne: true } };
+    if (req.query.academicSessionId) filter.academicSessionId = req.query.academicSessionId;
     if (req.query.month) filter.month = parseInt(req.query.month);
     if (req.query.year) filter.year = parseInt(req.query.year);
     if (req.query.status) filter.paymentStatus = req.query.status;
@@ -47,9 +48,10 @@ router.get('/export', protect, authorize('admin'), async(req, res) => {
       { key: 'paymentMethod', header: 'Payment Method' }
     ];
 
-    const csvBuffer = await ImportExportService.exportToCSV(records, columns);
     const monthLabel = req.query.month ? MONTH_NAMES[parseInt(req.query.month) - 1] : 'all';
     const yearLabel = req.query.year || 'all';
+    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, `Payroll Report — ${monthLabel} ${yearLabel}`);
+    const csvBuffer = await ImportExportService.exportToCSV(records, columns, headerInfo);
     const filename = `payroll_export_${monthLabel}_${yearLabel}.csv`;
 
     res.setHeader('Content-Type', 'text/csv');
@@ -72,10 +74,11 @@ router.get('/', protect, authorize('admin'), [
   handleValidationErrors
 ], async(req, res) => {
   try {
-    const { page, limit, month, year, employeeId, status } = req.query;
+    const { page, limit, month, year, employeeId, status, academicSessionId } = req.query;
 
     // Build filter (use $ne: true to include records where isDeleted doesn't exist or is false)
     const filter = { tenantId: req.user.tenantId, isDeleted: { $ne: true } };
+    if (academicSessionId) filter.academicSessionId = academicSessionId;
     if (month) filter.month = parseInt(month);
     if (year) filter.year = parseInt(year);
     if (employeeId) filter.employeeId = employeeId;
@@ -140,12 +143,16 @@ router.post('/generate', protect, authorize('admin'), [
   try {
     const { month, year, overwrite, bonuses, deductions } = req.body;
 
+    // Look up active academic session for this tenant
+    const AcademicSession = require('../models/AcademicSession');
+    const activeSession = await AcademicSession.findOne({ tenantId: req.user.tenantId, isActive: true }).select('_id').lean();
+
     const result = await payrollService.generateMonthlyPayroll(
       req.user.tenantId,
       month,
       year,
       req.user._id,
-      { overwrite, bonuses, deductions }
+      { overwrite, bonuses, deductions, academicSessionId: activeSession?._id }
     );
 
     if (!result.success) {
@@ -216,6 +223,8 @@ router.put('/:id', protect, authorize('admin'), [
     if (paymentStatus === 'paid' && previousStatus !== 'paid') {
       try {
         const employee = await User.findById(payroll.employeeId).select('name fullName').lean();
+        const AcademicSession = require('../models/AcademicSession');
+        const activeSession = await AcademicSession.findOne({ tenantId: payroll.tenantId, isActive: true }).select('_id').lean();
         await syncPayrollToExpense({
           tenantId: payroll.tenantId,
           payrollId: payroll._id,
@@ -226,7 +235,8 @@ router.put('/:id', protect, authorize('admin'), [
           year: payroll.year,
           employeeName: employee?.fullName || employee?.name || 'Employee',
           addedBy: req.user._id,
-          paymentReference: payroll.paymentReference
+          paymentReference: payroll.paymentReference,
+          academicSessionId: activeSession?._id
         });
       } catch (syncErr) {
         console.error('[Finance-AutoSync] payroll paid sync failed (non-fatal):', syncErr.message);

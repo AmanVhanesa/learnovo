@@ -1709,12 +1709,13 @@ router.get('/support-tickets/export', async(req, res) => {
       .limit(5000)
       .lean();
 
+    const reportHeader = `"Learnovo Platform"\n"Support Tickets Export"\n"Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}"\n\n`;
     const headers = 'Ticket ID,Subject,School,Status,Priority,Category,Created At,Resolved At\n';
     const rows = tickets.map(t =>
       `"${t._id}","${t.subject || ''}","${t.tenantId?.schoolName || ''}","${t.status}","${t.priority || ''}","${t.category || ''}","${t.createdAt?.toISOString()}","${t.resolvedAt?.toISOString() || ''}"`
     );
 
-    const csv = headers + rows.join('\n');
+    const csv = reportHeader + headers + rows.join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="support-tickets-export.csv"');
     return res.send(csv);
@@ -2610,7 +2611,9 @@ router.get('/reports/export/:type', async(req, res) => {
       return res.status(400).json({ success: false, message: `Unknown report type: ${type}`, requestId: req.requestId });
     }
 
-    const csv = headers + data.join('\n');
+    const reportTitle = type === 'tenants' ? 'Tenants Report' : type === 'users' ? 'Users Report' : 'Revenue Report';
+    const reportHeader = `"Learnovo Platform"\n"${reportTitle}"\n"Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}"\n\n`;
+    const csv = reportHeader + headers + data.join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.send(csv);
@@ -2875,12 +2878,13 @@ router.get('/audit-logs/export', async(req, res) => {
       .limit(10000)
       .lean();
 
+    const reportHeader = `"Learnovo Platform"\n"Audit Logs Export"\n"Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}"\n\n`;
     const headers = 'Timestamp,Admin,Action,Target Type,Target ID,IP\n';
     const rows = logs.map(l =>
       `"${l.timestamp?.toISOString()}","${l.superAdminId?.name || ''}","${l.action}","${l.targetType || ''}","${l.targetId || ''}","${l.ip || ''}"`
     );
 
-    const csv = headers + rows.join('\n');
+    const csv = reportHeader + headers + rows.join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="audit-logs-export.csv"');
     return res.send(csv);

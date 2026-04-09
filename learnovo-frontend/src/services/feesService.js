@@ -138,6 +138,7 @@ export const paymentsService = {
     if (filters.startDate) params.append('startDate', filters.startDate)
     if (filters.endDate) params.append('endDate', filters.endDate)
     if (filters.isConfirmed !== undefined) params.append('isConfirmed', filters.isConfirmed)
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
 
     const url = `/invoices/payments${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)

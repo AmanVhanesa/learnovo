@@ -212,18 +212,51 @@ class ImportExportService {
   }
 
   /**
+     * Build CSV/Excel header rows from headerInfo
+     * @param {Object} headerInfo - { schoolName, reportTitle, dateTime }
+     * @param {number} colCount - Number of columns (for padding empty cells)
+     * @returns {Array<string>} Array of pre-formatted CSV lines
+     */
+  static buildHeaderLines(headerInfo, colCount) {
+    if (!headerInfo) return [];
+    const lines = [];
+    const pad = (val) => {
+      const extra = Array(Math.max(0, colCount - 1)).fill('').join(',');
+      return `"${(val || '').replace(/"/g, '""')}"${extra}`;
+    };
+    if (headerInfo.schoolName) {
+      lines.push(pad(headerInfo.schoolName));
+    }
+    if (headerInfo.reportTitle) {
+      lines.push(pad(headerInfo.reportTitle));
+    }
+    if (headerInfo.dateTime !== false) {
+      const dt = headerInfo.dateTime || `Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}`;
+      lines.push(pad(dt));
+    }
+    lines.push(''); // blank line before data
+    return lines;
+  }
+
+  /**
      * Export data to CSV
      * @param {Array} data - Array of objects to export
      * @param {Array} columns - Column definitions [{ key: 'field', header: 'Header' }]
-     * @param {string} filename - Output filename
+     * @param {Object} headerInfo - Optional { schoolName, reportTitle, dateTime } for report header
      * @returns {Promise<Buffer>} CSV buffer
      */
-  static async exportToCSV(data, columns) {
+  static async exportToCSV(data, columns, headerInfo = null) {
     return new Promise((resolve, reject) => {
       const csvRows = [];
 
       const headers = columns.map(col => col.header || col.key);
       const _keys = columns.map(col => col.key);
+
+      // Add report header lines (school name, title, date)
+      const headerLines = this.buildHeaderLines(headerInfo, headers.length);
+      if (headerLines.length > 0) {
+        csvRows.push(`${headerLines.join('\n')}\n`);
+      }
 
       const stream = format({ headers: headers });
 
@@ -249,9 +282,10 @@ class ImportExportService {
      * @param {Array} data - Array of objects to export
      * @param {Array} columns - Column definitions
      * @param {string} sheetName - Sheet name
+     * @param {Object} headerInfo - Optional { schoolName, reportTitle, dateTime } for report header
      * @returns {Buffer} Excel buffer
      */
-  static exportToExcel(data, columns, sheetName = 'Sheet1') {
+  static exportToExcel(data, columns, sheetName = 'Sheet1', headerInfo = null) {
     // Prepare data with headers
     const headers = columns.map(col => col.header || col.key);
     const rows = data.map(item => {
@@ -261,9 +295,30 @@ class ImportExportService {
       });
     });
 
+    // Build header rows for school name, report title, date
+    const topRows = [];
+    if (headerInfo) {
+      if (headerInfo.schoolName) topRows.push([headerInfo.schoolName]);
+      if (headerInfo.reportTitle) topRows.push([headerInfo.reportTitle]);
+      const dt = headerInfo.dateTime || `Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}`;
+      if (headerInfo.dateTime !== false) topRows.push([dt]);
+      topRows.push([]); // blank row
+    }
+
     // Create worksheet
-    const wsData = [headers, ...rows];
+    const wsData = [...topRows, headers, ...rows];
     const worksheet = xlsx.utils.aoa_to_sheet(wsData);
+
+    // Style header info rows — merge across all columns
+    if (headerInfo && headers.length > 1) {
+      if (!worksheet['!merges']) worksheet['!merges'] = [];
+      for (let i = 0; i < topRows.length - 1; i++) { // -1 to skip blank row
+        worksheet['!merges'].push({ s: { r: i, c: 0 }, e: { r: i, c: headers.length - 1 } });
+      }
+    }
+
+    // Set column widths based on header lengths
+    worksheet['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 15) }));
 
     // Create workbook
     const workbook = xlsx.utils.book_new();
@@ -334,6 +389,35 @@ class ImportExportService {
      */
   static sanitizeFilename(filename) {
     return filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+  }
+
+  /**
+     * Get export header info from tenant
+     * @param {string} tenantId - Tenant ID
+     * @param {string} reportTitle - Title for the report (e.g., "Employee List")
+     * @returns {Promise<Object>} { schoolName, reportTitle, dateTime }
+     */
+  static async getExportHeaderInfo(tenantId, reportTitle) {
+    let schoolName = '';
+    try {
+      const Settings = require('mongoose').model('Settings');
+      const settings = await Settings.findOne({ tenantId });
+      schoolName = settings?.institution?.name || '';
+    } catch (_e) {
+      // Fallback: try Tenant model
+      try {
+        const Tenant = require('../models/Tenant');
+        const tenant = await Tenant.findById(tenantId).select('schoolName').lean();
+        schoolName = tenant?.schoolName || '';
+      } catch (_e2) {
+        // silently continue without school name
+      }
+    }
+    return {
+      schoolName,
+      reportTitle,
+      dateTime: `Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}`
+    };
   }
 }
 

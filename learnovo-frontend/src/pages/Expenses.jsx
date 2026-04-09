@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, List, Plus, Tags, PiggyBank, BarChart3,
   Search, X, Check, Ban, Edit, Trash2, Eye,
-  TrendingUp, TrendingDown, AlertTriangle, IndianRupee, Clock,
+  TrendingUp, TrendingDown, AlertTriangle, IndianRupee, Clock, Calendar,
   ChevronLeft, ChevronRight, Printer
 } from 'lucide-react'
 import { expensesService, expenseReportsService, expenseCategoriesService, expenseBudgetService } from '../services/expensesService'
+import { academicSessionsService } from '../services/academicsService'
 import ExportColumnPicker from '../components/ExportColumnPicker'
 import { formatCurrency } from '../utils/formatCurrency'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,6 +19,7 @@ import EmptyState from '../components/EmptyState'
 import StatusBadge from '../components/StatusBadge'
 import KpiCard from '../components/KpiCard'
 
+import AcademicSessionSelector from '../components/AcademicSessionSelector'
 import ExpenseFormModal from '../components/expenses/ExpenseFormModal'
 import ExpenseDetailModal from '../components/expenses/ExpenseDetailModal'
 import CategoryFormModal from '../components/expenses/CategoryFormModal'
@@ -86,6 +88,16 @@ const Expenses = () => {
 
   // ── Queries ────────────────────────────────────────────────────────────
 
+  const [selectedSession, setSelectedSession] = useState(null)
+
+  const { data: activeSession, isLoading: sessionLoading } = useQuery({
+    queryKey: ['expense-active-session'],
+    queryFn: async () => { const res = await academicSessionsService.getActive(); return res.data },
+  })
+
+  const currentSession = selectedSession || activeSession
+  const isViewOnly = currentSession && !currentSession.isActive
+
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ['expense-categories'],
     queryFn: async () => {
@@ -94,17 +106,18 @@ const Expenses = () => {
     },
   })
 
-  const isLoading = categoriesLoading
+  const isLoading = sessionLoading || categoriesLoading
 
   // Dashboard data
   const { data: dashboardQueryData } = useQuery({
-    queryKey: ['expense-dashboard'],
+    queryKey: ['expense-dashboard', currentSession?._id],
     queryFn: async () => {
+      const sessionFilter = { academicSessionId: currentSession._id }
       const [dashRes, monthRes, catRes, recentRes] = await Promise.all([
-        expenseReportsService.getDashboard(),
-        expenseReportsService.getMonthly(),
-        expenseReportsService.getByCategory(),
-        expensesService.list({ limit: 10, sortBy: 'expenseDate', sortOrder: 'desc' })
+        expenseReportsService.getDashboard(sessionFilter),
+        expenseReportsService.getMonthly(sessionFilter),
+        expenseReportsService.getByCategory(sessionFilter),
+        expensesService.list({ limit: 10, sortBy: 'expenseDate', sortOrder: 'desc', academicSessionId: currentSession._id })
       ])
       return {
         dashboardData: dashRes.data,
@@ -113,7 +126,7 @@ const Expenses = () => {
         recentExpenses: recentRes.data || []
       }
     },
-    enabled: activeTab === 'dashboard',
+    enabled: !!currentSession && activeTab === 'dashboard',
   })
 
   const dashboardData = dashboardQueryData?.dashboardData || null
@@ -123,12 +136,12 @@ const Expenses = () => {
 
   // Expenses list
   const { data: expensesListData, isLoading: listLoading } = useQuery({
-    queryKey: ['expenses-list', debouncedFilters, pagination.page, pagination.limit],
+    queryKey: ['expenses-list', debouncedFilters, pagination.page, pagination.limit, currentSession?._id],
     queryFn: async () => {
-      const res = await expensesService.list({ ...debouncedFilters, page: pagination.page, limit: pagination.limit })
+      const res = await expensesService.list({ ...debouncedFilters, page: pagination.page, limit: pagination.limit, academicSessionId: currentSession?._id })
       return { expenses: res.data || [], pagination: res.pagination || { page: 1, limit: 20, total: 0, pages: 0 } }
     },
-    enabled: activeTab === 'list',
+    enabled: !!currentSession && activeTab === 'list',
     placeholderData: (prev) => prev,
   })
 
@@ -158,14 +171,14 @@ const Expenses = () => {
 
   // Reports
   const { data: reportsQueryData, isLoading: reportLoading } = useQuery({
-    queryKey: ['expense-reports', reportMonth, reportYear],
+    queryKey: ['expense-reports', reportMonth, reportYear, currentSession?._id],
     queryFn: async () => {
       const startDate = new Date(reportYear, reportMonth - 1, 1).toISOString()
       const endDate = new Date(reportYear, reportMonth, 0, 23, 59, 59).toISOString()
 
       const [catRes, listRes] = await Promise.all([
-        expenseReportsService.getByCategory({ startDate, endDate }),
-        expensesService.list({ startDate, endDate, limit: 100 })
+        expenseReportsService.getByCategory({ startDate, endDate, academicSessionId: currentSession?._id }),
+        expensesService.list({ startDate, endDate, limit: 100, academicSessionId: currentSession?._id })
       ])
       const reportCategoryData = catRes.data || []
       const expensesList = listRes.data || []
@@ -183,7 +196,7 @@ const Expenses = () => {
       const prevEndDate = new Date(reportYear, reportMonth - 1, 0, 23, 59, 59).toISOString()
       let prevTotal = 0
       try {
-        const prevCatRes = await expenseReportsService.getByCategory({ startDate: prevStartDate, endDate: prevEndDate })
+        const prevCatRes = await expenseReportsService.getByCategory({ startDate: prevStartDate, endDate: prevEndDate, academicSessionId: currentSession?._id })
         prevTotal = (prevCatRes.data || []).reduce((s, c) => s + c.total, 0)
       } catch {}
 
@@ -194,7 +207,7 @@ const Expenses = () => {
         reportCategoryData
       }
     },
-    enabled: activeTab === 'reports',
+    enabled: !!currentSession && activeTab === 'reports',
   })
 
   const reportData = reportsQueryData?.reportData || null
@@ -208,7 +221,7 @@ const Expenses = () => {
         await expensesService.update(editingExpense._id, data)
         toast.success('Expense updated')
       } else {
-        await expensesService.create(data)
+        await expensesService.create({ ...data, academicSessionId: currentSession?._id })
         toast.success('Expense added')
       }
       setShowExpenseForm(false)
@@ -376,6 +389,7 @@ const Expenses = () => {
   }
 
   if (isLoading) return <LoadingSpinner />
+  if (!currentSession) return <EmptyState icon={Calendar} title="No active academic session" description="Please activate an academic session first" />
 
   // ── Charts data ─────────────────────────────────────────────────────────────
 
@@ -411,15 +425,20 @@ const Expenses = () => {
       <div className="page-header mb-6">
         <div>
           <h1 className="page-title">Expense Management</h1>
-          <p className="page-subtitle">Track and manage school expenses</p>
+          <AcademicSessionSelector
+            selectedSessionId={currentSession._id}
+            onSessionChange={setSelectedSession}
+          />
         </div>
-        <button
-          onClick={() => { setEditingExpense(null); setShowExpenseForm(true) }}
-          className="btn btn-primary"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Expense
-        </button>
+        {!isViewOnly && (
+          <button
+            onClick={() => { setEditingExpense(null); setShowExpenseForm(true) }}
+            className="btn btn-primary"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Expense
+          </button>
+        )}
       </div>
 
       {/* Tabs */}

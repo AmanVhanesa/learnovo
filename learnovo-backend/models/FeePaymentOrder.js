@@ -37,6 +37,12 @@ const feePaymentOrderSchema = new mongoose.Schema({
     index: true
   },
 
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
+
   // Who initiated the payment (could be a parent user)
   paidBy: {
     type: mongoose.Schema.Types.ObjectId,

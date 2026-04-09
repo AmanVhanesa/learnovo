@@ -56,6 +56,11 @@ const incomeSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
   // Cross-module reference for auto-created records (fee payments, etc.)
   referenceType: {
     type: String,
@@ -87,6 +92,7 @@ incomeSchema.index({ tenantId: 1, category: 1 });
 incomeSchema.index({ tenantId: 1, incomeDate: -1 });
 incomeSchema.index({ tenantId: 1, isDeleted: 1 });
 incomeSchema.index({ tenantId: 1, academicYear: 1 });
+incomeSchema.index({ tenantId: 1, academicSessionId: 1 });
 incomeSchema.index({ tenantId: 1, referenceType: 1, referenceId: 1 }, { sparse: true });
 incomeSchema.index({ tenantId: 1, isSystemGenerated: 1 });
 

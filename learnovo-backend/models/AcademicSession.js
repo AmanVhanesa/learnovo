@@ -91,6 +91,13 @@ academicSessionSchema.methods.activate = async function() {
     { $set: { isActive: false } }
   );
 
+  // Shift all "new" students to "old" — they are no longer new admissions
+  const User = mongoose.model('User');
+  await User.updateMany(
+    { tenantId: this.tenantId, role: 'student', studentType: 'new' },
+    { $set: { studentType: 'old' } }
+  );
+
   this.isActive = true;
   return this.save();
 };

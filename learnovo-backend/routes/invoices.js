@@ -1445,6 +1445,7 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       tenantId,
       studentId,
       invoiceId,
+      academicSessionId: invoice.academicSessionId,
       amount,
       paymentMethod,
       paymentDate: new Date(paymentDate),
@@ -1560,7 +1561,8 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
         tenantId, paymentId: payment._id, amount, paymentDate: new Date(paymentDate), paymentMethod,
         studentName: student?.fullName || student?.name || 'Student',
         invoiceNumber: invoice.invoiceNumber, addedBy: req.user._id,
-        paymentReference: transactionDetails?.referenceNumber || receiptNumber, referenceModel: 'Payment'
+        paymentReference: transactionDetails?.referenceNumber || receiptNumber, referenceModel: 'Payment',
+        academicSessionId: invoice.academicSessionId
       });
     } catch (_) { /* non-fatal */ }
 

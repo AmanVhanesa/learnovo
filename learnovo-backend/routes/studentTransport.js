@@ -46,7 +46,8 @@ router.get('/export', protect, authorize('admin'), async(req, res) => {
       { key: 'isActive', header: 'Status', format: (val) => val ? 'Active' : 'Inactive' }
     ];
 
-    const csvBuffer = await ImportExportService.exportToCSV(assignments, columns);
+    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, 'Student Transport Assignments');
+    const csvBuffer = await ImportExportService.exportToCSV(assignments, columns, headerInfo);
     const filename = `student_transport_export_${new Date().toISOString().split('T')[0]}.csv`;
 
     res.setHeader('Content-Type', 'text/csv');

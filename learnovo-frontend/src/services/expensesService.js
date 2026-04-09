@@ -15,6 +15,7 @@ export const expensesService = {
     if (filters.sortBy) params.append('sortBy', filters.sortBy)
     if (filters.sortOrder) params.append('sortOrder', filters.sortOrder)
     if (filters.source) params.append('source', filters.source)
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
 
     const url = `/expenses${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)
@@ -64,14 +65,18 @@ export const expensesService = {
 
 // Dashboard & Reports
 export const expenseReportsService = {
-  getDashboard: async () => {
-    const res = await api.get('/expenses/summary/dashboard')
+  getDashboard: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
+    const url = `/expenses/summary/dashboard${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url)
     return res.data
   },
 
   getMonthly: async (filters = {}) => {
     const params = new URLSearchParams()
     if (filters.academicYear) params.append('academicYear', filters.academicYear)
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
     const url = `/expenses/summary/monthly${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)
     return res.data
@@ -81,6 +86,7 @@ export const expenseReportsService = {
     const params = new URLSearchParams()
     if (filters.startDate) params.append('startDate', filters.startDate)
     if (filters.endDate) params.append('endDate', filters.endDate)
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
     const url = `/expenses/summary/category${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)
     return res.data
@@ -93,6 +99,7 @@ export const expenseReportsService = {
     if (filters.category) params.append('category', filters.category)
     if (filters.status) params.append('status', filters.status)
     if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
 
     const token = localStorage.getItem('token')
     const url = `/expenses/export${params.toString() ? `?${params.toString()}` : ''}&token=${token}`

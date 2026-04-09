@@ -31,6 +31,13 @@ const payrollSchema = new mongoose.Schema({
     max: 2100
   },
 
+  // Academic session
+  academicSessionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicSession',
+    index: true
+  },
+
   // Salary components
   baseSalary: {
     type: Number,

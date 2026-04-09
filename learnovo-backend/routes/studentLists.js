@@ -413,9 +413,25 @@ router.get('/:id/export/pdf', protect, async(req, res) => {
 router.get('/:id/export/excel', protect, async(req, res) => {
   try {
     const list = await getExportData(req.params.id, req.user.tenantId);
+    const ImportExportService = require('../services/importExportService');
+    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, `${list.name} — Student List`);
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Students');
+
+    // Add report header rows
+    const colCount = 6;
+    if (headerInfo.schoolName) {
+      worksheet.addRow([headerInfo.schoolName]);
+      worksheet.mergeCells(worksheet.lastRow.number, 1, worksheet.lastRow.number, colCount);
+      worksheet.lastRow.font = { bold: true, size: 14 };
+    }
+    worksheet.addRow([`${list.name} — Student List`]);
+    worksheet.mergeCells(worksheet.lastRow.number, 1, worksheet.lastRow.number, colCount);
+    worksheet.lastRow.font = { bold: true, size: 11 };
+    worksheet.addRow([headerInfo.dateTime]);
+    worksheet.mergeCells(worksheet.lastRow.number, 1, worksheet.lastRow.number, colCount);
+    worksheet.addRow([]);
 
     worksheet.columns = [
       { header: 'S.No', key: 'sno', width: 10 },
@@ -426,17 +442,19 @@ router.get('/:id/export/excel', protect, async(req, res) => {
       { header: 'Phone', key: 'phone', width: 20 }
     ];
 
-    worksheet.getRow(1).font = { bold: true };
+    // Add data header row manually since columns were set after header rows
+    const dataHeaderRow = worksheet.addRow(['S.No', 'Admission No', 'Student Name', 'Class', 'Section', 'Phone']);
+    dataHeaderRow.font = { bold: true };
 
     list.students.forEach((student, index) => {
-      worksheet.addRow({
-        sno: index + 1,
-        admissionNo: student.admissionNumber || '-',
-        name: student.fullName || student.name || '-',
-        class: student.class || '-',
-        section: student.section || '-',
-        phone: student.phone || '-'
-      });
+      worksheet.addRow([
+        index + 1,
+        student.admissionNumber || '-',
+        student.fullName || student.name || '-',
+        student.class || '-',
+        student.section || '-',
+        student.phone || '-'
+      ]);
     });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -456,6 +474,14 @@ router.get('/:id/export/excel', protect, async(req, res) => {
 router.get('/:id/export/csv', protect, async(req, res) => {
   try {
     const list = await getExportData(req.params.id, req.user.tenantId);
+    const ImportExportService = require('../services/importExportService');
+    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, `${list.name} — Student List`);
+
+    const reportHeader = [];
+    if (headerInfo.schoolName) reportHeader.push(`"${headerInfo.schoolName}"`);
+    reportHeader.push(`"${list.name} — Student List"`);
+    reportHeader.push(`"${headerInfo.dateTime}"`);
+    reportHeader.push('');
 
     const headers = ['S.No', 'Admission No', 'Student Name', 'Class', 'Section', 'Phone'];
     const rows = list.students.map((s, i) => {
@@ -469,7 +495,7 @@ router.get('/:id/export/csv', protect, async(req, res) => {
       ].join(',');
     });
 
-    const csvContent = [headers.join(','), ...rows].join('\n');
+    const csvContent = [...reportHeader, headers.join(','), ...rows].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${list.name.replace(/\\s+/g, '_')}_List.csv"`);
@@ -486,6 +512,14 @@ router.get('/:id/export/csv', protect, async(req, res) => {
 router.get('/:id/export/txt', protect, async(req, res) => {
   try {
     const list = await getExportData(req.params.id, req.user.tenantId);
+    const ImportExportService = require('../services/importExportService');
+    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, `${list.name} — Student List`);
+
+    const txtHeader = [];
+    if (headerInfo.schoolName) txtHeader.push(headerInfo.schoolName);
+    txtHeader.push(`${list.name} — Student List`);
+    txtHeader.push(headerInfo.dateTime);
+    txtHeader.push('-'.repeat(50));
 
     const headers = ['S.No', 'Admission No', 'Student Name', 'Class', 'Section', 'Phone'].join('\t');
     const rows = list.students.map((s, i) => {
@@ -499,7 +533,7 @@ router.get('/:id/export/txt', protect, async(req, res) => {
       ].join('\t');
     });
 
-    const txtContent = [`${list.name}\n${'-'.repeat(50)}\n`, headers, ...rows].join('\n');
+    const txtContent = [...txtHeader, '', headers, ...rows].join('\n');
 
     res.setHeader('Content-Type', 'text/plain');
     res.setHeader('Content-Disposition', `attachment; filename="${list.name.replace(/\\s+/g, '_')}_List.txt"`);
