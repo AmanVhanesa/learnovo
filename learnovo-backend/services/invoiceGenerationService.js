@@ -96,7 +96,7 @@ async function buildApplicableFeeHeads(tenantId, student, feeStructure) {
     if (headType === 'one_time') {
       // Check admission fee exclusions
       if (head.isAdmissionFee) {
-        if (student.isImported && student.studentType === 'old') {
+        if (student.isImported && student.studentType !== 'new') {
           headEntry.isIncluded = false;
           headEntry.exclusionReason = 'Old student — exempt from admission fee';
         } else if (student.admissionFeePaid) {

@@ -292,8 +292,7 @@ const userSchema = new mongoose.Schema({
   },
   studentType: {
     type: String,
-    enum: ['old', 'new'],
-    default: 'new'
+    enum: ['old', 'new']
   },
   admissionFeePaid: {
     type: Boolean,
