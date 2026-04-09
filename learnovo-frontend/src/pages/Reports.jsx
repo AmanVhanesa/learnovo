@@ -11,7 +11,7 @@ import api from '../services/authService'
 import { studentsService } from '../services/studentsService'
 import { invoicesService, feesReportsService } from '../services/feesService'
 import { sortClassObjects } from '../utils/classOrder'
-import { exportPDF, exportExcel } from '../utils/exportHelpers'
+import { exportPDF, exportReport } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 
 const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0)
@@ -19,15 +19,12 @@ const fmtNum = (n) => new Intl.NumberFormat('en-IN').format(n || 0)
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '\u2014'
 const fmtAmount = (n) => n != null ? Number(n).toFixed(2) : '0.00'
 
-function exportCSV(rows, filename) {
-  if (!rows || rows.length === 0) return
-  const headers = Object.keys(rows[0])
-  const csv = [headers.join(','), ...rows.map(r => headers.map(h => `"${r[h] ?? ''}"`).join(','))].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
+/** Helper: extract headers and row arrays from an array of objects */
+function objsToAoa(objs) {
+  if (!objs || objs.length === 0) return { headers: [], rows: [] }
+  const headers = Object.keys(objs[0])
+  const rows = objs.map(r => headers.map(h => r[h] ?? ''))
+  return { headers, rows }
 }
 
 const StatCard = ({ icon: Icon, label, value, sub, color }) => (
@@ -143,21 +140,28 @@ const Reports = () => {
       const r = await api.get(`/reports/activities?${params}`)
       const allActivities = r.data?.data || []
       if (allActivities.length === 0) { toast.error('No activities to export', { id: 'act-export' }); return }
-      exportCSV(allActivities.map(a => ({
+      const { headers, rows } = objsToAoa(allActivities.map(a => ({
         Type: a.type || '',
         Message: a.message || '',
         Date: fmtDate(a.date),
         Amount: a.amount != null ? fmtAmount(a.amount) : '',
         'Student Name': a.studentName || '',
         Action: a.action || '',
-      })), `activity_report_${todayStr}.csv`)
+      })))
+      exportReport(`activity_report_${todayStr}.xlsx`, {
+        schoolData: settings?.institution,
+        reportTitle: 'Activity Report',
+        dateRange: `${fmtDate(filters.startDate)} — ${fmtDate(filters.endDate)}`,
+        headers, rows, sheetName: 'Activities',
+        summary: [{ label: 'Total Activities', value: allActivities.length }],
+      })
       toast.success(`Exported ${allActivities.length} activities`, { id: 'act-export' })
     } catch { toast.error('Export failed', { id: 'act-export' }) }
   }
 
   const exportAttendance = () => {
     if (!attendanceReport || attendanceReport.length === 0) { toast.error('No attendance data to export'); return }
-    exportCSV(attendanceReport.map(r => {
+    const mapped = attendanceReport.map(r => {
       const pct = parseFloat(r.percentage || r.attendancePercentage || 0)
       const totalDays = (r.presentDays ?? r.present ?? 0) + (r.absentDays ?? r.absent ?? 0) + (r.lateDays ?? r.late ?? 0)
       return {
@@ -169,12 +173,24 @@ const Reports = () => {
         'Absent Days': r.absentDays ?? r.absent ?? 0,
         'Late Days': r.lateDays ?? r.late ?? 0,
         'Half Days': r.halfDays ?? r.halfDay ?? 0,
-        'Excused': r.excusedDays ?? r.excused ?? 0,
+        Excused: r.excusedDays ?? r.excused ?? 0,
         'Total Working Days': totalDays,
         'Attendance %': pct.toFixed(1),
-        'Status': pct >= 75 ? 'Regular' : pct >= 50 ? 'Irregular' : 'Critical',
+        Status: pct >= 75 ? 'Regular' : pct >= 50 ? 'Irregular' : 'Critical',
       }
-    }), `attendance_report_${filters.startDate}_to_${filters.endDate}.csv`)
+    })
+    const { headers, rows } = objsToAoa(mapped)
+    const avgPct = mapped.length > 0 ? (mapped.reduce((s, r) => s + parseFloat(r['Attendance %']), 0) / mapped.length).toFixed(1) : '0.0'
+    exportReport(`attendance_report_${filters.startDate}_to_${filters.endDate}.xlsx`, {
+      schoolData: settings?.institution,
+      reportTitle: 'Attendance Report',
+      dateRange: `${fmtDate(filters.startDate)} — ${fmtDate(filters.endDate)}`,
+      headers, rows, sheetName: 'Attendance',
+      summary: [
+        { label: 'Total Students', value: mapped.length },
+        { label: 'Average Attendance %', value: `${avgPct}%` },
+      ],
+    })
     toast.success('Attendance report exported')
   }
 
@@ -195,7 +211,7 @@ const Reports = () => {
       const students = r.data || []
       if (students.length === 0) { toast.error('No students found', { id: 'enroll-export' }); return }
       const sorted = [...students].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      exportCSV(sorted.map(s => ({
+      const { headers, rows } = objsToAoa(sorted.map(s => ({
         'Admission No': s.admissionNumber || '',
         'Student Name': s.name || s.fullName || `${s.firstName || ''} ${s.lastName || ''}`.trim(),
         Class: s.class || s.className || '',
@@ -208,7 +224,18 @@ const Reports = () => {
         Email: s.email || '',
         'Enrollment Date': fmtDate(s.createdAt),
         Status: s.isActive ? 'Active' : 'Inactive',
-      })), `enrollment_report_${todayStr}.csv`)
+      })))
+      const activeCount = sorted.filter(s => s.isActive).length
+      exportReport(`enrollment_report_${todayStr}.xlsx`, {
+        schoolData: settings?.institution,
+        reportTitle: 'Student Enrollment Report',
+        headers, rows, sheetName: 'Enrollment',
+        summary: [
+          { label: 'Total Students', value: sorted.length },
+          { label: 'Active', value: activeCount },
+          { label: 'Inactive', value: sorted.length - activeCount },
+        ],
+      })
       toast.success(`Exported ${sorted.length} student records`, { id: 'enroll-export' })
     } catch { toast.error('Export failed', { id: 'enroll-export' }) }
   }
@@ -219,47 +246,68 @@ const Reports = () => {
       const r = await invoicesService.list({ page: 1, limit: 500 })
       const invoices = r.data || r.invoices || []
       if (invoices.length === 0) { toast.error('No fee records found', { id: 'fee-export' }); return }
-      exportCSV(invoices.map(inv => ({
+      const mapped = invoices.map(inv => ({
         'Invoice No': inv.invoiceNumber || '',
         'Student Name': inv.studentId?.name || inv.studentName || '',
         'Admission No': inv.studentId?.admissionNumber || inv.admissionNumber || '',
         Class: inv.classId?.name || inv.className || '',
-        'Period': inv.periodLabel || '',
+        Period: inv.periodLabel || '',
         'Fee Heads': (inv.items || []).map(i => i.feeHeadName).join(', '),
         'Total Amount': fmtAmount(inv.totalAmount),
         'Paid Amount': fmtAmount(inv.paidAmount),
-        'Balance': fmtAmount(inv.balanceAmount),
+        Balance: fmtAmount(inv.balanceAmount),
         'Late Fee': fmtAmount(inv.lateFeeApplied || 0),
-        'Discount': fmtAmount((inv.items || []).reduce((s, i) => s + (i.discount || 0), 0)),
+        Discount: fmtAmount((inv.items || []).reduce((s, i) => s + (i.discount || 0), 0)),
         'Due Date': fmtDate(inv.dueDate),
-        'Status': inv.status || '',
+        Status: inv.status || '',
         'Issued Date': fmtDate(inv.issuedDate || inv.createdAt),
-      })), `fee_detailed_report_${todayStr}.csv`)
+      }))
+      const { headers, rows } = objsToAoa(mapped)
+      const totalAmt = invoices.reduce((s, i) => s + (i.totalAmount || 0), 0)
+      const paidAmt = invoices.reduce((s, i) => s + (i.paidAmount || 0), 0)
+      const balanceAmt = invoices.reduce((s, i) => s + (i.balanceAmount || 0), 0)
+      exportReport(`fee_detailed_report_${todayStr}.xlsx`, {
+        schoolData: settings?.institution,
+        reportTitle: 'Fee Collection Report',
+        headers, rows, sheetName: 'Fee Collection',
+        summary: [
+          { label: 'Total Invoices', value: invoices.length },
+          { label: 'Total Invoiced Amount', value: fmt(totalAmt) },
+          { label: 'Total Collected', value: fmt(paidAmt) },
+          { label: 'Total Pending', value: fmt(balanceAmt) },
+          { label: 'Collection Rate', value: totalAmt > 0 ? `${Math.round((paidAmt / totalAmt) * 100)}%` : '0%' },
+        ],
+      })
       toast.success(`Exported ${invoices.length} invoice records`, { id: 'fee-export' })
     } catch { toast.error('Export failed', { id: 'fee-export' }) }
   }
 
   const exportOverview = () => {
     if (!dashboard) return
-    const rows = [
-      { Category: 'Students', Metric: 'Total Students', Value: dashboard.students?.total || 0 },
-      { Category: 'Students', Metric: 'Active Students', Value: dashboard.students?.active || 0 },
-      { Category: 'Teachers', Metric: 'Total Teachers', Value: dashboard.teachers?.total || 0 },
-      { Category: 'Teachers', Metric: 'Active Teachers', Value: dashboard.teachers?.active || 0 },
-      { Category: 'Admissions', Metric: 'Total Admissions', Value: dashboard.admissions?.total || 0 },
-      { Category: 'Admissions', Metric: 'Pending', Value: dashboard.admissions?.pending || 0 },
-      { Category: 'Admissions', Metric: 'Approved', Value: dashboard.admissions?.approved || 0 },
-      { Category: 'Admissions', Metric: 'This Month', Value: dashboard.admissions?.thisMonth || 0 },
-      { Category: 'Fees', Metric: 'Total Fee Base', Value: fmtAmount(fees.total) },
-      { Category: 'Fees', Metric: 'Collected', Value: fmtAmount(fees.paid) },
-      { Category: 'Fees', Metric: 'Pending', Value: fmtAmount(fees.pending) },
-      { Category: 'Fees', Metric: 'Overdue', Value: fmtAmount(fees.overdue) },
-      { Category: 'Fees', Metric: 'Collected Today', Value: fmtAmount(fees.collectedToday) },
-      { Category: 'Fees', Metric: 'Collection Rate %', Value: fees.total > 0 ? `${Math.round((fees.paid / fees.total) * 100)}%` : '0%' },
-      { Category: 'Attendance', Metric: 'Students Present Today', Value: dashboard.attendance?.studentsPresentToday || 0 },
-      { Category: 'Attendance', Metric: 'Staff Present Today', Value: dashboard.attendance?.employeesPresentToday || 0 },
-    ]
-    exportCSV(rows, `school_overview_report_${todayStr}.csv`)
+    exportReport(`school_overview_report_${todayStr}.xlsx`, {
+      schoolData: settings?.institution,
+      reportTitle: 'School Overview Report',
+      headers: ['Category', 'Metric', 'Value'],
+      sheetName: 'Overview',
+      rows: [
+        ['Students', 'Total Students', dashboard.students?.total || 0],
+        ['Students', 'Active Students', dashboard.students?.active || 0],
+        ['Teachers', 'Total Teachers', dashboard.teachers?.total || 0],
+        ['Teachers', 'Active Teachers', dashboard.teachers?.active || 0],
+        ['Admissions', 'Total Admissions', dashboard.admissions?.total || 0],
+        ['Admissions', 'Pending', dashboard.admissions?.pending || 0],
+        ['Admissions', 'Approved', dashboard.admissions?.approved || 0],
+        ['Admissions', 'This Month', dashboard.admissions?.thisMonth || 0],
+        ['Fees', 'Total Fee Base', fmt(fees.total)],
+        ['Fees', 'Collected', fmt(fees.paid)],
+        ['Fees', 'Pending', fmt(fees.pending)],
+        ['Fees', 'Overdue', fmt(fees.overdue)],
+        ['Fees', 'Collected Today', fmt(fees.collectedToday)],
+        ['Fees', 'Collection Rate', fees.total > 0 ? `${Math.round((fees.paid / fees.total) * 100)}%` : '0%'],
+        ['Attendance', 'Students Present Today', dashboard.attendance?.studentsPresentToday || 0],
+        ['Attendance', 'Staff Present Today', dashboard.attendance?.employeesPresentToday || 0],
+      ],
+    })
     toast.success('Overview report exported')
   }
 
