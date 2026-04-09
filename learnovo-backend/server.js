@@ -91,7 +91,7 @@ app.use(compression());
 // express.json() normally parses the body and throws away the raw string, but we need
 // the exact raw bytes to compute the HMAC signature.
 app.use(express.json({
-  limit: '10mb',
+  limit: '50mb',
   verify: (req, res, buf) => {
     // Only save rawBody for webhook/callback routes (to save memory on other routes)
     if (req.originalUrl === '/api/fee-payments/webhook' ||
@@ -104,7 +104,7 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({
   extended: true,
-  limit: '10mb',
+  limit: '50mb',
   verify: (req, res, buf) => {
     // ICICI Orange callback may arrive as application/x-www-form-urlencoded.
     // Capture the raw body so the webhook handler can log/inspect the
