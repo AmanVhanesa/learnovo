@@ -58,6 +58,7 @@ const Students = () => {
   const [yearFilter, setYearFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('active') // active/inactive
   const [driverFilter, setDriverFilter] = useState('')
+  const [studentTypeFilter, setStudentTypeFilter] = useState('')
 
   // UI state
   const [showMobileFilters, setShowMobileFilters] = useState(false)
@@ -120,7 +121,7 @@ const Students = () => {
   useEffect(() => {
     setCurrentPage(1) // reset to page 1 on filter change
     setSelectedStudents([]) // clear selection on filter change
-  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter])
+  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, studentTypeFilter])
 
   // Reset section filter when class changes (available sections depend on class)
   useEffect(() => {
@@ -142,7 +143,7 @@ const Students = () => {
 
   // Fetch students with React Query
   const { data: studentsResponse, isLoading, error: studentsError, refetch: refetchStudents } = useQuery({
-    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, currentPage, perPage],
+    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, studentTypeFilter, currentPage, perPage],
     queryFn: async () => {
       const filters = {
         search: debouncedSearch,
@@ -151,6 +152,7 @@ const Students = () => {
         academicYear: yearFilter,
         status: statusFilter,
         driver: driverFilter,
+        studentType: studentTypeFilter,
         page: currentPage,
         limit: perPage
       }
@@ -515,6 +517,7 @@ const Students = () => {
     setYearFilter('')
     setStatusFilter('active')
     setDriverFilter('')
+    setStudentTypeFilter('')
   }
 
   // if (isLoading) {
@@ -624,16 +627,16 @@ const Students = () => {
           <button
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={`h-9 px-3.5 text-xs font-medium rounded-lg border transition-all inline-flex items-center gap-2 ${
-              (classFilter || sectionFilter || yearFilter || driverFilter)
+              (classFilter || sectionFilter || yearFilter || driverFilter || studentTypeFilter)
                 ? 'bg-primary-50 dark:bg-primary-500/10 border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
             }`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Filters
-            {(classFilter || sectionFilter || yearFilter || driverFilter) && (
+            {(classFilter || sectionFilter || yearFilter || driverFilter || studentTypeFilter) && (
               <span className="h-4 min-w-[16px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center">
-                {[classFilter, sectionFilter, yearFilter, driverFilter].filter(Boolean).length}
+                {[classFilter, sectionFilter, yearFilter, driverFilter, studentTypeFilter].filter(Boolean).length}
               </span>
             )}
           </button>
@@ -692,7 +695,18 @@ const Students = () => {
                 </div>
               </div>
             )}
-            {(classFilter || sectionFilter || yearFilter || driverFilter) && (
+            <div className="relative">
+              <select value={studentTypeFilter} onChange={(e) => setStudentTypeFilter(e.target.value)}
+                className="appearance-none w-full h-10 pl-3 pr-8 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer">
+                <option value="">Student Type</option>
+                <option value="old">Old Student</option>
+                <option value="new">New Admission</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
+              </div>
+            </div>
+            {(classFilter || sectionFilter || yearFilter || driverFilter || studentTypeFilter) && (
               <button onClick={clearFilters}
                 className="h-9 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-lg transition-all self-start">
                 Clear all filters
@@ -775,8 +789,24 @@ const Students = () => {
             </div>
           )}
 
+          {/* Student Type Filter */}
+          <div className="relative">
+            <select
+              value={studentTypeFilter}
+              onChange={(e) => setStudentTypeFilter(e.target.value)}
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+            >
+              <option value="">Student Type</option>
+              <option value="old">Old Student</option>
+              <option value="new">New Admission</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <ChevronDown className="h-3 w-3 text-gray-400 dark:text-[#8E8E93]" />
+            </div>
+          </div>
+
           {/* Clear Filters Button */}
-          {(searchQuery || classFilter || sectionFilter || yearFilter || driverFilter) && (
+          {(searchQuery || classFilter || sectionFilter || yearFilter || driverFilter || studentTypeFilter) && (
             <button
               onClick={clearFilters}
               className="h-8 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-md transition-all"

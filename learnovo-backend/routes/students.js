@@ -242,6 +242,13 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.driverId = req.query.driver;
     }
 
+    // Add student type filter (old / new)
+    if (req.query.studentType === 'old') {
+      filter.studentType = 'old';
+    } else if (req.query.studentType === 'new') {
+      filter.studentType = 'new';
+    }
+
     // Add search filter
     const searchTerm = req.query.search;
     if (searchTerm) {
