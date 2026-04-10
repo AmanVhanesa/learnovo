@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, Fragment } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { superAdminService } from '../../services/superAdminService'
 import { formatDateShort as formatDate, formatDateTime } from '../../utils/formatDate'
+import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import {
     X, Building2, Users, FileText, Activity, StickyNote, Settings, ChevronRight,
     Mail, Phone, MapPin, Calendar, Clock, Crown, Shield, GraduationCap, BookOpen,
     HardDrive, DollarSign, CreditCard, Check, AlertTriangle, Trash2, RotateCcw,
     KeyRound, Send, Plus, ChevronLeft, ChevronDown, Upload, Globe, Hash, Eye,
-    UserCircle, Loader2, RefreshCw, XCircle, CheckCircle2, Ban, Zap, Star
+    UserCircle, Loader2, RefreshCw, XCircle, CheckCircle2, Ban, Zap, Star, LogIn
 } from 'lucide-react'
 
 const TABS = [
@@ -252,6 +254,8 @@ function ConfirmModal({ isOpen, onClose, title, description, confirmLabel, confi
 
 // ─── Main Component ────────────────────────────────────────────────────────
 export default function TenantSlideOver({ isOpen, onClose, tenantId, onUpdate }) {
+    const navigate = useNavigate()
+    const { loginAsImpersonation } = useAuth()
     const [activeTab, setActiveTab] = useState('overview')
     const [tenant, setTenant] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -508,6 +512,26 @@ export default function TenantSlideOver({ isOpen, onClose, tenantId, onUpdate })
         }
     }
 
+    const handleImpersonate = async () => {
+        setActionLoading('impersonate')
+        try {
+            const res = await superAdminService.impersonateTenant(tenantId)
+            if (res.success) {
+                const { token, user, tenant: tenantData } = res.data
+                loginAsImpersonation({ token, user, tenant: tenantData })
+                onClose()
+                toast.success(`Logged in as ${user.name || user.email} in ${tenantData.schoolName}`)
+                navigate('/app/dashboard')
+            } else {
+                toast.error(res.message || 'Failed to impersonate tenant')
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to impersonate tenant')
+        } finally {
+            setActionLoading(null)
+        }
+    }
+
     const handleDelete = async () => {
         setActionLoading('delete')
         try {
@@ -705,6 +729,7 @@ export default function TenantSlideOver({ isOpen, onClose, tenantId, onUpdate })
                                 onSuspend={() => setSuspendModal(true)}
                                 onReactivate={handleReactivate}
                                 onResetPassword={handleResetAdminPassword}
+                                onImpersonate={handleImpersonate}
                                 onDelete={() => setDeleteModal(true)}
                             />
                         ) : (
@@ -1186,7 +1211,7 @@ function NotesTab({ notes, loading, error, newNote, setNewNote, savingNote, onAd
 }
 
 // ─── Actions Panel ─────────────────────────────────────────────────────────
-function ActionsPanel({ tenant, plans, selectedPlan, setSelectedPlan, trialDays, setTrialDays, actionLoading, isSuspended, onChangePlan, onExtendTrial, onSuspend, onReactivate, onResetPassword, onDelete }) {
+function ActionsPanel({ tenant, plans, selectedPlan, setSelectedPlan, trialDays, setTrialDays, actionLoading, isSuspended, onChangePlan, onExtendTrial, onSuspend, onReactivate, onResetPassword, onImpersonate, onDelete }) {
     return (
         <div className="p-6 space-y-6">
             {/* Change Plan */}
@@ -1263,6 +1288,16 @@ function ActionsPanel({ tenant, plans, selectedPlan, setSelectedPlan, trialDays,
                     Account Actions
                 </h3>
                 <div className="space-y-3">
+                    {/* Login as Admin (Impersonate) */}
+                    <button
+                        onClick={onImpersonate}
+                        disabled={actionLoading === 'impersonate' || isSuspended}
+                        className="w-full rounded-xl h-10 px-4 text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500 dark:bg-[#0A84FF] dark:hover:bg-[#409CFF] active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                        {actionLoading === 'impersonate' ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+                        Login as Admin
+                    </button>
+
                     {/* Suspend / Reactivate */}
                     {isSuspended ? (
                         <button

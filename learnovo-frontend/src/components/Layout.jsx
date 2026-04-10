@@ -6,6 +6,7 @@ import MobileHeader from './MobileHeader'
 import BottomNav from './BottomNav'
 import PageErrorBoundary from './PageErrorBoundary'
 import TrialBanner from './TrialBanner'
+import ImpersonationBanner from './ImpersonationBanner'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 
 const Layout = () => {
@@ -53,6 +54,9 @@ const Layout = () => {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden xl:ml-64">
+        {/* Super admin impersonation banner */}
+        <ImpersonationBanner />
+
         {/* Trial expiry banner */}
         <TrialBanner />
 

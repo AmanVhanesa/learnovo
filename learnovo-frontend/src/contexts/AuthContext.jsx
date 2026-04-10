@@ -10,7 +10,8 @@ const initialState = {
   token: localStorage.getItem('token'),
   isAuthenticated: false,
   isLoading: true,
-  error: null
+  error: null,
+  isImpersonating: !!localStorage.getItem('impersonation'),
 }
 
 function authReducer(state, action) {
@@ -29,7 +30,8 @@ function authReducer(state, action) {
         token: action.payload.token,
         isAuthenticated: true,
         isLoading: false,
-        error: null
+        error: null,
+        isImpersonating: action.payload.isImpersonating || false,
       }
     case 'AUTH_FAILURE':
       return {
@@ -48,7 +50,8 @@ function authReducer(state, action) {
         token: null,
         isAuthenticated: false,
         isLoading: false,
-        error: null
+        error: null,
+        isImpersonating: false,
       }
     case 'UPDATE_USER':
       return {
@@ -114,7 +117,8 @@ export function AuthProvider({ children }) {
             payload: {
               user: mergedUser,
               tenant: resolvedTenant,
-              token
+              token,
+              isImpersonating: !!localStorage.getItem('impersonation'),
             }
           })
         } catch (error) {
@@ -125,7 +129,8 @@ export function AuthProvider({ children }) {
               payload: {
                 user: JSON.parse(user),
                 tenant: tenant ? JSON.parse(tenant) : null,
-                token
+                token,
+                isImpersonating: !!localStorage.getItem('impersonation'),
               }
             })
           } else {
@@ -287,6 +292,56 @@ export function AuthProvider({ children }) {
     dispatch({ type: 'CLEAR_ERROR' })
   }
 
+  // Super admin impersonation: login as a tenant's admin
+  const loginAsImpersonation = ({ token: impToken, user: impUser, tenant: impTenant }) => {
+    // Save current super admin session so we can restore it later
+    const backup = {
+      token: localStorage.getItem('superAdminToken'),
+      superAdmin: localStorage.getItem('superAdmin'),
+      returnPath: window.location.pathname,
+    }
+    localStorage.setItem('impersonation', JSON.stringify(backup))
+
+    // Set the impersonation token as the active auth session
+    localStorage.setItem('token', impToken)
+    localStorage.setItem('user', JSON.stringify(impUser))
+    localStorage.setItem('tenant', JSON.stringify(impTenant))
+
+    dispatch({
+      type: 'AUTH_SUCCESS',
+      payload: {
+        user: impUser,
+        tenant: impTenant,
+        token: impToken,
+        isImpersonating: true,
+      }
+    })
+  }
+
+  // Exit impersonation and return to super admin panel
+  const exitImpersonation = () => {
+    const backup = JSON.parse(localStorage.getItem('impersonation') || '{}')
+
+    // Clear impersonation session
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('tenant')
+    localStorage.removeItem('impersonation')
+
+    // Restore super admin session
+    if (backup.token) {
+      localStorage.setItem('superAdminToken', backup.token)
+    }
+    if (backup.superAdmin) {
+      localStorage.setItem('superAdmin', backup.superAdmin)
+    }
+
+    dispatch({ type: 'LOGOUT' })
+
+    // Navigate back to super admin panel
+    window.location.href = backup.returnPath || '/super-admin/schools'
+  }
+
   const value = {
     ...state,
     login,
@@ -295,7 +350,9 @@ export function AuthProvider({ children }) {
     updateProfile,
     uploadPhoto,
     changePassword,
-    clearError
+    clearError,
+    loginAsImpersonation,
+    exitImpersonation,
   }
 
   return (
