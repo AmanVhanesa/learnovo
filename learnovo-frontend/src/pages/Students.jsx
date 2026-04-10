@@ -8,7 +8,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import StudentForm from '../components/students/StudentForm'
 import ImportModal from '../components/ImportModal'
 import DeactivateStudentModal from '../components/students/DeactivateStudentModal'
-import { exportPDF, exportReport } from '../utils/exportHelpers'
+import { exportCSV, exportReport } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
 import { useSettings } from '../contexts/SettingsContext'
 
@@ -69,7 +69,7 @@ const Students = () => {
   const [studentToDeactivate, setStudentToDeactivate] = useState(null)
   const [selectedStudents, setSelectedStudents] = useState([])
   const [showExportModal, setShowExportModal] = useState(false)
-  const [selectedFormat, setSelectedFormat] = useState('pdf')
+  const [selectedFormat, setSelectedFormat] = useState('csv')
 
   // Export column selection — keys must match backend fieldDefinitions
   const ALL_EXPORT_FIELDS = [
@@ -489,8 +489,8 @@ const Students = () => {
       const json = await res.json()
       if (!json.success) throw new Error(json.message)
 
-      if (selectedFormat === 'pdf') {
-        await exportPDF(`students_export_${dateStr}.pdf`, json.headers, json.rows, settings?.institution)
+      if (selectedFormat === 'csv') {
+        exportCSV(`students_export_${dateStr}.csv`, [json.headers, ...json.rows])
       } else {
         exportReport(`students_export_${dateStr}.xlsx`, {
           schoolName: settings?.institution?.name,
@@ -864,7 +864,7 @@ const Students = () => {
                   <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide mb-2">Export Format</p>
                   <div className="flex gap-2 mb-4">
                     {[
-                      { id: 'pdf', label: 'PDF', desc: 'Print-ready document' },
+                      { id: 'csv', label: 'CSV', desc: 'Comma-separated values' },
                       { id: 'excel', label: 'Excel', desc: '.xlsx spreadsheet' },
                     ].map(fmt => (
                       <button
