@@ -486,22 +486,39 @@ const ImportModal = ({
                             <p className="text-lg font-medium text-gray-900">Import Completed Successfully!</p>
                             {previewData && (
                                 <div className="mt-4 space-y-2">
-                                    <p className="text-sm text-gray-600">
-                                        <span className="font-semibold text-green-600">{previewData.data?.success || 0}</span> students imported successfully
-                                    </p>
+                                    {previewData.data?.success !== undefined && (
+                                        <p className="text-sm text-gray-600">
+                                            <span className="font-semibold text-green-600">{previewData.data.success}</span> {module} imported successfully
+                                        </p>
+                                    )}
+                                    {previewData.data?.allocationsCreated !== undefined && (
+                                        <p className="text-sm text-gray-600">
+                                            <span className="font-semibold text-green-600">{previewData.data.allocationsCreated}</span> fee allocations created
+                                        </p>
+                                    )}
+                                    {previewData.data?.invoicesCreated !== undefined && (
+                                        <p className="text-sm text-gray-600">
+                                            <span className="font-semibold text-green-600">{previewData.data.invoicesCreated}</span> invoices created
+                                        </p>
+                                    )}
+                                    {previewData.data?.paymentsCreated !== undefined && (
+                                        <p className="text-sm text-gray-600">
+                                            <span className="font-semibold text-green-600">{previewData.data.paymentsCreated}</span> payments recorded
+                                        </p>
+                                    )}
                                     {previewData.data?.replaced > 0 && (
                                         <p className="text-sm text-gray-600">
-                                            <span className="font-semibold text-blue-600">{previewData.data.replaced}</span> students replaced (updated)
+                                            <span className="font-semibold text-blue-600">{previewData.data.replaced}</span> {module} replaced (updated)
                                         </p>
                                     )}
                                     {previewData.data?.skipped > 0 && (
                                         <p className="text-sm text-gray-600">
-                                            <span className="font-semibold text-yellow-600">{previewData.data.skipped}</span> students skipped (already exist)
+                                            <span className="font-semibold text-yellow-600">{previewData.data.skipped}</span> {module} skipped (already exist)
                                         </p>
                                     )}
                                     {previewData.data?.failed > 0 && (
                                         <p className="text-sm text-gray-600">
-                                            <span className="font-semibold text-red-600">{previewData.data.failed}</span> students failed to import
+                                            <span className="font-semibold text-red-600">{previewData.data.failed}</span> rows failed to import
                                         </p>
                                     )}
                                 </div>

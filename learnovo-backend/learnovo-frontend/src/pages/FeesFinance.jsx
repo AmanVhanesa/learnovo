@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar, Users, FileText, Search, X, Plus, Receipt, Settings, Printer, History, Edit, Trash2, Eye } from 'lucide-react'
+import { DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar, Users, FileText, Search, X, Plus, Receipt, Settings, Printer, History, Edit, Trash2, Eye, Upload } from 'lucide-react'
 import { feesReportsService, invoicesService, paymentsService, feeStructuresService } from '../services/feesService'
 import { studentsService } from '../services/studentsService'
 import { academicSessionsService, classesService } from '../services/academicsService'
@@ -11,6 +11,7 @@ const SERVER_URL = API_BASE.replace(/\/api\/?$/, '')
 
 // Edit Invoice Modal
 import EditInvoiceModal from '../components/EditInvoiceModal'
+import ImportModal from '../components/ImportModal'
 
 const FeesFinance = () => {
     const { user } = useAuth()
@@ -54,6 +55,9 @@ const FeesFinance = () => {
         startDate: '',
         endDate: ''
     })
+
+    // Import modal state
+    const [showImportModal, setShowImportModal] = useState(false)
 
     // Disputes tab state
     const [disputesData, setDisputesData] = useState({ disputes: [], stuckPayments: [] })
@@ -743,6 +747,13 @@ const FeesFinance = () => {
                         Academic Session: {activeSession.name}
                     </p>
                 </div>
+                <button
+                    onClick={() => setShowImportModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 transition-colors"
+                >
+                    <Upload className="h-4 w-4" />
+                    Import Fees
+                </button>
             </div>
 
             {/* Tabs */}
@@ -1786,6 +1797,24 @@ const FeesFinance = () => {
                     />
                 )
             }
+
+            {showImportModal && (
+                <ImportModal
+                    isOpen={showImportModal}
+                    onClose={() => setShowImportModal(false)}
+                    module="fees"
+                    title="Import Fee Records"
+                    templateUrl="/fees/import/template"
+                    previewUrl="/fees/import/preview"
+                    executeUrl="/fees/import/execute"
+                    onSuccess={() => {
+                        setShowImportModal(false)
+                        if (activeTab === 'dashboard') fetchDashboard()
+                        if (activeTab === 'defaulters') fetchDefaulters()
+                        if (activeTab === 'receipts') fetchReceipts({})
+                    }}
+                />
+            )}
         </div >
     )
 }
