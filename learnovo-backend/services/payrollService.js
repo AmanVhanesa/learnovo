@@ -188,7 +188,7 @@ const payrollService = {
       const skip = (page - 1) * limit;
 
       const records = await Payroll.find(filter)
-        .populate('employeeId', 'name employeeId email phone designation department')
+        .populate('employeeId', 'name employeeId email phone designation department accountNumber ifscCode bankName')
         .populate('generatedBy', 'name email')
         .sort(options.sort || { year: -1, month: -1, createdAt: -1 })
         .skip(skip)

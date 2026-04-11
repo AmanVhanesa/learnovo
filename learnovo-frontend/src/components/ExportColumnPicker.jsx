@@ -42,10 +42,25 @@ const ExportColumnPicker = ({
     buttonClassName = '',
     sheetName = 'Sheet1',
     disabled = false,
-    emptyMessage = 'No data to export'
+    emptyMessage = 'No data to export',
+    // Controlled-mode props: when `externalOpen` is provided (not undefined),
+    // the modal's open state is driven by the parent. `hideTrigger` optionally
+    // hides the built-in button so the parent can provide its own trigger.
+    externalOpen,
+    onExternalClose,
+    hideTrigger = false
 }) => {
     const { settings } = useSettings();
-    const [isOpen, setIsOpen] = useState(false);
+    const isControlled = externalOpen !== undefined;
+    const [internalOpen, setInternalOpen] = useState(false);
+    const isOpen = isControlled ? externalOpen : internalOpen;
+    const setIsOpen = (next) => {
+        if (isControlled) {
+            if (!next && onExternalClose) onExternalClose();
+        } else {
+            setInternalOpen(next);
+        }
+    };
     const [exporting, setExporting] = useState(false);
     const [selectedFormat, setSelectedFormat] = useState(formats[0] || 'excel');
 
@@ -79,6 +94,14 @@ const ExportColumnPicker = ({
         }
         setIsOpen(true);
     };
+
+    // In controlled mode, guard against being opened with empty data
+    useEffect(() => {
+        if (isControlled && externalOpen && (!data || data.length === 0)) {
+            toast.error(emptyMessage);
+            if (onExternalClose) onExternalClose();
+        }
+    }, [externalOpen, isControlled]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const toggleKey = (key) => {
         setSelectedKeys(prev =>
@@ -149,18 +172,20 @@ const ExportColumnPicker = ({
 
     return (
         <>
-            <button
-                type="button"
-                onClick={openModal}
-                disabled={disabled}
-                className={
-                    buttonClassName ||
-                    'inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] disabled:opacity-50'
-                }
-            >
-                <Download className="w-4 h-4" />
-                {buttonLabel}
-            </button>
+            {!hideTrigger && (
+                <button
+                    type="button"
+                    onClick={openModal}
+                    disabled={disabled}
+                    className={
+                        buttonClassName ||
+                        'inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2C2C2E] disabled:opacity-50'
+                    }
+                >
+                    <Download className="w-4 h-4" />
+                    {buttonLabel}
+                </button>
+            )}
 
             {isOpen && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">

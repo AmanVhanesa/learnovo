@@ -42,6 +42,7 @@ const Payroll = () => {
     const [advanceModalMode, setAdvanceModalMode] = useState('create');
     const [showExportMenu, setShowExportMenu] = useState(false);
     const exportMenuRef = useRef(null);
+    const [showCustomExportModal, setShowCustomExportModal] = useState(false);
     const [showIciciModal, setShowIciciModal] = useState(false);
     const [iciciLoading, setIciciLoading] = useState(false);
     const [iciciForm, setIciciForm] = useState({
@@ -277,20 +278,25 @@ const Payroll = () => {
         ];
 
         const rows = paidRecords.map((r, idx) => {
-            const bankInfo = r.employeeId?.bankDetails || r.employeeId?.bankInfo || {};
+            const emp = r.employeeId || {};
             return [
                 idx + 1,
-                r.employeeId?.name || '',
-                bankInfo.accountNumber || bankInfo.account || '',
-                bankInfo.ifscCode || bankInfo.ifsc || '',
-                bankInfo.bankName || bankInfo.bank || '',
-                bankInfo.branchName || bankInfo.branch || '',
+                emp.name || '',
+                emp.accountNumber || '',
+                emp.ifscCode || '',
+                emp.bankName || '',
+                '',
                 r.netSalary || 0,
                 'NEFT',
-                r.employeeId?.employeeId || '',
+                emp.employeeId || '',
                 `Salary ${MONTH_NAMES[r.month - 1]} ${r.year}`
             ];
         });
+
+        const missingBankCount = paidRecords.filter(r => {
+            const emp = r.employeeId || {};
+            return !emp.accountNumber || !emp.ifscCode;
+        }).length;
 
         const totalAmount = paidRecords.reduce((sum, r) => sum + (r.netSalary || 0), 0);
 
@@ -307,7 +313,11 @@ const Payroll = () => {
                 ],
             }
         );
-        toast.success('Bank transfer file downloaded');
+        if (missingBankCount > 0) {
+            toast.success(`Bank transfer sheet downloaded · ${missingBankCount} employee(s) missing bank details`, { duration: 6000 });
+        } else {
+            toast.success('Bank transfer file downloaded');
+        }
         setShowExportMenu(false);
     };
 
@@ -446,17 +456,7 @@ const Payroll = () => {
                 <div className="flex items-center gap-2">
                     {activeTab === 'payroll' && (
                         <>
-                            {/* Column-selectable export */}
-                            <ExportColumnPicker
-                                data={payrollRecords}
-                                columns={payrollExportColumns}
-                                presets={payrollExportPresets}
-                                filename={`payroll_${MONTH_NAMES[filters.month - 1]}_${filters.year}`}
-                                title="Export Payroll"
-                                sheetName="Payroll"
-                                buttonClassName="btn btn-outline gap-2"
-                            />
-                            {/* Export Dropdown */}
+                            {/* Single unified Export dropdown */}
                             <div className="relative" ref={exportMenuRef}>
                                 <button
                                     onClick={() => setShowExportMenu(!showExportMenu)}
@@ -468,31 +468,53 @@ const Payroll = () => {
                                     <ChevronDown className="h-3.5 w-3.5" />
                                 </button>
                                 {showExportMenu && (
-                                    <div className="absolute right-0 mt-2 w-64 rounded-xl bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] shadow-xl shadow-black/10 dark:shadow-black/40 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                                        <div className="px-3 py-2 border-b border-gray-100 dark:border-[#2C2C2E]">
-                                            <p className="text-[11px] font-medium text-gray-400 dark:text-[#636366] uppercase tracking-wider">Export Options</p>
+                                    <div className="absolute right-0 mt-2 w-72 rounded-xl bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] shadow-xl shadow-black/10 dark:shadow-black/40 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                        {/* Data Export */}
+                                        <div className="px-3 pt-2.5 pb-1">
+                                            <p className="text-[10px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wider">Data Export</p>
+                                        </div>
+                                        <div className="py-1">
+                                            <button
+                                                onClick={() => { setShowExportMenu(false); setShowCustomExportModal(true); }}
+                                                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 dark:text-[#E5E5EA] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
+                                            >
+                                                <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
+                                                <div className="text-left">
+                                                    <div className="font-medium">Custom Export</div>
+                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">Pick columns · Excel, CSV or PDF</div>
+                                                </div>
+                                            </button>
+                                        </div>
+                                        {/* Reports */}
+                                        <div className="px-3 pt-2.5 pb-1 border-t border-gray-100 dark:border-[#2C2C2E]">
+                                            <p className="text-[10px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wider">Reports</p>
                                         </div>
                                         <div className="py-1">
                                             <button onClick={handleDownloadMonthlyReport} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 dark:text-[#E5E5EA] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
                                                 <FileText className="h-4 w-4 text-red-500" />
                                                 <div className="text-left">
                                                     <div className="font-medium">Monthly Report (PDF)</div>
-                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">Formatted salary report</div>
+                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">Branded salary report</div>
                                                 </div>
                                             </button>
-                                            <div className="border-t border-gray-100 dark:border-[#2C2C2E] my-1" />
+                                        </div>
+                                        {/* Bank Upload */}
+                                        <div className="px-3 pt-2.5 pb-1 border-t border-gray-100 dark:border-[#2C2C2E]">
+                                            <p className="text-[10px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wider">Bank Upload</p>
+                                        </div>
+                                        <div className="py-1 pb-2">
                                             <button onClick={handleExportBankStatement} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 dark:text-[#E5E5EA] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
                                                 <Building2 className="h-4 w-4 text-blue-500" />
                                                 <div className="text-left">
-                                                    <div className="font-medium">Bank Transfer (Excel)</div>
-                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">NEFT/RTGS format for bank upload</div>
+                                                    <div className="font-medium">Generic Bank Transfer (.xlsx)</div>
+                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">NEFT/RTGS sheet for any bank</div>
                                                 </div>
                                             </button>
                                             <button onClick={handleOpenIciciModal} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 dark:text-[#E5E5EA] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
                                                 <Building2 className="h-4 w-4 text-orange-500" />
                                                 <div className="text-left">
                                                     <div className="font-medium">ICICI Bank Upload (.xls)</div>
-                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">NPAB format for ICICI Corporate Banking</div>
+                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">NPAB format for ICICI CIB</div>
                                                 </div>
                                             </button>
                                         </div>
@@ -900,6 +922,19 @@ const Payroll = () => {
             <AdvanceSalaryModal isOpen={showAdvanceModal} onClose={() => { setShowAdvanceModal(false); setSelectedAdvance(null); }} onSuccess={handleAdvanceSuccess} mode={advanceModalMode} advanceData={selectedAdvance} />
             <PayrollDetailsModal isOpen={showDetailsModal} onClose={() => { setShowDetailsModal(false); setSelectedPayrollId(null); }} payrollId={selectedPayrollId} />
             <EditPayrollModal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setSelectedPayroll(null); }} payrollData={selectedPayroll} onSuccess={handleEditSuccess} />
+
+            {/* Custom export column-picker modal (controlled) */}
+            <ExportColumnPicker
+                hideTrigger
+                externalOpen={showCustomExportModal}
+                onExternalClose={() => setShowCustomExportModal(false)}
+                data={payrollRecords}
+                columns={payrollExportColumns}
+                presets={payrollExportPresets}
+                filename={`payroll_${MONTH_NAMES[filters.month - 1]}_${filters.year}`}
+                title="Custom Payroll Export"
+                sheetName="Payroll"
+            />
 
             {/* ═══ ICICI NPAB Bank Upload Modal ═══ */}
             {showIciciModal && (
