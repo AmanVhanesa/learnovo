@@ -424,8 +424,9 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                     <input
                                         className="input"
                                         value={form.ifscCode}
-                                        onChange={(e) => updateField('ifscCode', e.target.value.toUpperCase())}
-                                        placeholder="e.g., SBIN0001234"
+                                        onChange={(e) => updateField('ifscCode', e.target.value.replace(/\s/g, '').toUpperCase())}
+                                        placeholder="e.g., BARB0DBKOLI"
+                                        maxLength={11}
                                     />
                                 </div>
                             </div>

@@ -124,6 +124,29 @@ const payrollService = {
     },
 
     /**
+     * Download ICICI NPAB bank upload sheet for a month's payroll
+     */
+    downloadIciciBankSheet: async (year, month, { debitAccountNo, paymentMode, paymentDate, status }) => {
+        const params = new URLSearchParams();
+        params.append('debitAccountNo', debitAccountNo);
+        if (paymentMode) params.append('paymentMode', paymentMode);
+        if (paymentDate) params.append('paymentDate', paymentDate);
+        if (status) params.append('status', status);
+
+        const response = await api.get(`/payroll/bank-sheet/icici/${year}/${month}?${params.toString()}`, {
+            responseType: 'blob'
+        });
+        return {
+            blob: response.data,
+            included: response.headers['x-npab-included'],
+            skipped: response.headers['x-npab-skipped'],
+            skippedReasons: response.headers['x-npab-skipped-reasons']
+                ? JSON.parse(decodeURIComponent(response.headers['x-npab-skipped-reasons']))
+                : []
+        };
+    },
+
+    /**
      * Download yearly report PDF
      */
     downloadYearlyReport: async (employeeId, year) => {

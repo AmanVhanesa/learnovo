@@ -42,6 +42,13 @@ const Payroll = () => {
     const [advanceModalMode, setAdvanceModalMode] = useState('create');
     const [showExportMenu, setShowExportMenu] = useState(false);
     const exportMenuRef = useRef(null);
+    const [showIciciModal, setShowIciciModal] = useState(false);
+    const [iciciLoading, setIciciLoading] = useState(false);
+    const [iciciForm, setIciciForm] = useState({
+        debitAccountNo: '',
+        paymentMode: 'NEFT',
+        paymentDate: ''
+    });
 
     const currentDate = new Date();
     const [filters, setFilters] = useState({
@@ -304,6 +311,60 @@ const Payroll = () => {
         setShowExportMenu(false);
     };
 
+    // ─── ICICI NPAB Bank Upload Sheet ───────────────────────
+    const handleOpenIciciModal = () => {
+        setShowExportMenu(false);
+        setShowIciciModal(true);
+    };
+
+    const handleDownloadIciciSheet = async () => {
+        if (!/^\d{8,20}$/.test(iciciForm.debitAccountNo.trim())) {
+            toast.error('Enter a valid ICICI debit account number (digits only)');
+            return;
+        }
+        try {
+            setIciciLoading(true);
+            const result = await payrollService.downloadIciciBankSheet(filters.year, filters.month, {
+                debitAccountNo: iciciForm.debitAccountNo.trim(),
+                paymentMode: iciciForm.paymentMode,
+                paymentDate: iciciForm.paymentDate,
+                status: filters.status
+            });
+            const url = window.URL.createObjectURL(result.blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const monthAbbr = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][filters.month - 1];
+            link.download = `ICICI_NPAB_${monthAbbr}_${filters.year}.xls`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            setShowIciciModal(false);
+
+            const skippedCount = parseInt(result.skipped || '0', 10);
+            const includedCount = parseInt(result.included || '0', 10);
+            if (skippedCount > 0) {
+                toast.success(`ICICI sheet downloaded · ${includedCount} included, ${skippedCount} skipped`, { duration: 6000 });
+                console.warn('ICICI NPAB skipped employees:', result.skippedReasons);
+            } else {
+                toast.success(`ICICI NPAB sheet downloaded (${includedCount} employees)`);
+            }
+        } catch (err) {
+            let message = 'Failed to download ICICI bank sheet';
+            if (err.response?.data instanceof Blob) {
+                try {
+                    const text = await err.response.data.text();
+                    message = JSON.parse(text).message || message;
+                } catch { /* ignore */ }
+            } else if (err.response?.data?.message) {
+                message = err.response.data.message;
+            }
+            toast.error(message);
+        } finally {
+            setIciciLoading(false);
+        }
+    };
+
     // ─── Computed Stats ──────────────────────────────────────
     const stats = (() => {
         if (summaryData) {
@@ -425,6 +486,13 @@ const Payroll = () => {
                                                 <div className="text-left">
                                                     <div className="font-medium">Bank Transfer (Excel)</div>
                                                     <div className="text-[11px] text-gray-400 dark:text-[#636366]">NEFT/RTGS format for bank upload</div>
+                                                </div>
+                                            </button>
+                                            <button onClick={handleOpenIciciModal} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 dark:text-[#E5E5EA] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                                                <Building2 className="h-4 w-4 text-orange-500" />
+                                                <div className="text-left">
+                                                    <div className="font-medium">ICICI Bank Upload (.xls)</div>
+                                                    <div className="text-[11px] text-gray-400 dark:text-[#636366]">NPAB format for ICICI Corporate Banking</div>
                                                 </div>
                                             </button>
                                         </div>
@@ -832,6 +900,101 @@ const Payroll = () => {
             <AdvanceSalaryModal isOpen={showAdvanceModal} onClose={() => { setShowAdvanceModal(false); setSelectedAdvance(null); }} onSuccess={handleAdvanceSuccess} mode={advanceModalMode} advanceData={selectedAdvance} />
             <PayrollDetailsModal isOpen={showDetailsModal} onClose={() => { setShowDetailsModal(false); setSelectedPayrollId(null); }} payrollId={selectedPayrollId} />
             <EditPayrollModal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setSelectedPayroll(null); }} payrollData={selectedPayroll} onSuccess={handleEditSuccess} />
+
+            {/* ═══ ICICI NPAB Bank Upload Modal ═══ */}
+            {showIciciModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-2xl max-w-md w-full border border-gray-100 dark:border-[#38383A] animate-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-[#38383A] flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-semibold text-gray-900 dark:text-white tracking-tight">ICICI Bank Upload Sheet</h3>
+                                <p className="text-[11px] text-gray-500 dark:text-[#8E8E93] mt-0.5">
+                                    {MONTH_NAMES[filters.month - 1]} {filters.year} payroll · NPAB format
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowIciciModal(false)}
+                                disabled={iciciLoading}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-50"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-[13px] font-medium text-gray-700 dark:text-[#E5E5EA] mb-1.5">
+                                    ICICI Debit Account Number <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={iciciForm.debitAccountNo}
+                                    onChange={(e) => setIciciForm({ ...iciciForm, debitAccountNo: e.target.value.replace(/\D/g, '') })}
+                                    placeholder="e.g. 123456789012"
+                                    maxLength={20}
+                                    className="input w-full"
+                                />
+                                <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] mt-1">School's ICICI account from which salaries will be debited.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-[13px] font-medium text-gray-700 dark:text-[#E5E5EA] mb-1.5">Payment Mode</label>
+                                <select
+                                    value={iciciForm.paymentMode}
+                                    onChange={(e) => setIciciForm({ ...iciciForm, paymentMode: e.target.value })}
+                                    className="input w-full"
+                                >
+                                    <option value="NEFT">NEFT (any bank)</option>
+                                    <option value="RTGS">RTGS (≥ ₹2,00,000)</option>
+                                    <option value="IMPS">IMPS (instant)</option>
+                                    <option value="FT">FT (ICICI to ICICI only)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-[13px] font-medium text-gray-700 dark:text-[#E5E5EA] mb-1.5">Payment Date</label>
+                                <input
+                                    type="date"
+                                    value={iciciForm.paymentDate ? iciciForm.paymentDate.split('-').reverse().join('-') : ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setIciciForm({
+                                            ...iciciForm,
+                                            paymentDate: val ? val.split('-').reverse().join('-') : ''
+                                        });
+                                    }}
+                                    className="input w-full"
+                                />
+                                <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] mt-1">Leave blank to use today's date.</p>
+                            </div>
+
+                            <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-3 py-2.5">
+                                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                                    Employees without a saved bank account number or IFSC will be skipped. Check employee profiles before generating.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-100 dark:border-[#38383A] flex justify-end gap-2">
+                            <button
+                                onClick={() => setShowIciciModal(false)}
+                                disabled={iciciLoading}
+                                className="btn btn-outline"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDownloadIciciSheet}
+                                disabled={iciciLoading || !iciciForm.debitAccountNo}
+                                className="btn btn-primary gap-2"
+                            >
+                                {iciciLoading ? 'Generating...' : 'Download .xls'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

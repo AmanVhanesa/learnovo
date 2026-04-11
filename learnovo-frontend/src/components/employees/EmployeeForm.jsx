@@ -774,8 +774,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         <input
                                             className={`input pr-8 ${formErrors.ifscCode ? 'border-red-500' : ifscVerified ? 'border-green-500' : ''}`}
                                             value={form.ifscCode}
-                                            onChange={(e) => updateField('ifscCode', e.target.value.toUpperCase())}
-                                            placeholder="e.g., SBIN0001234"
+                                            onChange={(e) => updateField('ifscCode', e.target.value.replace(/\s/g, '').toUpperCase())}
+                                            placeholder="e.g., BARB0DBKOLI"
                                             maxLength={11}
                                         />
                                         {ifscLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />}

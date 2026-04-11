@@ -212,11 +212,12 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
     const sequence = await Counter.getNextSequence('employee', currentYear, tenantId);
     const employeeId = `EMP${currentYear}${String(sequence).padStart(4, '0')}`;
 
-    // Validate IFSC code format if provided
-    if (ifscCode && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode.toUpperCase())) {
+    // Normalize and validate IFSC code if provided
+    const normalizedIfsc = ifscCode ? ifscCode.replace(/\s/g, '').toUpperCase() : '';
+    if (normalizedIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(normalizedIfsc)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid IFSC code format. Expected format: ABCD0123456'
+        message: 'Invalid IFSC code format. Expected format: ABCD0123456 (e.g., BARB0DBKOLI for Bank of Baroda)'
       });
     }
 
@@ -286,7 +287,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       photo,
       bankName,
       accountNumber: accountNumber ? accountNumber.replace(/\s/g, '') : undefined,
-      ifscCode: ifscCode ? ifscCode.toUpperCase() : undefined,
+      ifscCode: normalizedIfsc || undefined,
       subjects: role === 'teacher' ? subjects : undefined,
       emergencyContact,
       leaveBalance: { casual: 12, sick: 12, earned: 15 },
@@ -401,6 +402,23 @@ router.put('/:id', protect, authorize('admin'), [
     const updatePayload = { ...req.body };
     if (updatePayload.password === '') {
       delete updatePayload.password;
+    }
+
+    // Normalize and validate IFSC if provided
+    if (updatePayload.ifscCode !== undefined && updatePayload.ifscCode !== null && updatePayload.ifscCode !== '') {
+      const normalizedIfsc = updatePayload.ifscCode.toString().replace(/\s/g, '').toUpperCase();
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(normalizedIfsc)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid IFSC code format. Expected format: ABCD0123456 (e.g., BARB0DBKOLI for Bank of Baroda)'
+        });
+      }
+      updatePayload.ifscCode = normalizedIfsc;
+    }
+
+    // Normalize account number if provided
+    if (updatePayload.accountNumber !== undefined && updatePayload.accountNumber !== null && updatePayload.accountNumber !== '') {
+      updatePayload.accountNumber = updatePayload.accountNumber.toString().replace(/\s/g, '');
     }
 
     const updatedEmployee = await User.findByIdAndUpdate(

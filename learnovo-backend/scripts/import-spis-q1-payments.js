@@ -53,7 +53,7 @@ const Q1_QUARTER = 1; // billingPeriod.quarter for Q1 (Apr-Jun)
 function parseCSV(filePath) {
   return new Promise((resolve, reject) => {
     // Read file, strip BOM, find the real header row containing "Reg No"
-    let content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
+    const content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
     const lines = content.split('\n');
     const headerIdx = lines.findIndex(l => /Reg No/i.test(l));
     if (headerIdx === -1) {
