@@ -18,6 +18,13 @@ const Payroll = () => {
     const [showAdvanceModal, setShowAdvanceModal] = useState(false);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [showBankSheetModal, setShowBankSheetModal] = useState(false);
+    const [bankSheetLoading, setBankSheetLoading] = useState(false);
+    const [bankSheetForm, setBankSheetForm] = useState({
+        debitAccountNo: '',
+        paymentMode: 'NEFT',
+        paymentDate: ''
+    });
     const [selectedPayrollId, setSelectedPayrollId] = useState(null);
     const [selectedPayroll, setSelectedPayroll] = useState(null);
     const [selectedAdvance, setSelectedAdvance] = useState(null);
@@ -96,6 +103,55 @@ const Payroll = () => {
         } catch (err) {
             console.error('Error downloading monthly report:', err);
             alert('Failed to download monthly report');
+        }
+    };
+
+    const handleDownloadBankSheet = async () => {
+        if (!/^\d{8,20}$/.test(bankSheetForm.debitAccountNo.trim())) {
+            alert('Please enter a valid ICICI debit account number (digits only, 8-20 digits).');
+            return;
+        }
+        try {
+            setBankSheetLoading(true);
+            const result = await payrollService.downloadIciciBankSheet(filters.year, filters.month, {
+                debitAccountNo: bankSheetForm.debitAccountNo.trim(),
+                paymentMode: bankSheetForm.paymentMode,
+                paymentDate: bankSheetForm.paymentDate,
+                status: filters.status
+            });
+            const url = window.URL.createObjectURL(result.blob);
+            const link = document.createElement('a');
+            link.href = url;
+            const monthAbbr = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][filters.month - 1];
+            link.download = `ICICI_NPAB_${monthAbbr}_${filters.year}.xls`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            setShowBankSheetModal(false);
+
+            if (result.skipped && parseInt(result.skipped) > 0) {
+                const reasons = (result.skippedReasons || [])
+                    .map(s => `• ${s.employee}: ${s.reason}`)
+                    .join('\n');
+                alert(`Bank sheet downloaded.\nIncluded: ${result.included}\nSkipped: ${result.skipped}\n\n${reasons}`);
+            }
+        } catch (err) {
+            console.error('Error downloading bank sheet:', err);
+            let message = 'Failed to download bank sheet';
+            if (err.response?.data instanceof Blob) {
+                try {
+                    const text = await err.response.data.text();
+                    const parsed = JSON.parse(text);
+                    message = parsed.message || message;
+                } catch (_) { /* ignore */ }
+            } else if (err.response?.data?.message) {
+                message = err.response.data.message;
+            }
+            alert(message);
+        } finally {
+            setBankSheetLoading(false);
         }
     };
 
@@ -219,6 +275,18 @@ const Payroll = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                     </svg>
                                     Monthly Report
+                                </button>
+
+                                <button
+                                    onClick={() => setShowBankSheetModal(true)}
+                                    className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition flex items-center gap-2"
+                                    disabled={payrollRecords.length === 0}
+                                    title="Generate ICICI NPAB bank upload sheet"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" />
+                                    </svg>
+                                    Bank Sheet (ICICI)
                                 </button>
 
                                 <button
@@ -590,6 +658,100 @@ const Payroll = () => {
                 payrollData={selectedPayroll}
                 onSuccess={handleEditSuccess}
             />
+
+            {/* ICICI Bank Sheet Modal */}
+            {showBankSheetModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-gray-800">Generate ICICI Bank Upload Sheet</h3>
+                            <button
+                                onClick={() => setShowBankSheetModal(false)}
+                                className="text-gray-400 hover:text-gray-600"
+                                disabled={bankSheetLoading}
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="px-6 py-4 space-y-4">
+                            <p className="text-sm text-gray-600">
+                                Downloads the payroll for <strong>{monthNames[filters.month - 1]} {filters.year}</strong> in
+                                ICICI NPAB format (<code>.xls</code>), ready for direct upload to ICICI Corporate Internet Banking.
+                            </p>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    ICICI Debit Account Number <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={bankSheetForm.debitAccountNo}
+                                    onChange={(e) => setBankSheetForm({ ...bankSheetForm, debitAccountNo: e.target.value.replace(/\D/g, '') })}
+                                    placeholder="e.g. 123456789012"
+                                    maxLength={20}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">School's ICICI account from which salaries will be debited.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Mode</label>
+                                <select
+                                    value={bankSheetForm.paymentMode}
+                                    onChange={(e) => setBankSheetForm({ ...bankSheetForm, paymentMode: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="NEFT">NEFT (any bank)</option>
+                                    <option value="RTGS">RTGS (≥ ₹2,00,000)</option>
+                                    <option value="IMPS">IMPS (instant, any bank)</option>
+                                    <option value="FT">FT (ICICI to ICICI only)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+                                <input
+                                    type="date"
+                                    value={bankSheetForm.paymentDate ? bankSheetForm.paymentDate.split('-').reverse().join('-') : ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setBankSheetForm({
+                                            ...bankSheetForm,
+                                            paymentDate: val ? val.split('-').reverse().join('-') : ''
+                                        });
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Leave blank to use today's date.</p>
+                            </div>
+
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                                <p className="text-xs text-yellow-800">
+                                    Employees without a saved bank account number or IFSC will be skipped. Make sure employee bank details are filled in before generating.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+                            <button
+                                onClick={() => setShowBankSheetModal(false)}
+                                disabled={bankSheetLoading}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDownloadBankSheet}
+                                disabled={bankSheetLoading || !bankSheetForm.debitAccountNo}
+                                className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {bankSheetLoading ? 'Generating...' : 'Download .xls'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

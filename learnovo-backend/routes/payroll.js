@@ -8,8 +8,26 @@ const payrollService = require('../services/payrollService');
 const payrollPdfService = require('../services/payrollPdfService');
 const { syncPayrollToExpense, reversePayrollExpense } = require('../services/financeAutoSyncService');
 const ImportExportService = require('../services/importExportService');
+const XLSX = require('xlsx');
 
 const router = express.Router();
+
+// ICICI NPAB (Net Payment Advice Batch) column order — must match NPAB_FMT.xls exactly
+const NPAB_HEADERS = [
+  'PYMT_PROD_TYPE_CODE', 'PYMT_MODE', 'DEBIT_ACC_NO', 'BNF_NAME', 'BENE_ACC_NO',
+  'BENE_IFSC', 'AMOUNT', 'DEBIT_NARR', 'CREDIT_NARR', 'MOBILE_NUM',
+  'EMAIL_ID', 'REMARK', 'PYMT_DATE', 'REF_NO', 'ADDL_INFO1',
+  'ADDL_INFO2', 'ADDL_INFO3', 'ADDL_INFO4', 'ADDL_INFO5'
+];
+const NPAB_VALID_MODES = ['FT', 'NEFT', 'RTGS', 'IMPS'];
+const NPAB_MONTH_ABBR = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+const npabSanitizeAlpha = (str, max) => (str || '').toString().replace(/[^A-Za-z ]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+const npabSanitizeAlnum = (str, max) => (str || '').toString().replace(/[^A-Za-z0-9 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+const npabMobile10 = (str) => {
+  const digits = (str || '').toString().replace(/\D/g, '');
+  return digits.length >= 10 ? Number(digits.slice(-10)) : '';
+};
 
 // @desc    Export payroll records as CSV
 // @route   GET /api/payroll/export
@@ -60,6 +78,149 @@ router.get('/export', protect, authorize('admin'), async(req, res) => {
   } catch (error) {
     console.error('Export payroll error:', error);
     res.status(500).json({ success: false, message: 'Server error while exporting payroll' });
+  }
+});
+
+// @desc    Download ICICI NPAB bank upload sheet for a month's payroll
+// @route   GET /api/payroll/bank-sheet/icici/:year/:month
+// @access  Private (Admin)
+router.get('/bank-sheet/icici/:year/:month', protect, authorize('admin'), async(req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    const month = parseInt(req.params.month);
+    if (!year || !month || month < 1 || month > 12) {
+      return res.status(400).json({ success: false, message: 'Invalid year or month' });
+    }
+
+    const {
+      debitAccountNo,
+      paymentMode = 'NEFT',
+      paymentDate,
+      status
+    } = req.query;
+
+    if (!debitAccountNo || !/^\d{8,20}$/.test(debitAccountNo.toString().trim())) {
+      return res.status(400).json({ success: false, message: 'Valid ICICI debit account number required (digits only)' });
+    }
+    if (!NPAB_VALID_MODES.includes(paymentMode)) {
+      return res.status(400).json({ success: false, message: `Payment mode must be one of: ${NPAB_VALID_MODES.join(', ')}` });
+    }
+
+    const pad2 = (n) => String(n).padStart(2, '0');
+    let pymtDate;
+    if (paymentDate && /^\d{2}-\d{2}-\d{4}$/.test(paymentDate)) {
+      pymtDate = paymentDate;
+    } else {
+      const d = new Date();
+      pymtDate = `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${d.getFullYear()}`;
+    }
+
+    const filter = {
+      tenantId: req.user.tenantId,
+      month,
+      year,
+      isDeleted: { $ne: true }
+    };
+    if (status && ['pending', 'paid', 'cancelled'].includes(status)) {
+      filter.paymentStatus = status;
+    }
+
+    const records = await Payroll.find(filter)
+      .populate('employeeId', 'name fullName firstName lastName email phone accountNumber ifscCode bankName employeeId')
+      .lean();
+
+    if (records.length === 0) {
+      return res.status(404).json({ success: false, message: 'No payroll records found for the selected period' });
+    }
+
+    const periodLabel = `SALARY ${NPAB_MONTH_ABBR[month - 1]}${year}`;
+    const debitNarr = npabSanitizeAlnum(periodLabel, 30);
+    const creditNarr = npabSanitizeAlnum(periodLabel, 30);
+
+    const rows = [NPAB_HEADERS];
+    const skipped = [];
+    let included = 0;
+
+    for (const rec of records) {
+      const emp = rec.employeeId;
+      if (!emp) {
+        skipped.push({ employee: 'Unknown', reason: 'Employee record missing' });
+        continue;
+      }
+
+      const empName = (emp.fullName || emp.name || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || '').trim();
+      const acctNo = (emp.accountNumber || '').toString().trim();
+      const ifsc = (emp.ifscCode || '').toString().trim().toUpperCase();
+      const netSalary = Number(rec.netSalary || 0);
+
+      if (!empName) {
+        skipped.push({ employee: emp.employeeId || String(emp._id), reason: 'Missing employee name' });
+        continue;
+      }
+      if (!acctNo) {
+        skipped.push({ employee: empName, reason: 'Missing bank account number' });
+        continue;
+      }
+      if (paymentMode !== 'FT' && !ifsc) {
+        skipped.push({ employee: empName, reason: 'Missing IFSC code' });
+        continue;
+      }
+      if (netSalary <= 0) {
+        skipped.push({ employee: empName, reason: 'Net salary is zero or negative' });
+        continue;
+      }
+
+      rows.push([
+        'PAB_VENDOR',
+        paymentMode,
+        debitAccountNo.toString().trim(),
+        npabSanitizeAlpha(empName, 100),
+        acctNo,
+        paymentMode === 'FT' ? '' : ifsc,
+        Number(netSalary.toFixed(2)),
+        debitNarr,
+        creditNarr,
+        npabMobile10(emp.phone),
+        (emp.email || '').toString().trim().slice(0, 100),
+        '',
+        pymtDate,
+        '',
+        '',
+        '',
+        '',
+        '',
+        ''
+      ]);
+      included++;
+    }
+
+    if (included === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No eligible payroll records — all rows missing required bank details',
+        skipped
+      });
+    }
+
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet['!cols'] = NPAB_HEADERS.map(() => ({ wch: 20 }));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1');
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'biff8' });
+
+    const filename = `ICICI_NPAB_${NPAB_MONTH_ABBR[month - 1]}_${year}.xls`;
+    res.setHeader('Content-Type', 'application/vnd.ms-excel');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.setHeader('X-NPAB-Included', String(included));
+    res.setHeader('X-NPAB-Skipped', String(skipped.length));
+    if (skipped.length) {
+      res.setHeader('X-NPAB-Skipped-Reasons', encodeURIComponent(JSON.stringify(skipped).slice(0, 2000)));
+    }
+    res.send(buffer);
+  } catch (error) {
+    console.error('ICICI NPAB bank sheet export error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error while generating bank sheet' });
   }
 });
 
