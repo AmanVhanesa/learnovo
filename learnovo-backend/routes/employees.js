@@ -213,11 +213,15 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
     const employeeId = `EMP${currentYear}${String(sequence).padStart(4, '0')}`;
 
     // Normalize and validate IFSC code if provided
-    const normalizedIfsc = ifscCode ? ifscCode.replace(/\s/g, '').toUpperCase() : '';
+    let normalizedIfsc = ifscCode ? ifscCode.replace(/\s/g, '').toUpperCase() : '';
+    // Auto-correct common mistake: 5th char must be digit 0, not letter O
+    if (normalizedIfsc.length >= 5 && normalizedIfsc[4] === 'O') {
+      normalizedIfsc = `${normalizedIfsc.slice(0, 4)}0${normalizedIfsc.slice(5)}`;
+    }
     if (normalizedIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(normalizedIfsc)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid IFSC code format. Expected format: ABCD0123456 (e.g., BARB0DBKOLI for Bank of Baroda)'
+        message: 'Invalid IFSC code format. Expected 11 characters, 5th must be digit 0 (e.g., BARB0DBKOLI for Bank of Baroda)'
       });
     }
 
@@ -406,11 +410,15 @@ router.put('/:id', protect, authorize('admin'), [
 
     // Normalize and validate IFSC if provided
     if (updatePayload.ifscCode !== undefined && updatePayload.ifscCode !== null && updatePayload.ifscCode !== '') {
-      const normalizedIfsc = updatePayload.ifscCode.toString().replace(/\s/g, '').toUpperCase();
+      let normalizedIfsc = updatePayload.ifscCode.toString().replace(/\s/g, '').toUpperCase();
+      // Auto-correct common mistake: 5th char must be digit 0, not letter O
+      if (normalizedIfsc.length >= 5 && normalizedIfsc[4] === 'O') {
+        normalizedIfsc = `${normalizedIfsc.slice(0, 4)}0${normalizedIfsc.slice(5)}`;
+      }
       if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(normalizedIfsc)) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid IFSC code format. Expected format: ABCD0123456 (e.g., BARB0DBKOLI for Bank of Baroda)'
+          message: 'Invalid IFSC code format. Expected 11 characters, 5th must be digit 0 (e.g., BARB0DBKOLI for Bank of Baroda)'
         });
       }
       updatePayload.ifscCode = normalizedIfsc;

@@ -211,8 +211,15 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
 
         // IFSC Code validation
         if (form.ifscCode) {
-            if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifscCode.toUpperCase())) {
-                errors.ifscCode = 'Invalid IFSC format (e.g., SBIN0001234)'
+            const ifsc = form.ifscCode.toUpperCase()
+            if (ifsc.length !== 11) {
+                errors.ifscCode = `IFSC must be exactly 11 characters (you entered ${ifsc.length})`
+            } else if (ifsc[4] === 'O') {
+                errors.ifscCode = '5th character must be digit ZERO (0), not letter O'
+            } else if (ifsc[4] !== '0') {
+                errors.ifscCode = '5th character must be digit 0 (reserved by RBI)'
+            } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+                errors.ifscCode = 'Invalid IFSC format (e.g., BARB0DBKOLI for Bank of Baroda)'
             }
         }
 
@@ -774,7 +781,14 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         <input
                                             className={`input pr-8 ${formErrors.ifscCode ? 'border-red-500' : ifscVerified ? 'border-green-500' : ''}`}
                                             value={form.ifscCode}
-                                            onChange={(e) => updateField('ifscCode', e.target.value.replace(/\s/g, '').toUpperCase())}
+                                            onChange={(e) => {
+                                                let v = e.target.value.replace(/\s/g, '').toUpperCase()
+                                                // Auto-correct common mistake: 5th char must be digit 0, not letter O
+                                                if (v.length >= 5 && v[4] === 'O') {
+                                                    v = v.slice(0, 4) + '0' + v.slice(5)
+                                                }
+                                                updateField('ifscCode', v)
+                                            }}
                                             placeholder="e.g., BARB0DBKOLI"
                                             maxLength={11}
                                         />
