@@ -3492,7 +3492,18 @@ router.post('/:id/demote', protect, authorize('admin', 'principal'), async(req, 
 // @access  Private (Admin)
 router.post('/bulk-class-action', protect, authorize('admin', 'principal'), async(req, res) => {
   try {
-    const { studentIds, actionType, toClass, toSection, academicYear, remarks, forceOverride } = req.body;
+    const {
+      studentIds,
+      actionType,
+      toClass,
+      toSection,
+      academicYear,
+      remarks,
+      forceOverride,
+      reallocateFees = false,
+      targetAcademicSessionId,
+      paymentPlan
+    } = req.body;
 
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       return res.status(400).json({ success: false, message: 'No students selected' });
@@ -3506,8 +3517,26 @@ router.post('/bulk-class-action', protect, authorize('admin', 'principal'), asyn
 
     const classDoc = await Class.findOne({ grade: toClass, tenantId: req.user.tenantId });
 
+    // Resolve the target session once if fee reallocation was requested
+    let targetSession = null;
+    if (reallocateFees) {
+      const { resolveTargetSession } = require('../services/feeReallocationService');
+      targetSession = await resolveTargetSession({
+        tenantId: req.user.tenantId,
+        targetAcademicSessionId,
+        academicYearName: academicYear
+      });
+    }
+
     let successCount = 0;
     const errors = [];
+    const feeReallocation = {
+      attempted: Boolean(reallocateFees),
+      created: 0,
+      skipped: 0,
+      errors: 0,
+      details: []
+    };
 
     for (const student of students) {
       try {
@@ -3553,16 +3582,58 @@ router.post('/bulk-class-action', protect, authorize('admin', 'principal'), asyn
         });
 
         successCount++;
+
+        // Fee reallocation: only if requested, a session was resolved, and the class actually changed
+        if (reallocateFees && targetSession && classDoc && fromClass !== toClass) {
+          try {
+            const { reallocateStudentForSession } = require('../services/feeReallocationService');
+            const result = await reallocateStudentForSession({
+              tenantId: req.user.tenantId,
+              student,
+              newClassId: classDoc._id,
+              newSectionId: null,
+              session: targetSession,
+              performedBy: req.user._id,
+              paymentPlan
+            });
+
+            if (result.status === 'created') {
+              feeReallocation.created++;
+            } else if (result.status === 'skipped') {
+              feeReallocation.skipped++;
+              feeReallocation.details.push(`${student.name || student.fullName}: ${result.reason}`);
+            } else {
+              feeReallocation.errors++;
+              feeReallocation.details.push(`${student.name || student.fullName}: ${result.reason}`);
+            }
+          } catch (reallocErr) {
+            feeReallocation.errors++;
+            feeReallocation.details.push(`${student.name || student.fullName}: ${reallocErr.message}`);
+            logger.error('Fee reallocation failed for student', reallocErr, {
+              requestId: req.requestId,
+              tenantId: req.user.tenantId,
+              studentId: String(student._id)
+            });
+          }
+        }
       } catch (err) {
         errors.push(`Failed for ${student.name || student.fullName}: ${err.message}`);
       }
+    }
+
+    // Surface "target session not found" as a single top-level warning
+    if (reallocateFees && !targetSession && successCount > 0) {
+      feeReallocation.details.push(
+        `Fee reallocation skipped — no academic session matching "${academicYear}" found. Create the session (and its fee structures) first, then re-run reallocation from the Fees page.`
+      );
     }
 
     res.json({
       success: true,
       message: `Successfully ${actionType} ${successCount} students.`,
       successCount,
-      errors
+      errors,
+      feeReallocation
     });
   } catch (error) {
     logger.error('Bulk class action error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId, userEmail: req.user?.email });

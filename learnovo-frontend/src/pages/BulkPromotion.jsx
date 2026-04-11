@@ -35,6 +35,7 @@ const BulkPromotion = () => {
     const [targetYear, setTargetYear] = useState(defaultAcademicYear);
     const [remarks, setRemarks] = useState('');
     const [forceOverride, setForceOverride] = useState(false);
+    const [reallocateFees, setReallocateFees] = useState(true);
 
     const [executionSummary, setExecutionSummary] = useState(null);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -148,7 +149,8 @@ const BulkPromotion = () => {
             setExecutionSummary({
                 successCount: response.successCount,
                 errors: response.errors || [],
-                message: response.message
+                message: response.message,
+                feeReallocation: response.feeReallocation || null
             });
 
             if (response.successCount > 0) {
@@ -189,9 +191,23 @@ const BulkPromotion = () => {
             toSection: targetSection,
             academicYear: targetYear,
             remarks,
-            forceOverride
+            forceOverride,
+            reallocateFees
         });
     };
+
+    // Mid-session warning: target year matches most students' current year (no session change).
+    // Auto-reallocation isn't safe in that case — no new FeeStructure/session to pull from.
+    const midSessionWarning = useMemo(() => {
+        if (!sourceClass || students.length === 0 || !targetYear) return null;
+        const currentYears = students.map(s => s.academicYear).filter(Boolean);
+        if (currentYears.length === 0) return null;
+        const sameYearCount = currentYears.filter(y => y === targetYear).length;
+        if (sameYearCount / currentYears.length > 0.5) {
+            return `${sameYearCount} of ${currentYears.length} selected students are already in academic year ${targetYear}. Mid-session class changes don't trigger automatic fee reallocation — adjust pending invoices manually from the student's fee page.`;
+        }
+        return null;
+    }, [sourceClass, students, targetYear]);
 
     const allVisibleSelected = filteredStudents.length > 0 && filteredStudents.every(s => selectedStudents.includes(s._id));
     const someVisibleSelected = filteredStudents.some(s => selectedStudents.includes(s._id));
@@ -342,6 +358,30 @@ const BulkPromotion = () => {
                                 Force override (ignore duplicates this year)
                             </label>
 
+                            <div className="rounded-lg border border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] p-3">
+                                <label className="flex items-start gap-2 cursor-pointer text-sm text-gray-700 dark:text-[#8E8E93]">
+                                    <input
+                                        type="checkbox"
+                                        className="mt-0.5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                                        checked={reallocateFees}
+                                        onChange={(e) => setReallocateFees(e.target.checked)}
+                                    />
+                                    <span>
+                                        <span className="font-medium text-gray-900 dark:text-white">Reallocate fees from new class structure</span>
+                                        <span className="block text-xs mt-0.5">
+                                            Creates fresh annual fee allocations for each student based on the target class&apos;s fee structure. Requires academic session &ldquo;{targetYear}&rdquo; to exist with an active fee structure.
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+
+                            {midSessionWarning && (
+                                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 flex gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                                    <p className="text-xs text-amber-800 dark:text-amber-300">{midSessionWarning}</p>
+                                </div>
+                            )}
+
                             <button
                                 type="submit"
                                 disabled={isExecuting || selectedStudents.length === 0 || !sourceClass || !targetClass || !isValidAcademicYear(targetYear)}
@@ -381,6 +421,23 @@ const BulkPromotion = () => {
                                                     <li key={idx}>{error}</li>
                                                 ))}
                                             </ul>
+                                        </div>
+                                    )}
+                                    {executionSummary.feeReallocation?.attempted && (
+                                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-[#38383A] text-sm text-gray-700 dark:text-[#8E8E93]">
+                                            <p className="font-medium">
+                                                Fee reallocation: {executionSummary.feeReallocation.created} created, {executionSummary.feeReallocation.skipped} skipped, {executionSummary.feeReallocation.errors} errors
+                                            </p>
+                                            {executionSummary.feeReallocation.details?.length > 0 && (
+                                                <ul className="list-disc pl-5 space-y-1 mt-1 text-xs">
+                                                    {executionSummary.feeReallocation.details.slice(0, 10).map((d, idx) => (
+                                                        <li key={idx}>{d}</li>
+                                                    ))}
+                                                    {executionSummary.feeReallocation.details.length > 10 && (
+                                                        <li>&hellip; and {executionSummary.feeReallocation.details.length - 10} more</li>
+                                                    )}
+                                                </ul>
+                                            )}
                                         </div>
                                     )}
                                 </div>
