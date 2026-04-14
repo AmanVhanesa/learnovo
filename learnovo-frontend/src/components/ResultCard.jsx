@@ -4,6 +4,7 @@ import { X, Printer, FileText, Download } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { settingsService } from '../services/settingsService';
 import { academicSessionsService } from '../services/academicsService';
+import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { highQualityPrint } from '../utils/highQualityPrint';
 
@@ -219,6 +220,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
 ───────────────────────────────────────────────────────── */
 
 const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
+    const { user } = useAuth();
+    const isStudent = user?.role === 'student';
     const [cardData, setCardData] = useState(null);
     const [twoTermData, setTwoTermData] = useState(null);
     const [activeSessionId, setActiveSessionId] = useState(null);
@@ -286,15 +289,27 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
             .finally(() => setLoading(false));
     }, [studentId, filterSeries, isFullYear, activeSessionId]);
 
-    /* ── print ── */
+    /* ── print (opens backend-generated PDF in new tab for native print) ── */
     const handlePrint = async () => {
         const hasData = isFullYear ? !!twoTermData?.subjectRows?.length : !!cardData?.subjects?.length;
-        if (!hasData || !reportCardPrintRef.current) return;
+        if (!hasData) return;
         setPrinting(true);
         try {
-            await highQualityPrint(reportCardPrintRef.current, 'Report-Card', {
-                scale: 3, format: 'a4', orientation: 'portrait', margin: 10,
+            const blob = isFullYear
+                ? await examsService.downloadFinalReportCardPDF(studentId, activeSessionId)
+                : await examsService.downloadReportCardPDF(studentId, { examSeries: filterSeries });
+            const url = window.URL.createObjectURL(blob);
+            const w = window.open(url, '_blank');
+            if (!w) {
+                toast.error('Popup blocked. Allow popups to print.');
+                window.URL.revokeObjectURL(url);
+                return;
+            }
+            const cleanup = () => window.URL.revokeObjectURL(url);
+            w.addEventListener('load', () => {
+                try { w.focus(); w.print(); } catch { /* user can still print manually */ }
             });
+            setTimeout(cleanup, 60000);
         } catch (error) {
             console.error('Print failed:', error);
             toast.error('Failed to prepare print. Please try again.');
@@ -418,6 +433,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                             </select>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
+                            {!isStudent && (
                             <button
                                 className="btn btn-sm gap-1.5 bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#38383A] border border-gray-200 dark:border-[#38383A]"
                                 onClick={handleDownloadBlank}
@@ -427,6 +443,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 <FileText className="h-4 w-4" />
                                 {downloadingBlank ? 'Downloading\u2026' : 'Blank PDF'}
                             </button>
+                            )}
                             <button
                                 className="btn btn-sm gap-1.5 bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#38383A] border border-gray-200 dark:border-[#38383A]"
                                 onClick={handleDownloadPDF}
