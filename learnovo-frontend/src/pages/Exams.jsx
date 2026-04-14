@@ -633,66 +633,90 @@ const Exams = () => {
                             ))}
                         </div>
 
-                        {/* Subject-wise Results */}
-                        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
-                            <div className="px-5 py-3.5 border-b border-gray-100 dark:border-[#38383A]">
-                                <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Subject-wise Results</h2>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm min-w-[600px]">
-                                    <thead>
-                                        <tr className="bg-gray-50 dark:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A]">
-                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Subject</th>
-                                            <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Exam</th>
-                                            <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Marks</th>
-                                            <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">%</th>
-                                            <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Grade</th>
-                                            <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Result</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {mySubjects.map((s, i) => (
-                                            <tr key={s.examId + '-' + i} className={`border-b border-gray-50 dark:border-[#38383A] ${s.percentage >= 75 ? 'bg-emerald-50/40 dark:bg-[rgba(48,209,88,0.06)]' : i % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-[#2C2C2E]/30'}`}>
-                                                <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
-                                                    <div className="flex items-center gap-2">
-                                                        {s.subject}
-                                                        {s.percentage >= 75 && (
-                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158]">
-                                                                <Award className="h-3 w-3 mr-0.5" />
-                                                                Distinction
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-5 py-3">
-                                                    <div className="text-gray-700 dark:text-[#8E8E93]">{s.examName}</div>
-                                                    <div className="text-xs text-gray-400 dark:text-[#636366]">{s.examSeries} {s.date ? `• ${formatDate(s.date)}` : ''}</div>
-                                                </td>
-                                                <td className="px-5 py-3 text-center font-bold text-gray-900 dark:text-white">{s.marksObtained}/{s.totalMarks}</td>
-                                                <td className="px-5 py-3 text-center text-gray-700 dark:text-[#8E8E93]">{s.percentage}%</td>
-                                                <td className="px-5 py-3 text-center">
-                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                                        s.grade === 'A+' || s.grade === 'A' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
-                                                        s.grade === 'B' ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-400' :
-                                                        s.grade === 'C' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' :
-                                                        s.grade === 'D' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
-                                                        'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
-                                                    }`}>{s.grade}</span>
-                                                </td>
-                                                <td className="px-5 py-3 text-center">
-                                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${s.isPassed
-                                                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158]'
-                                                        : 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-[rgba(255,69,58,0.12)] dark:text-[#FF453A]'
-                                                    }`}>
-                                                        {s.isPassed ? 'Pass' : 'Fail'}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        {/* Results grouped by Exam Series */}
+                        {(() => {
+                            const grouped = {};
+                            mySubjects.forEach(s => {
+                                const key = s.examSeries || 'Custom';
+                                if (!grouped[key]) grouped[key] = [];
+                                grouped[key].push(s);
+                            });
+                            const entries = Object.entries(grouped).sort((a, b) => seriesSortKey(a[0]) - seriesSortKey(b[0]));
+                            return entries.map(([series, rows]) => {
+                                const cfg = SERIES_CONFIG[series] || SERIES_CONFIG.Custom;
+                                const seriesTotal = rows.reduce((a, r) => a + (r.totalMarks || 0), 0);
+                                const seriesObtained = rows.reduce((a, r) => a + (r.marksObtained || 0), 0);
+                                const seriesPct = seriesTotal > 0 ? Math.round((seriesObtained / seriesTotal) * 1000) / 10 : 0;
+                                return (
+                                    <div key={series} className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
+                                        <div className={`px-5 py-3 border-b ${cfg.border} ${cfg.bg} flex items-center justify-between flex-wrap gap-2`}>
+                                            <div className="flex items-center gap-2">
+                                                <Layers className={`h-4 w-4 ${cfg.color}`} />
+                                                <span className={`text-sm font-semibold ${cfg.color}`}>{cfg.label || series}</span>
+                                                <span className="text-xs text-gray-500 dark:text-[#8E8E93] bg-white/60 dark:bg-[#1C1C1E]/60 px-2 py-0.5 rounded-full">{rows.length} subject{rows.length !== 1 ? 's' : ''}</span>
+                                            </div>
+                                            <div className="text-xs font-semibold text-gray-700 dark:text-[#8E8E93]">
+                                                {seriesObtained}/{seriesTotal} &middot; {seriesPct}%
+                                            </div>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm min-w-[560px]">
+                                                <thead>
+                                                    <tr className="bg-gray-50 dark:bg-[#2C2C2E] border-b border-gray-100 dark:border-[#38383A]">
+                                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Subject</th>
+                                                        <th className="px-5 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Exam</th>
+                                                        <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Marks</th>
+                                                        <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">%</th>
+                                                        <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Grade</th>
+                                                        <th className="px-5 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Result</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {rows.map((s, i) => (
+                                                        <tr key={s.examId + '-' + i} className={`border-b border-gray-50 dark:border-[#38383A] ${s.percentage >= 75 ? 'bg-emerald-50/40 dark:bg-[rgba(48,209,88,0.06)]' : i % 2 === 0 ? '' : 'bg-gray-50/30 dark:bg-[#2C2C2E]/30'}`}>
+                                                            <td className="px-5 py-3 font-medium text-gray-900 dark:text-white">
+                                                                <div className="flex items-center gap-2">
+                                                                    {s.subject}
+                                                                    {s.percentage >= 75 && (
+                                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158]">
+                                                                            <Award className="h-3 w-3 mr-0.5" />
+                                                                            Distinction
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-5 py-3">
+                                                                <div className="text-gray-700 dark:text-[#8E8E93]">{s.examName}</div>
+                                                                <div className="text-xs text-gray-400 dark:text-[#636366]">{s.date ? formatDate(s.date) : ''}</div>
+                                                            </td>
+                                                            <td className="px-5 py-3 text-center font-bold text-gray-900 dark:text-white">{s.marksObtained}/{s.totalMarks}</td>
+                                                            <td className="px-5 py-3 text-center text-gray-700 dark:text-[#8E8E93]">{s.percentage}%</td>
+                                                            <td className="px-5 py-3 text-center">
+                                                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                                                    s.grade === 'A+' || s.grade === 'A' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' :
+                                                                    s.grade === 'B' ? 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-400' :
+                                                                    s.grade === 'C' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' :
+                                                                    s.grade === 'D' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                                                                    'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                                                                }`}>{s.grade}</span>
+                                                            </td>
+                                                            <td className="px-5 py-3 text-center">
+                                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${s.isPassed
+                                                                    ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-[rgba(48,209,88,0.12)] dark:text-[#30D158]'
+                                                                    : 'bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-[rgba(255,69,58,0.12)] dark:text-[#FF453A]'
+                                                                }`}>
+                                                                    {s.isPassed ? 'Pass' : 'Fail'}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                );
+                            });
+                        })()}
                     </>
                 ) : (
                     <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] flex flex-col items-center justify-center py-16 px-6 text-center text-gray-400 dark:text-[#636366]">
