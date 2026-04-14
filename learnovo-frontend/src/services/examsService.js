@@ -117,6 +117,13 @@ export const examsService = {
         return res.data
     },
 
+    downloadBlankFinalReportCardPDF: async (studentId, sessionId) => {
+        const res = await api.get(`/report-cards/final/${studentId}/${sessionId}/blank/pdf`, {
+            responseType: 'blob'
+        })
+        return res.data
+    },
+
     startFinalBulkDownload: async (sectionId, sessionId) => {
         const res = await api.post('/report-cards/final/bulk-download', {
             sectionId,

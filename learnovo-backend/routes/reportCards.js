@@ -212,6 +212,37 @@ router.get('/final/:studentId/:sessionId/pdf', protect, examPlanGates, async(req
   }
 });
 
+// @desc    Download BLANK two-term/full-year report card PDF (empty marks for hand-filling)
+// @route   GET /api/report-cards/final/:studentId/:sessionId/blank/pdf
+// @access  Private (admin, teacher)
+router.get('/final/:studentId/:sessionId/blank/pdf', protect, examPlanGates, authorize('admin', 'teacher'), async(req, res, _next) => {
+  try {
+    const { studentId, sessionId } = req.params;
+
+    const data = await getReportCardService().getBlankTwoTermReportCardData(req.user.tenantId, studentId, sessionId);
+    if (!data) {
+      return res.status(404).json({ success: false, message: 'No exams found for this student\u2019s class in this session' });
+    }
+
+    const pdfBuffer = await getPdfService().generateTwoTermReportCard(data);
+    const studentName = (data.student.name || 'Student').replace(/\s+/g, '_');
+    const filename = `Blank_Report_Card_${studentName}_${data.session.name || ''}.pdf`;
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': pdfBuffer.length
+    });
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Blank two-term report card PDF error:', error.message);
+    const msg = error.message?.includes('timed out') || error.message?.includes('Target closed')
+      ? 'PDF generation timed out. Please try again.'
+      : 'Failed to generate blank full-year report card PDF';
+    res.status(500).json({ success: false, message: msg });
+  }
+});
+
 // @desc    Start bulk final report card download job
 // @route   POST /api/report-cards/final/bulk-download
 // @access  Private (admin, teacher)

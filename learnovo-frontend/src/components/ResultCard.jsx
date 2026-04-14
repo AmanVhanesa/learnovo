@@ -342,7 +342,9 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const handleDownloadBlank = async () => {
         setDownloadingBlank(true);
         try {
-            const blob = await examsService.downloadBlankReportCardPDF(studentId, { examSeries: filterSeries });
+            const blob = isFullYear && activeSessionId
+                ? await examsService.downloadBlankFinalReportCardPDF(studentId, activeSessionId)
+                : await examsService.downloadBlankReportCardPDF(studentId, { examSeries: filterSeries });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

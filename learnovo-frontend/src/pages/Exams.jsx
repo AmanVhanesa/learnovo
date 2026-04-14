@@ -1105,16 +1105,16 @@ const Exams = () => {
                     setRcDownloading(prev => ({ ...prev, [key]: true }));
                     try {
                         let blob;
+                        const sessionRes = await academicSessionsService.getActive();
+                        const session = sessionRes?.data || sessionRes;
+                        if (!session?._id) {
+                            toast.error('No active academic session found.');
+                            return;
+                        }
                         if (type === 'blank') {
-                            blob = await examsService.downloadBlankReportCardPDF(studentId, {});
+                            // Two-term/full-year blank layout for hand-fill
+                            blob = await examsService.downloadBlankFinalReportCardPDF(studentId, session._id);
                         } else {
-                            // Cumulative / Full Year — two-term format
-                            const sessionRes = await academicSessionsService.getActive();
-                            const session = sessionRes?.data || sessionRes;
-                            if (!session?._id) {
-                                toast.error('No active academic session found.');
-                                return;
-                            }
                             blob = await examsService.downloadFinalReportCardPDF(studentId, session._id);
                         }
                         const url = window.URL.createObjectURL(blob);

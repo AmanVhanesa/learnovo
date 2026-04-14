@@ -503,6 +503,93 @@ const reportCardService = {
   },
 
   /**
+   * Get BLANK two-term report card data — same layout as getTwoTermReportCardData
+   * but with empty marks, totals, and grades so it can be printed and filled by hand.
+   */
+  async getBlankTwoTermReportCardData(tenantId, studentId, sessionId) {
+    const studentDoc = await User.findOne({ _id: studentId, tenantId, role: 'student' })
+      .select('name fullName rollNumber admissionNumber class section classId sectionId dateOfBirth fatherOrHusbandName guardianName guardians skippedSubjects')
+      .lean();
+    if (!studentDoc) return null;
+
+    const session = await AcademicSession.findOne({ _id: sessionId, tenantId }).lean();
+    if (!session) return null;
+
+    // Find exams for this student's class (match by classId OR class string to handle "1" vs "Class 1")
+    const examFilter = { tenantId };
+    const classOr = [];
+    if (studentDoc.classId) classOr.push({ classId: studentDoc.classId });
+    if (studentDoc.class) classOr.push({ class: studentDoc.class });
+    if (classOr.length) examFilter.$or = classOr;
+
+    const exams = await Exam.find(examFilter)
+      .select('name subject examSeries term totalMarks date')
+      .sort({ date: 1 })
+      .lean();
+    if (!exams.length) return null;
+
+    // Per-term exam series (UT1/FA1/SA1 etc.) with max marks
+    const buildTermExams = (term) => {
+      const map = new Map();
+      for (const e of exams) {
+        const t = e.term || 'Term 1';
+        if (t !== term) continue;
+        const key = e.examSeries || e.name;
+        if (!map.has(key)) map.set(key, { name: key, maxMarks: e.totalMarks || 100 });
+      }
+      return [...map.values()];
+    };
+    const term1Exams = buildTermExams('Term 1');
+    const term2Exams = buildTermExams('Term 2');
+
+    // Unique subjects, excluding student's skippedSubjects
+    const skipped = studentDoc.skippedSubjects || [];
+    const subjectSet = [...new Set(exams.map(e => e.subject).filter(s => s && !skipped.includes(s)))];
+
+    const subjectRows = subjectSet.map(subject => ({
+      subject,
+      marks: {},
+      term1Total: '', term1Max: '', term1Pct: '', term1Grade: '',
+      term2Total: '', term2Max: '', term2Pct: '', term2Grade: '',
+      overallPct: '',
+      isPassed: null
+    }));
+
+    const settings = await Settings.findOne({ tenantId });
+
+    return {
+      school: buildSchoolData(settings),
+      student: {
+        ...buildStudentData(studentDoc, studentDoc.class, studentDoc.section),
+        fatherName: studentDoc?.fatherOrHusbandName
+          || (studentDoc?.guardians || []).find(g => /father/i.test(g.relation))?.name
+          || '',
+        motherName: (studentDoc?.guardians || []).find(g => /mother/i.test(g.relation))?.name || ''
+      },
+      session: { name: session.name },
+      term1: { exams: term1Exams },
+      term2: { exams: term2Exams },
+      subjectRows,
+      coScholastic: (settings?.academic?.coScholasticAreas || [])
+        .filter(a => a.isActive !== false && a.area)
+        .map(a => ({ area: a.area, term1Grade: '', term2Grade: '' })),
+      summary: {
+        term1Total: '', term1Max: '', term1Percentage: '', term1Grade: '',
+        term2Total: '', term2Max: '', term2Percentage: '', term2Grade: '',
+        overallPercentage: '', overallGrade: '',
+        overallPassed: null
+      },
+      remarks: '',
+      result: '',
+      signatures: {
+        principal: settings?.institution?.principalSignature || null,
+        class_teacher: null
+      },
+      isBlank: true
+    };
+  },
+
+  /**
    * Get all students in a section (for bulk operations).
    */
   async getStudentsInSection(tenantId, sectionId) {
