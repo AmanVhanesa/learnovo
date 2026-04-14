@@ -695,7 +695,7 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                             Custom Report Card
                         </h3>
                         <p className="text-xs text-gray-400 dark:text-[#636366] mt-0.5">
-                            Generate a single exam, cumulative, or two-term report card PDF
+                            Generate a single exam or two-term report card PDF
                         </p>
                     </div>
                     <button className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors" onClick={onClose}>
@@ -723,18 +723,6 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                             >
                                 <FileText className="h-4 w-4" />
                                 Single Exam
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setReportType('cumulative')}
-                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border-2 transition-all ${
-                                    reportType === 'cumulative'
-                                        ? 'bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-400 border-primary-300 dark:border-primary-500/30'
-                                        : 'bg-white dark:bg-[#2C2C2E] text-gray-500 dark:text-[#8E8E93] border-gray-200 dark:border-[#38383A] hover:border-gray-300'
-                                }`}
-                            >
-                                <Layers className="h-4 w-4" />
-                                Cumulative (Multi-Exam)
                             </button>
                             <button
                                 type="button"
