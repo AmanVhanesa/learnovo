@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { X, Printer, FileText, Download } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { settingsService } from '../services/settingsService';
+import { academicSessionsService } from '../services/academicsService';
 import toast from 'react-hot-toast';
 import { highQualityPrint } from '../utils/highQualityPrint';
 
@@ -219,6 +220,8 @@ function buildPrintHTML({ cardData, schoolInfo, filterSeries, studentName }) {
 
 const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const [cardData, setCardData] = useState(null);
+    const [twoTermData, setTwoTermData] = useState(null);
+    const [activeSessionId, setActiveSessionId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [printing, setPrinting] = useState(false);
     const [downloading, setDownloading] = useState(false);
@@ -226,6 +229,17 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const [schoolInfo, setSchoolInfo] = useState({ name: 'School', address: '', logo: null, principalSignature: null, brandColor: '#1E3A5F' });
     const [filterSeries, setFilterSeries] = useState(defaultExamSeries || '');
     const reportCardPrintRef = useRef(null);
+    const isFullYear = !filterSeries;
+
+    /* ── active academic session ── */
+    useEffect(() => {
+        academicSessionsService.getActive?.()
+            .then(res => {
+                const s = res?.data || res;
+                if (s?._id) setActiveSessionId(s._id);
+            })
+            .catch(() => { });
+    }, []);
 
     /* ── settings ── */
     useEffect(() => {
@@ -252,16 +266,30 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     /* ── result card data ── */
     useEffect(() => {
         if (!studentId) return;
+        // Full Year mode: needs active session before fetching
+        if (isFullYear) {
+            if (!activeSessionId) return;
+            setLoading(true);
+            setCardData(null);
+            examsService.getFinalReportCard(studentId, activeSessionId)
+                .then(res => setTwoTermData(res.data))
+                .catch(() => { setTwoTermData(null); toast.error('Failed to load full year report card'); })
+                .finally(() => setLoading(false));
+            return;
+        }
+        // Single-series mode
         setLoading(true);
+        setTwoTermData(null);
         examsService.getResultCard(studentId, { examSeries: filterSeries })
             .then(res => setCardData(res.data))
             .catch(() => toast.error('Failed to load result card'))
             .finally(() => setLoading(false));
-    }, [studentId, filterSeries]);
+    }, [studentId, filterSeries, isFullYear, activeSessionId]);
 
     /* ── print ── */
     const handlePrint = async () => {
-        if (!cardData?.subjects?.length || !reportCardPrintRef.current) return;
+        const hasData = isFullYear ? !!twoTermData?.subjectRows?.length : !!cardData?.subjects?.length;
+        if (!hasData || !reportCardPrintRef.current) return;
         setPrinting(true);
         try {
             await highQualityPrint(reportCardPrintRef.current, 'Report-Card', {
@@ -275,14 +303,18 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
 
     /* ── download PDF via backend ── */
     const handleDownloadPDF = async () => {
-        if (!cardData?.subjects?.length) return;
+        const hasData = isFullYear ? !!twoTermData?.subjectRows?.length : !!cardData?.subjects?.length;
+        if (!hasData) return;
         setDownloading(true);
         try {
-            const blob = await examsService.downloadReportCardPDF(studentId, { examSeries: filterSeries });
+            const blob = isFullYear
+                ? await examsService.downloadFinalReportCardPDF(studentId, activeSessionId)
+                : await examsService.downloadReportCardPDF(studentId, { examSeries: filterSeries });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Report_Card_${(cardData?.student?.name || studentName || 'Student').replace(/\s+/g, '_')}_${filterSeries || 'All'}.pdf`;
+            const sName = (isFullYear ? twoTermData?.student?.name : cardData?.student?.name) || studentName || 'Student';
+            a.download = `Report_Card_${sName.replace(/\s+/g, '_')}_${filterSeries || 'FullYear'}.pdf`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -339,10 +371,12 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
         }
     };
 
-    const student = cardData?.student;
-    const subjects = cardData?.subjects || [];
-    const summary = cardData?.summary;
+    const student = (isFullYear ? twoTermData?.student : cardData?.student);
+    const subjects = (isFullYear ? (twoTermData?.subjectRows || []) : (cardData?.subjects || []));
+    const summary = (isFullYear ? twoTermData?.summary : cardData?.summary);
     const brandColor = schoolInfo.brandColor || '#1E3A5F';
+    const t1Exams = twoTermData?.term1?.exams || [];
+    const t2Exams = twoTermData?.term2?.exams || [];
 
     return ReactDOM.createPortal(
         <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -377,7 +411,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 value={filterSeries}
                                 onChange={e => setFilterSeries(e.target.value)}
                             >
-                                <option value="">All Series</option>
+                                <option value="">Full Year Report Card</option>
                                 {SERIES_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
@@ -426,7 +460,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                             <p className="font-medium">No results found</p>
                             <p className="text-sm mt-1 text-center px-8">
                                 {filterSeries
-                                    ? `No results for "${filterSeries}". Try "All Series".`
+                                    ? `No results for "${filterSeries}". Try "Full Year Report Card".`
                                     : 'No exam results entered yet.'}
                             </p>
                         </div>
@@ -474,7 +508,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 <div className="flex justify-between items-baseline mb-7">
                                     <span className="text-[15px] font-semibold uppercase" style={{ color: brandColor, letterSpacing: '0.1em' }}>Student Report Card</span>
                                     <div className="text-right">
-                                        <span className="block text-[12px] font-semibold text-gray-500 dark:text-[#8E8E93]">{filterSeries || 'Midterm'} Examination</span>
+                                        <span className="block text-[12px] font-semibold text-gray-500 dark:text-[#8E8E93]">{isFullYear ? `Full Year ${twoTermData?.session?.name || ''}`.trim() : `${filterSeries} Examination`}</span>
                                         <span className="block text-[12px] text-gray-400 dark:text-[#636366]">Issued: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                                     </div>
                                 </div>
@@ -499,7 +533,85 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 </div>
 
                                 {/* ── Academic Performance ── */}
-                                <p className="text-[11px] font-semibold uppercase text-gray-400 dark:text-[#636366] mb-3" style={{ letterSpacing: '0.14em' }}>Academic Performance</p>
+                                <p className="text-[11px] font-semibold uppercase text-gray-400 dark:text-[#636366] mb-3" style={{ letterSpacing: '0.14em' }}>Scholastic Areas</p>
+                                {isFullYear && twoTermData ? (
+                                    <div className="overflow-x-auto mb-7">
+                                        <table className="w-full text-[11.5px]" style={{ borderCollapse: 'collapse' }}>
+                                            <thead>
+                                                <tr>
+                                                    <th rowSpan={2} className="px-2 py-2 text-left font-semibold uppercase text-gray-500 dark:text-[#8E8E93]" style={{ letterSpacing: '0.06em', borderBottom: '1.5px solid #E5E7EB' }}>Subject</th>
+                                                    <th colSpan={t1Exams.length + 2} className="px-2 py-2 text-center font-semibold uppercase text-gray-600 dark:text-[#8E8E93]" style={{ letterSpacing: '0.08em', borderBottom: '1px solid #E5E7EB' }}>Term 1</th>
+                                                    <th colSpan={t2Exams.length + 2} className="px-2 py-2 text-center font-semibold uppercase text-gray-600 dark:text-[#8E8E93]" style={{ letterSpacing: '0.08em', borderBottom: '1px solid #E5E7EB' }}>Term 2</th>
+                                                </tr>
+                                                <tr>
+                                                    {t1Exams.map(e => (
+                                                        <th key={`t1-${e.name}`} className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93]" style={{ borderBottom: '1.5px solid #E5E7EB' }}>{e.name}<div className="text-[9px] font-normal text-gray-400">({e.maxMarks})</div></th>
+                                                    ))}
+                                                    <th className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93]" style={{ borderBottom: '1.5px solid #E5E7EB' }}>Total</th>
+                                                    <th className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93]" style={{ borderBottom: '1.5px solid #E5E7EB' }}>Grade</th>
+                                                    {t2Exams.map(e => (
+                                                        <th key={`t2-${e.name}`} className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93]" style={{ borderBottom: '1.5px solid #E5E7EB' }}>{e.name}<div className="text-[9px] font-normal text-gray-400">({e.maxMarks})</div></th>
+                                                    ))}
+                                                    <th className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93]" style={{ borderBottom: '1.5px solid #E5E7EB' }}>Total</th>
+                                                    <th className="px-2 py-1.5 text-center text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93]" style={{ borderBottom: '1.5px solid #E5E7EB' }}>Grade</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {subjects.map((r, i) => (
+                                                    <tr key={r.subject || i} style={{ background: i % 2 === 1 ? 'rgba(249,250,251,0.5)' : 'transparent' }}>
+                                                        <td className="px-2 py-2.5 font-medium text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{r.subject}</td>
+                                                        {t1Exams.map(e => (
+                                                            <td key={`c-t1-${e.name}`} className="px-2 py-2.5 text-center tabular-nums text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{r.marks?.[e.name] ?? '\u2014'}</td>
+                                                        ))}
+                                                        <td className="px-2 py-2.5 text-center font-semibold tabular-nums text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{r.term1Total}</td>
+                                                        <td className="px-2 py-2.5 text-center" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
+                                                            <span className="inline-flex items-center gap-1 font-semibold text-gray-900 dark:text-white">
+                                                                <span className="w-[6px] h-[6px] rounded-full inline-block" style={{ background: GRADE_DOT_COLOR(r.term1Grade) }} />
+                                                                {r.term1Grade}
+                                                            </span>
+                                                        </td>
+                                                        {t2Exams.map(e => (
+                                                            <td key={`c-t2-${e.name}`} className="px-2 py-2.5 text-center tabular-nums text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{r.marks?.[e.name] ?? '\u2014'}</td>
+                                                        ))}
+                                                        <td className="px-2 py-2.5 text-center font-semibold tabular-nums text-gray-900 dark:text-white" style={{ borderBottom: '0.5px solid #F3F4F6' }}>{r.term2Total}</td>
+                                                        <td className="px-2 py-2.5 text-center" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
+                                                            <span className="inline-flex items-center gap-1 font-semibold text-gray-900 dark:text-white">
+                                                                <span className="w-[6px] h-[6px] rounded-full inline-block" style={{ background: GRADE_DOT_COLOR(r.term2Grade) }} />
+                                                                {r.term2Grade}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                <tr>
+                                                    <td className="px-2 py-2.5 font-semibold text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>Grand Total</td>
+                                                    <td colSpan={t1Exams.length} style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }} />
+                                                    <td className="px-2 py-2.5 text-center font-semibold tabular-nums text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary?.term1Total} / {summary?.term1Max}</td>
+                                                    <td className="px-2 py-2.5 text-center font-semibold text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary?.term1Grade}</td>
+                                                    <td colSpan={t2Exams.length} style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }} />
+                                                    <td className="px-2 py-2.5 text-center font-semibold tabular-nums text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary?.term2Total} / {summary?.term2Max}</td>
+                                                    <td className="px-2 py-2.5 text-center font-semibold text-gray-900 dark:text-white" style={{ borderTop: `1.5px solid ${brandColor}`, background: `${brandColor}0A` }}>{summary?.term2Grade}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                        <div className="grid grid-cols-3 gap-3 mt-4 text-center">
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-[#2C2C2E]">
+                                                <div className="text-[10px] uppercase text-gray-500 font-semibold tracking-wider">Term 1</div>
+                                                <div className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{summary?.term1Total} / {summary?.term1Max}</div>
+                                                <div className="text-[11px] text-gray-500">{summary?.term1Percentage}% &middot; Grade {summary?.term1Grade}</div>
+                                            </div>
+                                            <div className="p-3 rounded-lg bg-gray-50 dark:bg-[#2C2C2E]">
+                                                <div className="text-[10px] uppercase text-gray-500 font-semibold tracking-wider">Term 2</div>
+                                                <div className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{summary?.term2Total} / {summary?.term2Max}</div>
+                                                <div className="text-[11px] text-gray-500">{summary?.term2Percentage}% &middot; Grade {summary?.term2Grade}</div>
+                                            </div>
+                                            <div className="p-3 rounded-lg" style={{ background: `${brandColor}12` }}>
+                                                <div className="text-[10px] uppercase text-gray-500 font-semibold tracking-wider">Overall</div>
+                                                <div className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{summary?.overallPercentage}%</div>
+                                                <div className="text-[11px] text-gray-500">Grade {summary?.overallGrade} &middot; {twoTermData?.result || (summary?.overallPassed ? 'Promoted' : 'Not Promoted')}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
                                 <div className="overflow-x-auto mb-7">
                                     <table className="w-full" style={{ borderCollapse: 'collapse' }}>
                                         <thead>
@@ -559,8 +671,10 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                         </tfoot>
                                     </table>
                                 </div>
+                                )}
 
-                                {/* ── Result Banner ── */}
+                                {/* ── Result Banner (single-series only) ── */}
+                                {!isFullYear && summary && (
                                 <div className="mb-7 flex items-center justify-between px-6 py-4.5" style={{
                                     borderLeft: `3px solid ${summary.overallPassed ? '#059669' : '#DC2626'}`,
                                     background: summary.overallPassed ? 'rgba(5,150,105,0.04)' : 'rgba(220,38,38,0.04)',
@@ -577,6 +691,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                         <p className="text-[11px] text-gray-400 dark:text-[#636366]">{summary.passCount} of {summary.totalSubjects} subjects passed &middot; Overall: {summary.overallPercentage}% &middot; Grade: {summary.overallGrade}</p>
                                     </div>
                                 </div>
+                                )}
 
                                 {/* ── Signatures ── */}
                                 <div className="flex justify-between pt-2 mb-8">

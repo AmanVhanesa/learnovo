@@ -159,8 +159,10 @@ const reportCardService = {
     const resolvedClass = className || studentDoc.class;
     const settings = await Settings.findOne({ tenantId });
 
-    // Try to get subject list from existing results first
-    const { filtered } = await fetchFilteredResults(tenantId, studentId, { examSeries, className: resolvedClass });
+    // Try to get subject list from existing results first (don't filter by className —
+    // results are already scoped to this student, and exam.class strings often differ
+    // from studentDoc.class e.g. "Class 1" vs "1")
+    const { filtered } = await fetchFilteredResults(tenantId, studentId, { examSeries });
 
     let subjects;
     if (filtered.length) {
@@ -184,10 +186,13 @@ const reportCardService = {
           remarks: ''
         }));
     } else {
-      // Fallback: get subjects from exams matching this student's class
+      // Fallback: get subjects from exams matching this student's class.
+      // Match by classId OR class string (handles "1" vs "Class 1" mismatch).
       const examFilter = { tenantId };
-      if (resolvedClass) examFilter.class = resolvedClass;
-      if (studentDoc.classId) examFilter.classId = studentDoc.classId;
+      const classOr = [];
+      if (studentDoc.classId) classOr.push({ classId: studentDoc.classId });
+      if (resolvedClass) classOr.push({ class: resolvedClass });
+      if (classOr.length) examFilter.$or = classOr;
       if (examSeries) examFilter.examSeries = examSeries;
       const exams = await Exam.find(examFilter).select('subject totalMarks').lean();
       const seen = new Set();
