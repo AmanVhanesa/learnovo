@@ -209,16 +209,16 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
             }
         }
 
-        // IFSC Code validation
+        // IFSC Code validation — accept 10 or 11 chars (some legacy BOB branches use 10)
         if (form.ifscCode) {
             const ifsc = form.ifscCode.toUpperCase()
-            if (ifsc.length !== 11) {
-                errors.ifscCode = `IFSC must be exactly 11 characters (you entered ${ifsc.length})`
+            if (ifsc.length < 10 || ifsc.length > 11) {
+                errors.ifscCode = `IFSC must be 10 or 11 characters (you entered ${ifsc.length})`
             } else if (ifsc[4] === 'O') {
                 errors.ifscCode = '5th character must be digit ZERO (0), not letter O'
             } else if (ifsc[4] !== '0') {
                 errors.ifscCode = '5th character must be digit 0 (reserved by RBI)'
-            } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+            } else if (!/^[A-Z]{4}0[A-Z0-9]{5,6}$/.test(ifsc)) {
                 errors.ifscCode = 'Invalid IFSC format (e.g., BARB0DBKOLI for Bank of Baroda)'
             }
         }
