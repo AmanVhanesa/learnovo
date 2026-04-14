@@ -501,6 +501,14 @@ const Exams = () => {
     if (isStudent) {
         const mySubjects = myResultData?.subjects || [];
         const mySummary = myResultData?.summary || null;
+        const toggleResultSeries = (key) => {
+            setCollapsedSeries(prev => {
+                const next = new Set(prev);
+                const id = `result:${key}`;
+                if (next.has(id)) next.delete(id); else next.add(id);
+                return next;
+            });
+        };
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -647,10 +655,19 @@ const Exams = () => {
                                 const seriesTotal = rows.reduce((a, r) => a + (r.totalMarks || 0), 0);
                                 const seriesObtained = rows.reduce((a, r) => a + (r.marksObtained || 0), 0);
                                 const seriesPct = seriesTotal > 0 ? Math.round((seriesObtained / seriesTotal) * 1000) / 10 : 0;
+                                const isOpen = !collapsedSeries.has(`result:${series}`);
                                 return (
                                     <div key={series} className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass border border-gray-100 dark:border-[#38383A] overflow-hidden">
-                                        <div className={`px-5 py-3 border-b ${cfg.border} ${cfg.bg} flex items-center justify-between flex-wrap gap-2`}>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleResultSeries(series)}
+                                            aria-expanded={isOpen}
+                                            className={`w-full px-5 py-3 ${isOpen ? `border-b ${cfg.border}` : ''} ${cfg.bg} flex items-center justify-between flex-wrap gap-2 text-left hover:brightness-[0.98] transition`}
+                                        >
                                             <div className="flex items-center gap-2">
+                                                {isOpen
+                                                    ? <ChevronDown className={`h-4 w-4 ${cfg.color}`} />
+                                                    : <ChevronRight className={`h-4 w-4 ${cfg.color}`} />}
                                                 <Layers className={`h-4 w-4 ${cfg.color}`} />
                                                 <span className={`text-sm font-semibold ${cfg.color}`}>{cfg.label || series}</span>
                                                 <span className="text-xs text-gray-500 dark:text-[#8E8E93] bg-white/60 dark:bg-[#1C1C1E]/60 px-2 py-0.5 rounded-full">{rows.length} subject{rows.length !== 1 ? 's' : ''}</span>
@@ -658,7 +675,8 @@ const Exams = () => {
                                             <div className="text-xs font-semibold text-gray-700 dark:text-[#8E8E93]">
                                                 {seriesObtained}/{seriesTotal} &middot; {seriesPct}%
                                             </div>
-                                        </div>
+                                        </button>
+                                        {isOpen && (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm min-w-[560px]">
                                                 <thead>
@@ -713,6 +731,7 @@ const Exams = () => {
                                                 </tbody>
                                             </table>
                                         </div>
+                                        )}
                                     </div>
                                 );
                             });
