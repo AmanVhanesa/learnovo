@@ -254,6 +254,17 @@ router.get('/:tenantCode', (req, res) => {
   if (!ALLOWED_TENANT_CODES.has(tenantCode)) {
     return res.status(404).json({ success: false, message: 'Not found' });
   }
+
+  // Challenge for Basic Auth on GET too. This is intentional: the bank
+  // verifies the callback URL by opening it in a browser and entering the
+  // credentials into the browser's native popup. Without a 401 +
+  // WWW-Authenticate challenge, the browser shows no popup at all.
+  const authPassed = verifyBasicAuth(req, tenantCode);
+  if (!authPassed) {
+    res.set('WWW-Authenticate', 'Basic realm="ICICI Orange Callback"');
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+
   // Per-tenant descriptor. The legal merchant on ICICI's books is the
   // society (Sardar Patel Educational Society for SPIS), with the school
   // as the operating unit. Bank fraud-checks that browse this URL must
@@ -277,7 +288,7 @@ router.get('/:tenantCode', (req, res) => {
     auth: 'HTTP Basic Auth',
     contentTypes: ['application/json', 'application/x-www-form-urlencoded', 'text/xml'],
     status: 'active',
-    note: 'This endpoint accepts payment notifications from ICICI Bank. Browse-via-GET returns this informational descriptor only; live notifications must be POSTed with HTTP Basic Auth credentials issued to ICICI during onboarding.'
+    note: 'This endpoint accepts payment notifications from ICICI Bank. Live notifications must be POSTed with these same HTTP Basic Auth credentials.'
   });
 });
 
