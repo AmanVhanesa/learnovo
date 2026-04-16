@@ -277,19 +277,45 @@ router.get('/:tenantCode', (req, res) => {
     }
   };
   const descriptor = TENANT_DESCRIPTORS[tenantCode];
-  return res.status(200).json({
-    endpoint: 'ICICI Orange Payment Callback',
-    platform: 'Learnovo — School Management Platform',
-    operator: 'Aman Vhanesa',
-    merchant: descriptor.merchant,
-    operatingUnit: descriptor.operatingUnit,
-    tenantSubdomain: `${tenantCode}.learnovoportal.com`,
-    method: 'POST',
-    auth: 'HTTP Basic Auth',
-    contentTypes: ['application/json', 'application/x-www-form-urlencoded', 'text/xml'],
-    status: 'active',
-    note: 'This endpoint accepts payment notifications from ICICI Bank. Live notifications must be POSTed with these same HTTP Basic Auth credentials.'
-  });
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Callback Endpoint — ${descriptor.operatingUnit}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 40px 20px; }
+    .card { background: #fff; border-radius: 8px; max-width: 560px; margin: 0 auto; padding: 36px 40px; box-shadow: 0 2px 8px rgba(0,0,0,0.10); }
+    .badge { display: inline-block; background: #22c55e; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 1px; padding: 3px 10px; border-radius: 12px; margin-bottom: 20px; text-transform: uppercase; }
+    h1 { font-size: 22px; color: #1a1a2e; margin: 0 0 4px; }
+    h2 { font-size: 15px; color: #555; font-weight: 400; margin: 0 0 28px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    td { padding: 10px 0; border-bottom: 1px solid #eee; vertical-align: top; }
+    td:first-child { color: #888; width: 44%; }
+    td:last-child { color: #1a1a2e; font-weight: 500; }
+    tr:last-child td { border-bottom: none; }
+    .footer { margin-top: 28px; font-size: 12px; color: #aaa; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">&#10003; Active</div>
+    <h1>${descriptor.operatingUnit}</h1>
+    <h2>${descriptor.merchant}</h2>
+    <table>
+      <tr><td>Merchant Name</td><td>${descriptor.merchant}</td></tr>
+      <tr><td>School / Unit</td><td>${descriptor.operatingUnit}</td></tr>
+      <tr><td>Platform</td><td>Learnovo School Management</td></tr>
+      <tr><td>Callback Type</td><td>ICICI Orange Payment Notification</td></tr>
+      <tr><td>Authentication</td><td>HTTP Basic Auth</td></tr>
+      <tr><td>Endpoint Status</td><td>Active &amp; Accepting</td></tr>
+      <tr><td>Accepted Methods</td><td>POST (live notifications)</td></tr>
+    </table>
+    <div class="footer">This endpoint receives payment callbacks from ICICI Bank securely over HTTPS.</div>
+  </div>
+</body>
+</html>`;
+  return res.status(200).set('Content-Type', 'text/html').send(html);
 });
 
 /**
