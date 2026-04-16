@@ -44,6 +44,7 @@ const crypto = require('crypto');
 const { logger } = require('../middleware/errorHandler');
 const Tenant = require('../models/Tenant');
 const ICICIOrangeWebhookLog = require('../models/ICICIOrangeWebhookLog');
+const iciciOrangeCallbackProcessor = require('../services/payment/iciciOrangeCallbackProcessor');
 
 const router = express.Router();
 
@@ -188,7 +189,13 @@ async function persistWebhookLog(req, tenantCode, authPassed) {
   };
 
   try {
-    const doc = await ICICIOrangeWebhookLog.findOneAndUpdate(
+    // Use new:true + rawResult:true so we get:
+    //   - the actual persisted document (for logId on fresh inserts)
+    //   - lastErrorObject.updatedExisting to distinguish duplicate vs new
+    // The previous revision used new:false and inferred duplicate from
+    // a truthy pre-doc, but that returned logId=null for genuinely new
+    // callbacks — which broke downstream fire-and-forget processing.
+    const result = await ICICIOrangeWebhookLog.findOneAndUpdate(
       { tenantCode, bodyHash },
       {
         $setOnInsert: {
@@ -209,11 +216,11 @@ async function persistWebhookLog(req, tenantCode, authPassed) {
           receivedAt: new Date()
         }
       },
-      { upsert: true, new: false, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true, rawResult: true }
     );
-    // findOneAndUpdate with new:false returns the pre-update doc.
-    // null pre-doc means this was a fresh insert (not a duplicate).
-    return { duplicate: Boolean(doc), logId: doc ? doc._id : null };
+    const doc = result?.value || null;
+    const duplicate = Boolean(result?.lastErrorObject?.updatedExisting);
+    return { duplicate, logId: doc ? doc._id : null };
   } catch (err) {
     logger.error('ICICI Orange webhook log persist failed', {
       requestId: req.requestId,
@@ -382,11 +389,41 @@ router.post('/:tenantCode', async(req, res) => {
   //    a short JSON ACK. We return {status:"OK"} per the integration
   //    research recommendation; if ICICI's spec later requires a
   //    different shape, change this once.
-  return res.status(200).json({
+  res.status(200).json({
     status: 'OK',
     message: duplicate ? 'Duplicate (already received)' : 'Callback received',
     requestId
   });
+
+  // 6. Fire-and-forget: map the log into a PaymentAttempt state
+  //    transition AFTER we've acked. Running async guarantees ICICI
+  //    never sees a 5xx if the processor hits an unexpected error —
+  //    any failure is captured onto the log row itself (processError)
+  //    so the sweep can retry and an admin can inspect. Duplicate
+  //    logs short-circuit inside the processor (processed=true), so
+  //    calling it on a duplicate is safe.
+  if (logId) {
+    setImmediate(async() => {
+      try {
+        const result = await iciciOrangeCallbackProcessor.processLog(logId);
+        logger.info('ICICI Orange callback processed', {
+          requestId,
+          tenantCode,
+          logId,
+          processorReason: result?.reason,
+          paymentAttemptId: result?.paymentAttemptId ? String(result.paymentAttemptId) : null
+        });
+      } catch (err) {
+        logger.error('ICICI Orange callback processor threw', {
+          requestId,
+          tenantCode,
+          logId,
+          error: err.message,
+          stack: err.stack
+        });
+      }
+    });
+  }
 });
 
 module.exports = router;

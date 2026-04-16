@@ -1,6 +1,6 @@
 const MockPaymentGateway = require('./MockPaymentGateway');
-const ICICIEazypayGateway = require('./ICICIEazypayGateway');
 const RazorpayGateway = require('./RazorpayGateway');
+const ICICIOrangeGateway = require('./ICICIOrangeGateway');
 
 /**
  * GatewayFactory — resolves the correct payment gateway for a tenant.
@@ -38,15 +38,31 @@ function getGateway(tenant) {
   let instance;
 
   switch (pgConfig.provider) {
-  case 'icici_eazypay': {
-    const backendUrl = process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5001}`;
-    instance = new ICICIEazypayGateway({
-      merchantId: pgConfig.icici.merchantId,
-      encryptionKey: pgConfig.icici.encryptionKey,
-      subMerchantId: pgConfig.icici.subMerchantId,
-      paymode: pgConfig.icici.paymode || '9',
-      returnUrl: `${backendUrl}/api/student-fees/payment/icici-return`
-    });
+  case 'icici_orange': {
+    // ICICI Orange gateway. The class loads with whatever credentials
+    // the tenant has configured — if the MID kit is incomplete
+    // (terminalId/apiKey/apiSecret still empty), outbound methods
+    // throw SpecPendingError and callers can render a clean "online
+    // payments pending setup" message. The inbound callback path is
+    // already live and reconciles through the processor regardless of
+    // whether outbound is wired yet.
+    const cfg = pgConfig.iciciOrange || {};
+    if (!cfg.merchantId) {
+      console.warn(`ICICI Orange gateway for tenant ${tenantId} has no merchantId — returning null.`);
+      return null;
+    }
+    try {
+      instance = new ICICIOrangeGateway({
+        merchantId: cfg.merchantId,
+        terminalId: cfg.terminalId,
+        apiKey: cfg.apiKey,
+        apiSecret: cfg.apiSecret,
+        tenantCode: tenant.schoolCode
+      });
+    } catch (err) {
+      console.error(`ICICI Orange gateway construction failed for tenant ${tenantId}: ${err.message}`);
+      return null;
+    }
     break;
   }
 

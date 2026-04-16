@@ -81,6 +81,17 @@ const iciciOrangeWebhookLogSchema = new mongoose.Schema({
   processedAt: { type: Date, default: null },
   processError: { type: String, default: '' },
 
+  // Back-reference to the PaymentAttempt this callback settled (if the
+  // processor could match one). Null when: the callback arrived before
+  // any attempt existed, the payload was unparseable, or an amount
+  // mismatch left the attempt flagged for review without crediting.
+  paymentAttemptId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PaymentAttempt',
+    default: null,
+    index: true
+  },
+
   receivedAt: { type: Date, default: Date.now, index: true }
 }, {
   timestamps: true,
