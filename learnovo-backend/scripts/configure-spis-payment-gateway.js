@@ -1,14 +1,15 @@
 /**
- * Configure ICICI EazyPay payment gateway for SPIS production tenant.
+ * Configure ICICI Orange payment gateway for SPIS production tenant.
  *
  * Usage:
- *   node scripts/configure-spis-payment-gateway.js <merchantId> <encryptionKey> <subMerchantId>
+ *   node scripts/configure-spis-payment-gateway.js [merchantId]
  *
- * Example:
- *   node scripts/configure-spis-payment-gateway.js 123456 myAES128key1234 SUB001
+ * If no merchantId is provided, defaults to 100000000420292 (SPIS production MID).
+ *
+ * Additional credentials (terminalId, apiKey, apiSecret) will be added
+ * once the full MID kit is received from ICICI.
  *
  * Run this against the PRODUCTION database (set MONGODB_URI accordingly).
- * The encryption key must be exactly 16 characters (AES-128).
  */
 
 require('dotenv').config({ path: './config.env' });
@@ -16,18 +17,10 @@ const mongoose = require('mongoose');
 const Tenant = require('../models/Tenant');
 // encrypt/decrypt handled automatically by Tenant model hooks
 
+const DEFAULT_MERCHANT_ID = '100000000420292';
+
 async function configure() {
-  const [merchantId, encryptionKey, subMerchantId] = process.argv.slice(2);
-
-  if (!merchantId || !encryptionKey || !subMerchantId) {
-    console.error('Usage: node scripts/configure-spis-payment-gateway.js <merchantId> <encryptionKey> <subMerchantId>');
-    process.exit(1);
-  }
-
-  if (encryptionKey.length !== 16) {
-    console.error(`ERROR: Encryption key must be exactly 16 characters (AES-128). Got ${encryptionKey.length} characters.`);
-    process.exit(1);
-  }
+  const merchantId = process.argv[2] || DEFAULT_MERCHANT_ID;
 
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('Connected to MongoDB');
@@ -45,27 +38,28 @@ async function configure() {
 
   console.log(`Found tenant: ${tenant.schoolName} (${tenant.schoolCode})`);
 
-  // Update payment gateway config
+  // Update payment gateway config for ICICI Orange
   tenant.paymentGateway = {
-    provider: 'icici_eazypay',
-    icici: {
+    provider: 'icici_orange',
+    iciciOrange: {
       merchantId,
-      encryptionKey,
-      subMerchantId,
-      paymode: '9' // All payment modes
+      terminalId: '',  // Pending from MID kit
+      apiKey: '',      // Pending from MID kit
+      apiSecret: ''    // Pending from MID kit
     },
-    isActive: true
+    isActive: false // Activate once full MID kit credentials are configured
   };
 
   await tenant.save();
 
   console.log('\nPayment gateway configured successfully!');
-  console.log('  Provider      : ICICI EazyPay');
+  console.log('  Provider      : ICICI Orange');
   console.log(`  Merchant ID   : ${merchantId}`);
-  console.log(`  Sub-Merchant  : ${subMerchantId}`);
-  console.log(`  Encryption Key: ${'*'.repeat(12)}${encryptionKey.slice(-4)}`);
-  console.log('  Pay Mode      : 9 (all modes)');
-  console.log('  Active        : true');
+  console.log('  Terminal ID   : (pending MID kit)');
+  console.log('  API Key       : (pending MID kit)');
+  console.log('  Active        : false (activate after full credentials are set)');
+  console.log('\nNote: Run this script again or use the admin panel to update');
+  console.log('credentials once the MID kit arrives from ICICI.');
 
   await mongoose.connection.close();
 }

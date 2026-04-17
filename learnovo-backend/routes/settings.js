@@ -533,18 +533,11 @@ router.get('/payment-gateway', protect, authorize('admin'), async(req, res) => {
 
     // Mask sensitive keys for security (only show last 4 chars)
     const config = tenant.paymentGateway?.toObject?.() || tenant.paymentGateway || {};
-    if (config.icici?.encryptionKey) {
-      const key = config.icici.encryptionKey;
-      config.icici.encryptionKey = key.length > 4 ? `****${  key.slice(-4)}` : '****';
-    }
-    if (config.razorpay?.keySecret) {
-      const s = config.razorpay.keySecret;
-      config.razorpay.keySecret = s.length > 4 ? `****${s.slice(-4)}` : '****';
-    }
-    if (config.razorpay?.webhookSecret) {
-      const w = config.razorpay.webhookSecret;
-      config.razorpay.webhookSecret = w.length > 4 ? `****${w.slice(-4)}` : '****';
-    }
+    const maskField = (val) => val && val.length > 4 ? `****${val.slice(-4)}` : '****';
+    if (config.iciciOrange?.apiKey) config.iciciOrange.apiKey = maskField(config.iciciOrange.apiKey);
+    if (config.iciciOrange?.apiSecret) config.iciciOrange.apiSecret = maskField(config.iciciOrange.apiSecret);
+    if (config.razorpay?.keySecret) config.razorpay.keySecret = maskField(config.razorpay.keySecret);
+    if (config.razorpay?.webhookSecret) config.razorpay.webhookSecret = maskField(config.razorpay.webhookSecret);
 
     res.json({ success: true, data: config });
   } catch (error) {
@@ -558,37 +551,38 @@ router.get('/payment-gateway', protect, authorize('admin'), async(req, res) => {
  * @access  Private (Admin only)
  *
  * Body: {
- *   provider: 'icici_eazypay' | 'mock' | 'none',
- *   icici: { merchantId, encryptionKey, subMerchantId, paymode },
+ *   provider: 'icici_orange' | 'razorpay' | 'mock' | 'none',
+ *   iciciOrange: { merchantId, terminalId, apiKey, apiSecret },
+ *   razorpay: { keyId, keySecret, webhookSecret },
  *   isActive: true/false
  * }
  */
 router.put('/payment-gateway', protect, authorize('admin'), [
-  body('provider').isIn(['none', 'mock', 'icici_eazypay', 'razorpay']).withMessage('Invalid provider'),
+  body('provider').isIn(['none', 'mock', 'icici_orange', 'razorpay']).withMessage('Invalid provider'),
   body('isActive').optional().isBoolean()
 ], handleValidationErrors, async(req, res) => {
   try {
-    const { provider, icici, isActive } = req.body;
+    const { provider, iciciOrange, isActive } = req.body;
     const update = { 'paymentGateway.provider': provider };
 
     if (typeof isActive === 'boolean') {
       update['paymentGateway.isActive'] = isActive;
     }
 
-    if (provider === 'icici_eazypay' && icici) {
-      if (icici.merchantId) update['paymentGateway.icici.merchantId'] = encrypt(icici.merchantId);
-      // Only update encryption key if it's not the masked value
-      if (icici.encryptionKey && !icici.encryptionKey.startsWith('****')) {
-        update['paymentGateway.icici.encryptionKey'] = encrypt(icici.encryptionKey);
+    if (provider === 'icici_orange' && iciciOrange) {
+      if (iciciOrange.merchantId) update['paymentGateway.iciciOrange.merchantId'] = encrypt(iciciOrange.merchantId);
+      if (iciciOrange.terminalId) update['paymentGateway.iciciOrange.terminalId'] = encrypt(iciciOrange.terminalId);
+      if (iciciOrange.apiKey && !iciciOrange.apiKey.startsWith('****')) {
+        update['paymentGateway.iciciOrange.apiKey'] = encrypt(iciciOrange.apiKey);
       }
-      if (icici.subMerchantId) update['paymentGateway.icici.subMerchantId'] = encrypt(icici.subMerchantId);
-      if (icici.paymode) update['paymentGateway.icici.paymode'] = icici.paymode;
+      if (iciciOrange.apiSecret && !iciciOrange.apiSecret.startsWith('****')) {
+        update['paymentGateway.iciciOrange.apiSecret'] = encrypt(iciciOrange.apiSecret);
+      }
     }
 
     if (provider === 'razorpay' && req.body.razorpay) {
       const rz = req.body.razorpay;
       if (rz.keyId) update['paymentGateway.razorpay.keyId'] = encrypt(rz.keyId);
-      // Only update secrets if not masked
       if (rz.keySecret && !rz.keySecret.startsWith('****')) {
         update['paymentGateway.razorpay.keySecret'] = encrypt(rz.keySecret);
       }
