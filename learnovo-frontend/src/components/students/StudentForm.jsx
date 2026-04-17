@@ -454,16 +454,20 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 {/* Form Content */}
                 <form onSubmit={handleSubmit} className="p-4 sm:p-6">
                     {/* Validation error summary */}
-                    {Object.keys(formErrors).length > 0 && (
-                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                            <p className="text-sm font-medium text-red-800 dark:text-red-300 mb-1">Please fix the following errors:</p>
-                            <ul className="list-disc list-inside text-xs text-red-600 dark:text-red-400 space-y-0.5">
-                                {Object.values(formErrors).map((msg, i) => (
-                                    <li key={i}>{msg}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
+                    {(() => {
+                        const visibleErrors = Object.values(formErrors).filter(msg => typeof msg === 'string' && msg.trim())
+                        if (visibleErrors.length === 0) return null
+                        return (
+                            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                <p className="text-sm font-medium text-red-800 dark:text-red-300 mb-1">Please fix the following errors:</p>
+                                <ul className="list-disc list-inside text-xs text-red-600 dark:text-red-400 space-y-0.5">
+                                    {visibleErrors.map((msg, i) => (
+                                        <li key={i}>{msg}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )
+                    })()}
                     <div className="max-h-[60vh] overflow-y-auto">
                         {/* Section 0: Student Info */}
                         {activeSection === 0 && (
