@@ -1109,7 +1109,7 @@ const StudentFeesDashboard = () => {
                 return (
                 <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in text-gray-900 dark:text-white">
                     <div className="bg-white dark:bg-[#1C1C1E] rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md overflow-hidden">
-                        <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center bg-gray-50 dark:bg-[#2C2C2E]">
+                        <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-[#38383A] flex justify-between items-center bg-white dark:bg-[#1C1C1E]">
                             <div>
                                 <h2 className="text-lg font-bold flex items-center gap-2">
                                     <IndianRupee className="h-5 w-5 text-primary-600 dark:text-primary-400" />
