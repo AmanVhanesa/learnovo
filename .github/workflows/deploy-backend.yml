@@ -16,7 +16,7 @@ jobs:
   deploy:
     name: Deploy Backend
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Deploy via SSH
@@ -47,9 +47,9 @@ jobs:
 
             cd learnovo-backend
             echo "Installing dependencies..."
-            npm ci --omit=dev
+            npm ci --omit=dev --prefer-offline --no-audit --no-fund
             echo "Restarting PM2..."
-            pm2 restart learnovo-backend || pm2 start /var/www/learnovo/ecosystem.config.js
+            pm2 restart learnovo-backend --update-env || pm2 start /var/www/learnovo/ecosystem.config.js
 
             # Verify the process is running
             sleep 3
@@ -58,4 +58,4 @@ jobs:
             echo "========================================="
             echo "Backend deployed successfully!"
             echo "========================================="
-          command_timeout: 5m
+          command_timeout: 15m

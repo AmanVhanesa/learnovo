@@ -16,7 +16,7 @@ jobs:
   deploy:
     name: Build & Deploy Frontend
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Deploy via SSH
@@ -33,4 +33,4 @@ jobs:
             flock -n 200 || { echo "Another deploy is running. Waiting..."; flock 200; }
 
             /var/www/learnovo/deploy.sh
-          command_timeout: 5m
+          command_timeout: 15m

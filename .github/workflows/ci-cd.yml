@@ -149,25 +149,9 @@ jobs:
           cache: npm
           cache-dependency-path: learnovo-backend/package-lock.json
       - name: Install Production Dependencies
-        run: npm ci --omit=dev
+        run: npm ci --omit=dev --prefer-offline --no-audit --no-fund
       - name: Build Application
         run: npm run build --if-present
-      - name: Create Deployment Package
-        run: |
-          tar -czf deployment.tar.gz \
-            --exclude=.git \
-            --exclude=tests \
-            --exclude=coverage \
-            --exclude=.eslintrc.js \
-            --exclude=jest.config.js \
-            --warning=no-file-changed \
-            . || [ $? -eq 1 ]
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-package
-          path: learnovo-backend/deployment.tar.gz
-          retention-days: 7
 
   deploy-staging:
     name: Deploy to Staging
@@ -176,13 +160,9 @@ jobs:
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
     environment: staging
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: deployment-package
       - name: Deploy to Staging
         run: |
-          echo "🚀 Deploying artifact to staging environment..."
+          echo "🚀 Deploying to staging environment..."
 
   deploy-production:
     name: Deploy to Hostinger VPS
