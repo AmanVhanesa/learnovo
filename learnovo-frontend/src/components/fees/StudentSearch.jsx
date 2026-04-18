@@ -25,7 +25,7 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
 
-    if (searchTerm.trim().length < 2) {
+    if (searchTerm.trim().length < 1) {
       setSearchResults([])
       setIsOpen(false)
       return
@@ -127,7 +127,7 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
         </div>
       )}
 
-      {isOpen && searchTerm.length >= 2 && !isSearching && searchResults.length === 0 && (
+      {isOpen && searchTerm.length >= 1 && !isSearching && searchResults.length === 0 && (
         <div className="absolute z-20 w-full mt-1.5 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg p-6 text-center">
           <User className="h-8 w-8 text-gray-300 dark:text-[#636366] mx-auto mb-2" />
           <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No students found</p>
