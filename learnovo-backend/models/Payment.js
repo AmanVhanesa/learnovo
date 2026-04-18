@@ -88,6 +88,11 @@ const paymentSchema = new mongoose.Schema({
     trim: true
   },
 
+  depositorName: {
+    type: String,
+    trim: true
+  },
+
   // Immutability & Confirmation
   isConfirmed: {
     type: Boolean,

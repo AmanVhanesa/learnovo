@@ -1417,7 +1417,7 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
   handleValidationErrors
 ], async(req, res) => {
   try {
-    const { studentId, invoiceId, amount, paymentMethod, paymentDate, transactionDetails, remarks } = req.body;
+    const { studentId, invoiceId, amount, paymentMethod, paymentDate, transactionDetails, remarks, depositorName } = req.body;
     const tenantId = req.user.tenantId;
 
     // ── Step 1: Validate invoice ──
@@ -1451,6 +1451,7 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
       paymentDate: new Date(paymentDate),
       transactionDetails: transactionDetails || {},
       remarks,
+      depositorName: depositorName ? String(depositorName).trim() : undefined,
       receiptNumber,
       isConfirmed: true,
       confirmedAt: new Date(),
@@ -1606,7 +1607,7 @@ router.get('/payments', protect, authorize('admin', 'accountant'), async(req, re
     }
 
     const payments = await Payment.find(filter)
-      .populate('studentId', 'name fullName admissionNumber studentId')
+      .populate({ path: 'studentId', select: 'name fullName admissionNumber studentId classId', populate: { path: 'classId', select: 'name' } })
       .populate('invoiceId', 'invoiceNumber')
       .populate('collectedBy', 'name')
       .sort({ paymentDate: -1, createdAt: -1 })

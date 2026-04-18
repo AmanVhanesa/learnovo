@@ -3,6 +3,30 @@
 const pdfService = require('./pdfService');
 const axios = require('axios');
 
+function numberToIndianWords(num) {
+  const n = Math.round(Math.abs(Number(num) || 0));
+  if (n === 0) return 'Zero Rupees Only';
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const twoDigits = (x) => (x < 20 ? ones[x] : `${tens[Math.floor(x / 10)]}${x % 10 ? ` ${ones[x % 10]}` : ''}`);
+  const threeDigits = (x) => {
+    const h = Math.floor(x / 100);
+    const r = x % 100;
+    return `${h ? `${ones[h]} Hundred${r ? ' ' : ''}` : ''}${r ? twoDigits(r) : ''}`;
+  };
+  const crore = Math.floor(n / 10000000);
+  const lakh = Math.floor((n % 10000000) / 100000);
+  const thousand = Math.floor((n % 100000) / 1000);
+  const rest = n % 1000;
+  const parts = [];
+  if (crore) parts.push(`${threeDigits(crore)} Crore`);
+  if (lakh) parts.push(`${twoDigits(lakh)} Lakh`);
+  if (thousand) parts.push(`${twoDigits(thousand)} Thousand`);
+  if (rest) parts.push(threeDigits(rest));
+  return `${parts.join(' ').replace(/\s+/g, ' ').trim()} Rupees Only`;
+}
+
 async function toBase64DataUri(url) {
   if (!url) return '';
   try {
@@ -17,7 +41,7 @@ async function toBase64DataUri(url) {
   }
 }
 
-function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
+function buildReceiptHtml(payment, schoolData, logoDataUri) {
   const student = payment.studentId || {};
   const studentName = student.name || student.fullName || 'N/A';
   const studentAdmNo = student.admissionNumber || student.studentId || '-';
@@ -26,6 +50,7 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
     ? new Date(payment.paymentDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
     : '-';
   const amountFormatted = typeof payment.amount === 'number' ? payment.amount.toLocaleString('en-IN') : '0';
+  const amountInWords = numberToIndianWords(payment.amount || 0);
   const invoiceItems = payment.invoiceId?.items || [];
   const billingPeriod = payment.invoiceId?.billingPeriod?.displayText || payment.invoiceId?.periodLabel || '';
   const initiatedByLabel = (payment.initiatedBy === 'admin' || payment.collectedBy) ? 'Admin' : 'Student';
@@ -71,10 +96,11 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
     overflow: hidden; background: #f9fafb;
   }
   .card {
-    margin: 10px; background: #fff; border-radius: 10px;
+    margin: 8px 10px 18px; background: #fff; border-radius: 10px;
     box-shadow: 0 2px 18px rgba(0,0,0,0.07);
     overflow: hidden; display: flex; flex-direction: column;
     position: relative;
+    border: 3px solid #0a5c56;
   }
 
   /* Decorative shapes */
@@ -146,6 +172,9 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
   .amt-box { background: #edf9f7; border: 1px solid #d1fae5; border-radius: 8px; padding: 7px 14px; display: flex; align-items: center; justify-content: space-between; }
   .amt-label { font-size: 10px; font-weight: 700; color: #0a5c56; text-transform: uppercase; letter-spacing: 1.5px; }
   .amt-value { font-size: 22px; font-weight: 800; color: #059669; font-variant-numeric: tabular-nums; }
+  .amt-right { display: flex; flex-direction: column; align-items: flex-end; }
+  .amt-words { margin-top: 1px; font-size: 8.5px; font-style: italic; color: #0a5c56; font-weight: 600; letter-spacing: 0.3px; text-align: right; }
+  .amt-words b { font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; font-style: normal; font-size: 7.5px; color: #4b5563; }
 
   /* Balance */
   .bal-sec { margin: 4px 14px 0; flex-shrink: 0; }
@@ -157,15 +186,16 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
   .spacer { flex: 1; min-height: 4px; }
 
   /* Signatures */
-  .sig-sec { padding: 0 20px 6px; flex-shrink: 0; }
-  .sig-row { display: flex; justify-content: space-between; align-items: flex-end; height: 110px; }
+  .sig-sec { padding: 0 20px 4px; flex-shrink: 0; }
+  .sig-row { display: flex; justify-content: space-between; align-items: flex-end; height: 70px; }
   .sig-col { text-align: center; width: 210px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
   .sig-img { max-height: 100px; max-width: 200px; margin: 0 auto 4px; object-fit: contain; display: block; }
   .sig-col .sig-line { width: 80px; height: 1px; background: #9ca3af; margin: 0 auto 2px; }
   .sig-col .sig-label { font-size: 8px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.6px; }
+  .sig-col .dep-name { font-size: 13px; font-weight: 700; color: #0a5c56; margin: 0 auto 4px; padding-bottom: 3px; border-bottom: 1px solid #0a5c56; min-width: 140px; text-align: center; font-family: Georgia, serif; }
 
   /* Footer */
-  .footer { padding: 5px 18px; border-top: 1px solid #e5e7eb; text-align: center; flex-shrink: 0; }
+  .footer { padding: 4px 18px; border-top: 1px solid #e5e7eb; text-align: center; flex-shrink: 0; }
   .footer span { font-size: 7px; color: #4b5563; font-weight: 500; text-transform: uppercase; letter-spacing: 1.2px; }
   .footer .brand { font-weight: 600; color: #0f766e; }
   .footer .gen { display: block; margin-top: 1px; font-size: 6.5px; color: #6b7280; text-transform: none; letter-spacing: 0; }
@@ -226,7 +256,10 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
   <div class="amt-sec">
     <div class="amt-box">
       <span class="amt-label">Total Amount Paid</span>
-      <span class="amt-value">&#8377; ${amountFormatted}</span>
+      <div class="amt-right">
+        <span class="amt-value">&#8377; ${amountFormatted}</span>
+        <div class="amt-words"><b>In Words:</b> ${amountInWords}</div>
+      </div>
     </div>
   </div>
 
@@ -242,10 +275,13 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
 
   <div class="sig-sec">
     <div class="sig-row">
-      <div class="sig-col"><div class="sig-line"></div><div class="sig-label">Depositor</div></div>
       <div class="sig-col">
-        ${signatureDataUri ? `<img class="sig-img" src="${signatureDataUri}" alt="Signature">` : ''}
-        <div class="sig-line"></div><div class="sig-label">Principal</div>
+        ${payment.depositorName ? `<div class="dep-name">${payment.depositorName}</div>` : '<div class="sig-line"></div>'}
+        <div class="sig-label">Depositor Name</div>
+      </div>
+      <div class="sig-col">
+        <div class="sig-line"></div>
+        <div class="sig-label">Cashier</div>
       </div>
     </div>
   </div>
@@ -261,12 +297,8 @@ function buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri) {
 }
 
 async function generateReceiptPdf(payment, schoolData) {
-  const [logoDataUri, signatureDataUri] = await Promise.all([
-    toBase64DataUri(schoolData.logo),
-    toBase64DataUri(schoolData.principalSignature)
-  ]);
-
-  const html = buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri);
+  const logoDataUri = await toBase64DataUri(schoolData.logo);
+  const html = buildReceiptHtml(payment, schoolData, logoDataUri);
   const { getBrowser, releaseBrowser } = pdfService._internal;
   const browser = await getBrowser();
   const page = await browser.newPage();
@@ -293,12 +325,8 @@ async function generateReceiptPdf(payment, schoolData) {
  * Browser @page CSS handles the half-A4 sizing when user hits Print.
  */
 async function generateReceiptHtml(payment, schoolData) {
-  const [logoDataUri, signatureDataUri] = await Promise.all([
-    toBase64DataUri(schoolData.logo),
-    toBase64DataUri(schoolData.principalSignature)
-  ]);
-
-  let html = buildReceiptHtml(payment, schoolData, logoDataUri, signatureDataUri);
+  const logoDataUri = await toBase64DataUri(schoolData.logo);
+  let html = buildReceiptHtml(payment, schoolData, logoDataUri);
 
   // Inject a toolbar and tweak for browser viewing/printing
   const toolbarHtml = `
@@ -309,7 +337,7 @@ async function generateReceiptHtml(payment, schoolData) {
     </div>`;
 
   // Add toolbar right after <body>, add padding-top so content isn't hidden behind toolbar
-  html = html.replace('<body>', `<body>${  toolbarHtml}`);
+  html = html.replace('<body>', `<body>${toolbarHtml}`);
   html = html.replace('.page {', '.page { margin-top: 50px; ');
 
   // Override @page for browser print — A4 portrait

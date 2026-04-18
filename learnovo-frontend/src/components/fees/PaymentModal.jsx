@@ -29,6 +29,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
     paymentDate: new Date().toISOString().split('T')[0],
     transactionDetails: {},
     remarks: '',
+    depositorName: '',
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -158,6 +159,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
         paymentDate: form.paymentDate,
         transactionDetails: form.transactionDetails,
         remarks: form.remarks,
+        depositorName: form.depositorName.trim(),
       })
       onSuccess()
     } catch (error) {
@@ -682,6 +684,18 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                   onChange={(e) => setForm(prev => ({ ...prev, paymentDate: e.target.value }))}
                   max={new Date().toISOString().split('T')[0]}
                   required
+                />
+              </div>
+
+              {/* Depositor name */}
+              <div>
+                <label className="label mb-1.5 block">Depositor Name</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={form.depositorName}
+                  onChange={(e) => setForm(prev => ({ ...prev, depositorName: e.target.value }))}
+                  placeholder="Name of person depositing the fees (prints on receipt)"
                 />
               </div>
 
