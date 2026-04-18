@@ -26,26 +26,19 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
     const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
     const sessionObjectId = academicSessionId ? new mongoose.Types.ObjectId(academicSessionId) : null;
 
-    // Total Collected
-    const collectedFilter = {
-      tenantId,
-      isConfirmed: true,
-      isReversed: false
-    };
-
-    if (sessionObjectId) collectedFilter.academicSessionId = sessionObjectId;
-
-    if (startDate || endDate) {
-      collectedFilter.paymentDate = {};
-      if (startDate) collectedFilter.paymentDate.$gte = new Date(startDate);
-      if (endDate) collectedFilter.paymentDate.$lte = new Date(endDate);
+    // Total Collected — Payment has no academicSessionId, so filter via invoice lookup
+    const collectedPipeline = [
+      { $match: { tenantId, isConfirmed: true, isReversed: false, ...(startDate || endDate ? { paymentDate: { ...(startDate && { $gte: new Date(startDate) }), ...(endDate && { $lte: new Date(endDate) }) } } : {}) } },
+    ];
+    if (sessionObjectId) {
+      collectedPipeline.push(
+        { $lookup: { from: 'feeinvoices', localField: 'invoiceId', foreignField: '_id', as: '_inv' } },
+        { $match: { '_inv.academicSessionId': sessionObjectId } }
+      );
     }
+    collectedPipeline.push({ $group: { _id: null, total: { $sum: '$amount' } } });
 
-    const collectedAgg = await Payment.aggregate([
-      { $match: collectedFilter },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]);
-
+    const collectedAgg = await Payment.aggregate(collectedPipeline);
     const totalCollected = collectedAgg.length > 0 ? collectedAgg[0].total : 0;
 
     // This Month Collection
@@ -53,18 +46,18 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
     thisMonthStart.setDate(1);
     thisMonthStart.setHours(0, 0, 0, 0);
 
-    const thisMonthFilter = {
-      tenantId,
-      isConfirmed: true,
-      isReversed: false,
-      paymentDate: { $gte: thisMonthStart }
-    };
-    if (sessionObjectId) thisMonthFilter.academicSessionId = sessionObjectId;
+    const thisMonthPipeline = [
+      { $match: { tenantId, isConfirmed: true, isReversed: false, paymentDate: { $gte: thisMonthStart } } },
+    ];
+    if (sessionObjectId) {
+      thisMonthPipeline.push(
+        { $lookup: { from: 'feeinvoices', localField: 'invoiceId', foreignField: '_id', as: '_inv' } },
+        { $match: { '_inv.academicSessionId': sessionObjectId } }
+      );
+    }
+    thisMonthPipeline.push({ $group: { _id: null, total: { $sum: '$amount' } } });
 
-    const thisMonthAgg = await Payment.aggregate([
-      { $match: thisMonthFilter },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
-    ]);
+    const thisMonthAgg = await Payment.aggregate(thisMonthPipeline);
 
     const thisMonthCollection = thisMonthAgg.length > 0 ? thisMonthAgg[0].total : 0;
 
@@ -249,6 +242,127 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, 
     res.status(500).json({
       success: false,
       message: 'Server error while fetching defaulters'
+    });
+  }
+});
+
+// @desc    Export defaulters list as CSV or Excel
+// @route   GET /api/fees/defaulters/export
+// @access  Private (Admin, Accountant)
+router.get('/defaulters/export', protect, authorize('admin', 'accountant'), async(req, res) => {
+  try {
+    const { academicSessionId, classId, minBalance, format: fmt } = req.query;
+    const tenantId = req.user.tenantId;
+
+    if (!academicSessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'academicSessionId is required'
+      });
+    }
+
+    const options = {};
+    if (minBalance) options.minBalance = parseFloat(minBalance);
+
+    const defaulters = await StudentBalance.find({
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      academicSessionId: new mongoose.Types.ObjectId(academicSessionId),
+      totalBalance: options.minBalance ? { $gte: options.minBalance, $gt: 0 } : { $gt: 0 }
+    })
+      .populate({
+        path: 'studentId',
+        select: 'name fullName studentId admissionNumber phone email classId sectionId',
+        populate: [
+          { path: 'classId', select: 'name' },
+          { path: 'sectionId', select: 'name' }
+        ]
+      })
+      .populate('academicSessionId', 'name')
+      .sort({ totalBalance: -1 })
+      .limit(5000);
+
+    const now = new Date();
+    const enriched = (await Promise.all(defaulters.map(async(d) => {
+      if (!d.studentId) return null;
+      if (classId && (!d.studentId.classId || d.studentId.classId._id.toString() !== classId)) return null;
+
+      const unpaidInvoices = await FeeInvoice.find({
+        tenantId,
+        studentId: d.studentId._id,
+        academicSessionId,
+        status: { $in: ['Pending', 'Partial', 'Overdue'] }
+      }).sort({ dueDate: 1 }).select('_id dueDate status balanceAmount');
+
+      if (unpaidInvoices.length === 0) return null;
+
+      const oldest = unpaidInvoices[0];
+      const overdueDays = oldest.dueDate
+        ? Math.max(0, Math.floor((now - oldest.dueDate) / (1000 * 60 * 60 * 24)))
+        : 0;
+      const liveBalance = sumMoney(unpaidInvoices.map(inv => inv.balanceAmount || 0));
+      if (liveBalance <= 0) return null;
+
+      return {
+        admissionNumber: d.studentId.admissionNumber || d.studentId.studentId || '-',
+        studentName: d.studentId.fullName || d.studentId.name || 'N/A',
+        className: d.studentId.classId?.name || '-',
+        sectionName: d.studentId.sectionId?.name || '-',
+        phone: d.studentId.phone || '-',
+        email: d.studentId.email || '-',
+        totalBalance: roundToRupee(liveBalance),
+        unpaidInvoiceCount: unpaidInvoices.length,
+        oldestDueDate: oldest.dueDate,
+        overdueDays
+      };
+    }))).filter(Boolean);
+
+    const columns = [
+      { key: 'admissionNumber', header: 'Admission No.' },
+      { key: 'studentName', header: 'Student Name' },
+      { key: 'className', header: 'Class' },
+      { key: 'sectionName', header: 'Section' },
+      { key: 'phone', header: 'Phone' },
+      { key: 'email', header: 'Email' },
+      {
+        key: 'totalBalance',
+        header: 'Total Pending',
+        format: (v) => (v != null ? Number(v).toFixed(2) : '0.00')
+      },
+      { key: 'unpaidInvoiceCount', header: 'Unpaid Invoices' },
+      {
+        key: 'oldestDueDate',
+        header: 'Oldest Due Date',
+        format: (v) => (v ? new Date(v).toLocaleDateString('en-IN') : '-')
+      },
+      {
+        key: 'overdueDays',
+        header: 'Overdue Days',
+        format: (v) => (v > 0 ? `${v}` : 'Not yet due')
+      }
+    ];
+
+    const today = new Date().toISOString().split('T')[0];
+    const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, 'Fee Defaulters Report');
+    let buffer, contentType, ext;
+
+    if (fmt === 'excel') {
+      buffer = ImportExportService.exportToExcel(enriched, columns, 'Defaulters', headerInfo);
+      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      ext = 'xlsx';
+    } else {
+      buffer = await ImportExportService.exportToCSV(enriched, columns, headerInfo);
+      contentType = 'text/csv';
+      ext = 'csv';
+    }
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename=fee_defaulters_${today}.${ext}`);
+    res.status(200).send(buffer);
+  } catch (error) {
+    logger.error('Defaulters export error', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while exporting defaulters'
     });
   }
 });

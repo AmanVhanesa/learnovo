@@ -266,6 +266,18 @@ export const feesReportsService = {
     return res.data
   },
 
+  exportDefaulters: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
+    if (filters.classId) params.append('classId', filters.classId)
+    if (filters.minBalance) params.append('minBalance', filters.minBalance)
+    params.append('format', filters.format || 'excel')
+
+    const url = `/fees/defaulters/export?${params.toString()}`
+    const res = await api.get(url, { responseType: 'blob' })
+    return res.data
+  },
+
   exportReceipts: async (filters = {}) => {
     const params = new URLSearchParams()
     if (filters.startDate) params.append('startDate', filters.startDate)
