@@ -1128,20 +1128,15 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async(req, res)
 
     const { studentId, academicSessionId, invoiceNumber, totalAmount } = invoice;
 
-    // Soft delete: Cancel the invoice instead of hard deleting
-    // Financial records should never be permanently deleted for audit trail integrity
-    invoice.status = 'Cancelled';
-    invoice.balanceAmount = 0;
-    invoice.cancelledAt = new Date();
-    invoice.cancelledBy = req.user._id;
-    invoice.cancellationReason = req.body?.reason || 'Cancelled by admin';
-    await invoice.save();
+    // Hard-delete unpaid invoices so the list doesn't fill with stale cancelled rows.
+    // Paid invoices go through the soft-cancel flow via POST /:id/cancel (with payment reversal).
+    await FeeInvoice.deleteOne({ _id: invoice._id });
 
     // Log action (best-effort)
     try {
       await FeeAuditLog.logAction({
         tenantId,
-        action: 'INVOICE_CANCELLED',
+        action: 'INVOICE_DELETED',
         entityType: 'FeeInvoice',
         entityId: invoice._id,
         userId: req.user._id,
@@ -1150,7 +1145,7 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async(req, res)
         details: {
           invoiceNumber,
           totalAmount,
-          reason: 'Deleted by user'
+          reason: req.body?.reason || 'Deleted by user'
         },
         ipAddress: req.ip
       });
@@ -1166,7 +1161,7 @@ router.delete('/:id', protect, authorize('admin', 'accountant'), async(req, res)
 
     res.json({
       success: true,
-      message: 'Invoice cancelled successfully'
+      message: 'Invoice deleted successfully'
     });
 
   } catch (error) {
