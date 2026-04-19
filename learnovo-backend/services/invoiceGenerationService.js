@@ -340,7 +340,9 @@ async function generateInvoicesForStudent({
     return { allocation: null, invoices: [], summary: { total: 0, skipped: true, reason: 'No applicable fee heads' } };
   }
 
-  // 3. Check if allocation already exists
+  // 3. Check if allocation already exists.
+  // If an allocation exists but every linked invoice is Cancelled, the prior generation
+  // was effectively undone — clean it up and continue so regeneration works.
   const existingAllocation = await AnnualFeeAllocation.findOne({
     tenantId,
     studentId: student._id,
@@ -348,11 +350,23 @@ async function generateInvoicesForStudent({
   });
 
   if (existingAllocation) {
-    return {
-      allocation: existingAllocation,
-      invoices: [],
-      summary: { total: 0, skipped: true, reason: 'Allocation already exists for this student and academic year' }
-    };
+    const activeInvoice = await FeeInvoice.findOne({
+      tenantId,
+      studentId: student._id,
+      academicSessionId,
+      status: { $ne: 'Cancelled' }
+    });
+
+    if (activeInvoice) {
+      return {
+        allocation: existingAllocation,
+        invoices: [],
+        summary: { total: 0, skipped: true, reason: 'Allocation already exists for this student and academic year' }
+      };
+    }
+
+    // All prior invoices cancelled — safe to remove the stale allocation and regenerate.
+    await AnnualFeeAllocation.deleteOne({ _id: existingAllocation._id });
   }
 
   // 4. Get billing periods and filter for mid-year admission

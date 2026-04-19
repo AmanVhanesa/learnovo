@@ -184,12 +184,24 @@ router.post('/generate', protect, authorize('admin'), [
           });
 
           if (existing) {
-            skipped.push({
+            const activeInvoice = await FeeInvoice.findOne({
+              tenantId,
               studentId: student._id,
-              studentName: student.name,
-              reason: 'Allocation already exists'
+              academicSessionId,
+              status: { $ne: 'Cancelled' }
             });
-            continue;
+
+            if (activeInvoice) {
+              skipped.push({
+                studentId: student._id,
+                studentName: student.name,
+                reason: 'Allocation already exists'
+              });
+              continue;
+            }
+
+            // All prior invoices cancelled — safe to remove the stale allocation and regenerate.
+            await AnnualFeeAllocation.deleteOne({ _id: existing._id });
           }
 
           // Build fee heads for this student
@@ -957,7 +969,19 @@ router.post('/mid-year', protect, authorize('admin'), [
     // Check existing allocation
     const existing = await AnnualFeeAllocation.findOne({ tenantId, studentId, academicSessionId });
     if (existing) {
-      return res.status(409).json({ success: false, message: 'Allocation already exists for this student and session' });
+      const activeInvoice = await FeeInvoice.findOne({
+        tenantId,
+        studentId,
+        academicSessionId,
+        status: { $ne: 'Cancelled' }
+      });
+
+      if (activeInvoice) {
+        return res.status(409).json({ success: false, message: 'Allocation already exists for this student and session' });
+      }
+
+      // All prior invoices cancelled — safe to remove the stale allocation and regenerate.
+      await AnnualFeeAllocation.deleteOne({ _id: existing._id });
     }
 
     // Find fee structure for student's class
