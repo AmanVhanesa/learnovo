@@ -39,7 +39,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
   const [discountForm, setDiscountForm] = useState({ type: '', amount: '', percentage: '', reason: '' })
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false)
 
-  // Extract unique periods/quarters from invoices for filtering
+  // Extract unique periods/quarters from invoices for filtering (sorted chronologically)
   const periodOptions = useMemo(() => {
     const periods = []
     const seen = new Set()
@@ -47,18 +47,26 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
       const label = inv.periodLabel || inv.billingPeriod?.displayText || ''
       if (label && !seen.has(label)) {
         seen.add(label)
-        periods.push({ value: label, label })
+        periods.push({
+          value: label,
+          label,
+          sortKey: new Date(inv.periodStart || inv.billingPeriod?.startDate || inv.dueDate || 0).getTime() || 0,
+        })
       }
     })
-    return periods
+    periods.sort((a, b) => a.sortKey - b.sortKey)
+    return periods.map(({ sortKey, ...rest }) => rest) // eslint-disable-line no-unused-vars
   }, [invoices])
 
-  // Filter invoices by selected period
+  // Filter invoices by selected period, sorted chronologically (Q1 → Q4)
   const filteredInvoices = useMemo(() => {
-    if (selectedQuarter === 'all') return invoices
-    return invoices.filter(inv => {
-      const label = inv.periodLabel || inv.billingPeriod?.displayText || ''
-      return label === selectedQuarter
+    const list = selectedQuarter === 'all'
+      ? invoices
+      : invoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === selectedQuarter)
+    return [...list].sort((a, b) => {
+      const ka = new Date(a.periodStart || a.billingPeriod?.startDate || a.dueDate || 0).getTime() || 0
+      const kb = new Date(b.periodStart || b.billingPeriod?.startDate || b.dueDate || 0).getTime() || 0
+      return ka - kb
     })
   }, [invoices, selectedQuarter])
 
