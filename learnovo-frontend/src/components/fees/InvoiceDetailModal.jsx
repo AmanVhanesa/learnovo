@@ -238,7 +238,7 @@ const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt
               <Tag className="h-4 w-4 mr-2" /> Apply Discount
             </button>
           )}
-          {onEdit && invoice.status !== 'Paid' && (
+          {onEdit && invoice.status !== 'Cancelled' && (
             <button onClick={() => onEdit(invoice)} className="btn btn-outline w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" /> Edit
             </button>

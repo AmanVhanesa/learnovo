@@ -36,6 +36,7 @@ import BulkDeleteInvoiceForm from '../components/fees/BulkDeleteInvoiceForm'
 import PaymentModal from '../components/fees/PaymentModal'
 import AllInvoicesTab from '../components/fees/AllInvoicesTab'
 import AnnualAllocationsTab from '../components/fees/AnnualAllocationsTab'
+import PaymentEditModal from '../components/fees/PaymentEditModal'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
 
@@ -91,6 +92,7 @@ const FeesFinance = () => {
   const [studentInvoices, setStudentInvoices] = useState([])
   const [studentPayments, setStudentPayments] = useState([])
   const [editingInvoice, setEditingInvoice] = useState(null)
+  const [paymentAction, setPaymentAction] = useState(null) // { payment, mode: 'edit' | 'reverse' }
   const [receiptFilters, setReceiptFilters] = useState({ search: '', paymentMethod: '', startDate: '', endDate: '' })
   const [showFeeImportModal, setShowFeeImportModal] = useState(false)
   const [resolvingDispute, setResolvingDispute] = useState(null)
@@ -382,7 +384,7 @@ const FeesFinance = () => {
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
         {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
         {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} onExport={handleExportDefaulters} />}
-        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} />}
+        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
         {activeTab === 'reports' && <ReportsTab activeSession={activeSession} />}
@@ -394,6 +396,7 @@ const FeesFinance = () => {
       {showInvoiceModal && <IndividualInvoiceModal feeStructures={feeStructures} activeSession={activeSession} onClose={() => setShowInvoiceModal(false)} onSuccess={() => { setShowInvoiceModal(false); toast.success('Invoice generated'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
       {showPaymentModal && <PaymentModal student={selectedStudent} invoices={studentInvoices} payments={studentPayments} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onClose={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); setStudentPayments([]) }} onSuccess={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); toast.success('Payment collected') }} />}
       {editingInvoice && <EditInvoiceModal invoice={editingInvoice} onClose={() => setEditingInvoice(null)} onSuccess={() => { setEditingInvoice(null); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
+      {paymentAction && <PaymentEditModal payment={paymentAction.payment} mode={paymentAction.mode} onClose={() => setPaymentAction(null)} onSuccess={() => { setPaymentAction(null); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['all-invoices'] }) }} />}
       {showFeeImportModal && <ImportModal isOpen={showFeeImportModal} onClose={() => setShowFeeImportModal(false)} module="fees" title="Import Fee Records" templateUrl="/fees/import/template" previewUrl="/fees/import/preview" executeUrl="/fees/import/execute" onSuccess={(result) => { setShowFeeImportModal(false); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fee-allocations'] }); toast.success(`Import complete: ${result?.allocationsCreated || result?.created || 0} records created`) }} />}
     </div>
   )
@@ -488,7 +491,9 @@ const ImportFeesTab = ({ onImport }) => (
 
 const DashboardTab = ({ data, onPrintReceipt, onDownloadReceipt, onEditInvoice, onDeleteInvoice, onNavigate }) => {
   const summary = data.summary || {}
-  const totalExpected = (summary.totalCollected || 0) + (summary.totalPending || 0) + (summary.totalOverdue || 0)
+  // totalPending from backend already includes Overdue balances (status IN [Pending, Partial, Overdue]);
+  // do not add totalOverdue again or it will double-count.
+  const totalExpected = (summary.totalCollected || 0) + (summary.totalPending || 0)
   const collectionRate = totalExpected > 0 ? Math.round(((summary.totalCollected || 0) / totalExpected) * 100) : 0
   const chartData = data.collectionByDate || data.byDate || []
   const maxChartVal = chartData.length > 0 ? Math.max(...chartData.map(d => d.amount || 0), 1) : 1
@@ -1117,7 +1122,7 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport }) => {
 
 // ── Receipts Tab ──
 
-const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport }) => (
+const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport, onEditPayment, onReversePayment }) => (
   <div className="space-y-4">
     <div className="card p-3 sm:p-4">
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
@@ -1150,7 +1155,7 @@ const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilter
                   <td className="px-5 py-3 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(p.amount)}</td>
                   <td className="px-5 py-3 whitespace-nowrap"><span className="px-2 py-0.5 bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] text-xs rounded-md font-medium">{p.paymentMethod}</span></td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(p.paymentDate).toLocaleDateString('en-IN')}</td>
-                  <td className="px-5 py-3 whitespace-nowrap text-right"><div className="flex justify-end gap-1"><button onClick={() => onPrintReceipt(p._id)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button><button onClick={() => onDownloadReceipt(p._id)} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"><Download className="h-3.5 w-3.5" /></button></div></td>
+                  <td className="px-5 py-3 whitespace-nowrap text-right"><div className="flex justify-end gap-1">{p.isReversed && <span className="px-1.5 py-0.5 mr-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-[10px] font-semibold rounded">REVERSED</span>}<button onClick={() => onPrintReceipt(p._id)} title="View" className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"><Eye className="h-3.5 w-3.5" /></button><button onClick={() => onDownloadReceipt(p._id)} title="Download" className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"><Download className="h-3.5 w-3.5" /></button>{!p.isReversed && p.amount > 0 && (<><button onClick={() => onEditPayment(p)} title="Edit Payment" className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"><Edit className="h-3.5 w-3.5" /></button><button onClick={() => onReversePayment(p)} title="Reverse Payment" className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><RotateCcw className="h-3.5 w-3.5" /></button></>)}</div></td>
                 </tr>
               ))}
             </tbody>
@@ -1250,7 +1255,7 @@ const ReportsTab = ({ activeSession }) => {
       const a = document.createElement('a')
       a.href = url
       const periodSlug = period || 'monthly'
-      a.download = `collection_summary_${periodSlug}_${new Date().toISOString().split('T')[0]}.${fmt === 'excel' ? 'xlsx' : 'csv'}`
+      a.download = `daily_collection_${periodSlug}_${new Date().toISOString().split('T')[0]}.${fmt === 'excel' ? 'xlsx' : 'csv'}`
       document.body.appendChild(a)
       a.click()
       a.remove()

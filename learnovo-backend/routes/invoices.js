@@ -1586,6 +1586,117 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
   }
 });
 
+// @desc    Edit non-financial fields of a payment (method/date/remarks/depositor/txn details)
+// @route   PUT /api/invoices/payments/:id
+// @access  Private (Admin)
+router.put('/payments/:id', protect, authorize('admin'), [
+  body('paymentMethod').optional().isIn(['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Card', 'Online']).withMessage('Invalid payment method'),
+  body('paymentDate').optional().isISO8601().withMessage('Valid payment date is required'),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const payment = await Payment.findOne({ _id: req.params.id, tenantId });
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
+    if (payment.isReversed) {
+      return res.status(400).json({ success: false, message: 'Cannot edit a reversed payment' });
+    }
+
+    const { paymentMethod, paymentDate, remarks, depositorName, transactionDetails } = req.body;
+    const update = {};
+    if (paymentMethod !== undefined) update.paymentMethod = paymentMethod;
+    if (paymentDate !== undefined) update.paymentDate = new Date(paymentDate);
+    if (remarks !== undefined) update.remarks = remarks;
+    if (depositorName !== undefined) update.depositorName = depositorName ? String(depositorName).trim() : undefined;
+    if (transactionDetails !== undefined) update.transactionDetails = transactionDetails || {};
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ success: false, message: 'No editable fields provided' });
+    }
+
+    // Bypass pre-save hook (it blocks edits to confirmed payments). These fields are
+    // non-financial metadata — no invoice/balance recalculation needed.
+    await Payment.updateOne({ _id: payment._id, tenantId }, { $set: update });
+
+    try {
+      await FeeAuditLog.logAction({
+        tenantId, action: 'PAYMENT_UPDATED', entityType: 'Payment', entityId: payment._id,
+        userId: req.user._id, userName: req.user.name || req.user.fullName || 'Admin', userRole: req.user.role,
+        details: { receiptNumber: payment.receiptNumber, changes: Object.keys(update) },
+        ipAddress: req.ip
+      });
+    } catch (_) { /* non-fatal */ }
+
+    const updated = await Payment.findById(payment._id)
+      .populate({ path: 'studentId', select: 'name fullName admissionNumber studentId classId', populate: { path: 'classId', select: 'name' } })
+      .populate('invoiceId', 'invoiceNumber');
+
+    res.json({ success: true, message: 'Payment updated successfully', data: updated });
+  } catch (error) {
+    logger.error('Update payment error', { message: error.message });
+    res.status(500).json({ success: false, message: 'Server error while updating payment' });
+  }
+});
+
+// @desc    Reverse a confirmed payment (admin correction)
+// @route   POST /api/invoices/payments/:id/reverse
+// @access  Private (Admin)
+router.post('/payments/:id/reverse', protect, authorize('admin'), [
+  body('reason').notEmpty().withMessage('Reversal reason is required'),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { reason } = req.body;
+
+    const payment = await Payment.findOne({ _id: req.params.id, tenantId });
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
+    if (payment.isReversed) {
+      return res.status(400).json({ success: false, message: 'Payment is already reversed' });
+    }
+    if (!payment.isConfirmed) {
+      return res.status(400).json({ success: false, message: 'Only confirmed payments can be reversed' });
+    }
+
+    const originalAmount = toNumber(payment.amount);
+
+    // Use model method: creates a negative reversal Payment record and flips isReversed
+    await payment.reverse(req.user._id, reason);
+
+    // Decrement invoice paidAmount so balance reflects reality
+    const invoice = await FeeInvoice.findOne({ _id: payment.invoiceId, tenantId });
+    if (invoice) {
+      invoice.paidAmount = roundToRupee(Math.max(0, toNumber(invoice.paidAmount) - originalAmount));
+      await invoice.save();
+      try {
+        await StudentBalance.updateBalance(tenantId, invoice.studentId, invoice.academicSessionId);
+      } catch (_) { /* non-fatal */ }
+    }
+
+    try {
+      await FeeAuditLog.logAction({
+        tenantId, action: 'PAYMENT_REVERSED', entityType: 'Payment', entityId: payment._id,
+        userId: req.user._id, userName: req.user.name || req.user.fullName || 'Admin', userRole: req.user.role,
+        details: { receiptNumber: payment.receiptNumber, amount: originalAmount, reason },
+        ipAddress: req.ip
+      });
+    } catch (_) { /* non-fatal */ }
+
+    res.json({
+      success: true,
+      message: 'Payment reversed successfully',
+      data: { paymentId: payment._id, invoiceId: payment.invoiceId }
+    });
+  } catch (error) {
+    logger.error('Reverse payment error', { message: error.message, stack: error.stack });
+    res.status(500).json({ success: false, message: error.message || 'Server error while reversing payment' });
+  }
+});
+
 // @desc    Get payments list
 // @route   GET /api/invoices/payments
 // @access  Private (Admin, Accountant)
@@ -1858,6 +1969,9 @@ router.post('/:id/cancel', protect, authorize('admin'), [
         await AnnualFeeAllocation.recalculateFromInvoices(invoice.annualAllocationId);
       } catch (e) { /* non-fatal */ }
     }
+
+    // Clean up allocation if all invoices are now cancelled (allows regeneration)
+    await cleanupOrphanedAllocations(tenantId, [invoice.studentId], invoice.academicSessionId);
 
     res.json({
       success: true,

@@ -43,10 +43,18 @@ async function buildStudentFeeHeads(student, feeStructure, tenantId) {
       exclusionReason: null
     };
 
-    // Exclude admission fees for imported students
-    if (head.isAdmissionFee && student.isImported) {
+    // Exclude admission fees for old students (returning from previous year)
+    if (head.isAdmissionFee && student.studentType === 'old') {
       entry.isIncluded = false;
-      entry.exclusionReason = 'Imported student — exempt from admission fee';
+      entry.exclusionReason = 'Old student — exempt from admission fee';
+      allocatedHeads.push(entry);
+      continue;
+    }
+
+    // Exclude admission fees for imported old students (new imported students still pay)
+    if (head.isAdmissionFee && student.isImported && student.studentType !== 'new') {
+      entry.isIncluded = false;
+      entry.exclusionReason = 'Imported old student — exempt from admission fee';
       allocatedHeads.push(entry);
       continue;
     }

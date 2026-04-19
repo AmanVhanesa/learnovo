@@ -161,7 +161,12 @@ export const paymentsService = {
   },
 
   reverse: async (id, reason) => {
-    const res = await api.post(`/payments/${id}/reverse`, { reason })
+    const res = await api.post(`/invoices/payments/${id}/reverse`, { reason })
+    return res.data
+  },
+
+  update: async (id, data) => {
+    const res = await api.put(`/invoices/payments/${id}`, data)
     return res.data
   },
 

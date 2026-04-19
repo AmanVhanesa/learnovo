@@ -1,5 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 const FeeInvoice = require('../models/FeeInvoice');
 const Payment = require('../models/Payment');
 const StudentBalance = require('../models/StudentBalance');
@@ -7,6 +8,8 @@ const { protect, authorize } = require('../middleware/auth');
 const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, sumMoney } = require('../utils/money');
 const ImportExportService = require('../services/importExportService');
+
+const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Online'];
 
 const planGate = require('../middleware/planGate');
 
@@ -28,7 +31,7 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
 
     // Total Collected — Payment has no academicSessionId, so filter via invoice lookup
     const collectedPipeline = [
-      { $match: { tenantId, isConfirmed: true, isReversed: false, ...(startDate || endDate ? { paymentDate: { ...(startDate && { $gte: new Date(startDate) }), ...(endDate && { $lte: new Date(endDate) }) } } : {}) } },
+      { $match: { tenantId, isConfirmed: true, isReversed: false, ...(startDate || endDate ? { paymentDate: { ...(startDate && { $gte: new Date(startDate) }), ...(endDate && { $lte: new Date(endDate) }) } } : {}) } }
     ];
     if (sessionObjectId) {
       collectedPipeline.push(
@@ -47,7 +50,7 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
     thisMonthStart.setHours(0, 0, 0, 0);
 
     const thisMonthPipeline = [
-      { $match: { tenantId, isConfirmed: true, isReversed: false, paymentDate: { $gte: thisMonthStart } } },
+      { $match: { tenantId, isConfirmed: true, isReversed: false, paymentDate: { $gte: thisMonthStart } } }
     ];
     if (sessionObjectId) {
       thisMonthPipeline.push(
@@ -931,7 +934,7 @@ router.get('/collection-summary', protect, authorize('admin', 'accountant'), asy
   }
 });
 
-// @desc    Export fee collection summary with method-wise breakdown
+// @desc    Export daily fee collection summary (date × payment method pivot), A4 ready
 // @route   GET /api/fees/collection-summary/export
 // @access  Private (Admin, Accountant)
 router.get('/collection-summary/export', protect, authorize('admin', 'accountant'), async(req, res) => {
@@ -939,7 +942,6 @@ router.get('/collection-summary/export', protect, authorize('admin', 'accountant
     const { period, paymentMethod, format: fmt } = req.query;
     const tenantId = req.user.tenantId;
 
-    // Calculate date range
     const now = new Date();
     const endDate = new Date(now);
     endDate.setHours(23, 59, 59, 999);
@@ -966,78 +968,261 @@ router.get('/collection-summary/export', protect, authorize('admin', 'accountant
     }
 
     const filter = {
-      tenantId,
+      tenantId: new mongoose.Types.ObjectId(tenantId),
       isConfirmed: true,
       isReversed: false,
       paymentDate: { $gte: startDate, $lte: endDate }
     };
     if (paymentMethod) filter.paymentMethod = paymentMethod;
 
-    const payments = await Payment.find(filter)
-      .populate('studentId', 'name fullName admissionNumber studentId classId')
-      .populate({ path: 'studentId', populate: { path: 'classId', select: 'name' } })
-      .populate('invoiceId', 'invoiceNumber')
-      .populate('collectedBy', 'name')
-      .sort({ paymentDate: -1 })
-      .lean();
+    // Aggregate date × method totals
+    const rows = await Payment.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: '%Y-%m-%d', date: '$paymentDate' } },
+            method: '$paymentMethod'
+          },
+          total: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
 
-    // Method-wise totals for summary rows
+    // Build method list (fixed order + any extras)
+    const extraMethods = [...new Set(rows.map(r => r._id.method).filter(m => m && !PAYMENT_METHODS.includes(m)))];
+    const methods = paymentMethod ? [paymentMethod] : [...PAYMENT_METHODS, ...extraMethods];
+
+    // Build date→method→{total,count} map
+    const byDate = {};
+    rows.forEach(r => {
+      const d = r._id.date;
+      const m = r._id.method || 'Unknown';
+      if (!byDate[d]) byDate[d] = {};
+      byDate[d][m] = { total: toNumber(r.total), count: r.count };
+    });
+
+    // Sorted descending (most recent first)
+    const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+    // Build pivoted rows
+    const pivot = dates.map(d => {
+      const row = { date: d };
+      let dayTotal = 0;
+      let dayCount = 0;
+      methods.forEach(m => {
+        const cell = byDate[d][m];
+        row[m] = cell ? roundToRupee(cell.total) : 0;
+        row[`${m}__count`] = cell ? cell.count : 0;
+        if (cell) {
+          dayTotal += cell.total;
+          dayCount += cell.count;
+        }
+      });
+      row.dayTotal = roundToRupee(dayTotal);
+      row.dayCount = dayCount;
+      return row;
+    });
+
+    // Method-wise grand totals (column footer)
     const methodTotals = {};
-    payments.forEach(p => {
-      const m = p.paymentMethod || 'Unknown';
-      if (!methodTotals[m]) methodTotals[m] = { count: 0, total: 0 };
-      methodTotals[m].count += 1;
-      methodTotals[m].total += toNumber(p.amount);
+    const methodCounts = {};
+    methods.forEach(m => {
+      methodTotals[m] = 0; methodCounts[m] = 0;
     });
-
-    const columns = [
-      { key: 'receiptNumber', header: 'Receipt No.' },
-      { key: 'studentId.admissionNumber', header: 'Admission No.' },
-      { key: 'studentName', header: 'Student Name', format: (v) => v || 'N/A' },
-      { key: 'className', header: 'Class', format: (v) => v || '-' },
-      { key: 'invoiceId.invoiceNumber', header: 'Invoice No.' },
-      { key: 'amount', header: 'Amount', format: (v) => (v != null ? Number(v).toFixed(2) : '0.00') },
-      { key: 'paymentMethod', header: 'Payment Method' },
-      { key: 'paymentDate', header: 'Payment Date', format: (v) => (v ? new Date(v).toLocaleDateString('en-IN') : '') },
-      { key: 'collectedBy.name', header: 'Collected By', format: (v) => v || '-' }
-    ];
-
-    const data = payments.map(p => ({
-      ...p,
-      studentName: p.studentId?.fullName || p.studentId?.name || 'N/A',
-      className: p.studentId?.classId?.name || '-'
-    }));
-
-    // Add summary rows at the end
-    const grandTotal = sumMoney(payments.map(p => p.amount));
-    data.push({ receiptNumber: '', studentName: '', className: '', amount: null, paymentMethod: '', paymentDate: '', 'collectedBy.name': '' });
-    data.push({ receiptNumber: '--- METHOD-WISE SUMMARY ---', studentName: '', className: '', amount: null, paymentMethod: '', paymentDate: '' });
-    Object.entries(methodTotals).forEach(([method, info]) => {
-      data.push({ receiptNumber: method, studentName: `${info.count} payments`, className: '', amount: roundToRupee(info.total), paymentMethod: '', paymentDate: '' });
+    rows.forEach(r => {
+      const m = r._id.method || 'Unknown';
+      if (methodTotals[m] == null) {
+        methodTotals[m] = 0; methodCounts[m] = 0;
+      }
+      methodTotals[m] += toNumber(r.total);
+      methodCounts[m] += r.count;
     });
-    data.push({ receiptNumber: 'GRAND TOTAL', studentName: `${payments.length} payments`, className: '', amount: roundToRupee(grandTotal), paymentMethod: '', paymentDate: '' });
+    const grandTotal = sumMoney(Object.values(methodTotals));
+    const grandCount = Object.values(methodCounts).reduce((a, b) => a + b, 0);
 
     const periodLabel = period === 'today' ? 'Today' : period === 'weekly' ? 'This Week' : 'This Month';
     const methodLabel = paymentMethod ? ` - ${paymentMethod}` : ' - All Methods';
-    const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, `Fee Collection Summary (${periodLabel}${methodLabel})`);
+    const headerInfo = await ImportExportService.getExportHeaderInfo(
+      tenantId,
+      `Daily Fee Collection Report (${periodLabel}${methodLabel})`
+    );
 
     const today = new Date().toISOString().split('T')[0];
-    let buffer, contentType, ext;
-
-    if (fmt === 'excel') {
-      buffer = ImportExportService.exportToExcel(data, columns, 'Collection Summary', headerInfo);
-      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      ext = 'xlsx';
-    } else {
-      buffer = await ImportExportService.exportToCSV(data, columns, headerInfo);
-      contentType = 'text/csv';
-      ext = 'csv';
-    }
+    const fmtINR = (n) => Number(n || 0).toFixed(2);
+    const fmtDate = (d) => new Date(`${d  }T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
 
     const periodSlug = period || 'monthly';
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename=collection_summary_${periodSlug}_${today}.${ext}`);
-    res.status(200).send(buffer);
+
+    if (fmt === 'excel') {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Learnovo';
+      const ws = workbook.addWorksheet('Daily Collection', {
+        pageSetup: {
+          paperSize: 9, // 9 = A4
+          orientation: 'landscape',
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          horizontalCentered: true,
+          margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
+        },
+        views: [{ state: 'frozen', ySplit: 0 }]
+      });
+
+      const colCount = 2 + methods.length + 2; // S.No + Date + methods + Day Total + Txns
+
+      // Title rows
+      if (headerInfo.schoolName) {
+        ws.addRow([headerInfo.schoolName]);
+        ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+        ws.lastRow.font = { bold: true, size: 14 };
+        ws.lastRow.alignment = { horizontal: 'center' };
+      }
+      ws.addRow([`Daily Fee Collection Report — ${periodLabel}${methodLabel}`]);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.font = { bold: true, size: 12 };
+      ws.lastRow.alignment = { horizontal: 'center' };
+
+      ws.addRow([`Period: ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}`]);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.alignment = { horizontal: 'center' };
+
+      ws.addRow([headerInfo.dateTime]);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.alignment = { horizontal: 'center' };
+      ws.lastRow.font = { italic: true, size: 9 };
+      ws.addRow([]);
+
+      // Column widths — constrained to fit A4 landscape
+      ws.columns = [
+        { width: 6 },
+        { width: 22 },
+        ...methods.map(() => ({ width: 13 })),
+        { width: 14 },
+        { width: 8 }
+      ];
+
+      // Header row
+      const headerRow = ws.addRow(['S.No', 'Date', ...methods, 'Day Total', 'Txns']);
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }, bottom: { style: 'thin' } };
+      });
+
+      // Data rows
+      pivot.forEach((r, idx) => {
+        const values = [
+          idx + 1,
+          fmtDate(r.date),
+          ...methods.map(m => Number(r[m] || 0)),
+          Number(r.dayTotal || 0),
+          r.dayCount || 0
+        ];
+        const row = ws.addRow(values);
+        row.eachCell((cell, colNumber) => {
+          cell.border = { top: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' }, bottom: { style: 'hair' } };
+          if (colNumber === 1) cell.alignment = { horizontal: 'center' };
+          else if (colNumber === 2) cell.alignment = { horizontal: 'left' };
+          else cell.alignment = { horizontal: 'right' };
+          if (colNumber >= 3 && colNumber <= 2 + methods.length + 1) {
+            cell.numFmt = '#,##0.00';
+          }
+        });
+        if (idx % 2 === 1) {
+          row.eachCell(c => {
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F7F6' } };
+          });
+        }
+      });
+
+      // Method total footer
+      const totalRow = ws.addRow([
+        '', 'TOTAL',
+        ...methods.map(m => Number(roundToRupee(methodTotals[m] || 0))),
+        Number(roundToRupee(grandTotal)),
+        grandCount
+      ]);
+      totalRow.eachCell((cell, colNumber) => {
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
+        cell.border = { top: { style: 'medium' }, bottom: { style: 'medium' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        if (colNumber >= 3 && colNumber <= 2 + methods.length + 1) {
+          cell.numFmt = '#,##0.00';
+          cell.alignment = { horizontal: 'right' };
+        } else if (colNumber === 2) {
+          cell.alignment = { horizontal: 'right' };
+        } else {
+          cell.alignment = { horizontal: 'center' };
+        }
+      });
+
+      // Count footer
+      const countRow = ws.addRow([
+        '', 'Transactions',
+        ...methods.map(m => methodCounts[m] || 0),
+        grandCount,
+        ''
+      ]);
+      countRow.eachCell((cell, colNumber) => {
+        cell.font = { italic: true, size: 10, color: { argb: 'FF555555' } };
+        if (colNumber === 2) cell.alignment = { horizontal: 'right' };
+        else cell.alignment = { horizontal: colNumber === 1 ? 'center' : 'right' };
+      });
+
+      // Repeat header on every printed page
+      ws.pageSetup.printTitlesRow = `${headerRow.number}:${headerRow.number}`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=daily_collection_${periodSlug}_${today}.xlsx`);
+      await workbook.xlsx.write(res);
+      return res.end();
+    }
+
+    // CSV export
+    const lines = [];
+    const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    if (headerInfo.schoolName) lines.push(q(headerInfo.schoolName));
+    lines.push(q(`Daily Fee Collection Report - ${periodLabel}${methodLabel}`));
+    lines.push(q(`Period: ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}`));
+    lines.push(q(headerInfo.dateTime));
+    lines.push('');
+
+    const headers = ['S.No', 'Date', ...methods, 'Day Total', 'Txns'];
+    lines.push(headers.map(q).join(','));
+
+    pivot.forEach((r, idx) => {
+      const row = [
+        idx + 1,
+        fmtDate(r.date),
+        ...methods.map(m => fmtINR(r[m])),
+        fmtINR(r.dayTotal),
+        r.dayCount
+      ];
+      lines.push(row.map(q).join(','));
+    });
+
+    lines.push([
+      '', 'TOTAL',
+      ...methods.map(m => fmtINR(methodTotals[m])),
+      fmtINR(grandTotal),
+      grandCount
+    ].map(q).join(','));
+
+    lines.push([
+      '', 'Transactions',
+      ...methods.map(m => methodCounts[m] || 0),
+      grandCount,
+      ''
+    ].map(q).join(','));
+
+    const csv = lines.join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=daily_collection_${periodSlug}_${today}.csv`);
+    return res.status(200).send(csv);
   } catch (error) {
     logger.error('Collection summary export error', error);
     res.status(500).json({
