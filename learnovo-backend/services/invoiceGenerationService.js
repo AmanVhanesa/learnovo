@@ -349,15 +349,21 @@ async function generateInvoicesForStudent({
     academicSessionId
   });
 
+  let reuseAllocation = null;
   if (existingAllocation) {
-    const activeInvoice = await FeeInvoice.findOne({
+    const activeInvoices = await FeeInvoice.find({
       tenantId,
       studentId: student._id,
       academicSessionId,
       status: { $ne: 'Cancelled' }
     });
 
-    if (activeInvoice) {
+    // If any existing invoice contains recurring items, recurring has already been generated — skip.
+    const hasRecurring = activeInvoices.some(inv =>
+      (inv.items || []).some(it => it.type === 'recurring')
+    );
+
+    if (hasRecurring) {
       return {
         allocation: existingAllocation,
         invoices: [],
@@ -365,8 +371,14 @@ async function generateInvoicesForStudent({
       };
     }
 
-    // All prior invoices cancelled — safe to remove the stale allocation and regenerate.
-    await AnnualFeeAllocation.deleteOne({ _id: existingAllocation._id });
+    if (activeInvoices.length > 0) {
+      // Only one-time (e.g., paid admission fee) invoices exist — reuse allocation and
+      // generate the recurring periodic invoices. Skip adding one-time heads again.
+      reuseAllocation = existingAllocation;
+    } else {
+      // All prior invoices cancelled — safe to remove the stale allocation and regenerate.
+      await AnnualFeeAllocation.deleteOne({ _id: existingAllocation._id });
+    }
   }
 
   // 4. Get billing periods and filter for mid-year admission
@@ -398,7 +410,7 @@ async function generateInvoicesForStudent({
     allocationData.concessionPercentage = concessionPercentage;
     allocationData.concessionReason = concessionReason || `${concessionPercentage}% concession`;
   }
-  const allocation = await AnnualFeeAllocation.create(allocationData);
+  const allocation = reuseAllocation || await AnnualFeeAllocation.create(allocationData);
 
   // 6. Generate invoices
   const invoices = [];
@@ -427,8 +439,8 @@ async function generateInvoicesForStudent({
       });
     }
 
-    // 6b. Add one-time heads ONLY to the first invoice
-    if (isFirstPeriod) {
+    // 6b. Add one-time heads ONLY to the first invoice (skip if reusing allocation — they were already invoiced)
+    if (isFirstPeriod && !reuseAllocation) {
       for (const head of includedOneTime) {
         lineItems.push({
           feeHeadName: head.feeHeadName,
@@ -486,11 +498,12 @@ async function generateInvoicesForStudent({
   }
 
   // 7. Handle rounding errors
-  // Sum of all invoice totals must equal totalAnnual exactly
+  // Sum of all invoice totals must equal totalAnnual (or recurring-only when reusing allocation)
   if (invoices.length > 0) {
+    const expectedTotal = reuseAllocation ? totalRecurringAnnual : totalAnnual;
     const actualTotal = sumMoney(invoices.map(inv => inv.totalAmount));
-    if (actualTotal !== totalAnnual) {
-      const diff = totalAnnual - actualTotal;
+    if (actualTotal !== expectedTotal) {
+      const diff = expectedTotal - actualTotal;
       const lastInvoice = invoices[invoices.length - 1];
       lastInvoice.totalAmount = roundToRupee(lastInvoice.totalAmount + diff);
       lastInvoice.balanceAmount = lastInvoice.totalAmount;
