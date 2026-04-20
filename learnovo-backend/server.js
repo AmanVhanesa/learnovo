@@ -261,6 +261,7 @@ app.use('/api/fees', require('./routes/feesReports')); // Must come before gener
 app.use('/api/fees', require('./routes/fees'));
 app.use('/api/student-fees', require('./routes/studentFees'));
 app.use('/api/admin-disputes', require('./routes/adminDisputes'));
+app.use('/api/bank-reconciliation', require('./routes/bankReconciliation'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/fee-structures', require('./routes/feeStructures'));
 app.use('/api/fees/allocations', require('./routes/allocations'));

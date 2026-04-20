@@ -96,6 +96,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Income', href: '/app/income', icon: CircleDollarSign, roles: ['admin'] },
       { name: 'Expenses', href: '/app/expenses', icon: ReceiptText, roles: ['admin'] },
       { name: 'Payroll', href: '/app/payroll', icon: Wallet, roles: ['admin'] },
+      { name: 'Bank Reconciliation', href: '/app/bank-reconciliation', icon: ReceiptText, roles: ['admin', 'accountant'] },
     ].filter(i => i.roles.includes(r))
 
     if (feesFinanceItems.length > 0) {

@@ -90,6 +90,7 @@ const Payroll = lazy(() => import('./pages/Payroll'))
 const Expenses = lazy(() => import('./pages/Expenses'))
 const Income = lazy(() => import('./pages/Income'))
 const FinanceDashboard = lazy(() => import('./pages/FinanceDashboard'))
+const BankReconciliation = lazy(() => import('./pages/admin/BankReconciliation'))
 const CertificateGeneration = lazy(() => import('./pages/certificates/CertificateGeneration'))
 const TemplateSettings = lazy(() => import('./pages/certificates/TemplateSettings'))
 const PaymentStatus = lazy(() => import('./pages/PaymentStatus'))
@@ -398,6 +399,12 @@ function App() {
                       <Route path="finance-dashboard" element={
                         <ProtectedRoute allowedRoles={['admin']}>
                           <FinanceDashboard />
+                        </ProtectedRoute>
+                      } />
+
+                      <Route path="bank-reconciliation" element={
+                        <ProtectedRoute allowedRoles={['admin', 'accountant']}>
+                          <BankReconciliation />
                         </ProtectedRoute>
                       } />
 
