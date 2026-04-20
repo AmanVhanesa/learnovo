@@ -1235,12 +1235,23 @@ const DEFAULT_METHOD_COLOR = { bg: 'bg-gray-50 dark:bg-[#2C2C2E]', border: 'bord
 const ReportsTab = ({ activeSession }) => {
   const [period, setPeriod] = useState('today')
   const [methodFilter, setMethodFilter] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
 
+  const usingCustom = Boolean(startDate || endDate)
+  const effectivePeriod = usingCustom ? undefined : period
+  const filterArgs = {
+    period: effectivePeriod,
+    paymentMethod: methodFilter || undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+  }
+
   const { data: summaryData, isLoading } = useQuery({
-    queryKey: ['fees-collection-summary', period, methodFilter, activeSession?._id],
+    queryKey: ['fees-collection-summary', effectivePeriod, methodFilter, startDate, endDate, activeSession?._id],
     queryFn: async () => {
-      const res = await feesReportsService.getCollectionSummary({ period, paymentMethod: methodFilter || undefined, academicSessionId: activeSession?._id })
+      const res = await feesReportsService.getCollectionSummary({ ...filterArgs, academicSessionId: activeSession?._id })
       return res.data
     },
     enabled: !!activeSession,
@@ -1250,11 +1261,11 @@ const ReportsTab = ({ activeSession }) => {
     setShowExportMenu(false)
     const toastId = toast.loading(`Exporting ${fmt.toUpperCase()}...`)
     try {
-      const blob = await feesReportsService.exportCollectionSummary({ period, paymentMethod: methodFilter || undefined, format: fmt })
+      const blob = await feesReportsService.exportCollectionSummary({ ...filterArgs, format: fmt })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const periodSlug = period || 'monthly'
+      const periodSlug = usingCustom ? 'custom' : (period || 'monthly')
       a.download = `daily_collection_${periodSlug}_${new Date().toISOString().split('T')[0]}.${fmt === 'excel' ? 'xlsx' : 'csv'}`
       document.body.appendChild(a)
       a.click()
@@ -1293,13 +1304,29 @@ const ReportsTab = ({ activeSession }) => {
         </div>
 
         {/* Period selector */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-3">
           {PERIOD_OPTIONS.map(opt => (
-            <button key={opt.id} onClick={() => setPeriod(opt.id)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${period === opt.id ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
+            <button key={opt.id} onClick={() => { setPeriod(opt.id); setStartDate(''); setEndDate('') }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${!usingCustom && period === opt.id ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
               {opt.label}
             </button>
           ))}
+        </div>
+
+        {/* Custom date range */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Custom range:</span>
+          <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+            className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          <span className="text-gray-400">to</span>
+          <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+            className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          {usingCustom && (
+            <button onClick={() => { setStartDate(''); setEndDate('') }}
+              className="px-2 py-1 text-xs rounded-md bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]">
+              Clear
+            </button>
+          )}
         </div>
 
         {/* Method filter */}

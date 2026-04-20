@@ -313,6 +313,8 @@ export const feesReportsService = {
     if (filters.period) params.append('period', filters.period)
     if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
     if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
 
     const url = `/fees/collection-summary${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)
@@ -323,9 +325,24 @@ export const feesReportsService = {
     const params = new URLSearchParams()
     if (filters.period) params.append('period', filters.period)
     if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
     params.append('format', filters.format || 'excel')
 
     const url = `/fees/collection-summary/export${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await api.get(url, { responseType: 'blob' })
+    return res.data
+  },
+
+  exportReceipts: async (filters = {}) => {
+    const params = new URLSearchParams()
+    if (filters.period) params.append('period', filters.period)
+    if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
+    params.append('format', filters.format || 'excel')
+
+    const url = `/fees/receipts/export${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url, { responseType: 'blob' })
     return res.data
   }

@@ -11,6 +11,39 @@ const ImportExportService = require('../services/importExportService');
 
 const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Online'];
 
+/**
+ * Resolve a date range from query params.
+ * Custom startDate/endDate override the period preset.
+ */
+function resolveDateRange({ period, startDate: s, endDate: e }) {
+  if (s || e) {
+    const start = s ? new Date(s) : new Date(0);
+    start.setHours(0, 0, 0, 0);
+    const end = e ? new Date(e) : new Date();
+    end.setHours(23, 59, 59, 999);
+    return { startDate: start, endDate: end, preset: 'custom' };
+  }
+  const now = new Date();
+  const endDate = new Date(now);
+  endDate.setHours(23, 59, 59, 999);
+  let startDate;
+  switch (period) {
+  case 'today':
+    startDate = new Date(now); startDate.setHours(0, 0, 0, 0); break;
+  case 'weekly': {
+    startDate = new Date(now);
+    const dow = startDate.getDay();
+    startDate.setDate(startDate.getDate() - (dow === 0 ? 6 : dow - 1));
+    startDate.setHours(0, 0, 0, 0); break;
+  }
+  case 'monthly':
+  default:
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    startDate.setHours(0, 0, 0, 0); break;
+  }
+  return { startDate, endDate, preset: period || 'monthly' };
+}
+
 const planGate = require('../middleware/planGate');
 
 const router = express.Router();
@@ -586,96 +619,241 @@ router.get('/class-wise-report', protect, authorize('admin', 'accountant'), asyn
 // @access  Private (Admin, Accountant)
 router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
-    const { startDate, endDate, paymentMethod, format: fmt } = req.query;
+    const { paymentMethod, format: fmt } = req.query;
     const tenantId = req.user.tenantId;
+    const { startDate, endDate, preset } = resolveDateRange(req.query);
 
     const filter = { tenantId, isReversed: false };
-
     if (paymentMethod) filter.paymentMethod = paymentMethod;
-
-    if (startDate || endDate) {
-      filter.paymentDate = {};
-      if (startDate) filter.paymentDate.$gte = new Date(startDate);
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        filter.paymentDate.$lte = end;
-      }
+    if (req.query.startDate || req.query.endDate || req.query.period) {
+      filter.paymentDate = { $gte: startDate, $lte: endDate };
     }
 
     const payments = await Payment.find(filter)
       .populate('studentId', 'name fullName admissionNumber studentId classId')
-      .populate({
-        path: 'studentId',
-        populate: { path: 'classId', select: 'name' }
-      })
+      .populate({ path: 'studentId', populate: { path: 'classId', select: 'name' } })
       .populate('invoiceId', 'invoiceNumber')
       .populate('collectedBy', 'name')
       .sort({ paymentDate: -1, createdAt: -1 })
       .lean();
 
-    const columns = [
-      { key: 'receiptNumber', header: 'Receipt No.' },
-      { key: 'studentId.admissionNumber', header: 'Admission No.' },
-      {
-        key: 'studentName',
-        header: 'Student Name',
-        format: (v) => v || 'N/A'
-      },
-      {
-        key: 'className',
-        header: 'Class',
-        format: (v) => v || '-'
-      },
-      { key: 'invoiceId.invoiceNumber', header: 'Invoice No.' },
-      {
-        key: 'amount',
-        header: 'Amount',
-        format: (v) => (v != null ? Number(v).toFixed(2) : '0.00')
-      },
-      { key: 'paymentMethod', header: 'Payment Method' },
-      {
-        key: 'paymentDate',
-        header: 'Payment Date',
-        format: (v) => (v ? new Date(v).toLocaleDateString('en-IN') : '')
-      },
-      {
-        key: 'isConfirmed',
-        header: 'Confirmed',
-        format: (v) => (v ? 'Yes' : 'No')
-      },
-      {
-        key: 'collectedBy.name',
-        header: 'Collected By',
-        format: (v) => v || '-'
-      },
-      { key: 'remarks', header: 'Remarks', format: (v) => v || '' }
-    ];
+    // Totals by method
+    const methodTotals = {};
+    const methodCounts = {};
+    PAYMENT_METHODS.forEach(m => {
+      methodTotals[m] = 0; methodCounts[m] = 0;
+    });
+    payments.forEach(p => {
+      const m = p.paymentMethod || 'Unknown';
+      if (methodTotals[m] == null) {
+        methodTotals[m] = 0; methodCounts[m] = 0;
+      }
+      methodTotals[m] += toNumber(p.amount);
+      methodCounts[m] += 1;
+    });
+    const grandTotal = sumMoney(payments.map(p => p.amount));
+    const grandCount = payments.length;
 
-    // Flatten nested student fields for the export service
-    const data = payments.map(p => ({
-      ...p,
-      studentName: p.studentId?.fullName || p.studentId?.name || 'N/A',
-      className: p.studentId?.classId?.name || '-'
-    }));
+    const periodLabel = preset === 'custom'
+      ? `${startDate.toLocaleDateString('en-IN')} — ${endDate.toLocaleDateString('en-IN')}`
+      : preset === 'today' ? 'Today'
+        : preset === 'weekly' ? 'This Week'
+          : 'This Month';
+    const methodLabel = paymentMethod ? ` - ${paymentMethod}` : ' - All Methods';
+    const headerInfo = await ImportExportService.getExportHeaderInfo(
+      tenantId,
+      `Fee Receipts Report (${periodLabel}${methodLabel})`
+    );
 
     const today = new Date().toISOString().split('T')[0];
-    const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, 'Fee Receipts Report');
-    let buffer, contentType, ext;
+    const fmtINR = (n) => Number(n || 0).toFixed(2);
 
     if (fmt === 'excel') {
-      buffer = ImportExportService.exportToExcel(data, columns, 'Receipts', headerInfo);
-      contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      ext = 'xlsx';
-    } else {
-      buffer = await ImportExportService.exportToCSV(data, columns, headerInfo);
-      contentType = 'text/csv';
-      ext = 'csv';
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Learnovo';
+      const ws = workbook.addWorksheet('Receipts', {
+        pageSetup: {
+          paperSize: 9, orientation: 'landscape', fitToPage: true,
+          fitToWidth: 1, fitToHeight: 0, horizontalCentered: true,
+          margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
+        }
+      });
+
+      const colCount = 10;
+
+      if (headerInfo.schoolName) {
+        ws.addRow([headerInfo.schoolName]);
+        ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+        ws.lastRow.font = { bold: true, size: 14 };
+        ws.lastRow.alignment = { horizontal: 'center' };
+      }
+      ws.addRow([`Fee Receipts Report — ${periodLabel}${methodLabel}`]);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.font = { bold: true, size: 12 };
+      ws.lastRow.alignment = { horizontal: 'center' };
+
+      ws.addRow([`Period: ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}`]);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.alignment = { horizontal: 'center' };
+
+      ws.addRow([headerInfo.dateTime]);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.alignment = { horizontal: 'center' };
+      ws.lastRow.font = { italic: true, size: 9 };
+      ws.addRow([]);
+
+      ws.columns = [
+        { width: 6 }, { width: 14 }, { width: 14 }, { width: 24 },
+        { width: 10 }, { width: 14 }, { width: 11 }, { width: 13 },
+        { width: 12 }, { width: 16 }
+      ];
+
+      const headerRow = ws.addRow(['S.No', 'Receipt No.', 'Admission No.', 'Student Name', 'Class', 'Invoice No.', 'Amount', 'Method', 'Date', 'Collected By']);
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }, bottom: { style: 'thin' } };
+      });
+
+      payments.forEach((p, idx) => {
+        const row = ws.addRow([
+          idx + 1,
+          p.receiptNumber || '',
+          p.studentId?.admissionNumber || p.studentId?.studentId || '-',
+          p.studentId?.fullName || p.studentId?.name || 'N/A',
+          p.studentId?.classId?.name || '-',
+          p.invoiceId?.invoiceNumber || '',
+          Number(p.amount || 0),
+          p.paymentMethod || '-',
+          p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
+          p.collectedBy?.name || '-'
+        ]);
+        row.eachCell((cell, colNumber) => {
+          cell.border = { top: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' }, bottom: { style: 'hair' } };
+          if (colNumber === 7) {
+            cell.numFmt = '#,##0.00'; cell.alignment = { horizontal: 'right' };
+          } else if (colNumber === 1 || colNumber === 9) cell.alignment = { horizontal: 'center' };
+          else cell.alignment = { horizontal: 'left' };
+        });
+        if (idx % 2 === 1) row.eachCell(c => {
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F7F6' } };
+        });
+      });
+
+      // Grand total row within table
+      const totalRow = ws.addRow(['', '', '', '', '', 'TOTAL', Number(roundToRupee(grandTotal)), '', '', `${grandCount  } txns`]);
+      totalRow.eachCell((cell, colNumber) => {
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
+        cell.border = { top: { style: 'medium' }, bottom: { style: 'medium' } };
+        if (colNumber === 7) {
+          cell.numFmt = '#,##0.00'; cell.alignment = { horizontal: 'right' };
+        } else if (colNumber === 6) cell.alignment = { horizontal: 'right' };
+        else cell.alignment = { horizontal: 'center' };
+      });
+
+      // Method-wise summary block
+      ws.addRow([]);
+      const sumTitle = ws.addRow(['Collection Summary by Payment Method']);
+      ws.mergeCells(sumTitle.number, 1, sumTitle.number, colCount);
+      sumTitle.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+      sumTitle.alignment = { horizontal: 'center' };
+      sumTitle.eachCell(c => {
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+      });
+
+      const sumHeader = ws.addRow(['Payment Method', 'Transactions', 'Amount (INR)']);
+      ws.mergeCells(sumHeader.number, 1, sumHeader.number, 3);
+      ws.mergeCells(sumHeader.number, 4, sumHeader.number, 6);
+      ws.mergeCells(sumHeader.number, 7, sumHeader.number, colCount);
+      sumHeader.eachCell(cell => {
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0E8' } };
+        cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+        cell.alignment = { horizontal: 'center' };
+      });
+
+      const addSummaryRow = (label, txns, amount, opts = {}) => {
+        const row = ws.addRow([label, txns, Number(amount || 0)]);
+        ws.mergeCells(row.number, 1, row.number, 3);
+        ws.mergeCells(row.number, 4, row.number, 6);
+        ws.mergeCells(row.number, 7, row.number, colCount);
+        row.getCell(1).alignment = { horizontal: 'left', indent: 1 };
+        row.getCell(4).alignment = { horizontal: 'center' };
+        row.getCell(7).alignment = { horizontal: 'right', indent: 1 };
+        row.getCell(7).numFmt = '#,##0.00';
+        row.eachCell(c => {
+          c.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
+          if (opts.bold) c.font = { bold: true, size: opts.size || 11 };
+          if (opts.fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.fill } };
+        });
+      };
+
+      const seenMethods = new Set(Object.keys(methodTotals));
+      [...PAYMENT_METHODS, ...Array.from(seenMethods).filter(m => !PAYMENT_METHODS.includes(m))].forEach(m => {
+        if (methodTotals[m] != null) addSummaryRow(m, methodCounts[m] || 0, roundToRupee(methodTotals[m] || 0));
+      });
+
+      addSummaryRow('GRAND TOTAL', grandCount, roundToRupee(grandTotal), { bold: true, size: 12, fill: 'FFD9EAD3' });
+
+      ws.addRow([]); ws.addRow([]);
+      const sigRow = ws.addRow(['Prepared by: ______________________', '', '', '', '', '', '', '', 'Verified by: ______________________', '']);
+      ws.mergeCells(sigRow.number, 1, sigRow.number, 5);
+      ws.mergeCells(sigRow.number, 6, sigRow.number, colCount);
+      sigRow.font = { size: 10 };
+      sigRow.getCell(1).alignment = { horizontal: 'left' };
+      sigRow.getCell(6).alignment = { horizontal: 'right' };
+
+      ws.pageSetup.printTitlesRow = `${headerRow.number}:${headerRow.number}`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=fee_receipts_${today}.xlsx`);
+      await workbook.xlsx.write(res);
+      return res.end();
     }
 
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename=fee_receipts_${today}.${ext}`);
-    res.status(200).send(buffer);
+    // CSV export
+    const lines = [];
+    const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    if (headerInfo.schoolName) lines.push(q(headerInfo.schoolName));
+    lines.push(q(`Fee Receipts Report - ${periodLabel}${methodLabel}`));
+    lines.push(q(`Period: ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}`));
+    lines.push(q(headerInfo.dateTime));
+    lines.push('');
+
+    const csvHeaders = ['S.No', 'Receipt No.', 'Admission No.', 'Student Name', 'Class', 'Invoice No.', 'Amount', 'Method', 'Date', 'Collected By'];
+    lines.push(csvHeaders.map(q).join(','));
+
+    payments.forEach((p, idx) => {
+      lines.push([
+        idx + 1,
+        p.receiptNumber || '',
+        p.studentId?.admissionNumber || p.studentId?.studentId || '-',
+        p.studentId?.fullName || p.studentId?.name || 'N/A',
+        p.studentId?.classId?.name || '-',
+        p.invoiceId?.invoiceNumber || '',
+        fmtINR(p.amount),
+        p.paymentMethod || '-',
+        p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
+        p.collectedBy?.name || '-'
+      ].map(q).join(','));
+    });
+
+    lines.push(['', '', '', '', '', 'TOTAL', fmtINR(grandTotal), '', '', `${grandCount} txns`].map(q).join(','));
+    lines.push('');
+    lines.push(q('Collection Summary by Payment Method'));
+    lines.push(['Payment Method', 'Transactions', 'Amount (INR)'].map(q).join(','));
+    Object.keys(methodTotals).forEach(m => {
+      lines.push([m, methodCounts[m] || 0, fmtINR(methodTotals[m])].map(q).join(','));
+    });
+    lines.push(['GRAND TOTAL', grandCount, fmtINR(grandTotal)].map(q).join(','));
+    lines.push('');
+    lines.push([q('Prepared by: ______________________'), '', q('Verified by: ______________________')].join(','));
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=fee_receipts_${today}.csv`);
+    return res.status(200).send(lines.join('\n'));
   } catch (error) {
     logger.error('Receipts export error', error);
     res.status(500).json({
@@ -795,34 +973,9 @@ router.get('/collection-report/export', protect, authorize('admin', 'accountant'
 // @access  Private (Admin, Accountant)
 router.get('/collection-summary', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
-    const { period, paymentMethod, academicSessionId } = req.query;
+    const { paymentMethod, academicSessionId } = req.query;
     const tenantId = new mongoose.Types.ObjectId(req.user.tenantId);
-
-    // Calculate date range based on period
-    const now = new Date();
-    const endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
-    let startDate;
-
-    switch (period) {
-    case 'today':
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    case 'weekly': {
-      startDate = new Date(now);
-      const dayOfWeek = startDate.getDay();
-      const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday as start
-      startDate.setDate(startDate.getDate() - diff);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    }
-    case 'monthly':
-    default:
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    }
+    const { startDate, endDate, preset } = resolveDateRange(req.query);
 
     const filter = {
       tenantId,
@@ -898,7 +1051,7 @@ router.get('/collection-summary', protect, authorize('admin', 'accountant'), asy
     res.json({
       success: true,
       data: {
-        period: period || 'monthly',
+        period: preset,
         dateRange: { startDate, endDate },
         summary: {
           grandTotal,
@@ -939,33 +1092,10 @@ router.get('/collection-summary', protect, authorize('admin', 'accountant'), asy
 // @access  Private (Admin, Accountant)
 router.get('/collection-summary/export', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
-    const { period, paymentMethod, format: fmt } = req.query;
+    const { paymentMethod, format: fmt } = req.query;
     const tenantId = req.user.tenantId;
-
-    const now = new Date();
-    const endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
-    let startDate;
-
-    switch (period) {
-    case 'today':
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    case 'weekly': {
-      startDate = new Date(now);
-      const dayOfWeek = startDate.getDay();
-      const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      startDate.setDate(startDate.getDate() - diff);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    }
-    case 'monthly':
-    default:
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    }
+    const { startDate, endDate, preset } = resolveDateRange(req.query);
+    const period = preset;
 
     const filter = {
       tenantId: new mongoose.Types.ObjectId(tenantId),
@@ -1042,7 +1172,10 @@ router.get('/collection-summary/export', protect, authorize('admin', 'accountant
     const grandTotal = sumMoney(Object.values(methodTotals));
     const grandCount = Object.values(methodCounts).reduce((a, b) => a + b, 0);
 
-    const periodLabel = period === 'today' ? 'Today' : period === 'weekly' ? 'This Week' : 'This Month';
+    const periodLabel = period === 'today' ? 'Today'
+      : period === 'weekly' ? 'This Week'
+        : period === 'custom' ? `${startDate.toLocaleDateString('en-IN')} — ${endDate.toLocaleDateString('en-IN')}`
+          : 'This Month';
     const methodLabel = paymentMethod ? ` - ${paymentMethod}` : ' - All Methods';
     const headerInfo = await ImportExportService.getExportHeaderInfo(
       tenantId,
