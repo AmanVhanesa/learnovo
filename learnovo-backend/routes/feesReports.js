@@ -744,99 +744,159 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       workbook.creator = 'Learnovo';
       const ws = workbook.addWorksheet('Receipts', {
         pageSetup: {
-          paperSize: 9, orientation: 'landscape', fitToPage: true,
+          paperSize: 9, orientation: 'portrait', fitToPage: true,
           fitToWidth: 1, fitToHeight: 0, horizontalCentered: true,
           margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
         }
       });
 
-      const colCount = 10;
+      const colCount = 7;
+      ws.columns = [
+        { width: 5 },   // S.No
+        { width: 16 },  // Receipt No.
+        { width: 12 },  // Date
+        { width: 28 },  // Student (name + adm no)
+        { width: 10 },  // Class
+        { width: 12 },  // Method
+        { width: 14 }   // Amount
+      ];
 
+      // ── Header block ──
       if (headerInfo.schoolName) {
         ws.addRow([headerInfo.schoolName]);
         ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
-        ws.lastRow.font = { bold: true, size: 14 };
+        ws.lastRow.font = { bold: true, size: 15 };
         ws.lastRow.alignment = { horizontal: 'center' };
       }
-      ws.addRow([`Fee Receipts Report — ${periodLabel}${methodLabel}`]);
+      ws.addRow(['Fee Collection Report']);
       ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
       ws.lastRow.font = { bold: true, size: 12 };
       ws.lastRow.alignment = { horizontal: 'center' };
 
-      ws.addRow([`Period: ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}`]);
+      ws.addRow([`${periodLabel}${methodLabel} · ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}`]);
       ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.font = { size: 10 };
       ws.lastRow.alignment = { horizontal: 'center' };
 
       ws.addRow([headerInfo.dateTime]);
       ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
       ws.lastRow.alignment = { horizontal: 'center' };
-      ws.lastRow.font = { italic: true, size: 9 };
+      ws.lastRow.font = { italic: true, size: 9, color: { argb: 'FF666666' } };
       ws.addRow([]);
 
-      ws.columns = [
-        { width: 6 }, { width: 14 }, { width: 14 }, { width: 24 },
-        { width: 10 }, { width: 14 }, { width: 11 }, { width: 13 },
-        { width: 12 }, { width: 16 }
-      ];
+      // ── Top summary: totals + method breakdown (compact) ──
+      const summaryTitle = ws.addRow(['COLLECTION SUMMARY']);
+      ws.mergeCells(summaryTitle.number, 1, summaryTitle.number, colCount);
+      summaryTitle.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      summaryTitle.alignment = { horizontal: 'center' };
+      summaryTitle.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
 
-      const headerRow = ws.addRow(['S.No', 'Receipt No.', 'Admission No.', 'Student Name', 'Class', 'Invoice No.', 'Amount', 'Method', 'Date', 'Collected By']);
+      const totalLine = ws.addRow([
+        'Total Collection',
+        Number(roundToRupee(grandTotal)),
+        '',
+        'Transactions',
+        grandCount,
+        '',
+        ''
+      ]);
+      ws.mergeCells(totalLine.number, 2, totalLine.number, 3);
+      ws.mergeCells(totalLine.number, 5, totalLine.number, 7);
+      totalLine.getCell(1).font = { bold: true };
+      totalLine.getCell(2).font = { bold: true, size: 12 };
+      totalLine.getCell(2).numFmt = '₹#,##0.00';
+      totalLine.getCell(2).alignment = { horizontal: 'left' };
+      totalLine.getCell(4).font = { bold: true };
+      totalLine.getCell(5).font = { bold: true, size: 12 };
+      totalLine.getCell(5).alignment = { horizontal: 'left' };
+      totalLine.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF5EC' } }; });
+
+      // Method-wise compact table (Method | Count | Amount) — only non-zero
+      const activeMethods = [...PAYMENT_METHODS, ...Object.keys(methodTotals).filter(m => !PAYMENT_METHODS.includes(m))]
+        .filter(m => (methodCounts[m] || 0) > 0);
+      if (activeMethods.length) {
+        const mh = ws.addRow(['Method', '', 'Count', '', 'Amount', '', '']);
+        ws.mergeCells(mh.number, 1, mh.number, 2);
+        ws.mergeCells(mh.number, 3, mh.number, 4);
+        ws.mergeCells(mh.number, 5, mh.number, 7);
+        mh.font = { bold: true, size: 10 };
+        mh.eachCell(c => {
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
+          c.alignment = { horizontal: 'left' };
+          c.border = { bottom: { style: 'thin' } };
+        });
+        activeMethods.forEach(m => {
+          const r = ws.addRow([m, '', methodCounts[m] || 0, '', Number(roundToRupee(methodTotals[m] || 0)), '', '']);
+          ws.mergeCells(r.number, 1, r.number, 2);
+          ws.mergeCells(r.number, 3, r.number, 4);
+          ws.mergeCells(r.number, 5, r.number, 7);
+          r.getCell(5).numFmt = '₹#,##0.00';
+          r.font = { size: 10 };
+        });
+      }
+      ws.addRow([]);
+
+      // ── Detailed receipt list (the high-weight section) ──
+      const listTitle = ws.addRow(['RECEIPT DETAILS']);
+      ws.mergeCells(listTitle.number, 1, listTitle.number, colCount);
+      listTitle.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      listTitle.alignment = { horizontal: 'center' };
+      listTitle.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+
+      const headerRow = ws.addRow(['#', 'Receipt No.', 'Date', 'Student (Adm. No.)', 'Class', 'Method', 'Amount']);
       headerRow.eachCell(cell => {
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
         cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }, bottom: { style: 'thin' } };
       });
+      headerRow.height = 22;
 
       payments.forEach((p, idx) => {
+        const student = p.studentId?.fullName || p.studentId?.name || 'N/A';
+        const adm = p.studentId?.admissionNumber || p.studentId?.studentId || '';
         const row = ws.addRow([
           idx + 1,
           p.receiptNumber || '',
-          p.studentId?.admissionNumber || p.studentId?.studentId || '-',
-          p.studentId?.fullName || p.studentId?.name || 'N/A',
-          p.studentId?.classId?.name || '-',
-          p.invoiceId?.invoiceNumber || '',
-          Number(p.amount || 0),
-          p.paymentMethod || '-',
           p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
-          p.collectedBy?.name || '-'
+          adm ? `${student} (${adm})` : student,
+          p.studentId?.classId?.name || '-',
+          p.paymentMethod || '-',
+          Number(p.amount || 0)
         ]);
+        row.height = 18;
         row.eachCell((cell, colNumber) => {
           cell.border = { top: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' }, bottom: { style: 'hair' } };
           if (colNumber === 7) {
-            cell.numFmt = '#,##0.00'; cell.alignment = { horizontal: 'right' };
-          } else if (colNumber === 1 || colNumber === 9) cell.alignment = { horizontal: 'center' };
-          else cell.alignment = { horizontal: 'left' };
+            cell.numFmt = '₹#,##0.00'; cell.alignment = { horizontal: 'right' };
+          } else if (colNumber === 1 || colNumber === 3) cell.alignment = { horizontal: 'center' };
+          else cell.alignment = { horizontal: 'left', vertical: 'middle' };
         });
         if (idx % 2 === 1) row.eachCell(c => {
-          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F7F6' } };
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F8F8' } };
         });
       });
 
-      // Grand total row within table
-      const totalRow = ws.addRow(['', '', '', '', '', 'TOTAL', Number(roundToRupee(grandTotal)), '', '', `${grandCount  } txns`]);
+      // Grand total at the bottom of list
+      const totalRow = ws.addRow(['', '', '', '', '', 'TOTAL', Number(roundToRupee(grandTotal))]);
+      ws.mergeCells(totalRow.number, 1, totalRow.number, 5);
       totalRow.eachCell((cell, colNumber) => {
         cell.font = { bold: true };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
         cell.border = { top: { style: 'medium' }, bottom: { style: 'medium' } };
         if (colNumber === 7) {
-          cell.numFmt = '#,##0.00'; cell.alignment = { horizontal: 'right' };
-        } else if (colNumber === 6) cell.alignment = { horizontal: 'right' };
-        else cell.alignment = { horizontal: 'center' };
+          cell.numFmt = '₹#,##0.00'; cell.alignment = { horizontal: 'right' };
+        } else cell.alignment = { horizontal: 'right' };
       });
-
-      // Method-wise summary block (compact horizontal layout)
-      ws.addRow([]);
-      const summaryMethods = [...PAYMENT_METHODS, ...Object.keys(methodTotals).filter(m => !PAYMENT_METHODS.includes(m))]
-        .filter(m => methodTotals[m] != null);
-      writeHorizontalSummary(ws, colCount, summaryMethods, methodCounts, methodTotals, grandCount, grandTotal);
+      totalRow.height = 20;
 
       ws.addRow([]); ws.addRow([]);
-      const sigRow = ws.addRow(['Prepared by: ______________________', '', '', '', '', '', '', '', 'Verified by: ______________________', '']);
-      ws.mergeCells(sigRow.number, 1, sigRow.number, 5);
-      ws.mergeCells(sigRow.number, 6, sigRow.number, colCount);
+      const sigRow = ws.addRow(['Prepared by: ______________________', '', '', '', 'Verified by: ______________________', '', '']);
+      ws.mergeCells(sigRow.number, 1, sigRow.number, 4);
+      ws.mergeCells(sigRow.number, 5, sigRow.number, colCount);
       sigRow.font = { size: 10 };
       sigRow.getCell(1).alignment = { horizontal: 'left' };
-      sigRow.getCell(6).alignment = { horizontal: 'right' };
+      sigRow.getCell(5).alignment = { horizontal: 'right' };
 
       ws.pageSetup.printTitlesRow = `${headerRow.number}:${headerRow.number}`;
 
@@ -846,48 +906,57 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       return res.end();
     }
 
-    // CSV export
+    // CSV export — summary on top, then detailed list
     const lines = [];
     const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+
+    // Header block
     if (headerInfo.schoolName) lines.push(q(headerInfo.schoolName));
-    lines.push(q(`Fee Receipts Report - ${periodLabel}${methodLabel}`));
-    lines.push(q(`Period: ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}`));
+    lines.push(q('Fee Collection Report'));
+    lines.push(q(`${periodLabel}${methodLabel} - ${startDate.toLocaleDateString('en-IN')} to ${endDate.toLocaleDateString('en-IN')}`));
     lines.push(q(headerInfo.dateTime));
     lines.push('');
 
-    const csvHeaders = ['S.No', 'Receipt No.', 'Admission No.', 'Student Name', 'Class', 'Invoice No.', 'Amount', 'Method', 'Date', 'Collected By'];
+    // Compact summary block at the top
+    lines.push(q('COLLECTION SUMMARY'));
+    lines.push([q('Total Collection (INR)'), q(fmtINR(grandTotal)), q('Transactions'), q(grandCount)].join(','));
+    lines.push('');
+    const csvMethods = [...PAYMENT_METHODS, ...Object.keys(methodTotals).filter(m => !PAYMENT_METHODS.includes(m))]
+      .filter(m => (methodCounts[m] || 0) > 0);
+    if (csvMethods.length) {
+      lines.push(['Method', 'Count', 'Amount (INR)'].map(q).join(','));
+      csvMethods.forEach(m => {
+        lines.push([m, methodCounts[m] || 0, fmtINR(methodTotals[m])].map(q).join(','));
+      });
+    }
+    lines.push('');
+
+    // Detailed list
+    lines.push(q('RECEIPT DETAILS'));
+    const csvHeaders = ['#', 'Receipt No.', 'Date', 'Admission No.', 'Student Name', 'Class', 'Method', 'Amount (INR)'];
     lines.push(csvHeaders.map(q).join(','));
 
     payments.forEach((p, idx) => {
       lines.push([
         idx + 1,
         p.receiptNumber || '',
+        p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
         p.studentId?.admissionNumber || p.studentId?.studentId || '-',
         p.studentId?.fullName || p.studentId?.name || 'N/A',
         p.studentId?.classId?.name || '-',
-        p.invoiceId?.invoiceNumber || '',
-        fmtINR(p.amount),
         p.paymentMethod || '-',
-        p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
-        p.collectedBy?.name || '-'
+        fmtINR(p.amount)
       ].map(q).join(','));
     });
 
-    lines.push(['', '', '', '', '', 'TOTAL', fmtINR(grandTotal), '', '', `${grandCount} txns`].map(q).join(','));
-    lines.push('');
-    lines.push(q('Collection Summary by Payment Method'));
-    {
-      const csvMethods = [...PAYMENT_METHODS, ...Object.keys(methodTotals).filter(m => !PAYMENT_METHODS.includes(m))].filter(m => methodTotals[m] != null);
-      lines.push(['', ...csvMethods, 'GRAND TOTAL'].map(q).join(','));
-      lines.push(['Transactions', ...csvMethods.map(m => methodCounts[m] || 0), grandCount].map(q).join(','));
-      lines.push(['Amount (INR)', ...csvMethods.map(m => fmtINR(methodTotals[m])), fmtINR(grandTotal)].map(q).join(','));
-    }
+    lines.push(['', '', '', '', '', '', 'TOTAL', fmtINR(grandTotal)].map(q).join(','));
     lines.push('');
     lines.push([q('Prepared by: ______________________'), '', q('Verified by: ______________________')].join(','));
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename=fee_receipts_${today}.csv`);
-    return res.status(200).send(lines.join('\n'));
+    // UTF-8 BOM so Excel opens ₹ and Indian digit grouping correctly
+    return res.status(200).send('\ufeff' + lines.join('\n'));
   } catch (error) {
     logger.error('Receipts export error', error);
     res.status(500).json({

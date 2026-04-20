@@ -305,87 +305,29 @@ const FeesFinance = () => {
     }
   }
 
-  const handleExportReceipts = () => {
-    const list = receipts || []
-    if (list.length === 0) { toast.error('No receipts to export'); return }
-
-    const total = list.reduce((s, p) => s + (Number(p.amount) || 0), 0)
-    const methodTotals = list.reduce((acc, p) => {
-      const m = p.paymentMethod || 'Other'
-      if (!acc[m]) acc[m] = { count: 0, amount: 0 }
-      acc[m].count += 1
-      acc[m].amount += Number(p.amount) || 0
-      return acc
-    }, {})
-    const methodRows = Object.entries(methodTotals)
-      .sort((a, b) => b[1].amount - a[1].amount)
-      .map(([m, v]) => `<tr><td>${m}</td><td style="text-align:right">${v.count}</td><td style="text-align:right">${formatCurrency(v.amount)}</td></tr>`)
-      .join('')
-
-    const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN') : '-'
-    const rows = list.map((p, i) => `<tr>
-      <td>${i + 1}</td>
-      <td>${p.receiptNumber || '-'}</td>
-      <td>${fmtDate(p.paymentDate)}</td>
-      <td>${p.studentId?.admissionNumber || '-'}</td>
-      <td>${p.studentId?.name || p.studentId?.fullName || 'N/A'}</td>
-      <td>${p.studentId?.classId?.name || '-'}</td>
-      <td>${p.paymentMethod || '-'}</td>
-      <td style="text-align:right">${formatCurrency(p.amount)}</td>
-      <td>${p.isReversed ? 'Reversed' : 'Confirmed'}</td>
-    </tr>`).join('')
-
-    const range = [receiptFilters.startDate ? fmtDate(receiptFilters.startDate) : null, receiptFilters.endDate ? fmtDate(receiptFilters.endDate) : null].filter(Boolean).join(' — ') || 'All dates'
-    const methodMeta = receiptFilters.paymentMethod ? ` · Method: ${receiptFilters.paymentMethod}` : ''
-
-    const html = `<!DOCTYPE html><html><head><title>Fee Collection Receipts</title><style>
-      @page{size:A4 portrait;margin:12mm}
-      *{box-sizing:border-box}
-      body{font-family:Arial,Helvetica,sans-serif;color:#000;margin:0;font-size:11px;line-height:1.35}
-      h1{font-size:16px;margin:0 0 2px;letter-spacing:.2px}
-      .meta{font-size:10px;color:#555;margin-bottom:10px;border-bottom:1px solid #999;padding-bottom:6px}
-      table.main{width:100%;border-collapse:collapse;font-size:11px}
-      table.main th,table.main td{border:1px solid #999;padding:5px 6px;text-align:left;vertical-align:top}
-      table.main th{background:#eee;font-size:10px;text-transform:uppercase;letter-spacing:.3px}
-      table.main tbody tr:nth-child(even){background:#fafafa}
-      .summary{display:flex;gap:10px;margin-top:10px;page-break-inside:avoid}
-      .sum-card{flex:1;border:1px solid #999;padding:8px 10px}
-      .sum-card h3{margin:0 0 6px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#333}
-      .sum-card .big{font-size:18px;font-weight:700;margin:0}
-      .sum-card .sub{font-size:10px;color:#555;margin-top:2px}
-      table.mini{width:100%;border-collapse:collapse;font-size:10px}
-      table.mini td{padding:3px 4px;border-bottom:1px dotted #bbb}
-      table.mini tr:last-child td{border-bottom:none}
-      tfoot td{font-weight:700;background:#f0f0f0}
-      @media print{.noprint{display:none}}
-    </style></head><body>
-      <h1>Fee Collection Receipts</h1>
-      <div class="meta">Period: ${range}${methodMeta} · Generated: ${new Date().toLocaleString('en-IN')} · Entries: ${list.length} · Total: ${formatCurrency(total)}</div>
-      <table class="main">
-        <thead><tr><th>#</th><th>Receipt No.</th><th>Date</th><th>Adm. No.</th><th>Student</th><th>Class</th><th>Method</th><th style="text-align:right">Amount</th><th>Status</th></tr></thead>
-        <tbody>${rows}</tbody>
-        <tfoot><tr><td colspan="7" style="text-align:right">Grand Total</td><td style="text-align:right">${formatCurrency(total)}</td><td></td></tr></tfoot>
-      </table>
-      <div class="summary">
-        <div class="sum-card">
-          <h3>Total Collection</h3>
-          <p class="big">${formatCurrency(total)}</p>
-          <div class="sub">${list.length} receipt${list.length === 1 ? '' : 's'}</div>
-        </div>
-        <div class="sum-card" style="flex:1.6">
-          <h3>Payment Methods</h3>
-          <table class="mini">
-            <thead><tr><td style="font-weight:700">Method</td><td style="text-align:right;font-weight:700">Count</td><td style="text-align:right;font-weight:700">Amount</td></tr></thead>
-            <tbody>${methodRows}</tbody>
-          </table>
-        </div>
-      </div>
-      <script>window.onload=function(){window.print()}</script>
-    </body></html>`
-
-    const win = window.open('', '_blank', 'width=1000,height=700')
-    if (win) { win.document.write(html); win.document.close() }
-    else toast.error('Pop-up blocked — please allow pop-ups')
+  const handleExportReceipts = async (fmt) => {
+    const toastId = toast.loading(`Exporting ${fmt.toUpperCase()}...`)
+    try {
+      const blob = await feesReportsService.exportReceipts({
+        startDate: receiptFilters.startDate,
+        endDate: receiptFilters.endDate,
+        paymentMethod: receiptFilters.paymentMethod,
+        format: fmt
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `fee_receipts_${new Date().toISOString().split('T')[0]}.${fmt === 'excel' ? 'xlsx' : 'csv'}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.dismiss(toastId)
+      toast.success('Exported successfully')
+    } catch {
+      toast.dismiss(toastId)
+      toast.error('Failed to export receipts')
+    }
   }
 
   // Collection report export moved into ReportsTab component
@@ -1181,6 +1123,11 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport }) => {
 // ── Receipts Tab ──
 
 const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport, onEditPayment, onReversePayment }) => {
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const handleExport = (fmt) => {
+    setShowExportMenu(false)
+    onExport(fmt)
+  }
   return (
   <div className="space-y-4">
     <div className="card p-3 sm:p-4">
@@ -1190,7 +1137,18 @@ const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilter
         <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">From</label><input type="date" value={filters.startDate} onChange={e => onFilterChange({ ...filters, startDate: e.target.value })} className="input text-sm" /></div>
         <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">To</label><input type="date" value={filters.endDate} onChange={e => onFilterChange({ ...filters, endDate: e.target.value })} className="input text-sm" /></div>
         <button onClick={onClearFilters} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><X className="h-3.5 w-3.5" /> Clear</button>
-        <button onClick={onExport} className="btn btn-outline btn-sm flex items-center justify-center gap-1" title="Print A4 report"><Printer className="h-3.5 w-3.5" /> Print</button>
+        <div className="relative">
+          <button onClick={() => setShowExportMenu(!showExportMenu)} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
+          {showExportMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+              <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-20">
+                <button onClick={() => handleExport('csv')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
+                <button onClick={() => handleExport('excel')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
     <div className="card overflow-hidden">
