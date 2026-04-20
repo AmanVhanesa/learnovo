@@ -1281,12 +1281,14 @@ const ReportsTab = ({ activeSession }) => {
 
   const periodLabel = PERIOD_OPTIONS.find(p => p.id === period)?.label || 'This Month'
 
+  const grandTotal = summaryData?.summary?.grandTotal || 0
+
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header with filters */}
-      <div className="card p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Fee Collection Report</h3>
+    <div className="max-w-3xl mx-auto space-y-3">
+      {/* Compact filter bar */}
+      <div className="card p-3 sm:p-4 space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Daily Fee Collection</h3>
           <div className="relative">
             <button onClick={() => setShowExportMenu(!showExportMenu)} className="btn btn-outline btn-sm flex items-center gap-1">
               <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
@@ -1294,52 +1296,43 @@ const ReportsTab = ({ activeSession }) => {
             {showExportMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
-                <div className="absolute right-0 mt-1 w-44 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-20">
-                  <button onClick={() => handleExport('csv')} className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
-                  <button onClick={() => handleExport('excel')} className="w-full px-4 py-2.5 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+                <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-20">
+                  <button onClick={() => handleExport('csv')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
+                  <button onClick={() => handleExport('excel')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
                 </div>
               </>
             )}
           </div>
         </div>
 
-        {/* Period selector */}
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap items-center gap-1.5">
           {PERIOD_OPTIONS.map(opt => (
             <button key={opt.id} onClick={() => { setPeriod(opt.id); setStartDate(''); setEndDate('') }}
-              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${!usingCustom && period === opt.id ? 'bg-primary-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${!usingCustom && period === opt.id ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
               {opt.label}
             </button>
           ))}
-        </div>
-
-        {/* Custom date range */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <span className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Custom range:</span>
+          <span className="mx-1 h-4 w-px bg-gray-200 dark:bg-[#38383A]" />
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-            className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
-          <span className="text-gray-400">to</span>
+            className="px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500" />
+          <span className="text-xs text-gray-400">to</span>
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-            className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            className="px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-primary-500" />
           {usingCustom && (
-            <button onClick={() => { setStartDate(''); setEndDate('') }}
-              className="px-2 py-1 text-xs rounded-md bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]">
-              Clear
-            </button>
+            <button onClick={() => { setStartDate(''); setEndDate('') }} className="text-xs text-gray-500 hover:text-red-500 px-1">Clear</button>
           )}
         </div>
 
-        {/* Method filter */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           <button onClick={() => setMethodFilter('')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${!methodFilter ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
-            All Methods
+            className={`px-2.5 py-0.5 text-[11px] font-medium rounded-md transition-all ${!methodFilter ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
+            All
           </button>
           {PAYMENT_METHODS.map(m => {
             const colors = METHOD_COLORS[m] || DEFAULT_METHOD_COLOR
             return (
               <button key={m} onClick={() => setMethodFilter(m)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${methodFilter === m ? `${colors.bg} ${colors.text} border ${colors.border} ${colors.ring ? `ring-2 ${colors.ring}` : ''}` : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
+                className={`px-2.5 py-0.5 text-[11px] font-medium rounded-md transition-all ${methodFilter === m ? `${colors.bg} ${colors.text} border ${colors.border}` : 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-[#8E8E93] hover:bg-gray-200 dark:hover:bg-[#3A3A3C]'}`}>
                 {m}
               </button>
             )
@@ -1353,139 +1346,76 @@ const ReportsTab = ({ activeSession }) => {
         <EmptyState icon={History} title="No data available" description="No collection data found for the selected period" />
       ) : (
         <>
-          {/* Grand Total Card */}
-          <div className="card p-5 sm:p-6 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800/30">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-green-800 dark:text-green-300">Grand Total Collection ({periodLabel})</p>
-                <p className="text-3xl sm:text-4xl font-bold text-green-700 dark:text-green-400 mt-1">{formatCurrency(summaryData.summary?.grandTotal || 0)}</p>
-                <p className="text-sm text-green-600 dark:text-green-400/80 mt-1">{summaryData.summary?.totalCount || 0} payments &middot; Daily Avg: {formatCurrency(summaryData.summary?.dailyAverage || 0)}</p>
+          {/* Compact Total + Method breakdown in one vertical card */}
+          <div className="card overflow-hidden">
+            {/* Grand total strip */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-b border-green-200 dark:border-green-800/30">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-green-700 dark:text-green-400">Total Collection &middot; {periodLabel}</p>
+                <p className="text-[11px] text-green-600/80 dark:text-green-400/70">{summaryData.summary?.totalCount || 0} payments &middot; Avg/day {formatCurrency(summaryData.summary?.dailyAverage || 0)}</p>
               </div>
-              {methodFilter && (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/60 dark:bg-white/10 text-sm font-medium text-green-800 dark:text-green-300 border border-green-300 dark:border-green-700/40">
-                  Filtered: {methodFilter}
-                  <button onClick={() => setMethodFilter('')} className="ml-1 hover:text-green-600"><X className="h-3.5 w-3.5" /></button>
-                </span>
-              )}
+              <p className="text-xl sm:text-2xl font-bold text-green-700 dark:text-green-400 tabular-nums pl-3">{formatCurrency(grandTotal)}</p>
             </div>
-          </div>
 
-          {/* Method-wise Breakdown Cards */}
-          {!methodFilter && summaryData.methodBreakdown?.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Collection by Payment Method</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Method-wise vertical list — amounts indented on the right */}
+            {summaryData.methodBreakdown?.length > 0 && (
+              <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-[#2C2C2E]">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[#8E8E93]">Method</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[#8E8E93]">Amount</span>
+                </div>
                 {summaryData.methodBreakdown.map(mb => {
                   const colors = METHOD_COLORS[mb.method] || DEFAULT_METHOD_COLOR
                   const isCash = mb.method === 'Cash'
                   return (
-                    <div key={mb.method}
-                      className={`p-4 rounded-xl border ${colors.bg} ${colors.border} ${isCash ? `ring-2 ${colors.ring} shadow-md` : ''} transition-all hover:shadow-sm cursor-pointer`}
-                      onClick={() => setMethodFilter(mb.method)}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`text-sm font-semibold ${colors.text} flex items-center gap-1.5`}>
-                          {isCash && <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-amber-400/20 dark:bg-amber-400/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold">$</span>}
-                          {mb.method}
-                        </span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>{mb.percentage}%</span>
+                    <button key={mb.method} onClick={() => setMethodFilter(methodFilter === mb.method ? '' : mb.method)}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-[#2C2C2E] ${methodFilter === mb.method ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''}`}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={`inline-block h-2 w-2 rounded-full ${isCash ? 'bg-amber-400' : 'bg-gray-400 dark:bg-gray-500'}`} />
+                        <span className={`text-sm font-medium ${colors.text}`}>{mb.method}</span>
+                        <span className="text-[11px] text-gray-400">{mb.count} txn &middot; {mb.percentage}%</span>
                       </div>
-                      <p className={`text-xl font-bold ${colors.value}`}>{formatCurrency(mb.total)}</p>
-                      <p className={`text-xs mt-1 ${colors.text} opacity-80`}>{mb.count} payment{mb.count !== 1 ? 's' : ''}</p>
-                      {isCash && (
-                        <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-700/30">
-                          <p className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 dark:text-amber-400">Cash Collection</p>
+                      {/* Amount indented deep on the right for emphasis */}
+                      <div className="flex items-center">
+                        <div className="w-12 h-1 bg-gray-100 dark:bg-[#38383A] rounded-full overflow-hidden mr-3">
+                          <div className={`h-full ${isCash ? 'bg-amber-400' : 'bg-green-400'}`} style={{ width: `${Math.min(100, mb.percentage)}%` }} />
                         </div>
-                      )}
+                        <span className={`text-sm font-bold tabular-nums min-w-[6rem] text-right pl-4 ${isCash ? 'text-amber-700 dark:text-amber-400' : 'text-gray-900 dark:text-white'}`}>{formatCurrency(mb.total)}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-[#2C2C2E]">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Grand Total</span>
+                  <span className="text-sm font-bold text-green-700 dark:text-green-400 tabular-nums pl-4">{formatCurrency(grandTotal)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Day-wise Collection — vertical list */}
+          {summaryData.byDate?.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E]">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[#8E8E93]">Day-wise Collection</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-[#8E8E93]">Amount</span>
+              </div>
+              <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
+                {summaryData.byDate.map(d => {
+                  const isToday = d.date === new Date().toISOString().split('T')[0]
+                  return (
+                    <div key={d.date} className={`flex items-center justify-between px-4 py-2.5 ${isToday ? 'bg-green-50/40 dark:bg-green-900/10' : ''}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          {new Date(d.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </span>
+                        {isToday && <span className="text-[10px] uppercase font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">Today</span>}
+                        <span className="text-[11px] text-gray-400">{d.count} txn</span>
+                      </div>
+                      <span className="text-sm font-bold tabular-nums text-green-600 dark:text-green-400 min-w-[6rem] text-right pl-4">{formatCurrency(d.total)}</span>
                     </div>
                   )
                 })}
-              </div>
-            </div>
-          )}
-
-          {/* Method-wise Summary Table */}
-          {!methodFilter && summaryData.methodBreakdown?.length > 0 && (
-            <div className="card overflow-hidden">
-              <div className="p-4 border-b border-gray-200 dark:border-[#38383A]">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Method-wise Summary</h4>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full divide-y divide-gray-200 dark:divide-[#38383A]">
-                  <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
-                    <tr>
-                      {['Payment Method', 'Transactions', 'Amount', '% Share'].map(h => (
-                        <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
-                    {summaryData.methodBreakdown.map(mb => {
-                      const isCash = mb.method === 'Cash'
-                      return (
-                        <tr key={mb.method} className={`${isCash ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''} hover:bg-gray-50 dark:hover:bg-[#2C2C2E]`}>
-                          <td className="px-5 py-3.5 whitespace-nowrap">
-                            <span className={`text-sm font-medium ${isCash ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-white'} flex items-center gap-2`}>
-                              {isCash && <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />}
-                              {mb.method}
-                            </span>
-                          </td>
-                          <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{mb.count}</td>
-                          <td className={`px-5 py-3.5 whitespace-nowrap text-sm font-semibold ${isCash ? 'text-amber-700 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(mb.total)}</td>
-                          <td className="px-5 py-3.5 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-1.5 bg-gray-200 dark:bg-[#38383A] rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${isCash ? 'bg-amber-400' : 'bg-green-400'}`} style={{ width: `${Math.min(100, mb.percentage)}%` }} />
-                              </div>
-                              <span className="text-xs text-gray-500 dark:text-[#8E8E93]">{mb.percentage}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                    {/* Grand Total Row */}
-                    <tr className="bg-gray-100 dark:bg-[#2C2C2E] font-bold">
-                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-900 dark:text-white">Grand Total</td>
-                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-900 dark:text-white">{summaryData.summary?.totalCount || 0}</td>
-                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-green-700 dark:text-green-400">{formatCurrency(summaryData.summary?.grandTotal || 0)}</td>
-                      <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-900 dark:text-white">100%</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Day-wise Collection Table */}
-          {summaryData.byDate?.length > 0 && (
-            <div className="card overflow-hidden">
-              <div className="p-4 border-b border-gray-200 dark:border-[#38383A]">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Day-wise Collection</h4>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[500px] divide-y divide-gray-200 dark:divide-[#38383A]">
-                  <thead className="bg-gray-50 dark:bg-[#2C2C2E]">
-                    <tr>
-                      {['Date', 'Transactions', 'Amount'].map(h => (
-                        <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-200 dark:divide-[#38383A]">
-                    {summaryData.byDate.map(d => {
-                      const isToday = d.date === new Date().toISOString().split('T')[0]
-                      return (
-                        <tr key={d.date} className={`${isToday ? 'bg-green-50/50 dark:bg-green-900/10' : ''} hover:bg-gray-50 dark:hover:bg-[#2C2C2E]`}>
-                          <td className="px-5 py-3.5 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            {new Date(d.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' })}
-                            {isToday && <span className="ml-2 text-[10px] uppercase font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">Today</span>}
-                          </td>
-                          <td className="px-5 py-3.5 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{d.count}</td>
-                          <td className="px-5 py-3.5 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(d.total)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
               </div>
             </div>
           )}

@@ -2,14 +2,13 @@ import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Download, BarChart3, TrendingUp, Calendar, Users,
-  DollarSign, Activity, RefreshCw, AlertCircle, CheckCircle,
-  Clock, FileText, UserPlus, ChevronLeft, ChevronRight
+  DollarSign, Activity, RefreshCw, AlertCircle,
+  FileText, UserPlus, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
 import api from '../services/authService'
 import { studentsService } from '../services/studentsService'
-import { invoicesService, feesReportsService } from '../services/feesService'
 import { sortClassObjects } from '../utils/classOrder'
 import { exportPDF, exportReport } from '../utils/exportHelpers'
 import toast from 'react-hot-toast'
@@ -125,7 +124,6 @@ const Reports = () => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
     { id: 'enrollment', label: 'Enrollment', icon: TrendingUp },
-    { id: 'fees', label: 'Fee Collection', icon: DollarSign },
     { id: 'attendance', label: 'Attendance', icon: Calendar },
     { id: 'activity', label: 'Activity Feed', icon: Activity },
     { id: 'promotions', label: 'Class Actions', icon: RefreshCw },
@@ -240,48 +238,6 @@ const Reports = () => {
     } catch { toast.error('Export failed', { id: 'enroll-export' }) }
   }
 
-  const exportFees = async () => {
-    toast.loading('Fetching detailed fee data...', { id: 'fee-export' })
-    try {
-      const r = await invoicesService.list({ page: 1, limit: 500 })
-      const invoices = r.data || r.invoices || []
-      if (invoices.length === 0) { toast.error('No fee records found', { id: 'fee-export' }); return }
-      const mapped = invoices.map(inv => ({
-        'Invoice No': inv.invoiceNumber || '',
-        'Student Name': inv.studentId?.name || inv.studentName || '',
-        'Admission No': inv.studentId?.admissionNumber || inv.admissionNumber || '',
-        Class: inv.classId?.name || inv.className || '',
-        Period: inv.periodLabel || '',
-        'Fee Heads': (inv.items || []).map(i => i.feeHeadName).join(', '),
-        'Total Amount': fmtAmount(inv.totalAmount),
-        'Paid Amount': fmtAmount(inv.paidAmount),
-        Balance: fmtAmount(inv.balanceAmount),
-        'Late Fee': fmtAmount(inv.lateFeeApplied || 0),
-        Discount: fmtAmount((inv.items || []).reduce((s, i) => s + (i.discount || 0), 0)),
-        'Due Date': fmtDate(inv.dueDate),
-        Status: inv.status || '',
-        'Issued Date': fmtDate(inv.issuedDate || inv.createdAt),
-      }))
-      const { headers, rows } = objsToAoa(mapped)
-      const totalAmt = invoices.reduce((s, i) => s + (i.totalAmount || 0), 0)
-      const paidAmt = invoices.reduce((s, i) => s + (i.paidAmount || 0), 0)
-      const balanceAmt = invoices.reduce((s, i) => s + (i.balanceAmount || 0), 0)
-      exportReport(`fee_detailed_report_${todayStr}.xlsx`, {
-        schoolName: settings?.institution?.name,
-        reportTitle: 'Fee Collection Report',
-        headers, rows, sheetName: 'Fee Collection',
-        summary: [
-          { label: 'Total Invoices', value: invoices.length },
-          { label: 'Total Invoiced Amount', value: fmt(totalAmt) },
-          { label: 'Total Collected', value: fmt(paidAmt) },
-          { label: 'Total Pending', value: fmt(balanceAmt) },
-          { label: 'Collection Rate', value: totalAmt > 0 ? `${Math.round((paidAmt / totalAmt) * 100)}%` : '0%' },
-        ],
-      })
-      toast.success(`Exported ${invoices.length} invoice records`, { id: 'fee-export' })
-    } catch { toast.error('Export failed', { id: 'fee-export' }) }
-  }
-
   const exportOverview = () => {
     if (!dashboard) return
     exportReport(`school_overview_report_${todayStr}.xlsx`, {
@@ -340,7 +296,6 @@ const Reports = () => {
           {activeTab === 'attendance' && attendanceReport.length > 0 && <button onClick={exportAttendance} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export Detailed</button>}
           {activeTab === 'promotions' && promotionsReport.length > 0 && <button onClick={exportPromotions} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export PDF</button>}
           {activeTab === 'enrollment' && <button onClick={exportEnrollment} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export Students</button>}
-          {activeTab === 'fees' && <button onClick={exportFees} className="btn btn-primary gap-2"><Download className="h-4 w-4" />Export Invoices</button>}
         </div>
       </div>
 
@@ -441,36 +396,6 @@ const Reports = () => {
             </div>
           )}
 
-          {activeTab === 'fees' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[{ label: 'Total Fee Base', val: fmt(fees.total), icon: DollarSign, bg: 'bg-gray-100 dark:bg-[#2C2C2E]', text: 'text-gray-700 dark:text-[#8E8E93]' }, { label: 'Collected', val: fmt(fees.paid), icon: CheckCircle, bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-700 dark:text-green-400' }, { label: 'Pending', val: fmt(fees.pending), icon: Clock, bg: 'bg-yellow-50 dark:bg-yellow-900/20', text: 'text-yellow-700 dark:text-yellow-400' }, { label: 'Overdue', val: fmt(fees.overdue), icon: AlertCircle, bg: 'bg-red-50 dark:bg-red-900/20', text: 'text-red-700 dark:text-red-400' }].map(s => (
-                  <div key={s.label} className={`rounded-xl p-4 ${s.bg}`}>
-                    <div className="flex items-center gap-2 mb-2"><s.icon className={`h-4 w-4 ${s.text}`} /><span className="text-xs font-medium text-gray-500 dark:text-[#8E8E93]">{s.label}</span></div>
-                    <p className={`text-xl font-bold ${s.text}`}>{s.val}</p>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] mb-3">Collection Rate</h4>
-                <div className="bg-gray-100 dark:bg-[#2C2C2E] rounded-full h-4 relative overflow-hidden">
-                  <div className="h-4 rounded-full bg-gradient-to-r from-teal-400 to-teal-600 flex items-center justify-center transition-all duration-700" style={{ width: `${fees.total > 0 ? Math.round((fees.paid / fees.total) * 100) : 0}%` }}>
-                    <span className="text-[10px] font-bold text-white">{fees.total > 0 ? `${Math.round((fees.paid / fees.total) * 100)}%` : ''}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>0%</span>
-                  <span className="font-medium text-teal-600">{fees.total > 0 ? `${Math.round((fees.paid / fees.total) * 100)}% collected` : 'No data'}</span>
-                  <span>100%</span>
-                </div>
-              </div>
-              {fees.collectedToday > 0 && (
-                <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-2xl p-3 text-sm text-green-700 dark:text-green-400">
-                  <CheckCircle className="h-4 w-4 shrink-0" /><span><strong>{fmt(fees.collectedToday)}</strong> collected today</span>
-                </div>
-              )}
-            </div>
-          )}
 
           {activeTab === 'attendance' && (
             <div className="space-y-4">
