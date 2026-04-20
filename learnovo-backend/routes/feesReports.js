@@ -44,6 +44,77 @@ function resolveDateRange({ period, startDate: s, endDate: e }) {
   return { startDate, endDate, preset: period || 'monthly' };
 }
 
+/**
+ * Write a compact horizontal "Collection Summary by Payment Method" block.
+ * Layout: title | header (methods + GRAND TOTAL) | Transactions row | Amount row.
+ * Uses 4 rows instead of the old 9-row vertical block to save paper.
+ */
+function writeHorizontalSummary(ws, colCount, methods, methodCounts, methodTotals, grandCount, grandTotal) {
+  const n = methods.length;
+  const labelSpan = 2;
+  const gtSpan = Math.max(2, colCount - labelSpan - n);
+  const perMethod = 1;
+  const used = labelSpan + n * perMethod + gtSpan;
+  const pad = Math.max(0, colCount - used);
+  const gtStart = labelSpan + n * perMethod + pad + 1;
+
+  const title = ws.addRow(['Collection Summary by Payment Method']);
+  ws.mergeCells(title.number, 1, title.number, colCount);
+  title.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+  title.alignment = { horizontal: 'center' };
+  title.eachCell(c => {
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+  });
+
+  const headerCells = [];
+  headerCells.push(''); for (let i = 1; i < labelSpan; i++) headerCells.push('');
+  methods.forEach(m => headerCells.push(m));
+  for (let i = 0; i < pad; i++) headerCells.push('');
+  headerCells.push('GRAND TOTAL');
+  for (let i = 1; i < gtSpan; i++) headerCells.push('');
+  const header = ws.addRow(headerCells);
+  ws.mergeCells(header.number, 1, header.number, labelSpan);
+  ws.mergeCells(header.number, gtStart, header.number, colCount);
+  header.eachCell(c => {
+    c.font = { bold: true };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0E8' } };
+    c.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    c.alignment = { horizontal: 'center' };
+  });
+
+  const buildDataRow = (label, values, grand, opts = {}) => {
+    const cells = [label];
+    for (let i = 1; i < labelSpan; i++) cells.push('');
+    values.forEach(v => cells.push(v));
+    for (let i = 0; i < pad; i++) cells.push('');
+    cells.push(grand);
+    for (let i = 1; i < gtSpan; i++) cells.push('');
+    const row = ws.addRow(cells);
+    ws.mergeCells(row.number, 1, row.number, labelSpan);
+    ws.mergeCells(row.number, gtStart, row.number, colCount);
+    row.getCell(1).alignment = { horizontal: 'left', indent: 1 };
+    row.getCell(1).font = { bold: true };
+    for (let c = labelSpan + 1; c < gtStart; c++) {
+      row.getCell(c).alignment = { horizontal: opts.numFmt ? 'right' : 'center' };
+      if (opts.numFmt) row.getCell(c).numFmt = opts.numFmt;
+    }
+    row.getCell(gtStart).alignment = { horizontal: 'right', indent: 1 };
+    row.getCell(gtStart).font = { bold: true };
+    if (opts.numFmt) row.getCell(gtStart).numFmt = opts.numFmt;
+    row.eachCell(c => {
+      c.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    });
+    if (opts.fill) {
+      row.eachCell(c => {
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.fill } };
+      });
+    }
+  };
+
+  buildDataRow('Transactions', methods.map(m => methodCounts[m] || 0), grandCount);
+  buildDataRow('Amount (INR)', methods.map(m => Number(roundToRupee(methodTotals[m] || 0))), Number(roundToRupee(grandTotal)), { numFmt: '#,##0.00', fill: 'FFD9EAD3' });
+}
+
 const planGate = require('../middleware/planGate');
 
 const router = express.Router();
@@ -753,49 +824,11 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
         else cell.alignment = { horizontal: 'center' };
       });
 
-      // Method-wise summary block
+      // Method-wise summary block (compact horizontal layout)
       ws.addRow([]);
-      const sumTitle = ws.addRow(['Collection Summary by Payment Method']);
-      ws.mergeCells(sumTitle.number, 1, sumTitle.number, colCount);
-      sumTitle.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-      sumTitle.alignment = { horizontal: 'center' };
-      sumTitle.eachCell(c => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
-      });
-
-      const sumHeader = ws.addRow(['Payment Method', 'Transactions', 'Amount (INR)']);
-      ws.mergeCells(sumHeader.number, 1, sumHeader.number, 3);
-      ws.mergeCells(sumHeader.number, 4, sumHeader.number, 6);
-      ws.mergeCells(sumHeader.number, 7, sumHeader.number, colCount);
-      sumHeader.eachCell(cell => {
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0E8' } };
-        cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-        cell.alignment = { horizontal: 'center' };
-      });
-
-      const addSummaryRow = (label, txns, amount, opts = {}) => {
-        const row = ws.addRow([label, txns, Number(amount || 0)]);
-        ws.mergeCells(row.number, 1, row.number, 3);
-        ws.mergeCells(row.number, 4, row.number, 6);
-        ws.mergeCells(row.number, 7, row.number, colCount);
-        row.getCell(1).alignment = { horizontal: 'left', indent: 1 };
-        row.getCell(4).alignment = { horizontal: 'center' };
-        row.getCell(7).alignment = { horizontal: 'right', indent: 1 };
-        row.getCell(7).numFmt = '#,##0.00';
-        row.eachCell(c => {
-          c.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
-          if (opts.bold) c.font = { bold: true, size: opts.size || 11 };
-          if (opts.fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.fill } };
-        });
-      };
-
-      const seenMethods = new Set(Object.keys(methodTotals));
-      [...PAYMENT_METHODS, ...Array.from(seenMethods).filter(m => !PAYMENT_METHODS.includes(m))].forEach(m => {
-        if (methodTotals[m] != null) addSummaryRow(m, methodCounts[m] || 0, roundToRupee(methodTotals[m] || 0));
-      });
-
-      addSummaryRow('GRAND TOTAL', grandCount, roundToRupee(grandTotal), { bold: true, size: 12, fill: 'FFD9EAD3' });
+      const summaryMethods = [...PAYMENT_METHODS, ...Object.keys(methodTotals).filter(m => !PAYMENT_METHODS.includes(m))]
+        .filter(m => methodTotals[m] != null);
+      writeHorizontalSummary(ws, colCount, summaryMethods, methodCounts, methodTotals, grandCount, grandTotal);
 
       ws.addRow([]); ws.addRow([]);
       const sigRow = ws.addRow(['Prepared by: ______________________', '', '', '', '', '', '', '', 'Verified by: ______________________', '']);
@@ -843,11 +876,12 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
     lines.push(['', '', '', '', '', 'TOTAL', fmtINR(grandTotal), '', '', `${grandCount} txns`].map(q).join(','));
     lines.push('');
     lines.push(q('Collection Summary by Payment Method'));
-    lines.push(['Payment Method', 'Transactions', 'Amount (INR)'].map(q).join(','));
-    Object.keys(methodTotals).forEach(m => {
-      lines.push([m, methodCounts[m] || 0, fmtINR(methodTotals[m])].map(q).join(','));
-    });
-    lines.push(['GRAND TOTAL', grandCount, fmtINR(grandTotal)].map(q).join(','));
+    {
+      const csvMethods = [...PAYMENT_METHODS, ...Object.keys(methodTotals).filter(m => !PAYMENT_METHODS.includes(m))].filter(m => methodTotals[m] != null);
+      lines.push(['', ...csvMethods, 'GRAND TOTAL'].map(q).join(','));
+      lines.push(['Transactions', ...csvMethods.map(m => methodCounts[m] || 0), grandCount].map(q).join(','));
+      lines.push(['Amount (INR)', ...csvMethods.map(m => fmtINR(methodTotals[m])), fmtINR(grandTotal)].map(q).join(','));
+    }
     lines.push('');
     lines.push([q('Prepared by: ______________________'), '', q('Verified by: ______________________')].join(','));
 
@@ -1296,54 +1330,8 @@ router.get('/collection-summary/export', protect, authorize('admin', 'accountant
       // Spacer
       ws.addRow([]);
 
-      // ── Collection Summary by Payment Method (3-column block) ──
-      const summaryTitle = ws.addRow(['Collection Summary by Payment Method']);
-      ws.mergeCells(summaryTitle.number, 1, summaryTitle.number, colCount);
-      summaryTitle.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
-      summaryTitle.alignment = { horizontal: 'center' };
-      summaryTitle.eachCell(c => {
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
-      });
-
-      // Sub-header: Payment Method | Transactions | Amount (₹)
-      const sumHeader = ws.addRow(['Payment Method', 'Transactions', 'Amount (INR)']);
-      ws.mergeCells(sumHeader.number, 1, sumHeader.number, 2);
-      ws.mergeCells(sumHeader.number, 3, sumHeader.number, 2 + Math.ceil(methods.length / 2));
-      ws.mergeCells(sumHeader.number, 3 + Math.ceil(methods.length / 2), sumHeader.number, colCount);
-      sumHeader.eachCell(cell => {
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0E8' } };
-        cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
-        cell.alignment = { horizontal: 'center' };
-      });
-
-      const addSummaryRow = (label, txns, amount, opts = {}) => {
-        const row = ws.addRow([label, txns, Number(amount || 0)]);
-        ws.mergeCells(row.number, 1, row.number, 2);
-        ws.mergeCells(row.number, 3, row.number, 2 + Math.ceil(methods.length / 2));
-        ws.mergeCells(row.number, 3 + Math.ceil(methods.length / 2), row.number, colCount);
-        row.getCell(1).alignment = { horizontal: 'left', indent: 1 };
-        row.getCell(3).alignment = { horizontal: 'center' };
-        row.getCell(3 + Math.ceil(methods.length / 2)).alignment = { horizontal: 'right', indent: 1 };
-        row.getCell(3 + Math.ceil(methods.length / 2)).numFmt = '#,##0.00';
-        row.eachCell(c => {
-          c.border = { top: { style: 'hair' }, bottom: { style: 'hair' }, left: { style: 'thin' }, right: { style: 'thin' } };
-          if (opts.bold) c.font = { bold: true, size: opts.size || 11 };
-          if (opts.fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: opts.fill } };
-        });
-      };
-
-      methods.forEach(m => {
-        addSummaryRow(m, methodCounts[m] || 0, roundToRupee(methodTotals[m] || 0));
-      });
-
-      // Grand Total row
-      addSummaryRow(
-        'GRAND TOTAL',
-        grandCount,
-        roundToRupee(grandTotal),
-        { bold: true, size: 12, fill: 'FFD9EAD3' }
-      );
+      // ── Collection Summary by Payment Method (compact horizontal) ──
+      writeHorizontalSummary(ws, colCount, methods, methodCounts, methodTotals, grandCount, grandTotal);
 
       // Spacer
       ws.addRow([]);
@@ -1399,11 +1387,9 @@ router.get('/collection-summary/export', protect, authorize('admin', 'accountant
     // Collection Summary by Payment Method block
     lines.push('');
     lines.push(q('Collection Summary by Payment Method'));
-    lines.push(['Payment Method', 'Transactions', 'Amount (INR)'].map(q).join(','));
-    methods.forEach(m => {
-      lines.push([m, methodCounts[m] || 0, fmtINR(methodTotals[m])].map(q).join(','));
-    });
-    lines.push(['GRAND TOTAL', grandCount, fmtINR(grandTotal)].map(q).join(','));
+    lines.push(['', ...methods, 'GRAND TOTAL'].map(q).join(','));
+    lines.push(['Transactions', ...methods.map(m => methodCounts[m] || 0), grandCount].map(q).join(','));
+    lines.push(['Amount (INR)', ...methods.map(m => fmtINR(methodTotals[m])), fmtINR(grandTotal)].map(q).join(','));
 
     lines.push('');
     lines.push([q('Prepared by: ______________________'), '', q('Verified by: ______________________')].join(','));
