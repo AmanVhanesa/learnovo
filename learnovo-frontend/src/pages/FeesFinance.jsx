@@ -1122,7 +1122,13 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport }) => {
 
 // ── Receipts Tab ──
 
-const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport, onEditPayment, onReversePayment }) => (
+const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport, onEditPayment, onReversePayment }) => {
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const handleExport = (fmt) => {
+    setShowExportMenu(false)
+    onExport(fmt)
+  }
+  return (
   <div className="space-y-4">
     <div className="card p-3 sm:p-4">
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
@@ -1131,12 +1137,17 @@ const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilter
         <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">From</label><input type="date" value={filters.startDate} onChange={e => onFilterChange({ ...filters, startDate: e.target.value })} className="input text-sm" /></div>
         <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">To</label><input type="date" value={filters.endDate} onChange={e => onFilterChange({ ...filters, endDate: e.target.value })} className="input text-sm" /></div>
         <button onClick={onClearFilters} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><X className="h-3.5 w-3.5" /> Clear</button>
-        <div className="relative group">
-          <button className="btn btn-outline btn-sm flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
-          <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-10 hidden group-hover:block">
-            <button onClick={() => onExport('csv')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
-            <button onClick={() => onExport('excel')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
-          </div>
+        <div className="relative">
+          <button onClick={() => setShowExportMenu(!showExportMenu)} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
+          {showExportMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+              <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-20">
+                <button onClick={() => handleExport('csv')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
+                <button onClick={() => handleExport('excel')} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -1164,7 +1175,8 @@ const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilter
       )}
     </div>
   </div>
-)
+  )
+}
 
 // ── Disputes Tab ──
 
