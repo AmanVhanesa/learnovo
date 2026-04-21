@@ -26,7 +26,7 @@ export default function SpRefundPolicy() {
       {/* Hero */}
       <div className="bg-gradient-to-b from-amber-50 to-white border-b border-amber-100">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-          <div className="flex items-center gap-4 mb-2">
+          <div className="flex items-end gap-4 mb-2">
             <div className="h-12 w-12 rounded-2xl bg-amber-500 flex items-center justify-center shadow-sm flex-shrink-0">
               <RotateCcw className="w-6 h-6 text-white" />
             </div>
