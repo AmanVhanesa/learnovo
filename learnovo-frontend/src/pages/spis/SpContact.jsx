@@ -1,81 +1,162 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, MapPin, Phone, Mail, Globe, Clock } from 'lucide-react'
+import { ArrowLeft, MapPin, Phone, Mail, Globe, Clock, MessageCircle } from 'lucide-react'
 
 export default function SpContact() {
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-          <Link to="/login" className="flex items-center gap-2 text-sm font-medium hover:opacity-70 transition-opacity">
+
+      {/* Header */}
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/90 border-b border-gray-100 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <Link to="/login" className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            Back
+            Back to Login
           </Link>
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-md bg-teal-600 flex items-center justify-center">
+              <MessageCircle className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-sm font-semibold text-gray-700">SP International School</span>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-1">Contact Us</h1>
-        <p className="text-sm text-gray-500 mb-10">We're here to help</p>
+      {/* Hero */}
+      <div className="bg-gradient-to-b from-teal-50 to-white border-b border-teal-100">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-10 w-10 rounded-xl bg-teal-600 flex items-center justify-center shadow-sm">
+              <MessageCircle className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xs font-semibold uppercase tracking-widest text-teal-600">Get in Touch</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Contact Us</h1>
+          <p className="text-gray-500 text-sm">SP International School · Managed by Sardar Patel Educational Society</p>
+        </div>
+      </div>
 
-        <div className="space-y-8 text-sm leading-relaxed text-gray-600">
+      {/* Content */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+        <div className="space-y-10 text-sm leading-relaxed text-gray-600">
 
-          <section>
+          {/* School intro */}
+          <div>
             <h2 className="text-xl font-bold text-gray-900">SP International School</h2>
-            <p className="text-gray-500 italic mt-1">"The Future Begins Here!"</p>
-            <p className="mt-2">Managed by: <strong className="text-gray-900">Sardar Patel Educational Society</strong></p>
+            <p className="text-gray-500 italic mt-0.5">"The Future Begins Here!"</p>
+            <p className="mt-2 text-gray-600">
+              Managed by <strong className="text-gray-900">Sardar Patel Educational Society</strong>
+            </p>
+          </div>
+
+          {/* Contact cards grid */}
+          <div className="grid sm:grid-cols-2 gap-4">
+
+            <ContactCard
+              icon={<MapPin className="w-5 h-5 text-teal-600" />}
+              label="Address"
+              bg="bg-teal-50 border-teal-100"
+            >
+              <p>A.L.G Road, Firozepur Cantt,</p>
+              <p>Punjab – 152003, India</p>
+            </ContactCard>
+
+            <ContactCard
+              icon={<Phone className="w-5 h-5 text-teal-600" />}
+              label="Phone"
+              bg="bg-teal-50 border-teal-100"
+            >
+              <a href="tel:+919888468343" className="text-teal-700 hover:underline font-medium">
+                +91 98884 68343
+              </a>
+            </ContactCard>
+
+            <ContactCard
+              icon={<Mail className="w-5 h-5 text-teal-600" />}
+              label="Email"
+              bg="bg-teal-50 border-teal-100"
+            >
+              <a href="mailto:spinternationalschool2021@gmail.com" className="text-teal-700 hover:underline font-medium break-all">
+                spinternationalschool2021@gmail.com
+              </a>
+            </ContactCard>
+
+            <ContactCard
+              icon={<Globe className="w-5 h-5 text-teal-600" />}
+              label="Website & Portal"
+              bg="bg-teal-50 border-teal-100"
+            >
+              <a href="https://spinternationalschool.com" target="_blank" rel="noopener noreferrer" className="text-teal-700 hover:underline block">
+                spinternationalschool.com
+              </a>
+              <a href="https://spis.learnovoportal.com" target="_blank" rel="noopener noreferrer" className="text-teal-700 hover:underline block mt-0.5">
+                spis.learnovoportal.com
+              </a>
+            </ContactCard>
+
+          </div>
+
+          {/* Working hours */}
+          <section className="rounded-2xl border border-gray-100 bg-gray-50 px-6 py-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="w-4 h-4 text-gray-500" />
+              <h2 className="text-base font-semibold text-gray-900">Working Hours</h2>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                <span className="font-medium text-gray-700">Monday – Saturday</span>
+                <span className="text-gray-600">8:00 AM – 4:00 PM</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="font-medium text-gray-700">Sunday</span>
+                <span className="text-red-500 font-medium">Closed</span>
+              </div>
+            </div>
           </section>
 
-          <section className="space-y-3">
-            <div className="flex items-start gap-3">
-              <MapPin className="w-4 h-4 mt-0.5 text-gray-400 shrink-0" />
-              <span>A.L.G Road, Firozepur Cantt, Punjab – 152003, India</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-              <a href="tel:+919888468343" className="text-blue-600 hover:underline">+91 98884 68343</a>
-            </div>
-            <div className="flex items-center gap-3">
-              <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-              <a href="mailto:spinternationalschool2021@gmail.com" className="text-blue-600 hover:underline">spinternationalschool2021@gmail.com</a>
-            </div>
-            <div className="flex items-center gap-3">
-              <Globe className="w-4 h-4 text-gray-400 shrink-0" />
-              <a href="https://spinternationalschool.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">spinternationalschool.com</a>
-            </div>
-            <div className="flex items-center gap-3">
-              <Globe className="w-4 h-4 text-gray-400 shrink-0" />
-              <a href="https://spis.learnovoportal.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">spis.learnovoportal.com</a>
-            </div>
-          </section>
-
+          {/* Support note */}
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Clock className="w-4 h-4" /> Working Hours
-            </h2>
-            <ul className="space-y-1">
-              <li><strong className="text-gray-900">Monday – Saturday:</strong> 8:00 AM – 4:00 PM</li>
-              <li><strong className="text-gray-900">Sunday:</strong> Closed</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Support</h2>
-            <p>For any queries related to admissions, school fees, or online payments, please contact us via phone or email. We aim to respond within 24–48 hours.</p>
+            <h2 className="text-base font-semibold text-gray-900 mb-2">Support</h2>
+            <p>
+              For queries related to admissions, school fees, or online payments, please reach out via
+              phone or email during working hours. We aim to respond within <strong className="text-gray-900">24–48 hours</strong>.
+            </p>
           </section>
 
         </div>
       </main>
 
-      <footer className="border-t py-8 border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-gray-400">&copy; {new Date().getFullYear()} SP International School. All rights reserved.</p>
-          <div className="flex items-center gap-6 text-sm">
-            <Link to="/spis/privacy-policy" className="text-gray-500 hover:text-gray-900 hover:underline">Privacy Policy</Link>
-            <Link to="/spis/terms-and-conditions" className="text-gray-500 hover:text-gray-900 hover:underline">Terms &amp; Conditions</Link>
-            <Link to="/spis/refund-policy" className="text-gray-500 hover:text-gray-900 hover:underline">Refund Policy</Link>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
+  )
+}
+
+function ContactCard({ icon, label, children, bg }) {
+  return (
+    <div className={`rounded-2xl border ${bg} px-5 py-4`}>
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
+        <span className="text-xs font-semibold uppercase tracking-widest text-gray-500">{label}</span>
+      </div>
+      <div className="text-sm text-gray-700">{children}</div>
+    </div>
+  )
+}
+
+function Footer() {
+  return (
+    <footer className="border-t border-gray-100 py-8 mt-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-gray-700">SP International School</p>
+          <p className="text-xs text-gray-400">Sardar Patel Educational Society · Firozepur Cantt, Punjab</p>
+        </div>
+        <div className="flex items-center flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-gray-400">
+          <span className="font-medium text-gray-600">Contact Us</span>
+          <Link to="/spis/terms-and-conditions" className="hover:text-gray-700 transition-colors">Terms &amp; Conditions</Link>
+          <Link to="/spis/privacy-policy" className="hover:text-gray-700 transition-colors">Privacy Policy</Link>
+          <Link to="/spis/refund-policy" className="hover:text-gray-700 transition-colors">Refund Policy</Link>
+        </div>
+      </div>
+    </footer>
   )
 }

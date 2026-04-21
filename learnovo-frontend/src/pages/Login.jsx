@@ -515,8 +515,8 @@ const Login = () => {
                   <span>·</span>
                   <Link to="/spis/refund-policy" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Refund Policy</Link>
                 </div>
-                <p className="text-[10px] text-gray-300 dark:text-[#48484A]">
-                  Need help? <a href="mailto:spinternationalschool2021@gmail.com" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">spinternationalschool2021@gmail.com</a> · <a href="tel:+919888468343" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">+91 98884 68343</a>
+                <p className="text-[10px] text-gray-400 dark:text-[#636366]">
+                  Need help? <a href="mailto:spinternationalschool2021@gmail.com" className="hover:text-gray-700 dark:hover:text-[#8E8E93] transition-colors">spinternationalschool2021@gmail.com</a> · <a href="tel:+919888468343" className="hover:text-gray-700 dark:hover:text-[#8E8E93] transition-colors">+91 98884 68343</a>
                 </p>
               </>
             ) : (
@@ -526,8 +526,8 @@ const Login = () => {
                   <span>·</span>
                   <Link to="/privacy-policy" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Privacy Policy</Link>
                 </div>
-                <p className="text-[10px] text-gray-300 dark:text-[#48484A]">
-                  Need help? <a href="mailto:evotechnologiesinnovation@gmail.com" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">evotechnologiesinnovation@gmail.com</a> · <a href="tel:+916283482293" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">+91 62834 82293</a>
+                <p className="text-[10px] text-gray-400 dark:text-[#636366]">
+                  Need help? <a href="mailto:evotechnologiesinnovation@gmail.com" className="hover:text-gray-700 dark:hover:text-[#8E8E93] transition-colors">evotechnologiesinnovation@gmail.com</a> · <a href="tel:+916283482293" className="hover:text-gray-700 dark:hover:text-[#8E8E93] transition-colors">+91 62834 82293</a>
                 </p>
               </>
             )}
