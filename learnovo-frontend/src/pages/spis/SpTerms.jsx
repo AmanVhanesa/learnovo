@@ -26,11 +26,13 @@ export default function SpTerms() {
       {/* Hero */}
       <div className="bg-gradient-to-b from-indigo-50 to-white border-b border-indigo-100">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-          <div className="h-12 w-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-sm mb-4">
-            <FileText className="w-6 h-6 text-white" />
+          <div className="flex items-center gap-4 mb-2">
+            <div className="h-12 w-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-sm flex-shrink-0">
+              <FileText className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Terms &amp; Conditions</h1>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Terms &amp; Conditions</h1>
-          <p className="text-gray-500 text-sm">SP International School · Sardar Patel Educational Society</p>
+          <p className="text-gray-500 text-sm pl-16">SP International School · Sardar Patel Educational Society</p>
         </div>
       </div>
 
