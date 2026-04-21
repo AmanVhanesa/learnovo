@@ -504,14 +504,33 @@ const Login = () => {
             transition={{ duration: 0.6, delay: 1.5 }}
             className="mt-8 text-center space-y-2"
           >
-            <div className="flex items-center justify-center gap-3 text-[11px] text-gray-400 dark:text-[#636366]">
-              <Link to="/terms-and-conditions" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Terms & Conditions</Link>
-              <span>·</span>
-              <Link to="/privacy-policy" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Privacy Policy</Link>
-            </div>
-            <p className="text-[10px] text-gray-300 dark:text-[#48484A]">
-              Need help? <a href="mailto:evotechnologiesinnovation@gmail.com" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">evotechnologiesinnovation@gmail.com</a> · <a href="tel:+916283482293" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">+91 62834 82293</a>
-            </p>
+            {isTenantLogin && tenant?.schoolCode === 'spis' ? (
+              <>
+                <div className="flex items-center justify-center flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400 dark:text-[#636366]">
+                  <Link to="/spis/contact-us" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Contact Us</Link>
+                  <span>·</span>
+                  <Link to="/spis/terms-and-conditions" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Terms &amp; Conditions</Link>
+                  <span>·</span>
+                  <Link to="/spis/privacy-policy" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Privacy Policy</Link>
+                  <span>·</span>
+                  <Link to="/spis/refund-policy" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Refund Policy</Link>
+                </div>
+                <p className="text-[10px] text-gray-300 dark:text-[#48484A]">
+                  Need help? <a href="mailto:spinternationalschool2021@gmail.com" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">spinternationalschool2021@gmail.com</a> · <a href="tel:+919888468343" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">+91 98884 68343</a>
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-center gap-3 text-[11px] text-gray-400 dark:text-[#636366]">
+                  <Link to="/terms-and-conditions" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Terms &amp; Conditions</Link>
+                  <span>·</span>
+                  <Link to="/privacy-policy" className="hover:text-gray-600 dark:hover:text-[#8E8E93] transition-colors">Privacy Policy</Link>
+                </div>
+                <p className="text-[10px] text-gray-300 dark:text-[#48484A]">
+                  Need help? <a href="mailto:evotechnologiesinnovation@gmail.com" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">evotechnologiesinnovation@gmail.com</a> · <a href="tel:+916283482293" className="hover:text-gray-500 dark:hover:text-[#636366] transition-colors">+91 62834 82293</a>
+                </p>
+              </>
+            )}
           </motion.div>
         </div>
       </motion.div>
