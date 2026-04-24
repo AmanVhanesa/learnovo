@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee, Filter, ChevronDown, ArrowUpDown, RotateCcw, SlidersHorizontal, Printer } from 'lucide-react';
+import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee, Filter, ChevronDown, ArrowUpDown, RotateCcw, SlidersHorizontal, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { studentFeesService } from '../../services/studentFeesService';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { printReceiptHighQuality, downloadReceiptAsPdf } from '../../utils/receiptHelpers';
+import { SERVER_URL } from '../../constants/config';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useChild } from '../../contexts/ChildContext';
 
@@ -360,35 +360,45 @@ const StudentFeesDashboard = () => {
     };
 
     const handleDownloadReceipt = async (attempt) => {
+        const toastId = toast.loading('Generating PDF...', { id: 'receipt-dl' });
         try {
-            toast.loading('Generating receipt...', { id: 'receipt' });
-            const res = await studentFeesService.getReceipt(attempt._id);
-            const payment = res.data?.data || res.data;
-
-            if (!payment) {
-                toast.error('Receipt data not available', { id: 'receipt' });
-                return;
-            }
-
-            const school = schoolSettings || {};
-            await downloadReceiptAsPdf(payment, school);
-            toast.success('Receipt downloaded', { id: 'receipt' });
-        } catch (e) {
-            toast.error('Receipt unavailable', { id: 'receipt' });
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${SERVER_URL}/api/student-fees/receipt/${attempt._id}/pdf`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Receipt.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+            toast.dismiss(toastId);
+            toast.success('Receipt downloaded');
+        } catch {
+            toast.dismiss(toastId);
+            toast.error('Receipt unavailable');
         }
     }
 
-    const handlePrintReceipt = async (attempt) => {
+    const handleViewReceipt = async (attempt) => {
+        const toastId = toast.loading('Opening receipt...');
         try {
-            toast.loading('Preparing high quality receipt...', { id: 'receipt-print' });
-            const res = await studentFeesService.getReceipt(attempt._id);
-            const payment = res.data?.data || res.data;
-            if (!payment) { toast.error('Receipt data not available', { id: 'receipt-print' }); return; }
-            const school = schoolSettings || {};
-            toast.dismiss('receipt-print');
-            await printReceiptHighQuality(payment, school);
-        } catch (e) {
-            toast.dismiss('receipt-print');
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${SERVER_URL}/api/student-fees/receipt/${attempt._id}/html`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed');
+            const html = await response.text();
+            toast.dismiss(toastId);
+            const win = window.open('', '_blank', 'width=850,height=700');
+            if (win) { win.document.write(html); win.document.close(); }
+            else toast.error('Pop-up blocked — please allow pop-ups');
+        } catch {
+            toast.dismiss(toastId);
             toast.error('Receipt unavailable');
         }
     }
@@ -861,11 +871,11 @@ const StudentFeesDashboard = () => {
                                                     )}
                                                     {['SUCCESS', 'VERIFIED'].includes(attempt.status) && (
                                                         <div className="flex items-center gap-1.5">
-                                                            <button onClick={() => handlePrintReceipt(attempt)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-lg transition-colors" title="Print Receipt">
-                                                                <Printer className="h-3.5 w-3.5" />
-                                                                Print
+                                                            <button onClick={() => handleViewReceipt(attempt)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-lg transition-colors" title="View Receipt">
+                                                                <Eye className="h-3.5 w-3.5" />
+                                                                View
                                                             </button>
-                                                            <button onClick={() => handleDownloadReceipt(attempt)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg transition-colors" title="Download Receipt">
+                                                            <button onClick={() => handleDownloadReceipt(attempt)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg transition-colors" title="Download PDF">
                                                                 <Download className="h-3.5 w-3.5" />
                                                                 PDF
                                                             </button>
@@ -918,14 +928,14 @@ const StudentFeesDashboard = () => {
                                                     {formatCurrency(receipt.amount || receipt.paymentAttemptId?.amount || 0)}
                                                 </span>
                                                 <button
-                                                    onClick={() => handlePrintReceipt({ _id: receipt.paymentAttemptId?._id || receipt._id })}
+                                                    onClick={() => handleViewReceipt({ _id: receipt._id })}
                                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-lg transition-colors"
                                                 >
-                                                    <Printer className="h-3.5 w-3.5" />
-                                                    Print
+                                                    <Eye className="h-3.5 w-3.5" />
+                                                    View
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDownloadReceipt({ _id: receipt.paymentAttemptId?._id || receipt._id })}
+                                                    onClick={() => handleDownloadReceipt({ _id: receipt._id })}
                                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-500/10 hover:bg-green-100 dark:hover:bg-green-500/20 rounded-lg transition-colors"
                                                 >
                                                     <Download className="h-3.5 w-3.5" />

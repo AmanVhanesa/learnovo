@@ -1182,6 +1182,127 @@ router.post('/payment/razorpay-verify', protect, authorize('student'), async(req
  * @route   GET /api/student-fees/gateway-status
  * @access  Private (student)
  */
+/**
+ * @desc    Get student receipt as printable HTML
+ * @route   GET /api/student-fees/receipt/:id/html
+ * @access  Private (Student, Parent)
+ */
+router.get('/receipt/:id/html', protect, authorize('student', 'parent'), async(req, res) => {
+  try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).send('Bad request');
+
+    let receipt = await Receipt.findOne({ _id: req.params.id, studentId, tenantId: req.user.tenantId })
+      .catch(() => null);
+    if (!receipt) {
+      receipt = await Receipt.findOne({ paymentAttemptId: req.params.id, studentId, tenantId: req.user.tenantId });
+    }
+    if (!receipt) return res.status(404).send('Receipt not found');
+
+    await receipt.populate({
+      path: 'studentId',
+      select: 'name fullName admissionNumber studentId class section classId',
+      populate: { path: 'classId', select: 'name' }
+    });
+    await receipt.populate('invoiceId', 'invoiceNumber items billingPeriod status balanceAmount periodLabel');
+    await receipt.populate('paymentAttemptId', 'paymentMode transactionRefId');
+
+    const paymentData = {
+      receiptNumber: receipt.receiptNumber,
+      amount: receipt.amount,
+      paymentDate: receipt.paymentDate,
+      paymentMethod: receipt.paymentMode || receipt.paymentAttemptId?.paymentMode || '-',
+      studentId: receipt.studentId,
+      invoiceId: receipt.invoiceId,
+      initiatedBy: receipt.initiatedBy,
+      transactionRefId: receipt.transactionRefId || receipt.paymentAttemptId?.transactionRefId,
+    };
+
+    const Settings = require('../models/Settings');
+    const tenant = await Tenant.findById(req.user.tenantId).select('schoolName schoolCode address phone email logo fullAddress');
+    const settings = await Settings.getSettings(req.user.tenantId);
+    const schoolData = tenant ? tenant.toObject() : {};
+    if (settings?.institution) {
+      if (settings.institution.contact?.phone) schoolData.phone = settings.institution.contact.phone;
+      if (settings.institution.contact?.email) schoolData.email = settings.institution.contact.email;
+      if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
+      if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+      if (settings.institution.logo) schoolData.logo = settings.institution.logo;
+      if (settings.institution.principalSignature) schoolData.principalSignature = settings.institution.principalSignature;
+    }
+
+    const { generateReceiptHtml } = require('../services/receiptPdfService');
+    const html = await generateReceiptHtml(paymentData, schoolData);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    console.error('Student receipt HTML error:', error);
+    if (!res.headersSent) res.status(500).send('Server error generating receipt');
+  }
+});
+
+/**
+ * @desc    Download student receipt as PDF
+ * @route   GET /api/student-fees/receipt/:id/pdf
+ * @access  Private (Student, Parent)
+ */
+router.get('/receipt/:id/pdf', protect, authorize('student', 'parent'), async(req, res) => {
+  try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
+    let receipt = await Receipt.findOne({ _id: req.params.id, studentId, tenantId: req.user.tenantId })
+      .catch(() => null);
+    if (!receipt) {
+      receipt = await Receipt.findOne({ paymentAttemptId: req.params.id, studentId, tenantId: req.user.tenantId });
+    }
+    if (!receipt) return res.status(404).json({ success: false, message: 'Receipt not found' });
+
+    await receipt.populate({
+      path: 'studentId',
+      select: 'name fullName admissionNumber studentId class section classId',
+      populate: { path: 'classId', select: 'name' }
+    });
+    await receipt.populate('invoiceId', 'invoiceNumber items billingPeriod status balanceAmount periodLabel');
+    await receipt.populate('paymentAttemptId', 'paymentMode transactionRefId');
+
+    const paymentData = {
+      receiptNumber: receipt.receiptNumber,
+      amount: receipt.amount,
+      paymentDate: receipt.paymentDate,
+      paymentMethod: receipt.paymentMode || receipt.paymentAttemptId?.paymentMode || '-',
+      studentId: receipt.studentId,
+      invoiceId: receipt.invoiceId,
+      initiatedBy: receipt.initiatedBy,
+      transactionRefId: receipt.transactionRefId || receipt.paymentAttemptId?.transactionRefId,
+    };
+
+    const Settings = require('../models/Settings');
+    const tenant = await Tenant.findById(req.user.tenantId).select('schoolName schoolCode address phone email logo fullAddress');
+    const settings = await Settings.getSettings(req.user.tenantId);
+    const schoolData = tenant ? tenant.toObject() : {};
+    if (settings?.institution) {
+      if (settings.institution.contact?.phone) schoolData.phone = settings.institution.contact.phone;
+      if (settings.institution.contact?.email) schoolData.email = settings.institution.contact.email;
+      if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
+      if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+      if (settings.institution.logo) schoolData.logo = settings.institution.logo;
+      if (settings.institution.principalSignature) schoolData.principalSignature = settings.institution.principalSignature;
+    }
+
+    const { generateReceiptPdf } = require('../services/receiptPdfService');
+    const pdfBuffer = await generateReceiptPdf(paymentData, schoolData);
+    const filename = `Receipt-${(receipt.receiptNumber || req.params.id).replace(/[^a-zA-Z0-9-_]/g, '_')}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
+  } catch (error) {
+    console.error('Student receipt PDF error:', error);
+    if (!res.headersSent) res.status(500).json({ success: false, message: 'Server error generating receipt PDF' });
+  }
+});
+
 router.get('/gateway-status', protect, authorize('student', 'parent'), async(req, res) => {
   try {
     const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway').lean();
