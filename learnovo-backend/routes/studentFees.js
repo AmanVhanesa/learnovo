@@ -1215,7 +1215,7 @@ router.get('/receipt/:id/html', protect, authorize('student', 'parent'), async(r
       studentId: receipt.studentId,
       invoiceId: receipt.invoiceId,
       initiatedBy: receipt.initiatedBy,
-      transactionRefId: receipt.transactionRefId || receipt.paymentAttemptId?.transactionRefId,
+      transactionRefId: receipt.transactionRefId || receipt.paymentAttemptId?.transactionRefId
     };
 
     const Settings = require('../models/Settings');
@@ -1274,7 +1274,7 @@ router.get('/receipt/:id/pdf', protect, authorize('student', 'parent'), async(re
       studentId: receipt.studentId,
       invoiceId: receipt.invoiceId,
       initiatedBy: receipt.initiatedBy,
-      transactionRefId: receipt.transactionRefId || receipt.paymentAttemptId?.transactionRefId,
+      transactionRefId: receipt.transactionRefId || receipt.paymentAttemptId?.transactionRefId
     };
 
     const Settings = require('../models/Settings');
