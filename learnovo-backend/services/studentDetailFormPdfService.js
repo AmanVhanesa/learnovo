@@ -121,26 +121,26 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   .page-header-mini {
     display: flex; align-items: center; gap: 10px;
     padding-bottom: 6px; margin-bottom: 8px;
-    border-bottom: 2px solid #0a5c56;
+    border-bottom: 2px solid #14857d;
   }
   .page-header-mini .logo-mini { width: 52px; height: 52px; flex-shrink: 0; border-radius: 6px; overflow: hidden; }
   .page-header-mini .logo-mini img { width: 100%; height: 100%; object-fit: contain; }
   .page-header-mini .mini-name {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 14px; font-weight: 800; color: #1F6F6D; text-transform: uppercase; letter-spacing: 0.6px;
+    font-size: 14px; font-weight: 800; color: #1F8F8A; text-transform: uppercase; letter-spacing: 0.6px;
   }
   .page-header-mini .mini-meta { margin-left: auto; font-size: 9px; color: #4b5563; font-weight: 500; }
   .page-header-mini .mini-meta b { color: #111827; font-weight: 700; }
   .page-label { font-size: 8px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
 
   /* Header */
-  .header { display: flex; align-items: center; gap: 14px; padding-bottom: 10px; border-bottom: 2px solid #0a5c56; }
+  .header { display: flex; align-items: center; gap: 14px; padding-bottom: 10px; border-bottom: 2px solid #14857d; }
   .logo-wrap { width: 92px; height: 92px; flex-shrink: 0; border-radius: 8px; overflow: hidden; }
   .logo-wrap img { width: 92px; height: 92px; object-fit: contain; }
   .school-info { flex: 1; text-align: center; }
   .school-name {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 22px; font-weight: 800; color: #1F6F6D;
+    font-size: 22px; font-weight: 800; color: #1F8F8A;
     letter-spacing: 1px; line-height: 1.15; text-transform: uppercase;
   }
   .school-addr { font-size: 9.5px; color: #4b5563; font-weight: 500; margin-top: 2px; }
@@ -151,7 +151,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   /* Title */
   .title-sec { text-align: center; padding: 8px 0 4px; }
   .title-badge { display: inline-block; background: #edf9f7; border-radius: 8px; padding: 6px 24px; }
-  .title-badge h1 { font-size: 12px; font-weight: 700; color: #0a5c56; letter-spacing: 4px; text-transform: uppercase; line-height: 1; }
+  .title-badge h1 { font-size: 12px; font-weight: 700; color: #14857d; letter-spacing: 4px; text-transform: uppercase; line-height: 1; }
   .title-meta { font-size: 9px; color: #6b7280; margin-top: 6px; }
   .title-meta b { color: #111827; font-weight: 700; }
 
@@ -162,13 +162,13 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   }
   .photo-wrap {
     width: 95px; height: 115px; flex-shrink: 0;
-    border: 2px solid #0a5c56; border-radius: 6px; overflow: hidden;
+    border: 2px solid #14857d; border-radius: 6px; overflow: hidden;
     background: #fff; display: flex; align-items: center; justify-content: center;
   }
   .photo-wrap img { width: 100%; height: 100%; object-fit: cover; }
   .photo-placeholder { font-size: 9px; color: #9ca3af; text-align: center; padding: 4px; }
   .identity-body { flex: 1; }
-  .identity-name { font-size: 18px; font-weight: 800; color: #0a5c56; letter-spacing: 0.3px; }
+  .identity-name { font-size: 18px; font-weight: 800; color: #14857d; letter-spacing: 0.3px; }
   .identity-grid {
     display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; margin-top: 8px;
   }
@@ -177,7 +177,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   /* Sections */
   .section { margin-top: 8px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
   .section-title {
-    background: #edf9f7; color: #0a5c56;
+    background: #edf9f7; color: #14857d;
     font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
     padding: 6px 12px; border-bottom: 1px solid #d1ede9;
   }
@@ -196,7 +196,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   .guardian-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #fcfcfc; }
   .guardian-card:last-child { margin-bottom: 0; }
   .guardian-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .guardian-num { font-size: 9px; font-weight: 700; color: #0a5c56; text-transform: uppercase; letter-spacing: 1px; }
+  .guardian-num { font-size: 9px; font-weight: 700; color: #14857d; text-transform: uppercase; letter-spacing: 1px; }
   .badge { background: #fef3c7; color: #92400e; font-size: 7.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px; }
 
   .empty { font-size: 10px; color: #9ca3af; font-style: italic; }
@@ -209,12 +209,12 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   }
   .digital-icon {
     width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
-    background: #0a5c56; color: #fff;
+    background: #14857d; color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-size: 18px; font-weight: 700;
   }
   .digital-text { display: flex; flex-direction: column; gap: 2px; }
-  .digital-text b { font-size: 11px; font-weight: 700; color: #0a5c56; text-transform: uppercase; letter-spacing: 0.8px; }
+  .digital-text b { font-size: 11px; font-weight: 700; color: #14857d; text-transform: uppercase; letter-spacing: 0.8px; }
   .digital-text span { font-size: 9px; color: #4b5563; font-style: italic; }
 
   /* Declaration */
@@ -228,7 +228,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   /* Footer */
   .footer { margin-top: 18px; padding-top: 8px; border-top: 1px solid #e5e7eb; text-align: center; }
   .footer span { font-size: 8px; color: #4b5563; font-weight: 500; text-transform: uppercase; letter-spacing: 1.2px; }
-  .footer .brand { font-weight: 700; color: #0f766e; }
+  .footer .brand { font-weight: 700; color: #14857d; }
   .footer .gen { display: block; margin-top: 2px; font-size: 7.5px; color: #6b7280; text-transform: none; letter-spacing: 0; font-style: italic; }
 </style>
 </head>
@@ -264,7 +264,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
     <div class="identity-body">
       <div class="identity-name">${esc(studentName)}</div>
       <div class="identity-grid">
-        ${row('Class', `${className}${sectionName !== '—' ? ` — Section ${  sectionName}` : ''}`)}
+        ${row('Class', `${className}${sectionName !== '—' ? ` — Section ${sectionName}` : ''}`)}
         ${row('Roll No.', student.rollNumber)}
         ${row('Academic Year', student.academicYear)}
         ${row('Admission Date', fmtDate(student.admissionDate))}
@@ -279,7 +279,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   ${section('Personal Information', `
     <div class="grid-2">
       ${row('Full Name', studentName)}
-      ${row('Father / Husband', student.fatherOrHusbandName)}
+      ${row('Father\'s Name', student.fatherOrHusbandName)}
       ${row('Religion', student.religion)}
       ${row('Category', student.category)}
       ${row('PEN Number', student.penNumber)}
@@ -414,7 +414,7 @@ async function generateStudentDetailFormHtml(student, schoolData) {
   const toolbarHtml = `
     <div id="toolbar" style="position:fixed;top:0;left:0;right:0;background:#1C1C1E;color:#fff;padding:10px 24px;display:flex;gap:10px;align-items:center;z-index:999;font-family:'Helvetica Neue',Arial,sans-serif;">
       <span style="flex:1;font-size:13px;font-weight:500;">Student Detail Form — ${esc(studentName)}</span>
-      <button onclick="document.getElementById('toolbar').style.display='none';window.print();setTimeout(()=>document.getElementById('toolbar').style.display='flex',500)" style="padding:7px 18px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;background:#1F6F6D;color:white;">Print</button>
+      <button onclick="document.getElementById('toolbar').style.display='none';window.print();setTimeout(()=>document.getElementById('toolbar').style.display='flex',500)" style="padding:7px 18px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;background:#1F8F8A;color:white;">Print</button>
       <button onclick="window.close()" style="padding:7px 18px;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;background:#38383A;color:#8E8E93;">Close</button>
     </div>`;
 
