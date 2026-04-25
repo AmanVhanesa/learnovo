@@ -123,7 +123,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
     padding-bottom: 6px; margin-bottom: 8px;
     border-bottom: 2px solid #0a5c56;
   }
-  .page-header-mini .logo-mini { width: 36px; height: 36px; flex-shrink: 0; border-radius: 6px; overflow: hidden; }
+  .page-header-mini .logo-mini { width: 52px; height: 52px; flex-shrink: 0; border-radius: 6px; overflow: hidden; }
   .page-header-mini .logo-mini img { width: 100%; height: 100%; object-fit: contain; }
   .page-header-mini .mini-name {
     font-family: 'Playfair Display', Georgia, serif;
@@ -135,8 +135,8 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
 
   /* Header */
   .header { display: flex; align-items: center; gap: 14px; padding-bottom: 10px; border-bottom: 2px solid #0a5c56; }
-  .logo-wrap { width: 64px; height: 64px; flex-shrink: 0; border-radius: 8px; overflow: hidden; }
-  .logo-wrap img { width: 64px; height: 64px; object-fit: contain; }
+  .logo-wrap { width: 92px; height: 92px; flex-shrink: 0; border-radius: 8px; overflow: hidden; }
+  .logo-wrap img { width: 92px; height: 92px; object-fit: contain; }
   .school-info { flex: 1; text-align: center; }
   .school-name {
     font-family: 'Playfair Display', Georgia, serif;
