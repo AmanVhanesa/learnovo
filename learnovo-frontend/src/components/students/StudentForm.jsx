@@ -4,6 +4,7 @@ import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2,
 import api from '../../services/authService'
 import transportService from '../../services/transportService'
 import { SERVER_URL } from '../../constants/config'
+import ImageCropModal from '../ImageCropModal'
 
 const currentYear = new Date().getFullYear()
 const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
@@ -400,18 +401,43 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         onSave(submitData)
     }
 
+    const [cropModal, setCropModal] = useState({ isOpen: false, imageSrc: null })
+    const [photoError, setPhotoError] = useState(null)
+
     const handlePhotoUpload = async (e) => {
         const file = e.target.files[0]
+        // Reset input so the same file can be re-selected later
+        e.target.value = ''
         if (!file) return
 
-        // TODO: Implement photo upload to server
-        // For now, create a local preview
+        if (!file.type.startsWith('image/')) {
+            setPhotoError('Please select an image file (JPG or PNG).')
+            return
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setPhotoError('File size exceeds 5MB. Please choose a smaller image.')
+            return
+        }
+        setPhotoError(null)
+
         const reader = new FileReader()
         reader.onloadend = () => {
-            updateField('photo', reader.result)
+            setCropModal({ isOpen: true, imageSrc: reader.result })
         }
         reader.readAsDataURL(file)
     }
+
+    const handleCropComplete = async (blob) => {
+        const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+        })
+        updateField('photo', dataUrl)
+    }
+
+    const closeCropModal = () => setCropModal({ isOpen: false, imageSrc: null })
 
     return createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
@@ -516,6 +542,9 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 />
                                             </label>
                                         </div>
+                                        {photoError && (
+                                            <p className="text-xs text-red-500 mt-2">{photoError}</p>
+                                        )}
                                     </div>
                                 </div>
 
@@ -1225,6 +1254,16 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                     </div>
                 </form>
             </div>
+            <ImageCropModal
+                isOpen={cropModal.isOpen}
+                onClose={closeCropModal}
+                onCropComplete={handleCropComplete}
+                imageSrc={cropModal.imageSrc}
+                aspectRatio={1}
+                title="Crop Student Photo"
+                minWidth={400}
+                minHeight={400}
+            />
         </div>,
         document.body
     )
