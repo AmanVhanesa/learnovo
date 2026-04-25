@@ -78,7 +78,7 @@ function buildGuardiansHtml(guardians = []) {
     </div>`).join('');
 }
 
-function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
+function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl) {
   const studentName = buildStudentName(student);
   const className = student.classId?.name || student.class || '—';
   const sectionName = student.section || '—';
@@ -263,7 +263,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
 
   <div class="identity">
     <div class="photo-wrap">
-      ${photoDataUri ? `<img src="${photoDataUri}" alt="Student Photo">` : ''}
+      ${photoDataUri ? `<img src="${photoDataUri}" alt="Student Photo">` : (photoFallbackUrl ? `<img src="${photoFallbackUrl}" alt="Student Photo" onerror="this.style.display='none'">` : '')}
     </div>
     <div class="identity-body">
       <div class="identity-name">${esc(studentName)}</div>
@@ -387,7 +387,8 @@ async function generateStudentDetailFormPdf(student, schoolData) {
   const logoDataUri = await toBase64DataUri(schoolData.logo);
   const photoUrl = student.photo || student.avatar;
   const photoDataUri = await toBase64DataUri(photoUrl);
-  const html = buildHtml(student, schoolData, logoDataUri, photoDataUri);
+  const photoFallbackUrl = photoUrl && (photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
+  const html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
   const { getBrowser, releaseBrowser } = pdfService._internal;
   const browser = await getBrowser();
   const page = await browser.newPage();
@@ -412,7 +413,8 @@ async function generateStudentDetailFormHtml(student, schoolData) {
   const logoDataUri = await toBase64DataUri(schoolData.logo);
   const photoUrl = student.photo || student.avatar;
   const photoDataUri = await toBase64DataUri(photoUrl);
-  let html = buildHtml(student, schoolData, logoDataUri, photoDataUri);
+  const photoFallbackUrl = photoUrl && (photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
+  let html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
 
   const studentName = buildStudentName(student);
   const toolbarHtml = `
