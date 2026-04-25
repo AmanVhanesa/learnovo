@@ -13,13 +13,13 @@ async function toBase64DataUri(url) {
       maxRedirects: 5,
       headers: { 'User-Agent': 'Mozilla/5.0 LearnovoPDF/1.0' }
     });
+    const mime = response.headers['content-type'] || '';
     const buf = Buffer.from(response.data);
-    if (buf.length < 100) return fullUrl;
-    const mime = response.headers['content-type'] || 'image/png';
+    if (!mime.startsWith('image/') || buf.length < 100) return '';
     return `data:${mime};base64,${buf.toString('base64')}`;
   } catch (err) {
-    console.warn('[StudentDetailForm] image fetch failed, falling back to URL:', fullUrl, err.message);
-    return fullUrl;
+    console.warn('[StudentDetailForm] image fetch failed:', fullUrl, err.message);
+    return '';
   }
 }
 
