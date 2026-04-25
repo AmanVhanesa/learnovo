@@ -5,15 +5,21 @@ const axios = require('axios');
 
 async function toBase64DataUri(url) {
   if (!url) return '';
+  const fullUrl = url.startsWith('http') ? url : `https://api.learnovoportal.com${url}`;
   try {
-    const fullUrl = url.startsWith('http') ? url : `https://api.learnovoportal.com${url}`;
-    const response = await axios.get(fullUrl, { responseType: 'arraybuffer', timeout: 8000 });
+    const response = await axios.get(fullUrl, {
+      responseType: 'arraybuffer',
+      timeout: 12000,
+      maxRedirects: 5,
+      headers: { 'User-Agent': 'Mozilla/5.0 LearnovoPDF/1.0' }
+    });
     const buf = Buffer.from(response.data);
-    if (buf.length < 100) return '';
+    if (buf.length < 100) return fullUrl;
     const mime = response.headers['content-type'] || 'image/png';
     return `data:${mime};base64,${buf.toString('base64')}`;
-  } catch {
-    return '';
+  } catch (err) {
+    console.warn('[StudentDetailForm] image fetch failed, falling back to URL:', fullUrl, err.message);
+    return fullUrl;
   }
 }
 
