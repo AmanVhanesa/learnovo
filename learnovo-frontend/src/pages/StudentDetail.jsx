@@ -35,6 +35,51 @@ const StudentDetail = () => {
     const [feesLoading, setFeesLoading] = useState(false)
     const [feesSkipped, setFeesSkipped] = useState(false)
     const [showResultCard, setShowResultCard] = useState(false)
+    const [detailFormBusy, setDetailFormBusy] = useState(false)
+
+    const handleViewDetailForm = async () => {
+        if (detailFormBusy) return
+        setDetailFormBusy(true)
+        const toastId = toast.loading('Opening detail form...')
+        try {
+            const html = await studentsService.viewDetailForm(id)
+            const blob = new Blob([html], { type: 'text/html' })
+            const url = URL.createObjectURL(blob)
+            window.open(url, '_blank')
+            setTimeout(() => URL.revokeObjectURL(url), 30000)
+            toast.dismiss(toastId)
+        } catch {
+            toast.dismiss(toastId)
+            toast.error('Failed to open detail form')
+        } finally {
+            setDetailFormBusy(false)
+        }
+    }
+
+    const handleDownloadDetailForm = async () => {
+        if (detailFormBusy) return
+        setDetailFormBusy(true)
+        const toastId = toast.loading('Generating PDF...')
+        try {
+            const blob = await studentsService.downloadDetailForm(id)
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            const safeName = (student?.fullName || student?.name || 'Student').replace(/[^a-zA-Z0-9-_]/g, '_')
+            link.download = `Student-Detail-${safeName}-${student?.admissionNumber || id}.pdf`
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            setTimeout(() => URL.revokeObjectURL(url), 10000)
+            toast.dismiss(toastId)
+            toast.success('Detail form downloaded')
+        } catch {
+            toast.dismiss(toastId)
+            toast.error('Failed to download detail form')
+        } finally {
+            setDetailFormBusy(false)
+        }
+    }
 
     // Fetch student + class history
     const { data: studentData, isLoading, error: studentError } = useQuery({
@@ -307,6 +352,24 @@ const StudentDetail = () => {
                         >
                             <TrendingDown className="h-4 w-4 mr-1" />
                             Demote
+                        </button>
+                        <button
+                            onClick={handleViewDetailForm}
+                            disabled={detailFormBusy}
+                            className="btn btn-outline w-full sm:w-auto"
+                            title="View printable Student Detail Form"
+                        >
+                            <FileText className="h-4 w-4 mr-2" />
+                            View Form
+                        </button>
+                        <button
+                            onClick={handleDownloadDetailForm}
+                            disabled={detailFormBusy}
+                            className="btn btn-outline w-full sm:w-auto"
+                            title="Download Student Detail Form (PDF)"
+                        >
+                            {detailFormBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                            Download Form
                         </button>
                         <button
                             onClick={() => setShowPasswordModal(true)}

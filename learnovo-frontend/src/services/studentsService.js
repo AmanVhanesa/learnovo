@@ -122,6 +122,16 @@ export const studentsService = {
   updateSubjectPreferences: async (id, skippedSubjects) => {
     const res = await api.put(`/students/${id}/subject-preferences`, { skippedSubjects })
     return res.data
+  },
+
+  // Detail Form — printable physical record for admin
+  viewDetailForm: async (id) => {
+    const res = await api.get(`/students/${id}/detail-form/html`, { responseType: 'text' })
+    return res.data
+  },
+  downloadDetailForm: async (id) => {
+    const res = await api.get(`/students/${id}/detail-form/pdf`, { responseType: 'blob' })
+    return res.data
   }
 }
 

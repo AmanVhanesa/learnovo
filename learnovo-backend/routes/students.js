@@ -2066,6 +2066,84 @@ router.get('/:id', protect, canAccessStudent, async(req, res) => {
   }
 });
 
+// @desc    Helper — fetch student + school data for detail-form rendering
+async function loadStudentAndSchoolForForm(req) {
+  const student = await User.findOne({
+    _id: req.params.id,
+    role: 'student',
+    tenantId: req.user.tenantId
+  })
+    .select('-password')
+    .populate('subDepartment', 'name')
+    .populate('driverId', 'name phone')
+    .populate('classId', 'name grade')
+    .lean();
+
+  if (!student) return { student: null };
+
+  const Tenant = require('../models/Tenant');
+  const tenant = await Tenant.findById(req.user.tenantId)
+    .select('schoolName schoolCode address phone email logo fullAddress').lean();
+  const settings = await Settings.getSettings(req.user.tenantId);
+  const schoolData = tenant ? { ...tenant } : {};
+  if (settings?.institution) {
+    if (settings.institution.contact?.phone) schoolData.phone = settings.institution.contact.phone;
+    if (settings.institution.contact?.email) schoolData.email = settings.institution.contact.email;
+    if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
+    if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+    if (settings.institution.logo) schoolData.logo = settings.institution.logo;
+  }
+
+  return { student, schoolData };
+}
+
+// @desc    View printable student detail form (HTML)
+// @route   GET /api/students/:id/detail-form/html
+// @access  Private (Admin)
+router.get('/:id/detail-form/html', protect, authorize('admin', 'principal', 'vice_principal'), async(req, res) => {
+  try {
+    const { student, schoolData } = await loadStudentAndSchoolForForm(req);
+    if (!student) return res.status(404).send('Student not found');
+
+    const { generateStudentDetailFormHtml } = require('../services/studentDetailFormPdfService');
+    const html = await generateStudentDetailFormHtml(student, schoolData);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    logger.error('Student detail form HTML error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });
+    if (!res.headersSent) res.status(500).send('Server error generating form');
+  }
+});
+
+// @desc    Download student detail form (PDF)
+// @route   GET /api/students/:id/detail-form/pdf
+// @access  Private (Admin)
+router.get('/:id/detail-form/pdf', protect, authorize('admin', 'principal', 'vice_principal'), async(req, res) => {
+  try {
+    const { student, schoolData } = await loadStudentAndSchoolForForm(req);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found', requestId: req.requestId });
+    }
+
+    const { generateStudentDetailFormPdf } = require('../services/studentDetailFormPdfService');
+    const pdfBuffer = await generateStudentDetailFormPdf(student, schoolData);
+
+    const safeName = (student.fullName || student.name || 'Student').replace(/[^a-zA-Z0-9-_]/g, '_');
+    const safeAdm = (student.admissionNumber || '').replace(/[^a-zA-Z0-9-_]/g, '_');
+    const filename = `Student-Detail-${safeName}${safeAdm ? `-${  safeAdm}` : ''}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
+  } catch (error) {
+    logger.error('Student detail form PDF error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Server error generating form PDF', requestId: req.requestId });
+    }
+  }
+});
+
 // @desc    Create new student
 // @route   POST /api/students
 // @access  Private (Admin)
