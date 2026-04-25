@@ -257,9 +257,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
 
   <div class="identity">
     <div class="photo-wrap">
-      ${photoDataUri
-    ? `<img src="${photoDataUri}" alt="Student Photo">`
-    : '<div class="photo-placeholder">Student<br>Photograph</div>'}
+      ${photoDataUri ? `<img src="${photoDataUri}" alt="Student Photo">` : ''}
     </div>
     <div class="identity-body">
       <div class="identity-name">${esc(studentName)}</div>
