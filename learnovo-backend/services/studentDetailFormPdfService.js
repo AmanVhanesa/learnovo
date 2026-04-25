@@ -5,6 +5,7 @@ const axios = require('axios');
 
 async function toBase64DataUri(url) {
   if (!url) return '';
+  if (url.startsWith('data:')) return url;
   const fullUrl = url.startsWith('http') ? url : `https://api.learnovoportal.com${url}`;
   try {
     const response = await axios.get(fullUrl, {
@@ -387,7 +388,7 @@ async function generateStudentDetailFormPdf(student, schoolData) {
   const logoDataUri = await toBase64DataUri(schoolData.logo);
   const photoUrl = student.photo || student.avatar;
   const photoDataUri = await toBase64DataUri(photoUrl);
-  const photoFallbackUrl = photoUrl && (photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
+  const photoFallbackUrl = photoUrl && (photoUrl.startsWith('data:') || photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
   const html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
   const { getBrowser, releaseBrowser } = pdfService._internal;
   const browser = await getBrowser();
@@ -413,7 +414,7 @@ async function generateStudentDetailFormHtml(student, schoolData) {
   const logoDataUri = await toBase64DataUri(schoolData.logo);
   const photoUrl = student.photo || student.avatar;
   const photoDataUri = await toBase64DataUri(photoUrl);
-  const photoFallbackUrl = photoUrl && (photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
+  const photoFallbackUrl = photoUrl && (photoUrl.startsWith('data:') || photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
   let html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
 
   const studentName = buildStudentName(student);
