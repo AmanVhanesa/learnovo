@@ -129,9 +129,9 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
     font-family: 'Playfair Display', Georgia, serif;
     font-size: 14px; font-weight: 800; color: #1F6F6D; text-transform: uppercase; letter-spacing: 0.6px;
   }
-  .page-header-mini .mini-meta { margin-left: auto; font-size: 9px; color: #4b5563; font-weight: 500; }
+  .page-header-mini .mini-meta { margin-left: auto; font-size: 9px; color: #111827; font-weight: 500; }
   .page-header-mini .mini-meta b { color: #111827; font-weight: 700; }
-  .page-label { font-size: 8px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+  .page-label { font-size: 8px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
 
   /* Header */
   .header { display: flex; align-items: center; gap: 14px; padding-bottom: 10px; border-bottom: 2px solid #0a5c56; }
@@ -143,16 +143,16 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
     font-size: 22px; font-weight: 800; color: #1F6F6D;
     letter-spacing: 1px; line-height: 1.15; text-transform: uppercase;
   }
-  .school-addr { font-size: 9.5px; color: #4b5563; font-weight: 500; margin-top: 2px; }
+  .school-addr { font-size: 9.5px; color: #111827; font-weight: 500; margin-top: 2px; }
   .aff-row { display: flex; justify-content: center; gap: 14px; margin-top: 3px; }
-  .aff-line { font-size: 8.5px; color: #4b5563; font-weight: 500; }
+  .aff-line { font-size: 8.5px; color: #111827; font-weight: 500; }
   .aff-line b { font-weight: 700; color: #111827; }
 
   /* Title */
   .title-sec { text-align: center; padding: 8px 0 4px; }
   .title-badge { display: inline-block; background: #edf9f7; border-radius: 8px; padding: 6px 24px; }
   .title-badge h1 { font-size: 12px; font-weight: 700; color: #0a5c56; letter-spacing: 4px; text-transform: uppercase; line-height: 1; }
-  .title-meta { font-size: 9px; color: #6b7280; margin-top: 6px; }
+  .title-meta { font-size: 9px; color: #111827; margin-top: 6px; }
   .title-meta b { color: #111827; font-weight: 700; }
 
   /* Identity strip — photo + key facts */
@@ -166,7 +166,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
     background: #fff; display: flex; align-items: center; justify-content: center;
   }
   .photo-wrap img { width: 100%; height: 100%; object-fit: cover; }
-  .photo-placeholder { font-size: 9px; color: #9ca3af; text-align: center; padding: 4px; }
+  .photo-placeholder { font-size: 9px; color: #4b5563; text-align: center; padding: 4px; }
   .identity-body { flex: 1; }
   .identity-name { font-size: 18px; font-weight: 800; color: #0a5c56; letter-spacing: 0.3px; }
   .identity-grid {
@@ -187,10 +187,10 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   .grid-1 { display: block; }
 
   .row { display: flex; align-items: baseline; padding: 2px 0; min-height: 18px; }
-  .lbl { width: 110px; font-size: 9.5px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; flex-shrink: 0; }
+  .lbl { width: 110px; font-size: 9.5px; font-weight: 600; color: #111827; text-transform: uppercase; letter-spacing: 0.4px; flex-shrink: 0; }
   .val { font-size: 10.5px; font-weight: 600; color: #111827; word-break: break-word; }
 
-  .full-row .val { font-size: 10.5px; font-weight: 500; color: #1f2937; line-height: 1.5; }
+  .full-row .val { font-size: 10.5px; font-weight: 500; color: #111827; line-height: 1.5; }
 
   /* Guardian cards */
   .guardian-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: #fcfcfc; }
@@ -199,7 +199,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   .guardian-num { font-size: 9px; font-weight: 700; color: #0a5c56; text-transform: uppercase; letter-spacing: 1px; }
   .badge { background: #fef3c7; color: #92400e; font-size: 7.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.5px; }
 
-  .empty { font-size: 10px; color: #9ca3af; font-style: italic; }
+  .empty { font-size: 10px; color: #4b5563; font-style: italic; }
 
   /* Digital notice (replaces signatures) */
   .digital-notice {
@@ -215,21 +215,21 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri) {
   }
   .digital-text { display: flex; flex-direction: column; gap: 2px; }
   .digital-text b { font-size: 11px; font-weight: 700; color: #0a5c56; text-transform: uppercase; letter-spacing: 0.8px; }
-  .digital-text span { font-size: 9px; color: #4b5563; font-style: italic; }
+  .digital-text span { font-size: 9px; color: #111827; font-style: italic; }
 
   /* Declaration */
   .declaration {
     margin-top: 14px; padding: 10px 12px;
     background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 6px;
-    font-size: 9px; color: #4b5563; line-height: 1.5; font-style: italic;
+    font-size: 9px; color: #111827; line-height: 1.5; font-style: italic;
   }
   .declaration b { font-style: normal; color: #111827; font-weight: 700; }
 
   /* Footer */
   .footer { margin-top: 18px; padding-top: 8px; border-top: 1px solid #e5e7eb; text-align: center; }
-  .footer span { font-size: 8px; color: #4b5563; font-weight: 500; text-transform: uppercase; letter-spacing: 1.2px; }
+  .footer span { font-size: 8px; color: #111827; font-weight: 500; text-transform: uppercase; letter-spacing: 1.2px; }
   .footer .brand { font-weight: 700; color: #0f766e; }
-  .footer .gen { display: block; margin-top: 2px; font-size: 7.5px; color: #6b7280; text-transform: none; letter-spacing: 0; font-style: italic; }
+  .footer .gen { display: block; margin-top: 2px; font-size: 7.5px; color: #111827; text-transform: none; letter-spacing: 0; font-style: italic; }
 </style>
 </head>
 <body>
