@@ -187,6 +187,17 @@ const payrollService = {
       const limit = options.limit || 20;
       const skip = (page - 1) * limit;
 
+      // Exclude payroll records for inactive employees so their salary isn't shown
+      if (filter.tenantId && !filter.employeeId) {
+        const inactiveEmployees = await User.find({
+          tenantId: filter.tenantId,
+          isActive: false
+        }).select('_id').lean();
+        if (inactiveEmployees.length > 0) {
+          filter.employeeId = { $nin: inactiveEmployees.map(e => e._id) };
+        }
+      }
+
       const records = await Payroll.find(filter)
         .populate('employeeId', 'name employeeId email phone designation department accountNumber ifscCode bankName')
         .populate('generatedBy', 'name email')
@@ -246,7 +257,12 @@ const payrollService = {
      */
   getSalarySummary: async(tenantId, month, year) => {
     try {
-      const records = await Payroll.find({ tenantId, month, year, isDeleted: { $ne: true } });
+      const inactiveEmployees = await User.find({ tenantId, isActive: false }).select('_id').lean();
+      const summaryFilter = { tenantId, month, year, isDeleted: { $ne: true } };
+      if (inactiveEmployees.length > 0) {
+        summaryFilter.employeeId = { $nin: inactiveEmployees.map(e => e._id) };
+      }
+      const records = await Payroll.find(summaryFilter);
 
       const summary = {
         totalEmployees: records.length,

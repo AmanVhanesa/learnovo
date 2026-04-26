@@ -46,7 +46,7 @@ const Employees = () => {
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
     const [roleFilter, setRoleFilter] = useState('')
     const [departmentFilter, setDepartmentFilter] = useState('')
-    const [statusFilter, setStatusFilter] = useState('')
+    const [statusFilter, setStatusFilter] = useState('active')
 
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1)
@@ -221,7 +221,7 @@ const Employees = () => {
         setSearchQuery('')
         setRoleFilter('')
         setDepartmentFilter('')
-        setStatusFilter('')
+        setStatusFilter('active')
     }
 
     const handleSaveEmployee = (formData, pendingPhotoFile) => {
@@ -302,6 +302,30 @@ const Employees = () => {
                 </div>
             )}
 
+            {/* Active / Inactive Tabs */}
+            <div className="flex gap-1 bg-gray-100 dark:bg-[#2C2C2E] p-1 rounded-lg w-fit">
+                <button
+                    onClick={() => setStatusFilter('active')}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                        statusFilter === 'active'
+                            ? 'bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white shadow-sm'
+                            : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'
+                    }`}
+                >
+                    Active Employees
+                </button>
+                <button
+                    onClick={() => setStatusFilter('inactive')}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
+                        statusFilter === 'inactive'
+                            ? 'bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white shadow-sm'
+                            : 'text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'
+                    }`}
+                >
+                    Inactive Employees
+                </button>
+            </div>
+
             {/* Filters */}
             <div className="card p-3 sm:p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4">
@@ -345,17 +369,7 @@ const Employees = () => {
                             ))}
                         </select>
 
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="input w-full sm:w-32"
-                        >
-                            <option value="">All Status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
-
-                        {(searchQuery || roleFilter || departmentFilter || statusFilter) && (
+                        {(searchQuery || roleFilter || departmentFilter) && (
                             <button onClick={clearFilters} className="btn btn-ghost text-sm w-full sm:w-auto">
                                 Clear
                             </button>
