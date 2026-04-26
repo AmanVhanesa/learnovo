@@ -49,15 +49,47 @@
   <link rel="preconnect" href="https://api.learnovoportal.com" crossorigin />
   <link rel="dns-prefetch" href="https://api.learnovoportal.com" />
 
-  <!-- JSON-LD: Organization -->
+  <!--
+    JSON-LD: WebSite (FIRST — this is what Google uses to set the displayed
+    site name in search results, replacing "learnovoportal.com" with "Learnovo")
+  -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": "https://learnovoportal.com/#website",
+    "name": "Learnovo",
+    "alternateName": ["Learnovo Portal", "Learnovo School Management System", "Learnovo ERP"],
+    "url": "https://learnovoportal.com/",
+    "inLanguage": "en",
+    "publisher": { "@id": "https://learnovoportal.com/#organization" },
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": "https://learnovoportal.com/?q={search_term_string}"
+      },
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+
+  <!-- JSON-LD: Organization (linked to WebSite via @id) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "Organization",
+    "@id": "https://learnovoportal.com/#organization",
     "name": "Learnovo",
-    "alternateName": "Learnovo School Management System",
+    "legalName": "Learnovo",
+    "alternateName": ["Learnovo Portal", "Learnovo School Management System"],
     "url": "https://learnovoportal.com/",
-    "logo": "https://learnovoportal.com/learnovo.png",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://learnovoportal.com/learnovo.png",
+      "width": 512,
+      "height": 512
+    },
     "description": "Learnovo is an all-in-one cloud school management system and school ERP software for K-12 schools.",
     "foundingDate": "2024",
     "areaServed": "Worldwide",
@@ -70,11 +102,13 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Learnovo School Management System",
+    "name": "Learnovo",
+    "alternateName": "Learnovo School Management System",
     "applicationCategory": "EducationalApplication",
     "applicationSubCategory": "School Management Software",
     "operatingSystem": "Web, iOS, Android",
     "url": "https://learnovoportal.com/",
+    "publisher": { "@id": "https://learnovoportal.com/#organization" },
     "description": "Complete cloud school management & ERP platform: student information, fees & finance, attendance, exams & report cards, timetable, payroll, transport, homework, certificates and parent communication.",
     "offers": {
       "@type": "Offer",
@@ -103,17 +137,20 @@
   }
   </script>
 
-  <!-- JSON-LD: WebSite + SearchAction -->
+  <!-- JSON-LD: WebPage for the homepage (anchors site name to this URL) -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "Learnovo",
+    "@type": "WebPage",
+    "@id": "https://learnovoportal.com/#webpage",
     "url": "https://learnovoportal.com/",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://learnovoportal.com/?q={search_term_string}",
-      "query-input": "required name=search_term_string"
+    "name": "Learnovo — School Management System & ERP Software",
+    "isPartOf": { "@id": "https://learnovoportal.com/#website" },
+    "about": { "@id": "https://learnovoportal.com/#organization" },
+    "inLanguage": "en",
+    "primaryImageOfPage": {
+      "@type": "ImageObject",
+      "url": "https://learnovoportal.com/learnovo.png"
     }
   }
   </script>
