@@ -91,7 +91,9 @@ async function seedSection(tenant, session, klass, sectionName, subjects) {
         subject: subj.name,
         date: { $gte: dayStart, $lt: dayEnd }
       });
-      if (existing) { skipped++; continue; }
+      if (existing) {
+        skipped++; continue;
+      }
 
       const exam = await Exam.create({
         tenantId: tenant._id,

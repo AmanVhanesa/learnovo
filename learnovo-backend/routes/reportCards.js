@@ -48,7 +48,9 @@ router.get('/co-scholastic/:studentId/:sessionId', protect, examPlanGates, async
       }
     }
     res.json({ success: true, data: { areas } });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // @desc    Save co-scholastic grades for a student in a session
@@ -71,7 +73,9 @@ router.put('/co-scholastic/:studentId/:sessionId', protect, examPlanGates, autho
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
     res.json({ success: true, data: { areas: doc.areas } });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
