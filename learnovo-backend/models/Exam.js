@@ -19,7 +19,7 @@ const examSchema = new mongoose.Schema({
   },
   examSeries: {
     type: String,
-    enum: ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom', 'UT1', 'UT2'],
+    enum: ['FA1', 'FA2', 'FA3', 'FA4', 'SA1', 'SA2', 'Unit Test', 'Midterm', 'Final', 'Custom', 'UT1', 'UT2', 'Assessment'],
     default: 'UT1'
   },
   class: {

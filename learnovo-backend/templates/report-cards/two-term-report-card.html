@@ -118,7 +118,11 @@
     letter-spacing: 0.03em; color: var(--rc-text-primary);
     padding: 5px 2px; text-align: center;
     border-bottom: 1.5px solid var(--rc-border);
-    overflow: hidden; word-wrap: break-word;
+    overflow: hidden; white-space: nowrap;
+  }
+  .marks-table thead th.term1-sub,
+  .marks-table thead th.term2-sub {
+    font-size: 7px; letter-spacing: 0;
   }
   .marks-table thead th.subject-col { text-align: left; width: 18%; }
   .marks-table thead th.term1-group {
@@ -157,6 +161,31 @@
   .grade-dot.poor { background: var(--rc-grade-poor); }
   .pass-text { color: var(--rc-pass); font-weight: 600; font-size: 10px; }
   .fail-text { color: var(--rc-fail); font-weight: 600; font-size: 10px; }
+
+  /* ── GRADING SCALE ── */
+  .grade-scale-wrap { margin: 14px 0 16px; }
+  .grade-scale-title {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--rc-text-muted);
+    text-align: center; margin-bottom: 6px;
+  }
+  .grade-scale {
+    margin: 0 auto; border-collapse: collapse;
+    border: 0.5px solid var(--rc-border-light);
+  }
+  .grade-scale th, .grade-scale td {
+    padding: 4px 14px; font-size: 10px; text-align: center;
+    border-bottom: 0.5px solid var(--rc-border-light);
+  }
+  .grade-scale th {
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    font-size: 9px; color: var(--rc-text-secondary);
+    background: var(--rc-bg-subtle);
+    border-bottom: 1px solid var(--rc-border);
+  }
+  .grade-scale td:first-child { color: var(--rc-text-muted); font-weight: 500; }
+  .grade-scale td:nth-child(2) { font-weight: 700; color: var(--rc-text-primary); }
+  .grade-scale td:last-child { color: var(--rc-text-secondary); font-weight: 500; }
 
   /* Grand Total Row */
   .marks-table tfoot td {
@@ -222,13 +251,16 @@
     min-height: 24px; font-style: italic;
   }
   .result-block { flex: 1; text-align: right; }
+  .result-inline-group { display: inline-flex; flex-direction: column; align-items: center; }
   .result-inline-label {
     font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 3px;
+    text-align: center;
   }
   .result-inline-value {
     font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
     display: inline-block; padding: 4px 14px; border-radius: 6px;
+    text-align: center;
   }
   .result-inline-value.promoted {
     background: rgba(5, 150, 105, 0.1); color: var(--rc-pass);
@@ -249,10 +281,7 @@
     max-height: 55px; max-width: 140px; object-fit: contain;
   }
   .sig-block.principal .sig-img {
-    max-height: 70px; max-width: 160px;
-  }
-  .sig-block.principal .sig-line {
-    margin-top: 30px;
+    max-height: 55px; max-width: 140px;
   }
   .sig-label { font-size: 10px; font-weight: 600; color: var(--rc-text-secondary); }
   .sig-sublabel { font-size: 8px; color: var(--rc-text-muted); margin-top: 1px; }
@@ -389,6 +418,20 @@
 
   <!-- CO_SCHOLASTIC_SECTION -->
 
+  <!-- GRADING SCALE -->
+  <div class="grade-scale-wrap">
+    <div class="grade-scale-title">Grading Scale</div>
+    <table class="grade-scale">
+      <tr><th>Percentage</th><th>Grade</th><th>Remark</th></tr>
+      <tr><td>90 - 100%</td><td>A+</td><td>Outstanding</td></tr>
+      <tr><td>80 - 89%</td><td>A</td><td>Excellent</td></tr>
+      <tr><td>70 - 79%</td><td>B</td><td>Very Good</td></tr>
+      <tr><td>60 - 69%</td><td>C</td><td>Good</td></tr>
+      <tr><td>50 - 59%</td><td>D</td><td>Satisfactory</td></tr>
+      <tr><td>Below 50%</td><td>F</td><td>Needs Improvement</td></tr>
+    </table>
+  </div>
+
   <!-- REMARKS + RESULT -->
   <div class="remarks-result-row">
     <div class="remarks-block">
@@ -396,8 +439,10 @@
       <div class="remarks-text">{{remarks_text}}</div>
     </div>
     <div class="result-block">
-      <div class="result-inline-label">Result</div>
-      <div class="result-inline-value {{result_status_class}}">{{result_status}}</div>
+      <div class="result-inline-group">
+        <div class="result-inline-label">Result</div>
+        <div class="result-inline-value {{result_status_class}}">{{result_status}}</div>
+      </div>
     </div>
   </div>
 
@@ -408,17 +453,12 @@
     <div class="sig-block">
       <div class="sig-line"><!-- CLASS_TEACHER_SIGNATURE_PLACEHOLDER --></div>
       <div class="sig-label">Class Teacher</div>
-      <div class="sig-sublabel">Signature &amp; Seal</div>
-    </div>
-    <div class="sig-block">
-      <div class="sig-line"><!-- EXAM_CELL_SIGNATURE_PLACEHOLDER --></div>
-      <div class="sig-label">Exam Cell Incharge</div>
-      <div class="sig-sublabel">Signature &amp; Seal</div>
+      <div class="sig-sublabel">Signature</div>
     </div>
     <div class="sig-block principal">
       <div class="sig-line"><!-- PRINCIPAL_SIGNATURE_PLACEHOLDER --></div>
       <div class="sig-label">Principal</div>
-      <div class="sig-sublabel">Signature &amp; Seal</div>
+      <div class="sig-sublabel">Signature</div>
     </div>
   </div>
 

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Plus, Search, Calendar, Trash2, X, ClipboardList, Edit,
     Clock, BookOpen, User, MapPin, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, FileText,
-    Award, BarChart3, TrendingUp, Download, RefreshCw, AlertTriangle, Layers, GraduationCap
+    Award, BarChart3, TrendingUp, Download, RefreshCw, AlertTriangle, Layers, GraduationCap, Sparkles
 } from 'lucide-react';
 import { examsService } from '../services/examsService';
 import { classesService } from '../services/classesService';
@@ -18,6 +18,7 @@ import ExamResultsModal from '../components/ExamResultsModal';
 import ResultCard from '../components/ResultCard';
 import BulkDownloadProgress from '../components/BulkDownloadProgress';
 import CustomReportCardModal from '../components/CustomReportCardModal';
+import CoScholasticGradesModal from '../components/CoScholasticGradesModal';
 import toast from 'react-hot-toast';
 import { formatDate } from '../utils/formatDate';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,11 +44,11 @@ const STATUS_RING = {
 const TERMS = ['Term 1', 'Term 2'];
 
 const TERM_EXAM_TYPES = {
-    'Term 1': ['UT1', 'SA1', 'Custom'],
-    'Term 2': ['UT2', 'SA2', 'Custom']
+    'Term 1': ['UT1', 'SA1', 'Assessment', 'Custom'],
+    'Term 2': ['UT2', 'SA2', 'Assessment', 'Custom']
 };
 
-const EXAM_SERIES = ['UT1', 'UT2', 'SA1', 'SA2', 'Custom', 'FA1', 'FA2', 'FA3', 'FA4', 'Unit Test', 'Midterm', 'Final'];
+const EXAM_SERIES = ['UT1', 'UT2', 'SA1', 'SA2', 'Assessment', 'Custom', 'FA1', 'FA2', 'FA3', 'FA4', 'Unit Test', 'Midterm', 'Final'];
 const EXAM_TYPES = ['Written', 'Practical', 'Oral'];
 const EXAM_MODES = ['Offline', 'Online'];
 const EXAM_STATUSES = ['Scheduled', 'Ongoing', 'Completed', 'Cancelled'];
@@ -58,6 +59,7 @@ const SERIES_CONFIG = {
     SA1: { label: 'Summative Assessment 1', short: 'SA1', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-500/10', border: 'border-purple-200 dark:border-purple-500/20' },
     UT2: { label: 'Unit Test 2', short: 'UT2', color: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-500/10', border: 'border-teal-200 dark:border-teal-500/20' },
     SA2: { label: 'Summative Assessment 2', short: 'SA2', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-500/10', border: 'border-orange-200 dark:border-orange-500/20' },
+    Assessment: { label: 'Overall Assessment', short: 'Assessment', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20' },
     Custom: { label: 'Custom Exam', short: 'Custom', color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-500/10', border: 'border-gray-200 dark:border-gray-500/20' },
     // Keep legacy entries for backwards compat display
     FA1: { label: 'FA 1', short: 'FA1', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10', border: 'border-blue-200 dark:border-blue-500/20' },
@@ -101,7 +103,7 @@ function calcDuration(start, end) {
 }
 
 /* ── Exam series sort order ── */
-const SERIES_ORDER = ['UT1', 'SA1', 'UT2', 'SA2', 'Custom', 'FA1', 'FA2', 'FA3', 'FA4', 'Unit Test', 'Midterm', 'Final'];
+const SERIES_ORDER = ['UT1', 'SA1', 'UT2', 'SA2', 'Assessment', 'Custom', 'FA1', 'FA2', 'FA3', 'FA4', 'Unit Test', 'Midterm', 'Final'];
 function seriesSortKey(s) {
     const idx = SERIES_ORDER.indexOf(s);
     return idx >= 0 ? idx : 999;
@@ -138,6 +140,7 @@ const Exams = () => {
     const [rcStudentSearch, setRcStudentSearch] = useState('');
     const [rcDownloading, setRcDownloading] = useState({}); // { [studentId]: true }
     const [showCustomReportCard, setShowCustomReportCard] = useState(false);
+    const [coSchTarget, setCoSchTarget] = useState(null); // { studentId, studentName, sessionId }
 
     /* ── Accordion collapse state ── */
     const [collapsedClasses, setCollapsedClasses] = useState(new Set());
@@ -1355,6 +1358,21 @@ const Exams = () => {
                                                                 <FileText className="h-3.5 w-3.5" />
                                                                 {rcDownloading[`${sid}-blank`] ? '...' : 'Blank'}
                                                             </button>
+                                                            <button
+                                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10 hover:bg-primary-100 dark:hover:bg-primary-500/20 transition-colors"
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        const sessionRes = await academicSessionsService.getActive();
+                                                                        const session = sessionRes?.data || sessionRes;
+                                                                        if (!session?._id) { toast.error('No active academic session found.'); return; }
+                                                                        setCoSchTarget({ studentId: sid, studentName: sname, sessionId: session._id });
+                                                                    } catch { toast.error('Failed to load session'); }
+                                                                }}
+                                                                title="Edit co-scholastic grades"
+                                                            >
+                                                                <Sparkles className="h-3.5 w-3.5" />
+                                                                Co-Sch
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1699,6 +1717,15 @@ const Exams = () => {
                     subjects={allSubjects}
                 />
             )}
+
+            {/* Co-Scholastic grades editor */}
+            <CoScholasticGradesModal
+                open={!!coSchTarget}
+                studentId={coSchTarget?.studentId}
+                sessionId={coSchTarget?.sessionId}
+                studentName={coSchTarget?.studentName}
+                onClose={() => setCoSchTarget(null)}
+            />
         </div>
     );
 };

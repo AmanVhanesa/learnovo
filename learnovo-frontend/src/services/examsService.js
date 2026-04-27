@@ -132,6 +132,17 @@ export const examsService = {
         return res.data
     },
 
+    // ── Co-Scholastic Grades (per-student) ──
+    getCoScholasticGrades: async (studentId, sessionId) => {
+        const res = await api.get(`/report-cards/co-scholastic/${studentId}/${sessionId}`)
+        return res.data
+    },
+
+    saveCoScholasticGrades: async (studentId, sessionId, areas) => {
+        const res = await api.put(`/report-cards/co-scholastic/${studentId}/${sessionId}`, { areas })
+        return res.data
+    },
+
     // ── Custom / Manual Report Card ──
     generateCustomReportCardPDF: async (payload) => {
         const res = await api.post('/report-cards/custom/pdf', payload)

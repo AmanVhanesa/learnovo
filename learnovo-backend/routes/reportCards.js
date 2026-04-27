@@ -19,6 +19,61 @@ const router = express.Router();
 
 const examPlanGates = [planGate.requireActiveSubscription, planGate.checkGradesAndExams];
 
+const CoScholasticGrade = require('../models/CoScholasticGrade');
+const Settings = require('../models/Settings');
+
+// @desc    Get co-scholastic grades for a student in a session
+// @route   GET /api/report-cards/co-scholastic/:studentId/:sessionId
+// @access  Private (admin, teacher; student can read own)
+router.get('/co-scholastic/:studentId/:sessionId', protect, examPlanGates, async(req, res, next) => {
+  try {
+    const { studentId, sessionId } = req.params;
+    if (req.user.role === 'student' && studentId !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const tenantId = req.user.tenantId;
+    const settings = await Settings.findOne({ tenantId }).lean();
+    const settingsAreas = (settings?.academic?.coScholasticAreas || [])
+      .filter(a => a.isActive !== false && a.area)
+      .map(a => a.area);
+    const saved = await CoScholasticGrade.findOne({ tenantId, studentId, academicSessionId: sessionId }).lean();
+    const savedMap = new Map((saved?.areas || []).map(a => [a.area, a]));
+    const areas = settingsAreas.map(area => {
+      const s = savedMap.get(area);
+      return { area, term1Grade: s?.term1Grade || '', term2Grade: s?.term2Grade || '' };
+    });
+    for (const a of (saved?.areas || [])) {
+      if (!settingsAreas.includes(a.area) && a.area) {
+        areas.push({ area: a.area, term1Grade: a.term1Grade || '', term2Grade: a.term2Grade || '' });
+      }
+    }
+    res.json({ success: true, data: { areas } });
+  } catch (err) { next(err); }
+});
+
+// @desc    Save co-scholastic grades for a student in a session
+// @route   PUT /api/report-cards/co-scholastic/:studentId/:sessionId
+// @access  Private (admin, teacher)
+router.put('/co-scholastic/:studentId/:sessionId', protect, examPlanGates, authorize('admin', 'teacher'), async(req, res, next) => {
+  try {
+    const { studentId, sessionId } = req.params;
+    const incoming = Array.isArray(req.body?.areas) ? req.body.areas : [];
+    const cleaned = incoming
+      .filter(a => a && typeof a.area === 'string' && a.area.trim())
+      .map(a => ({
+        area: a.area.trim(),
+        term1Grade: (a.term1Grade || '').toString().trim(),
+        term2Grade: (a.term2Grade || '').toString().trim()
+      }));
+    const doc = await CoScholasticGrade.findOneAndUpdate(
+      { tenantId: req.user.tenantId, studentId, academicSessionId: sessionId },
+      { $set: { areas: cleaned } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    res.json({ success: true, data: { areas: doc.areas } });
+  } catch (err) { next(err); }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // INDIVIDUAL BLANK REPORT CARD
 // ─────────────────────────────────────────────────────────────────────────────

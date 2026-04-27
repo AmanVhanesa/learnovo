@@ -4,6 +4,27 @@ const Settings = require('../models/Settings');
 const Section = require('../models/Section');
 const Exam = require('../models/Exam');
 const AcademicSession = require('../models/AcademicSession');
+const CoScholasticGrade = require('../models/CoScholasticGrade');
+
+async function buildCoScholastic(tenantId, studentId, sessionId, settings) {
+  const settingsAreas = (settings?.academic?.coScholasticAreas || [])
+    .filter(a => a.isActive !== false && a.area)
+    .map(a => a.area);
+  const saved = await CoScholasticGrade.findOne({ tenantId, studentId, academicSessionId: sessionId }).lean();
+  const savedMap = new Map((saved?.areas || []).map(a => [a.area, a]));
+
+  const merged = settingsAreas.map(area => {
+    const s = savedMap.get(area);
+    return { area, term1Grade: s?.term1Grade || '', term2Grade: s?.term2Grade || '' };
+  });
+
+  for (const a of (saved?.areas || [])) {
+    if (!settingsAreas.includes(a.area) && a.area) {
+      merged.push({ area: a.area, term1Grade: a.term1Grade || '', term2Grade: a.term2Grade || '' });
+    }
+  }
+  return merged;
+}
 
 function calculateGrade(percentage) {
   if (percentage >= 90) return 'A+';
@@ -484,9 +505,7 @@ const reportCardService = {
       term1: { exams: term1Exams },
       term2: { exams: term2Exams },
       subjectRows,
-      coScholastic: (settings?.academic?.coScholasticAreas || [])
-        .filter(a => a.isActive !== false && a.area)
-        .map(a => ({ area: a.area, term1Grade: 'A', term2Grade: 'A' })),
+      coScholastic: await buildCoScholastic(tenantId, studentId, sessionId, settings),
       summary: {
         term1Total: gT1Total, term1Max: gT1Max, term1Percentage: gT1Pct, term1Grade: calculateGrade(gT1Pct),
         term2Total: gT2Total, term2Max: gT2Max, term2Percentage: gT2Pct, term2Grade: calculateGrade(gT2Pct),
