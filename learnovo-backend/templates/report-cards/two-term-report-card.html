@@ -27,7 +27,7 @@
     --rc-term2-bg: #ECFDF5;
   }
 
-  @page { size: A4; margin: 10mm 15mm; }
+  @page { size: A4; margin: 7mm 12mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -36,12 +36,12 @@
     color: var(--rc-text-primary);
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    width: 180mm;
+    width: 186mm;
     overflow: hidden;
   }
 
   .page {
-    width: 180mm; min-height: 277mm;
+    width: 186mm; max-height: 283mm;
     background: #FFFFFF; padding: 0; margin: 0; position: relative;
     page-break-inside: avoid; page-break-after: avoid;
     overflow: hidden;
@@ -50,79 +50,79 @@
   .page-content { flex: 1; }
 
   /* ── HEADER ── */
-  .header { position: relative; text-align: center; padding: 0 0 8px; margin-bottom: 0; }
+  .header { position: relative; text-align: center; padding: 0 0 4px; margin-bottom: 0; }
   .logo-wrap {
     position: absolute; left: 0; top: 0;
-    width: 80px; height: 80px;
+    width: 64px; height: 64px;
     display: flex; align-items: center; justify-content: center;
     border-radius: 8px; overflow: hidden;
   }
-  .logo-wrap img, .logo-wrap svg { width: 80px; height: 80px; object-fit: contain; }
-  .school-logo { width: 80px; height: 80px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+  .logo-wrap img, .logo-wrap svg { width: 64px; height: 64px; object-fit: contain; }
+  .school-logo { width: 64px; height: 64px; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
   .school-logo img { width: 100%; height: 100%; object-fit: contain; }
   .school-logo-fallback {
-    width: 80px; height: 80px; border-radius: 8px;
+    width: 64px; height: 64px; border-radius: 8px;
     background: var(--rc-primary);
     display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; flex-shrink: 0;
+    color: white; font-weight: 700; font-size: 18px; letter-spacing: -0.02em; flex-shrink: 0;
   }
 
   .school-info { text-align: center; }
   .school-name {
     font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-    font-size: 20px; font-weight: 800; color: #1F6F6D;
+    font-size: 24px; font-weight: 800; color: #1F6F6D;
     letter-spacing: 1.5px; line-height: 1.15; text-transform: uppercase;
     word-wrap: break-word; overflow-wrap: break-word;
   }
-  .school-address { font-size: 11px; color: #374151; font-weight: 500; margin-top: 3px; line-height: 1.3; }
-  .school-contact { font-size: 10px; color: #374151; font-weight: 500; margin-top: 2px; }
+  .school-address { font-size: 13px; color: #374151; font-weight: 500; margin-top: 3px; line-height: 1.3; }
+  .school-contact { font-size: 12px; color: #374151; font-weight: 500; margin-top: 2px; }
   .aff-row { display: flex; justify-content: center; gap: 16px; margin-top: 4px; flex-wrap: wrap; }
-  .aff-line { font-size: 10px; color: #374151; font-weight: 500; line-height: 1.4; }
+  .aff-line { font-size: 12px; color: #374151; font-weight: 500; line-height: 1.4; }
   .aff-line b { font-weight: 700; color: #111827; }
 
-  .accent-line { height: 1.5px; background: #9CA3AF; margin: 8px 0 10px; border: none; }
+  .accent-line { height: 1px; background: #9CA3AF; margin: 5px 0 6px; border: none; }
 
   /* ── TITLE ROW ── */
   .report-title-row {
-    text-align: center; margin-bottom: 10px;
+    text-align: center; margin-bottom: 6px;
   }
   .report-title {
-    font-size: 13px; font-weight: 700; color: var(--rc-primary);
+    font-size: 16px; font-weight: 700; color: var(--rc-primary);
     text-transform: uppercase; letter-spacing: 0.1em;
   }
 
   /* ── STUDENT INFO CARD ── */
   .student-card {
     background: var(--rc-bg-subtle); border-radius: 8px;
-    padding: 10px 14px; margin-bottom: 10px;
+    padding: 7px 12px; margin-bottom: 6px;
   }
-  .student-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px 16px; }
+  .student-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 5px 14px; }
   .info-label {
-    font-size: 9px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 1px;
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 2px;
   }
-  .info-value { font-size: 12px; font-weight: 600; color: var(--rc-text-primary); }
+  .info-value { font-size: 14px; font-weight: 600; color: var(--rc-text-primary); }
 
   /* ── SECTION LABEL ── */
   .section-label {
-    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.12em; color: var(--rc-text-muted); margin-bottom: 6px;
   }
 
   /* ── MARKS TABLE ── */
-  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
+  .marks-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; table-layout: fixed; }
 
   /* Two-row header */
   .marks-table thead th {
-    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.03em; color: var(--rc-text-primary);
-    padding: 5px 2px; text-align: center;
+    padding: 4px 2px; text-align: center;
     border-bottom: 1.5px solid var(--rc-border);
     overflow: hidden; white-space: nowrap;
   }
   .marks-table thead th.term1-sub,
   .marks-table thead th.term2-sub {
-    font-size: 7px; letter-spacing: 0;
+    font-size: 8px; letter-spacing: 0;
   }
   .marks-table thead th.subject-col { text-align: left; width: 18%; }
   .marks-table thead th.term1-group {
@@ -140,15 +140,15 @@
 
   /* Body */
   .marks-table tbody td {
-    font-size: 10px; color: var(--rc-text-primary);
-    padding: 5px 2px; text-align: center;
+    font-size: 11px; color: var(--rc-text-primary);
+    padding: 3px 2px; text-align: center;
     border-bottom: 0.5px solid var(--rc-border-light); font-weight: 500;
     overflow: hidden;
   }
   .marks-table tbody tr:nth-child(even) { background: rgba(249, 250, 251, 0.5); }
   .marks-table tbody td.subject-cell {
     text-align: left; font-weight: 600; color: var(--rc-text-primary);
-    font-size: 9px; word-wrap: break-word; overflow-wrap: break-word;
+    font-size: 10px; word-wrap: break-word; overflow-wrap: break-word;
   }
   .marks-table tbody td.no-data { color: #D1D5DB; }
 
@@ -159,13 +159,13 @@
   .grade-dot.good { background: var(--rc-grade-good); }
   .grade-dot.average { background: var(--rc-grade-average); }
   .grade-dot.poor { background: var(--rc-grade-poor); }
-  .pass-text { color: var(--rc-pass); font-weight: 600; font-size: 10px; }
-  .fail-text { color: var(--rc-fail); font-weight: 600; font-size: 10px; }
+  .pass-text { color: var(--rc-pass); font-weight: 600; font-size: 12px; }
+  .fail-text { color: var(--rc-fail); font-weight: 600; font-size: 12px; }
 
   /* ── GRADING SCALE ── */
-  .grade-scale-wrap { margin: 14px 0 16px; }
+  .grade-scale-wrap { margin: 6px 0 6px; }
   .grade-scale-title {
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.12em; color: var(--rc-text-muted);
     text-align: center; margin-bottom: 6px;
   }
@@ -174,7 +174,7 @@
     border: 0.5px solid var(--rc-border-light);
   }
   .grade-scale th, .grade-scale td {
-    padding: 4px 14px; font-size: 10px; text-align: center;
+    padding: 3px 12px; font-size: 10px; text-align: center;
     border-bottom: 0.5px solid var(--rc-border-light);
   }
   .grade-scale th {
@@ -189,8 +189,8 @@
 
   /* Grand Total Row */
   .marks-table tfoot td {
-    font-size: 10px; font-weight: 700; color: var(--rc-text-primary);
-    padding: 6px 2px; text-align: center;
+    font-size: 11px; font-weight: 700; color: var(--rc-text-primary);
+    padding: 4px 2px; text-align: center;
     border-top: 1.5px solid var(--rc-primary); background: var(--rc-primary-light);
   }
   .marks-table tfoot td.subject-cell { text-align: left; }
@@ -199,15 +199,15 @@
   .summary-row {
     display: flex; justify-content: space-between; align-items: center;
     background: var(--rc-bg-subtle); border-radius: 8px;
-    padding: 8px 14px; margin-bottom: 8px; gap: 8px;
+    padding: 5px 12px; margin-bottom: 6px; gap: 8px;
   }
   .summary-block { text-align: center; flex: 1; }
   .summary-block-title {
-    font-size: 8px; font-weight: 700; text-transform: uppercase;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 3px;
   }
   .summary-block-content {
-    font-size: 10px; font-weight: 600; color: var(--rc-text-primary); line-height: 1.5;
+    font-size: 12px; font-weight: 600; color: var(--rc-text-primary); line-height: 1.5;
   }
   .summary-divider {
     width: 1px; height: 30px; background: var(--rc-border-light); flex-shrink: 0;
@@ -215,8 +215,8 @@
 
   /* ── RESULT BANNER ── */
   .result-banner {
-    border-radius: 0 8px 8px 0; padding: 10px 16px;
-    margin-bottom: 8px; display: flex;
+    border-radius: 0 8px 8px 0; padding: 6px 14px;
+    margin-bottom: 6px; display: flex;
     align-items: center; justify-content: space-between;
   }
   .result-banner.pass { border-left: 3px solid var(--rc-pass); background: rgba(5, 150, 105, 0.04); }
@@ -225,12 +225,12 @@
   .result-dot { width: 8px; height: 8px; border-radius: 50%; }
   .result-dot.pass { background: var(--rc-pass); }
   .result-dot.fail { background: var(--rc-fail); }
-  .result-label { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
+  .result-label { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; }
   .result-label.pass { color: var(--rc-pass); }
   .result-label.fail { color: var(--rc-fail); }
   .result-details { text-align: right; }
-  .result-perf { font-size: 11px; color: var(--rc-text-secondary); }
-  .result-stats { font-size: 10px; color: var(--rc-text-muted); }
+  .result-perf { font-size: 13px; color: var(--rc-text-secondary); }
+  .result-stats { font-size: 12px; color: var(--rc-text-muted); }
 
   /* ── CO-SCHOLASTIC ── */
   .co-scholastic-section { margin-bottom: 8px; }
@@ -238,28 +238,28 @@
   /* ── REMARKS + RESULT ── */
   .remarks-result-row {
     display: flex; justify-content: space-between; align-items: flex-start;
-    margin-bottom: 8px; gap: 20px;
+    margin-bottom: 6px; gap: 18px;
   }
   .remarks-block { flex: 2; }
   .remarks-label {
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 3px;
   }
   .remarks-text {
-    font-size: 11px; color: var(--rc-text-secondary); line-height: 1.5;
+    font-size: 13px; color: var(--rc-text-secondary); line-height: 1.5;
     padding: 6px 0; border-bottom: 0.5px solid var(--rc-border-light);
-    min-height: 24px; font-style: italic;
+    min-height: 26px; font-style: italic;
   }
   .result-block { flex: 1; text-align: right; }
   .result-inline-group { display: inline-flex; flex-direction: column; align-items: center; }
   .result-inline-label {
-    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
     letter-spacing: 0.1em; color: var(--rc-text-muted); margin-bottom: 3px;
     text-align: center;
   }
   .result-inline-value {
-    font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
-    display: inline-block; padding: 4px 14px; border-radius: 6px;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.04em;
+    display: inline-block; padding: 5px 16px; border-radius: 6px;
     text-align: center;
   }
   .result-inline-value.promoted {
@@ -270,25 +270,25 @@
   }
 
   /* ── SIGNATURES ── */
-  .signatures { display: flex; justify-content: space-between; padding-top: 4px; margin-top: auto; margin-bottom: 12px; }
+  .signatures { display: flex; justify-content: space-between; padding-top: 2px; margin-top: auto; margin-bottom: 6px; }
   .sig-block { text-align: center; width: 150px; }
   .sig-line {
     width: 100%; height: 1px; background: var(--rc-border);
-    margin-bottom: 6px; margin-top: 40px; position: relative;
+    margin-bottom: 4px; margin-top: 26px; position: relative;
   }
   .sig-img {
     position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
-    max-height: 55px; max-width: 140px; object-fit: contain;
+    max-height: 40px; max-width: 130px; object-fit: contain;
   }
   .sig-block.principal .sig-img {
-    max-height: 55px; max-width: 140px;
+    max-height: 40px; max-width: 130px;
   }
-  .sig-label { font-size: 10px; font-weight: 600; color: var(--rc-text-secondary); }
-  .sig-sublabel { font-size: 8px; color: var(--rc-text-muted); margin-top: 1px; }
+  .sig-label { font-size: 12px; font-weight: 600; color: var(--rc-text-secondary); }
+  .sig-sublabel { font-size: 10px; color: var(--rc-text-muted); margin-top: 1px; }
 
   /* ── FOOTER ── */
-  .footer { text-align: center; padding-top: 8px; border-top: 0.5px solid var(--rc-border-light); }
-  .footer-text { font-size: 9px; color: var(--rc-text-muted); letter-spacing: 0.02em; font-style: italic; }
+  .footer { text-align: center; padding-top: 4px; border-top: 0.5px solid var(--rc-border-light); }
+  .footer-text { font-size: 11px; color: var(--rc-text-muted); letter-spacing: 0.02em; font-style: italic; }
 
   @media print { body { background: white; } .page { padding: 0; } }
 </style>
@@ -415,6 +415,8 @@
       <div class="result-perf">{{result_detail}}</div>
     </div>
   </div>
+
+  <!-- ATTENDANCE_SECTION -->
 
   <!-- CO_SCHOLASTIC_SECTION -->
 

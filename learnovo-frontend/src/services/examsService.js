@@ -143,6 +143,17 @@ export const examsService = {
         return res.data
     },
 
+    // ── Attendance (per-student, two-term) ──
+    getAttendance: async (studentId, sessionId) => {
+        const res = await api.get(`/report-cards/attendance/${studentId}/${sessionId}`)
+        return res.data
+    },
+
+    saveAttendance: async (studentId, sessionId, payload) => {
+        const res = await api.put(`/report-cards/attendance/${studentId}/${sessionId}`, payload)
+        return res.data
+    },
+
     // ── Custom / Manual Report Card ──
     generateCustomReportCardPDF: async (payload) => {
         const res = await api.post('/report-cards/custom/pdf', payload)

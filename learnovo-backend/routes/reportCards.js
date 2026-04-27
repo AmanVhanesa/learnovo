@@ -20,6 +20,7 @@ const router = express.Router();
 const examPlanGates = [planGate.requireActiveSubscription, planGate.checkGradesAndExams];
 
 const CoScholasticGrade = require('../models/CoScholasticGrade');
+const StudentAttendanceRecord = require('../models/StudentAttendanceRecord');
 const Settings = require('../models/Settings');
 
 // @desc    Get co-scholastic grades for a student in a session
@@ -73,6 +74,63 @@ router.put('/co-scholastic/:studentId/:sessionId', protect, examPlanGates, autho
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
     res.json({ success: true, data: { areas: doc.areas } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// @desc    Get attendance for a student in a session (two-term)
+// @route   GET /api/report-cards/attendance/:studentId/:sessionId
+// @access  Private (admin, teacher; student can read own)
+router.get('/attendance/:studentId/:sessionId', protect, examPlanGates, async(req, res, next) => {
+  try {
+    const { studentId, sessionId } = req.params;
+    if (req.user.role === 'student' && studentId !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+    const tenantId = req.user.tenantId;
+    const saved = await StudentAttendanceRecord.findOne({ tenantId, studentId, academicSessionId: sessionId }).lean();
+    res.json({
+      success: true,
+      data: {
+        term1WorkingDays: saved?.term1WorkingDays ?? null,
+        term1PresentDays: saved?.term1PresentDays ?? null,
+        term2WorkingDays: saved?.term2WorkingDays ?? null,
+        term2PresentDays: saved?.term2PresentDays ?? null
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// @desc    Save attendance for a student in a session (two-term)
+// @route   PUT /api/report-cards/attendance/:studentId/:sessionId
+// @access  Private (admin, teacher)
+router.put('/attendance/:studentId/:sessionId', protect, examPlanGates, authorize('admin', 'teacher'), async(req, res, next) => {
+  try {
+    const { studentId, sessionId } = req.params;
+    const num = (v) => (v === '' || v === null || v === undefined) ? null : (isNaN(Number(v)) ? null : Number(v));
+    const update = {
+      term1WorkingDays: num(req.body?.term1WorkingDays),
+      term1PresentDays: num(req.body?.term1PresentDays),
+      term2WorkingDays: num(req.body?.term2WorkingDays),
+      term2PresentDays: num(req.body?.term2PresentDays)
+    };
+    const doc = await StudentAttendanceRecord.findOneAndUpdate(
+      { tenantId: req.user.tenantId, studentId, academicSessionId: sessionId },
+      { $set: update },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+    res.json({
+      success: true,
+      data: {
+        term1WorkingDays: doc.term1WorkingDays,
+        term1PresentDays: doc.term1PresentDays,
+        term2WorkingDays: doc.term2WorkingDays,
+        term2PresentDays: doc.term2PresentDays
+      }
+    });
   } catch (err) {
     next(err);
   }
@@ -523,7 +581,7 @@ router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, re
 
     } else if (reportType === 'two-term') {
       // ─── TWO-TERM Report Card ───
-      const { term1, term2, subjects, coScholastic, sessionName } = req.body;
+      const { term1, term2, subjects, coScholastic, sessionName, attendance } = req.body;
       const resultText = req.body.result || '';
 
       if (!term1?.exams?.length || !term2?.exams?.length) {
@@ -596,6 +654,7 @@ router.post('/custom/pdf', protect, authorize('admin', 'teacher'), async(req, re
         term2: { exams: t2Exams },
         subjectRows,
         coScholastic: coScholastic || [],
+        attendance: attendance || null,
         summary: {
           term1Total: gT1Total, term1Max: gT1Max, term1Percentage: gT1Pct, term1Grade: calculateGrade(gT1Pct),
           term2Total: gT2Total, term2Max: gT2Max, term2Percentage: gT2Pct, term2Grade: calculateGrade(gT2Pct),

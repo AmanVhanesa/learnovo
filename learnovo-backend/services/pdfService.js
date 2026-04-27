@@ -378,7 +378,7 @@ function buildFinalReportCardPlaceholders(data) {
 // ── Two-Term Report Card helpers ──
 
 function buildTwoTermPlaceholders(data) {
-  const { school, student, session, term1, term2, subjectRows, coScholastic, summary, remarks, result } = data;
+  const { school, student, session, term1, term2, subjectRows, coScholastic, summary, remarks, result, attendance } = data;
   const brandColor = school.brand_color || school.brandColor || '#1E3A5F';
 
   // Term exam headers
@@ -386,11 +386,11 @@ function buildTwoTermPlaceholders(data) {
   const t2Exams = term2.exams || [];
 
   const term1ExamHeaders = t1Exams.map(e =>
-    `<th class="num term1-sub">${escapeHtml(e.name)}<br><span style="font-weight:400;font-size:7px;color:#6B7280">(${e.maxMarks})</span></th>`
+    `<th class="num term1-sub">${escapeHtml(e.name)}<br><span style="font-weight:400;font-size:9px;color:#6B7280">(${e.maxMarks})</span></th>`
   ).join('');
 
   const term2ExamHeaders = t2Exams.map(e =>
-    `<th class="num term2-sub">${escapeHtml(e.name)}<br><span style="font-weight:400;font-size:7px;color:#6B7280">(${e.maxMarks})</span></th>`
+    `<th class="num term2-sub">${escapeHtml(e.name)}<br><span style="font-weight:400;font-size:9px;color:#6B7280">(${e.maxMarks})</span></th>`
   ).join('');
 
   // Subject rows
@@ -444,18 +444,68 @@ function buildTwoTermPlaceholders(data) {
   let coScholasticHtml = '';
   if (coScholastic && coScholastic.length > 0 && coScholastic.some(c => c.term1Grade || c.term2Grade)) {
     const rows = coScholastic.filter(c => c.area).map(c =>
-      `<tr><td style="text-align:left;padding:4px 8px;font-size:10px">${escapeHtml(c.area)}</td><td style="text-align:center;padding:4px;font-size:10px;font-weight:600">${escapeHtml(c.term1Grade || '\u2014')}</td><td style="text-align:center;padding:4px;font-size:10px;font-weight:600">${escapeHtml(c.term2Grade || '\u2014')}</td></tr>`
+      `<tr><td style="text-align:left;padding:3px 8px;font-size:11px">${escapeHtml(c.area)}</td><td style="text-align:center;padding:3px;font-size:11px;font-weight:600">${escapeHtml(c.term1Grade || '\u2014')}</td><td style="text-align:center;padding:3px;font-size:11px;font-weight:600">${escapeHtml(c.term2Grade || '\u2014')}</td></tr>`
     ).join('');
     coScholasticHtml = `
-      <div style="margin-bottom:12px">
+      <div style="margin-bottom:6px">
         <div class="section-label">Co-Scholastic Areas</div>
         <table style="width:100%;border-collapse:collapse;table-layout:fixed">
           <thead><tr>
-            <th style="text-align:left;padding:4px 8px;font-size:8px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:60%">Area</th>
-            <th style="text-align:center;padding:4px;font-size:8px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">Term 1</th>
-            <th style="text-align:center;padding:4px;font-size:8px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">Term 2</th>
+            <th style="text-align:left;padding:3px 8px;font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:60%">Area</th>
+            <th style="text-align:center;padding:3px;font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">Term 1</th>
+            <th style="text-align:center;padding:3px;font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">Term 2</th>
           </tr></thead>
           <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // Attendance section
+  let attendanceHtml = '';
+  if (attendance && (
+    attendance.term1WorkingDays != null || attendance.term1PresentDays != null ||
+    attendance.term2WorkingDays != null || attendance.term2PresentDays != null
+  )) {
+    const t1Working = attendance.term1WorkingDays;
+    const t1Present = attendance.term1PresentDays;
+    const t2Working = attendance.term2WorkingDays;
+    const t2Present = attendance.term2PresentDays;
+    const pct = (p, w) => (w && Number(w) > 0 && p != null) ? `${Math.round((Number(p) / Number(w)) * 1000) / 10}%` : '\u2014';
+    const dash = v => (v == null || v === '') ? '\u2014' : v;
+    const totalWorking = (Number(t1Working) || 0) + (Number(t2Working) || 0);
+    const totalPresent = (Number(t1Present) || 0) + (Number(t2Present) || 0);
+    const totalPct = totalWorking > 0 ? `${Math.round((totalPresent / totalWorking) * 1000) / 10}%` : '\u2014';
+
+    attendanceHtml = `
+      <div style="margin-bottom:6px">
+        <div class="section-label">Attendance</div>
+        <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+          <thead><tr>
+            <th style="text-align:left;padding:3px 8px;font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:40%">Term</th>
+            <th style="text-align:center;padding:3px;font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">Working Days</th>
+            <th style="text-align:center;padding:3px;font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">Present Days</th>
+            <th style="text-align:center;padding:3px;font-size:9px;font-weight:700;text-transform:uppercase;border-bottom:1.5px solid #D1D5DB;width:20%">%</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td style="text-align:left;padding:3px 8px;font-size:11px">Term 1</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:600">${dash(t1Working)}</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:600">${dash(t1Present)}</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:700">${pct(t1Present, t1Working)}</td>
+            </tr>
+            <tr style="background:rgba(249,250,251,0.5)">
+              <td style="text-align:left;padding:3px 8px;font-size:11px">Term 2</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:600">${dash(t2Working)}</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:600">${dash(t2Present)}</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:700">${pct(t2Present, t2Working)}</td>
+            </tr>
+            <tr>
+              <td style="text-align:left;padding:3px 8px;font-size:11px;font-weight:700;border-top:1px solid #D1D5DB">Overall</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:700;border-top:1px solid #D1D5DB">${totalWorking || '\u2014'}</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:700;border-top:1px solid #D1D5DB">${totalPresent || '\u2014'}</td>
+              <td style="text-align:center;padding:3px;font-size:11px;font-weight:700;border-top:1px solid #D1D5DB;color:#1F6F6D">${totalPct}</td>
+            </tr>
+          </tbody>
         </table>
       </div>`;
   }
@@ -502,6 +552,7 @@ function buildTwoTermPlaceholders(data) {
     result_text: isPassed ? 'PASSED' : 'FAILED',
     result_detail: `Overall: ${summary.overallPercentage}% \u00B7 Grade: ${summary.overallGrade}`,
     co_scholastic_html: coScholasticHtml,
+    attendance_html: attendanceHtml,
     remarks_text: remarks || '',
     result_status: result || (isPassed ? 'Promoted' : 'Not Promoted'),
     result_status_class: (result || '').toLowerCase().includes('not') || (result || '').toLowerCase().includes('detained') || !isPassed ? 'not-promoted' : 'promoted'
@@ -958,6 +1009,10 @@ const pdfService = {
     // Inject co-scholastic section
     html = html.replace('<!-- CO_SCHOLASTIC_SECTION -->', placeholders.co_scholastic_html || '');
     delete placeholders.co_scholastic_html;
+
+    // Inject attendance section
+    html = html.replace('<!-- ATTENDANCE_SECTION -->', placeholders.attendance_html || '');
+    delete placeholders.attendance_html;
 
     html = fillTemplate(html, placeholders);
 

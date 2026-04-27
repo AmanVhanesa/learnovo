@@ -10,7 +10,7 @@ import { studentsService } from '../services/studentsService';
 import toast from 'react-hot-toast';
 import Select from './ui/Select';
 
-const EXAM_SERIES_OPTIONS = ['UT1', 'SA1', 'UT2', 'SA2', 'Custom'];
+const EXAM_SERIES_OPTIONS = ['UT1', 'SA1', 'HY1', 'CCE1', 'UT2', 'SA2', 'HY2', 'CCE2', 'Custom'];
 
 const EMPTY_SUBJECT = { name: '', totalMarks: 100, passingMarks: 33, marksObtained: '' };
 
@@ -98,6 +98,14 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
         { area: 'Discipline', term1Grade: '', term2Grade: '' }
     ]);
     const [resultText, setResultText] = useState('Promoted');
+
+    /* ── Two-Term: Attendance ── */
+    const [attendance, setAttendance] = useState({
+        term1WorkingDays: '',
+        term1PresentDays: '',
+        term2WorkingDays: '',
+        term2PresentDays: ''
+    });
 
     /* ── General ── */
     const [remarks, setRemarks] = useState('');
@@ -223,6 +231,10 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                     { area: 'Discipline', term1Grade: '', term2Grade: '' }
                 ]);
                 setResultText(payload.result || 'Promoted');
+                setAttendance(payload.attendance || {
+                    term1WorkingDays: '', term1PresentDays: '',
+                    term2WorkingDays: '', term2PresentDays: ''
+                });
             } else {
                 setExams((payload.exams || []).map(e => ({ name: e.name || '', examSeries: e.examSeries || 'Midterm' })));
                 setCumulativeSubjects((payload.subjects || []).map(s => ({
@@ -619,7 +631,13 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                     coScholastic: validCoSch,
                     sessionName: selectedSession?.name || '',
                     remarks,
-                    result: resultText
+                    result: resultText,
+                    attendance: {
+                        term1WorkingDays: attendance.term1WorkingDays === '' ? null : Number(attendance.term1WorkingDays),
+                        term1PresentDays: attendance.term1PresentDays === '' ? null : Number(attendance.term1PresentDays),
+                        term2WorkingDays: attendance.term2WorkingDays === '' ? null : Number(attendance.term2WorkingDays),
+                        term2PresentDays: attendance.term2PresentDays === '' ? null : Number(attendance.term2PresentDays)
+                    }
                 };
             } else {
                 // Cumulative payload
@@ -1376,8 +1394,62 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                                 {errors.twoTermSubjects && <p className="text-xs text-red-500 mt-1">{errors.twoTermSubjects}</p>}
                             </SectionBlock>
 
+                            {/* ── Attendance ── */}
+                            <SectionBlock title="Attendance (Optional)" icon={<UserCheck className="h-4 w-4" />}>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide mb-2">Term 1</div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 dark:text-[#8E8E93]">Working Days</label>
+                                                <input type="number" min="0" className="input text-sm w-full" value={attendance.term1WorkingDays} onChange={e => setAttendance(p => ({ ...p, term1WorkingDays: e.target.value }))} placeholder="e.g. 100" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 dark:text-[#8E8E93]">Present Days</label>
+                                                <input type="number" min="0" className="input text-sm w-full" value={attendance.term1PresentDays} onChange={e => setAttendance(p => ({ ...p, term1PresentDays: e.target.value }))} placeholder="e.g. 95" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide mb-2">Term 2</div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 dark:text-[#8E8E93]">Working Days</label>
+                                                <input type="number" min="0" className="input text-sm w-full" value={attendance.term2WorkingDays} onChange={e => setAttendance(p => ({ ...p, term2WorkingDays: e.target.value }))} placeholder="e.g. 100" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 dark:text-[#8E8E93]">Present Days</label>
+                                                <input type="number" min="0" className="input text-sm w-full" value={attendance.term2PresentDays} onChange={e => setAttendance(p => ({ ...p, term2PresentDays: e.target.value }))} placeholder="e.g. 95" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </SectionBlock>
+
                             {/* ── Co-Scholastic Areas ── */}
                             <SectionBlock title="Co-Scholastic Areas (Optional)" icon={<GraduationCap className="h-4 w-4" />}>
+                                <div className="flex flex-wrap items-center gap-2 mb-3">
+                                    <span className="text-[11px] text-gray-500 dark:text-[#8E8E93]">Quick fill:</span>
+                                    {['A', 'B', 'C', 'D', 'E'].map(g => (
+                                        <button
+                                            key={`fill-${g}`}
+                                            type="button"
+                                            onClick={() => setCoScholastic(prev => prev.map(c => c.area.trim() ? { ...c, term1Grade: g, term2Grade: g } : c))}
+                                            className="px-2.5 py-1 rounded-md text-[11px] font-semibold border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-700 dark:text-gray-200 hover:bg-primary-50 hover:border-primary-300 dark:hover:bg-primary-500/10 transition"
+                                            title={`Fill all areas (T1 + T2) with ${g}`}
+                                        >
+                                            All {g}
+                                        </button>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setCoScholastic(prev => prev.map(c => ({ ...c, term1Grade: '', term2Grade: '' })))}
+                                        className="px-2.5 py-1 rounded-md text-[11px] font-medium border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-500 hover:text-red-500 hover:border-red-300 transition"
+                                        title="Clear all grades"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
                                 {coScholastic.map((item, idx) => (
                                     <div key={idx} className="grid grid-cols-[1fr_80px_80px] gap-2 mb-2 items-center">
                                         <input type="text" className="input text-sm" value={item.area} onChange={e => setCoScholastic(prev => prev.map((c, i) => i === idx ? { ...c, area: e.target.value } : c))} placeholder="Area name" />

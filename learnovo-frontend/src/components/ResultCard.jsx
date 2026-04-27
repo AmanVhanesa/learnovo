@@ -16,7 +16,7 @@ const getSignatureUrl = (url) => {
     return encodeURI(full);
 };
 
-const SERIES_OPTIONS = ['UT1', 'SA1', 'UT2', 'SA2', 'Custom'];
+const SERIES_OPTIONS = ['UT1', 'SA1', 'HY1', 'CCE1', 'UT2', 'SA2', 'HY2', 'CCE2', 'Custom'];
 
 /* ─────────────────────────────────────────────────────────
    Grade helpers — colored dot system (modern, no badges)
