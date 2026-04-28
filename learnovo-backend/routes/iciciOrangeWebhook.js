@@ -47,12 +47,13 @@ const Tenant = require('../models/Tenant');
 const ICICIOrangeWebhookLog = require('../models/ICICIOrangeWebhookLog');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const PaymentAuditLog = require('../models/PaymentAuditLog');
-const FeeInvoice = require('../models/FeeInvoice');
-const Receipt = require('../models/Receipt');
-const StudentBalance = require('../models/StudentBalance');
 const ICICIOrangeGateway = require('../services/payment/ICICIOrangeGateway');
 const iciciOrangeCallbackProcessor = require('../services/payment/iciciOrangeCallbackProcessor');
-const { toNumber, roundToRupee, moneyEquals } = require('../utils/money');
+const {
+  settleSuccessfulAttempt,
+  runPostSettlementSideEffects
+} = require('../services/paymentSettlementService');
+const { toNumber, moneyEquals } = require('../utils/money');
 
 const router = express.Router();
 
@@ -450,67 +451,47 @@ function buildStatusRedirect(status, extras = {}) {
 async function applyReturnSuccess(attempt, parsed) {
   const session = await mongoose.startSession();
   session.startTransaction();
+
+  let result;
   try {
-    const previousStatus = attempt.status;
-    attempt.status = 'SUCCESS';
-    attempt.gatewayResponse = {
-      ...(attempt.gatewayResponse || {}),
-      bankRef: parsed.bankRef || null,
-      rawStatus: parsed.rawStatus,
-      source: 'returnURL'
-    };
-    await attempt.save({ session });
-
-    let invoice = null;
-    if (attempt.invoiceId) {
-      invoice = await FeeInvoice.findOne({
-        _id: attempt.invoiceId,
-        tenantId: attempt.tenantId
-      }).session(session);
-      if (invoice) {
-        invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
-        await invoice.save({ session });
-      }
-    }
-
-    if (invoice) {
-      const receiptNumber = await Receipt.generateReceiptNumber(attempt.tenantId);
-      await Receipt.create([{
-        tenantId: attempt.tenantId,
-        paymentAttemptId: attempt._id,
-        studentId: attempt.studentId,
-        invoiceId: invoice._id,
-        receiptNumber
-      }], { session });
-    }
-
-    await PaymentAuditLog.create([{
-      tenantId: attempt.tenantId,
-      paymentAttemptId: attempt._id,
-      previousStatus,
-      newStatus: 'SUCCESS',
+    const paymentDate = new Date();
+    result = await settleSuccessfulAttempt(attempt, session, {
+      gatewayResponseExtras: {
+        bankRef: parsed.bankRef || null,
+        rawStatus: parsed.rawStatus,
+        source: 'returnURL'
+      },
+      paymentMode: 'ONLINE',
+      paymentDate,
+      transactionRefId: parsed.bankRef || attempt.gatewayRefId || null,
+      initiatedBy: 'student',
       triggerSource: 'GATEWAY_RETURN',
       note: `ICICI Orange returnURL settled. Bank ref: ${parsed.bankRef || 'n/a'}.`
-    }], { session });
+    });
 
     await session.commitTransaction();
-    session.endSession();
-
-    if (invoice) {
-      try {
-        await StudentBalance.updateBalance(attempt.tenantId, attempt.studentId, invoice.academicSessionId);
-      } catch (balErr) {
-        logger.error('iciciOrangeReturn: balance recalc failed', {
-          tenantId: String(attempt.tenantId),
-          studentId: String(attempt.studentId),
-          error: balErr.message
-        });
-      }
-    }
   } catch (err) {
     await session.abortTransaction();
-    session.endSession();
     throw err;
+  } finally {
+    session.endSession();
+  }
+
+  if (result && !result.alreadySettled) {
+    try {
+      await runPostSettlementSideEffects(attempt, result.invoices, {
+        receipts: result.receipts,
+        paymentMode: 'Online',
+        paymentDate: new Date(),
+        transactionRefId: parsed.bankRef || attempt.gatewayRefId || null
+      });
+    } catch (sideErr) {
+      logger.error('iciciOrangeReturn: post-settlement side effects failed', {
+        tenantId: String(attempt.tenantId),
+        attemptId: String(attempt._id),
+        error: sideErr.message
+      });
+    }
   }
 }
 
