@@ -39,25 +39,28 @@ function getGateway(tenant) {
 
   switch (pgConfig.provider) {
   case 'icici_orange': {
-    // ICICI Orange gateway. The class loads with whatever credentials
-    // the tenant has configured — if the MID kit is incomplete
-    // (terminalId/apiKey/apiSecret still empty), outbound methods
-    // throw SpecPendingError and callers can render a clean "online
-    // payments pending setup" message. The inbound callback path is
-    // already live and reconciles through the processor regardless of
-    // whether outbound is wired yet.
+    // ICICI Orange (PG Direct) gateway. The class loads with the
+    // merchantId/aggregatorId/secureHashKey provisioned per-tenant.
+    // returnURL is computed from BACKEND_URL + the tenant's schoolCode
+    // so multiple tenants can share a single backend deployment without
+    // colliding on callback routing.
     const cfg = pgConfig.iciciOrange || {};
     if (!cfg.merchantId) {
       console.warn(`ICICI Orange gateway for tenant ${tenantId} has no merchantId — returning null.`);
       return null;
     }
+    const backendUrl = (process.env.BACKEND_URL || '').replace(/\/+$/, '');
+    const returnURL = backendUrl
+      ? `${backendUrl}/api/fee-payments/icici-orange/return/${tenant.schoolCode}`
+      : '';
     try {
       instance = new ICICIOrangeGateway({
         merchantId: cfg.merchantId,
-        terminalId: cfg.terminalId,
-        apiKey: cfg.apiKey,
-        apiSecret: cfg.apiSecret,
-        tenantCode: tenant.schoolCode
+        aggregatorId: cfg.aggregatorId,
+        secureHashKey: cfg.secureHashKey,
+        environment: cfg.environment || 'production',
+        tenantCode: tenant.schoolCode,
+        returnURL
       });
     } catch (err) {
       console.error(`ICICI Orange gateway construction failed for tenant ${tenantId}: ${err.message}`);

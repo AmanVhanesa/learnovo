@@ -350,7 +350,7 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
         amount: amountToPay,
         currency: 'INR',
         reference: idempotencyKey,
-        customerInfo: { name: req.user.fullName, email: req.user.email }
+        customerInfo: { name: req.user.fullName, email: req.user.email, phone: req.user.phone }
       });
 
       // Success call update status isolated
@@ -473,7 +473,7 @@ router.post('/pay-combined', protect, authorize('student'), [
         amount: totalAmount,
         currency: 'INR',
         reference: idempotencyKey,
-        customerInfo: { name: req.user.fullName, email: req.user.email }
+        customerInfo: { name: req.user.fullName, email: req.user.email, phone: req.user.phone }
       });
 
       await PaymentAttempt.findByIdAndUpdate(attempt._id, {

@@ -1,65 +1,91 @@
 /**
- * Configure ICICI Orange payment gateway for SPIS production tenant.
+ * Configure ICICI Orange (PG Direct) payment gateway for SPIS production tenant.
  *
  * Usage:
- *   node scripts/configure-spis-payment-gateway.js [merchantId]
+ *   node scripts/configure-spis-payment-gateway.js \
+ *     --merchantId=100000000423320 \
+ *     --aggregatorId=100000000423319 \
+ *     --secureHashKey=<uuid-from-icici-dashboard> \
+ *     --environment=production
  *
- * If no merchantId is provided, defaults to 100000000420292 (SPIS production MID).
- *
- * Additional credentials (terminalId, apiKey, apiSecret) will be added
- * once the full MID kit is received from ICICI.
+ * Defaults to the SPIS production credentials if no merchantId/aggregatorId
+ * is supplied. The secureHashKey MUST always be supplied — no default.
  *
  * Run this against the PRODUCTION database (set MONGODB_URI accordingly).
+ * The Tenant pre-save hook encrypts secureHashKey at rest automatically.
  */
 
 require('dotenv').config({ path: './config.env' });
 const mongoose = require('mongoose');
 const Tenant = require('../models/Tenant');
-// encrypt/decrypt handled automatically by Tenant model hooks
 
-const DEFAULT_MERCHANT_ID = '100000000420292';
+// SPIS production credentials shipped from ICICI 2026-04-28.
+const DEFAULTS = {
+  merchantId: '100000000423320',
+  aggregatorId: '100000000423319',
+  environment: 'production',
+  schoolCode: 'spis'
+};
+
+function parseArgs(argv) {
+  const out = {};
+  for (const arg of argv.slice(2)) {
+    const m = arg.match(/^--([^=]+)=(.*)$/);
+    if (m) out[m[1]] = m[2];
+  }
+  return out;
+}
 
 async function configure() {
-  const merchantId = process.argv[2] || DEFAULT_MERCHANT_ID;
+  const args = parseArgs(process.argv);
+  const schoolCode = args.schoolCode || DEFAULTS.schoolCode;
+  const merchantId = args.merchantId || DEFAULTS.merchantId;
+  const aggregatorId = args.aggregatorId || DEFAULTS.aggregatorId;
+  const environment = args.environment === 'uat' ? 'uat' : 'production';
+  const secureHashKey = args.secureHashKey || '';
+
+  if (!secureHashKey) {
+    console.error('Missing required --secureHashKey=<uuid> argument.');
+    console.error('Generate it from the ICICI merchant dashboard:');
+    console.error('  Live keys → Key Management → Generate / Download Key');
+    process.exit(1);
+  }
 
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('Connected to MongoDB');
 
-  // Find the SPIS production tenant (schoolCode: 'spis')
-  const tenant = await Tenant.findOne({ schoolCode: 'spis' });
-
+  const tenant = await Tenant.findOne({ schoolCode });
   if (!tenant) {
-    console.error('SPIS production tenant not found (schoolCode: "spis").');
-    console.log('Available tenants:');
+    console.error(`Tenant not found (schoolCode: "${schoolCode}").`);
     const tenants = await Tenant.find({}, 'schoolCode schoolName').lean();
+    console.log('Available tenants:');
     tenants.forEach(t => console.log(`  ${t.schoolCode} — ${t.schoolName}`));
+    await mongoose.connection.close();
     process.exit(1);
   }
 
   console.log(`Found tenant: ${tenant.schoolName} (${tenant.schoolCode})`);
 
-  // Update payment gateway config for ICICI Orange
   tenant.paymentGateway = {
     provider: 'icici_orange',
     iciciOrange: {
       merchantId,
-      terminalId: '',  // Pending from MID kit
-      apiKey: '',      // Pending from MID kit
-      apiSecret: ''    // Pending from MID kit
+      aggregatorId,
+      secureHashKey,
+      environment
     },
-    isActive: false // Activate once full MID kit credentials are configured
+    isActive: true
   };
 
   await tenant.save();
 
-  console.log('\nPayment gateway configured successfully!');
-  console.log('  Provider      : ICICI Orange');
+  console.log('\nICICI Orange gateway configured.');
+  console.log(`  School Code   : ${tenant.schoolCode}`);
   console.log(`  Merchant ID   : ${merchantId}`);
-  console.log('  Terminal ID   : (pending MID kit)');
-  console.log('  API Key       : (pending MID kit)');
-  console.log('  Active        : false (activate after full credentials are set)');
-  console.log('\nNote: Run this script again or use the admin panel to update');
-  console.log('credentials once the MID kit arrives from ICICI.');
+  console.log(`  Aggregator ID : ${aggregatorId}`);
+  console.log(`  Environment   : ${environment}`);
+  console.log(`  Hash Key      : ${secureHashKey.slice(0, 4)}…${secureHashKey.slice(-4)} (encrypted at rest)`);
+  console.log('  Active        : true');
 
   await mongoose.connection.close();
 }

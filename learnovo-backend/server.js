@@ -301,6 +301,10 @@ app.use(
   })
 );
 app.use('/api/fee-payments/webhook/icici-orange', require('./routes/iciciOrangeWebhook'));
+// ICICI Orange returnURL — public path that ICICI POSTs to after the
+// customer completes payment on the bank-hosted page. Mounted before
+// the generic /api/fee-payments router so the more-specific path wins.
+app.use('/api/fee-payments/icici-orange/return', require('./routes/iciciOrangeReturn'));
 app.use('/api/fee-payments', require('./routes/feePayments'));
 app.use('/api/subscription', require('./routes/subscription'));
 app.use('/api/exams', require('./routes/exams'));

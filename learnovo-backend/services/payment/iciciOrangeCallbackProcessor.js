@@ -223,11 +223,12 @@ async function _buildGatewayForLog(log) {
   const tenant = await Tenant.findById(log.tenantId);
   if (!tenant || !tenant.paymentGateway?.iciciOrange?.merchantId) return null;
   try {
+    const cfg = tenant.paymentGateway.iciciOrange;
     return new ICICIOrangeGateway({
-      merchantId: tenant.paymentGateway.iciciOrange.merchantId,
-      terminalId: tenant.paymentGateway.iciciOrange.terminalId,
-      apiKey: tenant.paymentGateway.iciciOrange.apiKey,
-      apiSecret: tenant.paymentGateway.iciciOrange.apiSecret,
+      merchantId: cfg.merchantId,
+      aggregatorId: cfg.aggregatorId,
+      secureHashKey: cfg.secureHashKey,
+      environment: cfg.environment || 'production',
       tenantCode: log.tenantCode
     });
   } catch (err) {
