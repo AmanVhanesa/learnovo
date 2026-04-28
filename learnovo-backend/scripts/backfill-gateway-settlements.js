@@ -38,6 +38,7 @@ const Receipt = require('../models/Receipt');
 const FeeInvoice = require('../models/FeeInvoice');
 const StudentBalance = require('../models/StudentBalance');
 const User = require('../models/User');
+require('../models/Payment'); // referenced by StudentBalance.updateBalance aggregation
 const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
 const { toNumber } = require('../utils/money');
 
@@ -156,7 +157,7 @@ async function main() {
               paymentMethod: 'Online',
               studentName,
               invoiceNumber: invoice.invoiceNumber,
-              addedBy: null,
+              addedBy: attempt.studentId,
               paymentReference: attempt.gatewayRefId || null,
               referenceModel: 'PaymentAttempt',
               academicSessionId: invoice.academicSessionId
