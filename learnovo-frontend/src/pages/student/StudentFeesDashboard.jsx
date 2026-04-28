@@ -207,6 +207,31 @@ const StudentFeesDashboard = () => {
         }
     };
 
+    // Cancel a stuck INITIATED/PROCESSING attempt then retry payment for the same invoice
+    const [isAbandoning, setIsAbandoning] = useState(false);
+    const handleAbandonAndRetry = async (invoiceId) => {
+        const stuck = history.find(h => h.invoiceId?._id === invoiceId && ['PENDING', 'PROCESSING', 'INITIATED'].includes(h.status));
+        if (!stuck) {
+            return handleGatewayPayment(invoiceId);
+        }
+        try {
+            setIsAbandoning(true);
+            const res = await studentFeesService.abandonAttempt(stuck._id);
+            if (!res.data?.success) {
+                toast.error(res.data?.message || 'Could not cancel previous attempt');
+                return;
+            }
+            toast.success('Previous attempt cancelled. Starting a new payment…');
+            await queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
+            await queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
+            await handleGatewayPayment(invoiceId);
+        } catch (error) {
+            toast.error(error.response?.data?.message || error.message || 'Could not cancel previous attempt');
+        } finally {
+            setIsAbandoning(false);
+        }
+    };
+
     // Combined payment for multiple selected invoices
     const handleCombinedPayment = async () => {
         if (selectedInvoiceIds.length < 2) return;
@@ -777,19 +802,41 @@ const StudentFeesDashboard = () => {
                                         >
                                             View Details
                                         </button>
-                                        {invoice.balanceAmount > 0 && !history.some(h => h.invoiceId?._id === invoice._id && ['PENDING', 'PROCESSING', 'INITIATED', 'UNDER_REVIEW'].includes(h.status)) && (
-                                            <button
-                                                onClick={() => PAYMENT_GATEWAY_ENABLED ? handleGatewayPayment(invoice._id) : openPaymentForm(invoice)}
-                                                disabled={isGatewayPaying}
-                                                className="flex-1 btn bg-primary-600 text-white hover:bg-primary-500 shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
-                                            >
-                                                {isGatewayPaying ? (
-                                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Connecting...</>
-                                                ) : (
-                                                    <><CreditCard className="h-4 w-4" /> Pay Now</>
-                                                )}
-                                            </button>
-                                        )}
+                                        {(() => {
+                                            if (invoice.balanceAmount <= 0) return null;
+                                            const stuck = history.find(h => h.invoiceId?._id === invoice._id && ['PENDING', 'PROCESSING', 'INITIATED'].includes(h.status));
+                                            const underReview = history.some(h => h.invoiceId?._id === invoice._id && h.status === 'UNDER_REVIEW');
+                                            if (underReview) return null; // genuine admin review — don't allow retry
+                                            if (stuck && PAYMENT_GATEWAY_ENABLED) {
+                                                return (
+                                                    <button
+                                                        onClick={() => handleAbandonAndRetry(invoice._id)}
+                                                        disabled={isGatewayPaying || isAbandoning}
+                                                        className="flex-1 btn bg-amber-600 text-white hover:bg-amber-500 shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+                                                        title="Cancel the previous payment attempt and start over"
+                                                    >
+                                                        {(isGatewayPaying || isAbandoning) ? (
+                                                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Retrying...</>
+                                                        ) : (
+                                                            <><CreditCard className="h-4 w-4" /> Cancel & Retry</>
+                                                        )}
+                                                    </button>
+                                                );
+                                            }
+                                            return (
+                                                <button
+                                                    onClick={() => PAYMENT_GATEWAY_ENABLED ? handleGatewayPayment(invoice._id) : openPaymentForm(invoice)}
+                                                    disabled={isGatewayPaying}
+                                                    className="flex-1 btn bg-primary-600 text-white hover:bg-primary-500 shadow-sm hover:shadow active:scale-95 flex items-center justify-center gap-2"
+                                                >
+                                                    {isGatewayPaying ? (
+                                                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Connecting...</>
+                                                    ) : (
+                                                        <><CreditCard className="h-4 w-4" /> Pay Now</>
+                                                    )}
+                                                </button>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                                 );
@@ -862,8 +909,18 @@ const StudentFeesDashboard = () => {
                                                         <div className="flex items-center justify-end gap-2">
                                                             <span className="inline-flex items-center gap-1 text-xs text-gray-400 dark:text-[#636366]">
                                                                 <Lock className="h-3 w-3" />
-                                                                Awaiting admin verification
+                                                                {attempt.status === 'UNDER_REVIEW' ? 'Awaiting admin verification' : 'Pending at gateway'}
                                                             </span>
+                                                            {['INITIATED', 'PROCESSING', 'PENDING'].includes(attempt.status) && attempt.invoiceId?._id && (
+                                                                <button
+                                                                    onClick={() => handleAbandonAndRetry(attempt.invoiceId._id)}
+                                                                    disabled={isGatewayPaying || isAbandoning}
+                                                                    className="px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 rounded disabled:opacity-50"
+                                                                    title="Cancel this attempt and try paying again"
+                                                                >
+                                                                    Cancel & Retry
+                                                                </button>
+                                                            )}
                                                             <button onClick={() => setDisputeModal({ isOpen: true, attemptId: attempt._id, invoiceId: attempt.invoiceId?._id })} className="p-1.5 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded" title="Report Issue">
                                                                 <AlertTriangle className="h-4 w-4" />
                                                             </button>
@@ -998,17 +1055,48 @@ const StudentFeesDashboard = () => {
                             </div>
 
                             {/* Pending verification warning */}
-                            {history.some(h => h.invoiceId?._id === selectedInvoice._id && ['PENDING', 'PROCESSING', 'INITIATED', 'UNDER_REVIEW'].includes(h.status)) && (
-                                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-xl flex items-start gap-3">
-                                    <ShieldCheck className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
-                                    <div>
-                                        <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-300">Payment Pending Verification</h4>
-                                        <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
-                                            You have a payment submission awaiting admin verification. You'll be notified once it's approved or if any action is needed.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+                            {(() => {
+                                const stuck = history.find(h => h.invoiceId?._id === selectedInvoice._id && ['PENDING', 'PROCESSING', 'INITIATED'].includes(h.status));
+                                const underReview = history.some(h => h.invoiceId?._id === selectedInvoice._id && h.status === 'UNDER_REVIEW');
+                                if (underReview) {
+                                    return (
+                                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-xl flex items-start gap-3">
+                                            <ShieldCheck className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                                            <div>
+                                                <h4 className="text-sm font-bold text-yellow-800 dark:text-yellow-300">Payment Pending Verification</h4>
+                                                <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                                                    You have a payment submission awaiting admin verification. You'll be notified once it's approved or if any action is needed.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                if (stuck && PAYMENT_GATEWAY_ENABLED) {
+                                    return (
+                                        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-start gap-3">
+                                            <ShieldCheck className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                            <div className="flex-1">
+                                                <h4 className="text-sm font-bold text-amber-800 dark:text-amber-300">Previous payment didn't complete</h4>
+                                                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                                                    Looks like your last payment attempt was cancelled or didn't finish. You can cancel it and try again.
+                                                </p>
+                                                <button
+                                                    onClick={() => handleAbandonAndRetry(selectedInvoice._id)}
+                                                    disabled={isGatewayPaying || isAbandoning}
+                                                    className="mt-3 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded-lg disabled:opacity-50"
+                                                >
+                                                    {(isGatewayPaying || isAbandoning) ? (
+                                                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Retrying...</>
+                                                    ) : (
+                                                        <><CreditCard className="h-4 w-4" /> Cancel & Retry Payment</>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
 
                         </div>
 
@@ -1019,24 +1107,43 @@ const StudentFeesDashboard = () => {
                                 <p className="text-xl sm:text-2xl font-bold">{formatCurrency(selectedInvoice.balanceAmount)}</p>
                             </div>
 
-                            <button
-                                onClick={() => PAYMENT_GATEWAY_ENABLED ? handleGatewayPayment(selectedInvoice._id) : openPaymentForm(selectedInvoice)}
-                                disabled={isGatewayPaying || selectedInvoice.balanceAmount <= 0 || history.some(h => h.invoiceId?._id === selectedInvoice._id && ['PENDING', 'PROCESSING', 'INITIATED', 'UNDER_REVIEW'].includes(h.status))}
-                                className={`w-full sm:w-auto justify-center px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${selectedInvoice.balanceAmount <= 0
-                                        ? 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-400 dark:text-[#636366] cursor-not-allowed'
-                                        : 'bg-primary-600 text-white hover:bg-primary-500 shadow-sm hover:shadow active:scale-95'
-                                    }`}
-                            >
-                                {isGatewayPaying ? (
-                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Connecting...</>
-                                ) : selectedInvoice.balanceAmount <= 0 ? (
-                                    <><CheckCircle className="h-5 w-5" /> Fully Paid</>
-                                ) : PAYMENT_GATEWAY_ENABLED ? (
-                                    <><CreditCard className="h-5 w-5" /> Pay Securely</>
-                                ) : (
-                                    <><CreditCard className="h-5 w-5" /> Submit Payment</>
-                                )}
-                            </button>
+                            {(() => {
+                                const stuck = history.find(h => h.invoiceId?._id === selectedInvoice._id && ['PENDING', 'PROCESSING', 'INITIATED'].includes(h.status));
+                                const underReview = history.some(h => h.invoiceId?._id === selectedInvoice._id && h.status === 'UNDER_REVIEW');
+                                const fullyPaid = selectedInvoice.balanceAmount <= 0;
+                                const blocked = fullyPaid || underReview;
+                                const onClick = () => {
+                                    if (blocked) return;
+                                    if (stuck && PAYMENT_GATEWAY_ENABLED) return handleAbandonAndRetry(selectedInvoice._id);
+                                    return PAYMENT_GATEWAY_ENABLED ? handleGatewayPayment(selectedInvoice._id) : openPaymentForm(selectedInvoice);
+                                };
+                                return (
+                                    <button
+                                        onClick={onClick}
+                                        disabled={isGatewayPaying || isAbandoning || blocked}
+                                        className={`w-full sm:w-auto justify-center px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${blocked
+                                                ? 'bg-gray-100 dark:bg-[#2C2C2E] text-gray-400 dark:text-[#636366] cursor-not-allowed'
+                                                : stuck
+                                                    ? 'bg-amber-600 text-white hover:bg-amber-500 shadow-sm hover:shadow active:scale-95'
+                                                    : 'bg-primary-600 text-white hover:bg-primary-500 shadow-sm hover:shadow active:scale-95'
+                                            }`}
+                                    >
+                                        {(isGatewayPaying || isAbandoning) ? (
+                                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> {stuck ? 'Retrying...' : 'Connecting...'}</>
+                                        ) : fullyPaid ? (
+                                            <><CheckCircle className="h-5 w-5" /> Fully Paid</>
+                                        ) : underReview ? (
+                                            <><ShieldCheck className="h-5 w-5" /> Awaiting Verification</>
+                                        ) : stuck && PAYMENT_GATEWAY_ENABLED ? (
+                                            <><CreditCard className="h-5 w-5" /> Cancel & Retry</>
+                                        ) : PAYMENT_GATEWAY_ENABLED ? (
+                                            <><CreditCard className="h-5 w-5" /> Pay Securely</>
+                                        ) : (
+                                            <><CreditCard className="h-5 w-5" /> Submit Payment</>
+                                        )}
+                                    </button>
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

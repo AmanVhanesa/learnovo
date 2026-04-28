@@ -419,6 +419,68 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
 });
 
 /**
+ * @desc    Abandon a stuck INITIATED/PROCESSING payment attempt so the student can retry.
+ *          Verifies with the gateway first to avoid losing a real success.
+ * @route   POST /api/student-fees/attempts/:attemptId/abandon
+ * @access  Private (Student)
+ */
+router.post('/attempts/:attemptId/abandon', protect, authorize('student'), async(req, res) => {
+  try {
+    const attempt = await PaymentAttempt.findOne({
+      _id: req.params.attemptId,
+      studentId: req.user._id,
+      tenantId: req.user.tenantId
+    });
+
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: 'Payment attempt not found' });
+    }
+
+    if (!['INITIATED', 'PROCESSING'].includes(attempt.status)) {
+      return res.status(400).json({ success: false, message: `Cannot abandon a payment in '${attempt.status}' state.` });
+    }
+
+    // Require a small grace window so we don't kill an attempt the user is still completing.
+    const ageMs = Date.now() - new Date(attempt.createdAt).getTime();
+    if (ageMs < 60 * 1000) {
+      return res.status(400).json({ success: false, message: 'Please wait a moment before cancelling this attempt.' });
+    }
+
+    // Confirm with gateway that no success has occurred — otherwise we'd lose a real payment.
+    if (attempt.gatewayRefId) {
+      try {
+        const tenant = await Tenant.findById(req.user.tenantId).lean();
+        const gateway = getGateway(tenant);
+        if (gateway && typeof gateway.checkStatus === 'function') {
+          const result = await gateway.checkStatus(attempt.gatewayRefId, attempt.idempotencyKey);
+          if (result && ['SUCCESS', 'VERIFIED'].includes(result.status)) {
+            return res.status(409).json({
+              success: false,
+              message: 'This payment actually succeeded at the gateway. Refresh the page to see the receipt.'
+            });
+          }
+        }
+      } catch (gatewayErr) {
+        // Gateway unreachable — be conservative and refuse.
+        return res.status(502).json({
+          success: false,
+          message: 'Could not verify payment status with the gateway. Please try again in a moment.'
+        });
+      }
+    }
+
+    const previousStatus = attempt.status;
+    attempt.status = 'FAILED';
+    await attempt.save();
+    await createAuditLog(attempt._id, null, req.user.tenantId, previousStatus, 'FAILED', 'STUDENT_PORTAL', 'Abandoned by student');
+
+    return res.json({ success: true, message: 'Previous attempt cancelled. You can pay again now.' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to cancel attempt' });
+  }
+});
+
+/**
  * @desc    Pay multiple invoices in one gateway transaction
  * @route   POST /api/student-fees/pay-combined
  * @access  Private (Student)

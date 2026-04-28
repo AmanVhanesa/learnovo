@@ -35,6 +35,9 @@ export const studentFeesService = {
     // Check attempt status directly
     checkPaymentStatus: (attemptId, childId) => api.get(`/student-fees/payment/${attemptId}/status${childParam(childId)}`),
 
+    // Abandon a stuck INITIATED/PROCESSING attempt so the student can retry
+    abandonAttempt: (attemptId) => api.post(`/student-fees/attempts/${attemptId}/abandon`),
+
     // File a dispute
     raiseDispute: (data) => api.post('/student-fees/dispute', data),
 
