@@ -190,8 +190,14 @@ const StudentFeesDashboard = () => {
                         queryClient.invalidateQueries({ queryKey: ['student-receipts'] });
                     },
                     modal: {
-                        ondismiss: () => {
+                        ondismiss: async () => {
                             toast('Payment cancelled', { icon: '⚠️' });
+                            if (data.paymentAttemptId) {
+                                try {
+                                    await studentFeesService.abandonAttempt(data.paymentAttemptId);
+                                } catch (_) { /* best-effort: poller will catch it */ }
+                            }
+                            queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
                             queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
                         }
                     },
@@ -271,7 +277,18 @@ const StudentFeesDashboard = () => {
                         queryClient.invalidateQueries({ queryKey: ['student-receipts'] });
                         setSelectedInvoiceIds([]);
                     },
-                    modal: { ondismiss: () => { toast('Payment cancelled', { icon: '⚠️' }); } },
+                    modal: {
+                        ondismiss: async () => {
+                            toast('Payment cancelled', { icon: '⚠️' });
+                            if (data.paymentAttemptId) {
+                                try {
+                                    await studentFeesService.abandonAttempt(data.paymentAttemptId);
+                                } catch (_) { /* best-effort: poller will catch it */ }
+                            }
+                            queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
+                            queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
+                        }
+                    },
                     theme: { color: '#4F46E5' }
                 };
                 const rzp = new window.Razorpay(options);

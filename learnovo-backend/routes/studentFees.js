@@ -390,12 +390,6 @@ router.post('/attempts/:attemptId/abandon', protect, authorize('student'), async
       return res.status(400).json({ success: false, message: `Cannot abandon a payment in '${attempt.status}' state.` });
     }
 
-    // Require a small grace window so we don't kill an attempt the user is still completing.
-    const ageMs = Date.now() - new Date(attempt.createdAt).getTime();
-    if (ageMs < 60 * 1000) {
-      return res.status(400).json({ success: false, message: 'Please wait a moment before cancelling this attempt.' });
-    }
-
     // Confirm with gateway that no success has occurred — otherwise we'd lose a real payment.
     if (attempt.gatewayRefId) {
       try {
