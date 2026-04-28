@@ -264,10 +264,38 @@ function normaliseTenantCode(raw) {
   return raw.trim().toLowerCase();
 }
 
-router.get('/:tenantCode', (req, res) => {
+router.get('/:tenantCode', async(req, res) => {
   const tenantCode = normaliseTenantCode(req.params.tenantCode);
   if (!ALLOWED_TENANT_CODES.has(tenantCode)) {
     return res.status(404).json({ success: false, message: 'Not found' });
+  }
+
+  // PG Direct returnURL "submitAsGet" fallback. ICICI's status-redirect
+  // page wires the manual "click here" link to submit the form via GET
+  // (data-click="submitAsGet" in their merchantResp.js). When the
+  // browser-side auto-POST is gated off (their "isSuccess":false flag),
+  // this GET is the only way the customer reaches us. We treat it
+  // identically to the POST: verify secureHash, settle, redirect.
+  if (typeof req.query?.secureHash === 'string' && req.query.secureHash.length > 0) {
+    const tenant = await Tenant.findOne({ schoolCode: tenantCode });
+    if (!tenant || tenant.paymentGateway?.provider !== 'icici_orange') {
+      logger.warn('iciciOrangeReturn: provider mismatch (GET)', { tenantCode, requestId: req.requestId });
+      return res.status(404).send('Not found');
+    }
+    try {
+      // Persist for audit. persistWebhookLog reads req.body, so swap
+      // query into body for the duration of the log call.
+      const originalBody = req.body;
+      req.body = { ...req.query };
+      await persistWebhookLog(req, tenantCode, true);
+      req.body = originalBody;
+    } catch (_) { /* never block redirect on logging */ }
+    // handlePgDirectReturn reads from req.body — pass query as body.
+    const originalBody = req.body;
+    req.body = { ...req.query };
+    const redirectPath = await handlePgDirectReturn(req, tenantCode, tenant);
+    req.body = originalBody;
+    return res.redirect(302, redirectPath);
   }
 
   // Challenge for Basic Auth on GET too. This is intentional: the bank
