@@ -294,8 +294,12 @@ router.get('/:tenantCode', async(req, res) => {
   // (data-click="submitAsGet" in their merchantResp.js). When the
   // browser-side auto-POST is gated off (their "isSuccess":false flag),
   // this GET is the only way the customer reaches us. We treat it
-  // identically to the POST: verify secureHash, settle, redirect.
-  if (typeof req.query?.secureHash === 'string' && req.query.secureHash.length > 0) {
+  // identically to the POST: settle and redirect. Trigger on
+  // merchantTxnNo (not secureHash) — the bank's submitAsGet often omits
+  // secureHash since their spec says it's a POST-only field, and
+  // handlePgDirectReturn already falls back to a signed STATUS query
+  // when the inbound hash is absent/invalid.
+  if (isPgDirectReturn(req)) {
     try {
       const tenant = await Tenant.findOne({ schoolCode: tenantCode });
       if (!tenant || tenant.paymentGateway?.provider !== 'icici_orange') {
