@@ -203,27 +203,46 @@ async function persistWebhookLog(req, tenantCode, authPassed) {
     // The previous revision used new:false and inferred duplicate from
     // a truthy pre-doc, but that returned logId=null for genuinely new
     // callbacks — which broke downstream fire-and-forget processing.
+    //
+    // Auth-flag handling: ICICI's passive-callback retry pattern fires
+    // an unauthenticated probe first, then retries with Basic Auth.
+    // Using $setOnInsert for `authPassed` would freeze the row at the
+    // first hit's value and refuse to ever process it. Promote the flag
+    // when a later retry succeeds and re-queue the row for the
+    // processor by clearing `processed`. We only ever upgrade
+    // false→true, never downgrade, so an unauthenticated probe arriving
+    // after an authenticated hit cannot un-settle the row.
+    const setOnInsert = {
+      tenantId,
+      tenantCode,
+      bodyHash,
+      rawBody,
+      parsedBody:
+        typeof req.body === 'object' && req.body !== null ? req.body : null,
+      contentType: safeHeaders.contentType,
+      method: req.method,
+      path: req.originalUrl,
+      query: req.query || null,
+      sourceIp: req.ip || safeHeaders.forwardedFor || '',
+      userAgent: safeHeaders.userAgent,
+      requestId: req.requestId || '',
+      receivedAt: new Date()
+    };
+    const update = { $setOnInsert: setOnInsert };
+    if (authPassed) {
+      update.$set = {
+        authPassed: true,
+        lastAuthPassedAt: new Date(),
+        processed: false,
+        processError: null,
+        processedAt: null
+      };
+    } else {
+      setOnInsert.authPassed = false;
+    }
     const result = await ICICIOrangeWebhookLog.findOneAndUpdate(
       { tenantCode, bodyHash },
-      {
-        $setOnInsert: {
-          tenantId,
-          tenantCode,
-          bodyHash,
-          rawBody,
-          parsedBody:
-            typeof req.body === 'object' && req.body !== null ? req.body : null,
-          contentType: safeHeaders.contentType,
-          method: req.method,
-          path: req.originalUrl,
-          query: req.query || null,
-          sourceIp: req.ip || safeHeaders.forwardedFor || '',
-          userAgent: safeHeaders.userAgent,
-          requestId: req.requestId || '',
-          authPassed,
-          receivedAt: new Date()
-        }
-      },
+      update,
       { upsert: true, new: true, setDefaultsOnInsert: true, rawResult: true }
     );
     const doc = result?.value || null;
@@ -377,15 +396,32 @@ router.get('/:tenantCode', async(req, res) => {
  * is matched first.
  */
 /**
- * Detect a PG Direct returnURL post-back. The bank POSTs the txn
- * response payload (form-encoded or JSON) carrying a `secureHash` field
- * — never an Authorization header. We treat the presence of secureHash
- * as the discriminator between the two flows on this single path.
+ * Detect a PG Direct returnURL post-back. The bank's customer-facing
+ * redirect always carries `merchantTxnNo` (and usually `merchantId`),
+ * but the secureHash is sometimes absent — observed on cancelled
+ * transactions and on the manual "click here" redirect from
+ * pgpay.icicibank.com/pg/api/statusCheckRedirect. We discriminate on
+ * merchantTxnNo, and trust the body only when the secureHash verifies
+ * (otherwise we fall back to a signed server-to-server STATUS check).
+ *
+ * Also handles GET (with query params) and form-encoded POST.
  */
 function isPgDirectReturn(req) {
   const body = req.body;
-  if (!body || typeof body !== 'object') return false;
-  return typeof body.secureHash === 'string' && body.secureHash.length > 0;
+  const query = req.query || {};
+  const haveTxnNo = (body && typeof body === 'object' && typeof body.merchantTxnNo === 'string' && body.merchantTxnNo.length > 0)
+    || (typeof query.merchantTxnNo === 'string' && query.merchantTxnNo.length > 0);
+  return haveTxnNo;
+}
+
+/**
+ * Build the canonical return-payload object from whichever transport
+ * the bank used (form POST → req.body, GET redirect → req.query).
+ */
+function getReturnPayload(req) {
+  if (req.body && typeof req.body === 'object' && req.body.merchantTxnNo) return req.body;
+  if (req.query && req.query.merchantTxnNo) return req.query;
+  return req.body || req.query || {};
 }
 
 /**
@@ -540,51 +576,100 @@ async function handlePgDirectReturn(req, tenantCode, tenant) {
     tenantCode
   });
 
-  const verified = gateway.verifyReturnPayload(req.body);
-  if (!verified.valid) {
-    logger.warn('iciciOrangeReturn: secureHash verification failed', {
-      tenantCode,
-      requestId: req.requestId,
-      hasHash: Boolean(req.body?.secureHash),
-      keys: Object.keys(req.body || {})
-    });
-    return buildStatusRedirect('error', { message: 'Signature verification failed' });
-  }
+  const payload = getReturnPayload(req);
+  const merchantRef = typeof payload.merchantTxnNo === 'string' && payload.merchantTxnNo.length > 0
+    ? payload.merchantTxnNo
+    : null;
 
-  if (!verified.merchantRef) {
+  if (!merchantRef) {
     logger.warn('iciciOrangeReturn: payload missing merchantTxnNo', { tenantCode, requestId: req.requestId });
     return buildStatusRedirect('error', { message: 'Could not identify transaction' });
   }
 
+  // Tenant-scoped attempt lookup. We always look this up first so we
+  // can redirect the customer to a meaningful status page even if the
+  // body verification or STATUS call fails.
   const attempt = await PaymentAttempt.findOne({
     tenantId: tenant._id,
-    gatewayRefId: verified.merchantRef
+    gatewayRefId: merchantRef
   });
 
   if (!attempt) {
     logger.warn('iciciOrangeReturn: no matching PaymentAttempt', {
       tenantCode,
-      merchantRef: verified.merchantRef,
+      merchantRef,
       requestId: req.requestId
     });
-    return buildStatusRedirect('error', { message: 'Transaction not found' });
+    return buildStatusRedirect('error', { ref: merchantRef, message: 'Transaction not found' });
   }
 
   const baseExtras = {
     attemptId: attempt._id,
-    ref: verified.merchantRef,
-    bankRef: verified.bankRef,
+    ref: merchantRef,
     amount: attempt.amount
   };
 
+  // Idempotent: already terminal — just redirect.
   if (['SUCCESS', 'VERIFIED', 'FAILED'].includes(attempt.status)) {
     const settled = attempt.status === 'FAILED' ? 'failed' : 'success';
     return buildStatusRedirect(settled, baseExtras);
   }
 
-  if (verified.amount !== null && !moneyEquals(toNumber(verified.amount), toNumber(attempt.amount))) {
+  // Decide the trust source for the outcome. The body is trustworthy
+  // ONLY when its secureHash verifies. Otherwise fall back to a signed
+  // server-to-server STATUS call — this is the bank's recommended way
+  // to confirm an ambiguous returnURL post.
+  let outcome = null;          // { normalisedStatus, rawStatus, bankRef, amount, source }
+  const bodyVerified = gateway.verifyReturnPayload(payload);
+  if (bodyVerified.valid) {
+    outcome = {
+      normalisedStatus: bodyVerified.normalisedStatus,
+      rawStatus: bodyVerified.rawStatus,
+      bankRef: bodyVerified.bankRef,
+      amount: bodyVerified.amount,
+      source: 'returnURL'
+    };
+  } else {
+    logger.warn('iciciOrangeReturn: body secureHash invalid/missing — falling back to STATUS query', {
+      tenantCode,
+      requestId: req.requestId,
+      merchantRef,
+      hasHash: Boolean(payload.secureHash),
+      bodyKeys: Object.keys(payload)
+    });
     try {
-      await applyReturnAmountMismatch(attempt, verified);
+      const status = await gateway.checkStatus(merchantRef);
+      outcome = {
+        normalisedStatus: status.status,
+        rawStatus: status.raw?.txnStatus || status.raw?.responseCode,
+        bankRef: status.raw?.txnID || status.raw?.txnAuthID || null,
+        amount: status.raw?.amount !== undefined ? Number(status.raw.amount) : null,
+        source: 'statusCheck'
+      };
+    } catch (statusErr) {
+      logger.error('iciciOrangeReturn: STATUS query failed', {
+        tenantCode,
+        requestId: req.requestId,
+        merchantRef,
+        error: statusErr.message
+      });
+      // Best the customer can see: a "pending" page. The reconciliation
+      // job will keep trying to settle this attempt asynchronously.
+      return buildStatusRedirect('error', {
+        ...baseExtras,
+        message: 'Payment is being verified. You will see the final status on your fee page shortly.'
+      });
+    }
+  }
+
+  baseExtras.bankRef = outcome.bankRef;
+
+  // Amount mismatch never credits — under review.
+  if (outcome.normalisedStatus === 'SUCCESS'
+      && outcome.amount !== null
+      && !moneyEquals(toNumber(outcome.amount), toNumber(attempt.amount))) {
+    try {
+      await applyReturnAmountMismatch(attempt, outcome);
     } catch (err) {
       logger.error('iciciOrangeReturn: amount-mismatch transition failed', { error: err.message });
     }
@@ -592,13 +677,13 @@ async function handlePgDirectReturn(req, tenantCode, tenant) {
   }
 
   try {
-    if (verified.normalisedStatus === 'SUCCESS') {
-      await applyReturnSuccess(attempt, verified);
+    if (outcome.normalisedStatus === 'SUCCESS') {
+      await applyReturnSuccess(attempt, outcome);
       return buildStatusRedirect('success', baseExtras);
     }
-    if (verified.normalisedStatus === 'FAILED') {
-      await applyReturnFailure(attempt, verified);
-      return buildStatusRedirect('failed', { ...baseExtras, message: verified.rawStatus || 'Payment was not completed' });
+    if (outcome.normalisedStatus === 'FAILED') {
+      await applyReturnFailure(attempt, outcome);
+      return buildStatusRedirect('failed', { ...baseExtras, message: outcome.rawStatus || 'Payment was not completed' });
     }
     return buildStatusRedirect('error', { ...baseExtras, message: 'Payment is still being processed. Check back shortly.' });
   } catch (err) {
