@@ -71,10 +71,30 @@ const corsOptions = {
   optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 };
 
-// Handle preflight OPTIONS for ALL routes before anything else
-app.options('*', cors(corsOptions));
-// Apply CORS to all requests
-app.use(cors(corsOptions));
+// Bank/payment-gateway webhooks and customer redirects from third-party
+// hosted pages (ICICI's pgpay, etc.) MUST bypass CORS. They arrive with
+// an Origin header from the bank's domain (which we cannot whitelist
+// without weakening the policy for everyone) and the bank's signed
+// payload — not the browser CORS check — is what proves authenticity.
+const WEBHOOK_PATHS = [
+  '/api/fee-payments/webhook',
+  '/api/student-fees/payment/notify',
+  '/api/payments/notify',
+  '/api/payments/return',
+  '/api/payments/cancel',
+  '/api/payments/failure'
+];
+function isWebhookPath(req) {
+  return WEBHOOK_PATHS.some(p => req.path === p || req.path.startsWith(`${p}/`));
+}
+app.options('*', (req, res, next) => {
+  if (isWebhookPath(req)) return next();
+  return cors(corsOptions)(req, res, next);
+});
+app.use((req, res, next) => {
+  if (isWebhookPath(req)) return next();
+  return cors(corsOptions)(req, res, next);
+});
 
 // Security middleware (AFTER CORS so headers aren't stripped)
 // Skip helmet for test-payment page (needs relaxed CSP for Razorpay)
