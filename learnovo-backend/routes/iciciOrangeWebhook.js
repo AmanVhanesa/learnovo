@@ -41,10 +41,18 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const { logger } = require('../middleware/errorHandler');
 const Tenant = require('../models/Tenant');
 const ICICIOrangeWebhookLog = require('../models/ICICIOrangeWebhookLog');
+const PaymentAttempt = require('../models/PaymentAttempt');
+const PaymentAuditLog = require('../models/PaymentAuditLog');
+const FeeInvoice = require('../models/FeeInvoice');
+const Receipt = require('../models/Receipt');
+const StudentBalance = require('../models/StudentBalance');
+const ICICIOrangeGateway = require('../services/payment/ICICIOrangeGateway');
 const iciciOrangeCallbackProcessor = require('../services/payment/iciciOrangeCallbackProcessor');
+const { toNumber, roundToRupee, moneyEquals } = require('../utils/money');
 
 const router = express.Router();
 
@@ -333,6 +341,242 @@ router.get('/:tenantCode', (req, res) => {
  * BEFORE the generic /api/fee-payments router in server.js so this path
  * is matched first.
  */
+/**
+ * Detect a PG Direct returnURL post-back. The bank POSTs the txn
+ * response payload (form-encoded or JSON) carrying a `secureHash` field
+ * — never an Authorization header. We treat the presence of secureHash
+ * as the discriminator between the two flows on this single path.
+ */
+function isPgDirectReturn(req) {
+  const body = req.body;
+  if (!body || typeof body !== 'object') return false;
+  return typeof body.secureHash === 'string' && body.secureHash.length > 0;
+}
+
+/**
+ * Build the redirect URL back to the SPA's /payment/status page on the
+ * SAME host the request arrived on. ICICI's returnURL is the tenant
+ * subdomain (e.g. spis.learnovoportal.com), and that's also where the
+ * frontend SPA lives, so a relative redirect lands in the right place.
+ */
+function buildStatusRedirect(status, extras = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (extras.attemptId) params.set('attemptId', String(extras.attemptId));
+  if (extras.ref) params.set('ref', String(extras.ref));
+  if (extras.bankRef) params.set('bankRef', String(extras.bankRef));
+  if (extras.amount !== undefined && extras.amount !== null) {
+    params.set('amount', String(extras.amount));
+  }
+  if (extras.message) params.set('message', String(extras.message));
+  return `/payment/status?${params.toString()}`;
+}
+
+async function applyReturnSuccess(attempt, parsed) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const previousStatus = attempt.status;
+    attempt.status = 'SUCCESS';
+    attempt.gatewayResponse = {
+      ...(attempt.gatewayResponse || {}),
+      bankRef: parsed.bankRef || null,
+      rawStatus: parsed.rawStatus,
+      source: 'returnURL'
+    };
+    await attempt.save({ session });
+
+    let invoice = null;
+    if (attempt.invoiceId) {
+      invoice = await FeeInvoice.findOne({
+        _id: attempt.invoiceId,
+        tenantId: attempt.tenantId
+      }).session(session);
+      if (invoice) {
+        invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
+        await invoice.save({ session });
+      }
+    }
+
+    if (invoice) {
+      const receiptNumber = await Receipt.generateReceiptNumber(attempt.tenantId);
+      await Receipt.create([{
+        tenantId: attempt.tenantId,
+        paymentAttemptId: attempt._id,
+        studentId: attempt.studentId,
+        invoiceId: invoice._id,
+        receiptNumber
+      }], { session });
+    }
+
+    await PaymentAuditLog.create([{
+      tenantId: attempt.tenantId,
+      paymentAttemptId: attempt._id,
+      previousStatus,
+      newStatus: 'SUCCESS',
+      triggerSource: 'GATEWAY_RETURN',
+      note: `ICICI Orange returnURL settled. Bank ref: ${parsed.bankRef || 'n/a'}.`
+    }], { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    if (invoice) {
+      try {
+        await StudentBalance.updateBalance(attempt.tenantId, attempt.studentId, invoice.academicSessionId);
+      } catch (balErr) {
+        logger.error('iciciOrangeReturn: balance recalc failed', {
+          tenantId: String(attempt.tenantId),
+          studentId: String(attempt.studentId),
+          error: balErr.message
+        });
+      }
+    }
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+  }
+}
+
+async function applyReturnFailure(attempt, parsed) {
+  const previousStatus = attempt.status;
+  attempt.status = 'FAILED';
+  attempt.gatewayResponse = {
+    ...(attempt.gatewayResponse || {}),
+    bankRef: parsed.bankRef || null,
+    rawStatus: parsed.rawStatus,
+    source: 'returnURL'
+  };
+  await attempt.save();
+  await PaymentAuditLog.create({
+    tenantId: attempt.tenantId,
+    paymentAttemptId: attempt._id,
+    previousStatus,
+    newStatus: 'FAILED',
+    triggerSource: 'GATEWAY_RETURN',
+    note: `ICICI Orange returnURL reported failure. Status: ${parsed.rawStatus || 'unknown'}.`
+  });
+}
+
+async function applyReturnAmountMismatch(attempt, parsed) {
+  const previousStatus = attempt.status;
+  attempt.status = 'UNDER_REVIEW';
+  attempt.gatewayResponse = {
+    ...(attempt.gatewayResponse || {}),
+    bankRef: parsed.bankRef || null,
+    rawStatus: parsed.rawStatus,
+    callbackAmount: parsed.amount,
+    source: 'returnURL'
+  };
+  await attempt.save();
+  await PaymentAuditLog.create({
+    tenantId: attempt.tenantId,
+    paymentAttemptId: attempt._id,
+    previousStatus,
+    newStatus: 'UNDER_REVIEW',
+    triggerSource: 'GATEWAY_RETURN',
+    note: `Amount mismatch on returnURL: callback ₹${parsed.amount} vs attempt ₹${attempt.amount}. Bank ref: ${parsed.bankRef || 'n/a'}.`
+  });
+}
+
+/**
+ * Handle the PG Direct returnURL post-back. Verifies the secureHash,
+ * settles the PaymentAttempt, then 302-redirects the customer's browser
+ * back to the SPA's /payment/status page.
+ *
+ * Returns the redirect path (caller wires the response).
+ */
+async function handlePgDirectReturn(req, tenantCode, tenant) {
+  const cfg = tenant.paymentGateway?.iciciOrange || {};
+  if (!cfg.merchantId || !cfg.secureHashKey) {
+    logger.error('iciciOrangeReturn: tenant has incomplete ICICI config', {
+      tenantCode,
+      requestId: req.requestId
+    });
+    return buildStatusRedirect('error', { message: 'Gateway not configured' });
+  }
+
+  const gateway = new ICICIOrangeGateway({
+    merchantId: cfg.merchantId,
+    aggregatorId: cfg.aggregatorId,
+    secureHashKey: cfg.secureHashKey,
+    environment: cfg.environment || 'production',
+    tenantCode
+  });
+
+  const verified = gateway.verifyReturnPayload(req.body);
+  if (!verified.valid) {
+    logger.warn('iciciOrangeReturn: secureHash verification failed', {
+      tenantCode,
+      requestId: req.requestId,
+      hasHash: Boolean(req.body?.secureHash),
+      keys: Object.keys(req.body || {})
+    });
+    return buildStatusRedirect('error', { message: 'Signature verification failed' });
+  }
+
+  if (!verified.merchantRef) {
+    logger.warn('iciciOrangeReturn: payload missing merchantTxnNo', { tenantCode, requestId: req.requestId });
+    return buildStatusRedirect('error', { message: 'Could not identify transaction' });
+  }
+
+  const attempt = await PaymentAttempt.findOne({
+    tenantId: tenant._id,
+    gatewayRefId: verified.merchantRef
+  });
+
+  if (!attempt) {
+    logger.warn('iciciOrangeReturn: no matching PaymentAttempt', {
+      tenantCode,
+      merchantRef: verified.merchantRef,
+      requestId: req.requestId
+    });
+    return buildStatusRedirect('error', { message: 'Transaction not found' });
+  }
+
+  const baseExtras = {
+    attemptId: attempt._id,
+    ref: verified.merchantRef,
+    bankRef: verified.bankRef,
+    amount: attempt.amount
+  };
+
+  if (['SUCCESS', 'VERIFIED', 'FAILED'].includes(attempt.status)) {
+    const settled = attempt.status === 'FAILED' ? 'failed' : 'success';
+    return buildStatusRedirect(settled, baseExtras);
+  }
+
+  if (verified.amount !== null && !moneyEquals(toNumber(verified.amount), toNumber(attempt.amount))) {
+    try {
+      await applyReturnAmountMismatch(attempt, verified);
+    } catch (err) {
+      logger.error('iciciOrangeReturn: amount-mismatch transition failed', { error: err.message });
+    }
+    return buildStatusRedirect('error', { ...baseExtras, message: 'Amount mismatch — under review by school office' });
+  }
+
+  try {
+    if (verified.normalisedStatus === 'SUCCESS') {
+      await applyReturnSuccess(attempt, verified);
+      return buildStatusRedirect('success', baseExtras);
+    }
+    if (verified.normalisedStatus === 'FAILED') {
+      await applyReturnFailure(attempt, verified);
+      return buildStatusRedirect('failed', { ...baseExtras, message: verified.rawStatus || 'Payment was not completed' });
+    }
+    return buildStatusRedirect('error', { ...baseExtras, message: 'Payment is still being processed. Check back shortly.' });
+  } catch (err) {
+    logger.error('iciciOrangeReturn: settlement failed', {
+      tenantCode,
+      attemptId: String(attempt._id),
+      error: err.message,
+      stack: err.stack
+    });
+    return buildStatusRedirect('error', { ...baseExtras, message: 'Could not finalise payment' });
+  }
+}
+
 router.post('/:tenantCode', async(req, res) => {
   const tenantCode = normaliseTenantCode(req.params.tenantCode);
   const requestId = req.requestId;
@@ -348,9 +592,29 @@ router.post('/:tenantCode', async(req, res) => {
     return res.status(404).json({ success: false, message: 'Not found' });
   }
 
-  // 2. HTTP Basic Auth verification. We persist BOTH successful and
-  //    failed attempts (the log row carries authPassed) so we can
-  //    spot misconfigured ICICI test fires and recon attempts.
+  // 2a. PG Direct returnURL flow — the bank POSTs the txn response with
+  //     a secureHash field (no Basic Auth). Verify, settle, redirect the
+  //     customer to /payment/status. This is the live path for SPIS.
+  if (isPgDirectReturn(req)) {
+    const tenant = await Tenant.findOne({ schoolCode: tenantCode });
+    if (!tenant || tenant.paymentGateway?.provider !== 'icici_orange') {
+      logger.warn('iciciOrangeReturn: provider mismatch', { tenantCode, requestId });
+      return res.status(404).send('Not found');
+    }
+    // Persist the inbound payload for audit (no Basic Auth on this flow,
+    // so authPassed is true by virtue of secureHash verification, which
+    // happens inside handlePgDirectReturn).
+    try {
+      await persistWebhookLog(req, tenantCode, true);
+    } catch (_) {
+      /* swallow — never block the customer redirect on a logging error */
+    }
+
+    const redirectPath = await handlePgDirectReturn(req, tenantCode, tenant);
+    return res.redirect(302, redirectPath);
+  }
+
+  // 2b. Legacy passive callback flow — HTTP Basic Auth.
   const authPassed = verifyBasicAuth(req, tenantCode);
 
   // 3. Persist the inbound request to the forensic log. Idempotent

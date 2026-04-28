@@ -49,10 +49,13 @@ function getGateway(tenant) {
       console.warn(`ICICI Orange gateway for tenant ${tenantId} has no merchantId — returning null.`);
       return null;
     }
-    const backendUrl = (process.env.BACKEND_URL || '').replace(/\/+$/, '');
-    const returnURL = backendUrl
-      ? `${backendUrl}/api/fee-payments/icici-orange/return/${tenant.schoolCode}`
-      : '';
+    // returnURL must match the URL whitelisted with ICICI for this
+    // tenant. SPIS was registered with the path under the tenant
+    // subdomain (spis.learnovoportal.com), which the VPS nginx proxies
+    // through to the backend's webhook route — the same route handles
+    // both legacy passive callbacks and the new PG Direct returnURL
+    // post-back.
+    const returnURL = `https://${tenant.schoolCode}.learnovoportal.com/api/fee-payments/webhook/icici-orange/${tenant.schoolCode}`;
     try {
       instance = new ICICIOrangeGateway({
         merchantId: cfg.merchantId,
