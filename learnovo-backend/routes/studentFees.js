@@ -119,6 +119,48 @@ router.get('/history', protect, authorize('student', 'parent'), async(req, res) 
     const { studentId, error } = resolveStudentId(req);
     if (error) return res.status(400).json({ success: false, message: error });
 
+    // Opportunistic refresh: ping the gateway for any in-flight attempts
+    // older than 30s and flip clearly-FAILED ones so the SPA polling sees
+    // an updated status without waiting for the background reconciliation
+    // job. SUCCESS transitions are intentionally left to webhook /
+    // returnURL / reconciliation paths (full settlement is heavy and must
+    // run inside a transaction).
+    try {
+      const refreshCutoff = new Date(Date.now() - 30 * 1000);
+      const inFlight = await PaymentAttempt.find({
+        studentId,
+        tenantId: req.user.tenantId,
+        status: { $in: ['INITIATED', 'PROCESSING', 'PENDING'] },
+        gatewayRefId: { $exists: true, $ne: null },
+        createdAt: { $lt: refreshCutoff }
+      }).limit(10);
+
+      if (inFlight.length > 0) {
+        const tenant = await Tenant.findById(req.user.tenantId).lean();
+        const gateway = tenant ? getGateway(tenant) : null;
+        if (gateway && typeof gateway.checkStatus === 'function') {
+          await Promise.all(inFlight.map(async(attempt) => {
+            try {
+              const result = await gateway.checkStatus(attempt.gatewayRefId, attempt.idempotencyKey);
+              if (result?.status === 'FAILED') {
+                const previousStatus = attempt.status;
+                attempt.status = 'FAILED';
+                await attempt.save();
+                await PaymentAuditLog.create({
+                  tenantId: attempt.tenantId,
+                  paymentAttemptId: attempt._id,
+                  previousStatus,
+                  newStatus: 'FAILED',
+                  triggerSource: 'STUDENT_PORTAL',
+                  note: 'Status reconciled during history fetch.'
+                });
+              }
+            } catch (_) { /* gateway flaky — ignore, reconciliation will retry */ }
+          }));
+        }
+      }
+    } catch (_) { /* never block the history response on refresh errors */ }
+
     const attempts = await PaymentAttempt.find({
       studentId,
       tenantId: req.user.tenantId

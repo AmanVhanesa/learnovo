@@ -52,7 +52,7 @@ async function runReconciliation() {
 
 async function _sweepPaymentAttempts() {
   const stuckAttempts = await PaymentAttempt.find({
-    status: { $in: ['PENDING', 'PROCESSING'] }
+    status: { $in: ['INITIATED', 'PENDING', 'PROCESSING'] }
   }).limit(500); // Cap batch size to prevent memory issues
 
   if (stuckAttempts.length === 0) return;
