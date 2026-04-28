@@ -665,6 +665,65 @@ router.post('/:tenantCode', async(req, res) => {
       hasAuthHeader: Boolean(req.headers.authorization),
       logId
     });
+
+    // Customer-browser fallback. ICICI's status-redirect page
+    // (pgpay.icicibank.com/pg/api/statusCheckRedirect) sometimes posts
+    // a stripped-down payload — without secureHash and without Basic
+    // Auth — when the customer clicks the manual "click here" link.
+    // For those requests, returning 401 + WWW-Authenticate triggers a
+    // browser credential popup the customer can't satisfy, leaving
+    // them stranded. Detect the browser by Accept/Sec-Fetch headers,
+    // look up the PaymentAttempt by merchantTxnNo, and redirect them
+    // to /payment/status with the current settled state. Server-to-
+    // server callbacks (the real ICICI notification host) keep the
+    // 401 challenge — they're expected to send proper credentials.
+    const looksLikeBrowser =
+      typeof req.headers.accept === 'string' && req.headers.accept.includes('text/html')
+      || typeof req.headers['sec-fetch-mode'] === 'string';
+    const merchantRef =
+      typeof req.body?.merchantTxnNo === 'string' ? req.body.merchantTxnNo : null;
+
+    if (looksLikeBrowser) {
+      const baseExtras = merchantRef ? { ref: merchantRef } : {};
+      if (merchantRef) {
+        try {
+          const attempt = await PaymentAttempt.findOne({
+            gatewayRefId: merchantRef
+          });
+          if (attempt) {
+            const settledStatus =
+              attempt.status === 'SUCCESS' || attempt.status === 'VERIFIED'
+                ? 'success'
+                : attempt.status === 'FAILED'
+                  ? 'failed'
+                  : 'pending';
+            return res.redirect(
+              302,
+              buildStatusRedirect(settledStatus, {
+                attemptId: attempt._id,
+                ref: merchantRef,
+                amount: attempt.amount
+              })
+            );
+          }
+        } catch (lookupErr) {
+          logger.error('iciciOrangeReturn: browser-fallback lookup failed', {
+            requestId,
+            tenantCode,
+            merchantRef,
+            error: lookupErr.message
+          });
+        }
+      }
+      return res.redirect(
+        302,
+        buildStatusRedirect('pending', {
+          ...baseExtras,
+          message: 'Payment is being verified. You will see the updated status on your fee page shortly.'
+        })
+      );
+    }
+
     res.set('WWW-Authenticate', 'Basic realm="ICICI Orange Callback"');
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
