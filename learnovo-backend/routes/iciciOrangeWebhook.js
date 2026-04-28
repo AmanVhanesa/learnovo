@@ -277,25 +277,32 @@ router.get('/:tenantCode', async(req, res) => {
   // this GET is the only way the customer reaches us. We treat it
   // identically to the POST: verify secureHash, settle, redirect.
   if (typeof req.query?.secureHash === 'string' && req.query.secureHash.length > 0) {
-    const tenant = await Tenant.findOne({ schoolCode: tenantCode });
-    if (!tenant || tenant.paymentGateway?.provider !== 'icici_orange') {
-      logger.warn('iciciOrangeReturn: provider mismatch (GET)', { tenantCode, requestId: req.requestId });
-      return res.status(404).send('Not found');
-    }
     try {
-      // Persist for audit. persistWebhookLog reads req.body, so swap
-      // query into body for the duration of the log call.
+      const tenant = await Tenant.findOne({ schoolCode: tenantCode });
+      if (!tenant || tenant.paymentGateway?.provider !== 'icici_orange') {
+        logger.warn('iciciOrangeReturn: provider mismatch (GET)', { tenantCode, requestId: req.requestId });
+        return res.status(404).send('Not found');
+      }
+      // Persist for audit. persistWebhookLog and handlePgDirectReturn
+      // both read req.body — swap query into body for the duration of
+      // the call.
       const originalBody = req.body;
       req.body = { ...req.query };
-      await persistWebhookLog(req, tenantCode, true);
+      try {
+        await persistWebhookLog(req, tenantCode, true);
+      } catch (_) { /* never block redirect on logging */ }
+      const redirectPath = await handlePgDirectReturn(req, tenantCode, tenant);
       req.body = originalBody;
-    } catch (_) { /* never block redirect on logging */ }
-    // handlePgDirectReturn reads from req.body — pass query as body.
-    const originalBody = req.body;
-    req.body = { ...req.query };
-    const redirectPath = await handlePgDirectReturn(req, tenantCode, tenant);
-    req.body = originalBody;
-    return res.redirect(302, redirectPath);
+      return res.redirect(302, redirectPath);
+    } catch (err) {
+      logger.error('iciciOrangeReturn: GET handler threw', {
+        tenantCode,
+        requestId: req.requestId,
+        error: err.message,
+        stack: err.stack
+      });
+      return res.redirect(302, '/payment/status?status=error&message=Could+not+finalise+payment');
+    }
   }
 
   // Challenge for Basic Auth on GET too. This is intentional: the bank
