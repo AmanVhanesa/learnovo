@@ -62,10 +62,24 @@ class ICICIOrangeGateway extends PaymentGateway {
    * secureHash itself), then concatenate the values in that key order.
    * The bank explicitly requires dynamic sorting — never hardcode the
    * field list, since payloads vary by transactionType.
+   *
+   * Boolean and non-primitive values are excluded. Confirmed empirically
+   * against the /command STATUS response, which carries oth_charge as a
+   * JSON boolean: ICICI signs the response without that field, and
+   * including it broke verification on every reconciliation poll.
+   * Form-encoded callbacks deliver the same field as the string "false"
+   * (HTTP forms stringify everything), so that path is unaffected — only
+   * JSON-bodied responses from /command had the boolean type leak.
    */
   _buildHashText(payload) {
     const keys = Object.keys(payload)
-      .filter(k => k !== 'secureHash' && payload[k] !== undefined && payload[k] !== null)
+      .filter(k => {
+        if (k === 'secureHash') return false;
+        const v = payload[k];
+        if (v === undefined || v === null) return false;
+        const t = typeof v;
+        return t === 'string' || t === 'number';
+      })
       .sort();
     return keys.map(k => String(payload[k])).join('');
   }
