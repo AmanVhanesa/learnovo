@@ -38,7 +38,7 @@ const Receipt = require('../models/Receipt');
 const FeeInvoice = require('../models/FeeInvoice');
 const StudentBalance = require('../models/StudentBalance');
 const User = require('../models/User');
-require('../models/Payment'); // referenced by StudentBalance.updateBalance aggregation
+const Payment = require('../models/Payment');
 const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
 const { toNumber } = require('../utils/money');
 
@@ -146,6 +146,47 @@ async function main() {
         }
 
         const incomeAmount = receipt && receipt.amount > 0 ? toNumber(receipt.amount) : expectedShare;
+
+        // Mirror into legacy Payment collection so the Fees & Finance
+        // dashboard's Total Collected / This Month / Recent Payments
+        // aggregations include this gateway settlement. Dedupe on
+        // (tenantId, transactionDetails.transactionId === attemptId,
+        // invoiceId).
+        if (!DRY_RUN) {
+          try {
+            const existingPayment = await Payment.findOne({
+              tenantId: attempt.tenantId,
+              'transactionDetails.transactionId': String(attempt._id),
+              invoiceId: invoice._id
+            });
+            if (!existingPayment) {
+              const paymentReceiptNum = await Payment.generateReceiptNumber(attempt.tenantId);
+              await Payment.create({
+                tenantId: attempt.tenantId,
+                receiptNumber: paymentReceiptNum,
+                studentId: attempt.studentId,
+                invoiceId: invoice._id,
+                academicSessionId: invoice.academicSessionId,
+                amount: incomeAmount,
+                paymentMethod: 'Online',
+                paymentDate: receipt?.paymentDate || attempt.updatedAt || attempt.createdAt || new Date(),
+                transactionDetails: {
+                  transactionId: String(attempt._id),
+                  referenceNumber: attempt.gatewayRefId || null
+                },
+                remarks: `Backfilled gateway payment (Attempt: ${attempt._id})`,
+                isConfirmed: true,
+                confirmedAt: new Date(),
+                confirmedBy: attempt.studentId,
+                collectedBy: attempt.studentId
+              });
+            }
+          } catch (payErr) {
+            console.error(`[backfill] Payment doc create failed for attempt ${attempt._id} invoice ${invoice._id}:`, payErr.message);
+          }
+        } else {
+          console.log(`[backfill] would CREATE Payment doc for attempt ${attempt._id} invoice ${invoice._id} amount ${incomeAmount}`);
+        }
 
         if (!DRY_RUN) {
           try {

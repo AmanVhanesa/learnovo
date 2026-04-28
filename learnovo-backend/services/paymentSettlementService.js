@@ -1,5 +1,6 @@
 const FeeInvoice = require('../models/FeeInvoice');
 const Receipt = require('../models/Receipt');
+const Payment = require('../models/Payment');
 const PaymentAuditLog = require('../models/PaymentAuditLog');
 const StudentBalance = require('../models/StudentBalance');
 const User = require('../models/User');
@@ -72,6 +73,42 @@ async function applyPaymentToInvoices(attempt, session, opts = {}) {
     });
     await receipt.save({ session });
     receipts.push(receipt);
+
+    // Mirror into the legacy Payment collection. The Fees & Finance
+    // dashboard's "Total Collected" / "This Month" / "Recent Payments" /
+    // method-breakdown widgets all aggregate Payment, so a gateway
+    // settlement that only writes Receipt would never show up. Dedupe
+    // via (paymentAttemptId, invoiceId) so a re-run doesn't duplicate.
+    const existingPayment = await Payment.findOne({
+      tenantId: attempt.tenantId,
+      'transactionDetails.transactionId': String(attempt._id),
+      invoiceId: invoice._id
+    }).session(session);
+
+    if (!existingPayment) {
+      const paymentReceiptNum = await Payment.generateReceiptNumber(attempt.tenantId);
+      const txnRef = opts.transactionRefId || attempt.gatewayRefId || null;
+      await Payment.create([{
+        tenantId: attempt.tenantId,
+        receiptNumber: paymentReceiptNum,
+        studentId: attempt.studentId,
+        invoiceId: invoice._id,
+        academicSessionId: invoice.academicSessionId,
+        amount: applyAmount,
+        paymentMethod: 'Online',
+        paymentDate: opts.paymentDate || new Date(),
+        transactionDetails: {
+          transactionId: String(attempt._id),
+          referenceNumber: txnRef
+        },
+        remarks: opts.note || `Online payment via gateway (Attempt: ${attempt._id})`,
+        isConfirmed: true,
+        confirmedAt: new Date(),
+        confirmedBy: opts.actorUserId || attempt.studentId,
+        collectedBy: opts.actorUserId || attempt.studentId
+      }], { session });
+    }
+
     touched.push(invoice);
   }
 
@@ -184,7 +221,7 @@ async function runPostSettlementSideEffects(attempt, invoices, opts = {}) {
         paymentMethod: opts.paymentMode || 'Online',
         studentName: student?.fullName || student?.name || 'Student',
         invoiceNumber: invoice.invoiceNumber,
-        addedBy: opts.actorUserId || null,
+        addedBy: opts.actorUserId || attempt.studentId,
         paymentReference: opts.transactionRefId || attempt.gatewayRefId || null,
         referenceModel: 'PaymentAttempt',
         academicSessionId: invoice.academicSessionId
