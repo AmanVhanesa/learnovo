@@ -418,11 +418,13 @@ if (isPrimaryInstance) {
 }
 
 // ── Memory monitoring ───────────────────────────────────────────────
+const v8 = require('v8');
+const HEAP_LIMIT = v8.getHeapStatistics().heap_size_limit;
 setInterval(() => {
   const mem = process.memoryUsage();
-  const heapPercent = (mem.heapUsed / mem.heapTotal) * 100;
+  const heapPercent = (mem.heapUsed / HEAP_LIMIT) * 100;
   if (heapPercent > 85) {
-    console.warn(`[memory] HIGH HEAP: ${heapPercent.toFixed(1)}% (${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(mem.heapTotal / 1024 / 1024)}MB)`);
+    console.warn(`[memory] HIGH HEAP: ${heapPercent.toFixed(1)}% (${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(HEAP_LIMIT / 1024 / 1024)}MB limit)`);
   }
 }, 60000); // check every 60s
 
