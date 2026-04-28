@@ -124,10 +124,11 @@ async function _sweepPaymentAttempts() {
           // capability for this gateway". The webhook-log sweep below
           // is how ICICI-side reconciliation happens for now.
           if (err?.code === 'ICICI_ORANGE_SPEC_PENDING') continue;
-          logger.error('Reconciliation: checkStatus failed', {
+          logger.error('Reconciliation: checkStatus failed', err, {
             attemptId: String(attempt._id),
             tenantId: tenantIdStr,
-            error: err.message
+            gatewayRefId: attempt.gatewayRefId,
+            provider: gateway?.constructor?.name
           });
           continue;
         }
