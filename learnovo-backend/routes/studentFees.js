@@ -1,7 +1,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const mongoose = require('mongoose');
-const { toNumber, roundToRupee, isFullyPaid } = require('../utils/money');
+const { toNumber, roundToRupee } = require('../utils/money');
 const FeeInvoice = require('../models/FeeInvoice');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const PaymentAuditLog = require('../models/PaymentAuditLog');
@@ -11,6 +11,9 @@ const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
+const {
+  applyPaymentToInvoices: sharedApplyPaymentToInvoices
+} = require('../services/paymentSettlementService');
 
 // Payment gateway — resolved per tenant via factory
 const { getGateway } = require('../services/payment/GatewayFactory');
@@ -68,67 +71,14 @@ async function createAuditLog(paymentAttemptId, session, tenantId, previousStatu
  * Helper: Get all invoice IDs for a payment attempt (supports both single and combined).
  * Returns array of ObjectIds.
  */
-function getAttemptInvoiceIds(attempt) {
-  if (attempt.invoiceIds && attempt.invoiceIds.length > 0) {
-    return attempt.invoiceIds;
-  }
-  return attempt.invoiceId ? [attempt.invoiceId] : [];
-}
-
 /**
- * Helper: Apply a successful payment across one or more invoices.
- * Distributes the payment amount proportionally, generates receipts,
- * and syncs to finance. Works inside a Mongoose session (transaction).
+ * Apply a successful payment across one or more invoices via the shared
+ * settlement service so reconciliation, ICICI callbacks and admin
+ * verification all stay in lockstep.
  */
 async function applyPaymentToInvoices(attempt, session, opts = {}) {
-  const invoiceIds = getAttemptInvoiceIds(attempt);
-  if (invoiceIds.length === 0) return [];
-
-  const invoices = await FeeInvoice.find({ _id: { $in: invoiceIds } }).session(session);
-  let remaining = toNumber(attempt.amount);
-  const receipts = [];
-
-  for (const invoice of invoices) {
-    if (remaining <= 0) break;
-    const balance = toNumber(invoice.balanceAmount);
-    if (balance <= 0) continue;
-
-    const applyAmount = Math.min(remaining, balance);
-    const newPaid = roundToRupee(toNumber(invoice.paidAmount) + applyAmount);
-    invoice.paidAmount = newPaid;
-    invoice.balanceAmount = roundToRupee(toNumber(invoice.totalAmount) - newPaid);
-
-    if (isFullyPaid(invoice.totalAmount, newPaid)) {
-      invoice.status = 'Paid';
-      invoice.paidDate = new Date();
-    } else {
-      invoice.status = 'Partially Paid';
-    }
-
-    await invoice.save({ session });
-    remaining = roundToRupee(remaining - applyAmount);
-
-    // Generate receipt per invoice
-    const receiptNum = await Receipt.generateReceiptNumber(attempt.tenantId);
-    const receipt = new Receipt({
-      tenantId: attempt.tenantId,
-      paymentAttemptId: attempt._id,
-      studentId: attempt.studentId,
-      invoiceId: invoice._id,
-      receiptNumber: receiptNum,
-      amount: applyAmount,
-      paymentMode: opts.paymentMode || 'ONLINE',
-      paymentDate: opts.paymentDate || new Date(),
-      transactionRefId: opts.transactionRefId || null,
-      ...(opts.initiatedBy && { initiatedBy: opts.initiatedBy }),
-      ...(opts.verifiedByUserId && { verifiedByUserId: opts.verifiedByUserId }),
-      ...(opts.verifiedByName && { verifiedByName: opts.verifiedByName })
-    });
-    await receipt.save({ session });
-    receipts.push(receipt);
-  }
-
-  return receipts;
+  const result = await sharedApplyPaymentToInvoices(attempt, session, opts);
+  return result.receipts;
 }
 
 /**

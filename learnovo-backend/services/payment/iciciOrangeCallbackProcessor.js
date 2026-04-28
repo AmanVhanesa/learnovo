@@ -36,13 +36,14 @@ const mongoose = require('mongoose');
 const ICICIOrangeWebhookLog = require('../../models/ICICIOrangeWebhookLog');
 const PaymentAttempt = require('../../models/PaymentAttempt');
 const PaymentAuditLog = require('../../models/PaymentAuditLog');
-const FeeInvoice = require('../../models/FeeInvoice');
-const Receipt = require('../../models/Receipt');
-const StudentBalance = require('../../models/StudentBalance');
 const Tenant = require('../../models/Tenant');
 const ICICIOrangeGateway = require('./ICICIOrangeGateway');
 const { logger } = require('../../middleware/errorHandler');
-const { toNumber, roundToRupee, moneyEquals } = require('../../utils/money');
+const { moneyEquals, toNumber } = require('../../utils/money');
+const {
+  settleSuccessfulAttempt,
+  runPostSettlementSideEffects
+} = require('../paymentSettlementService');
 
 /**
  * Terminal reasons written into log.processError. Strings are part of
@@ -275,56 +276,23 @@ async function _applySuccess(attempt, parsed, log) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
+  let result;
   try {
-    const previousStatus = attempt.status;
-    attempt.status = 'SUCCESS';
-    // Store bank reference if we have one — useful for the receipt and
-    // for admin lookups against ICICI's dashboard.
-    if (parsed.bankRef) {
-      attempt.gatewayResponse = {
-        ...(attempt.gatewayResponse || {}),
-        bankRef: parsed.bankRef,
-        rawStatus: parsed.rawStatus,
-        logId: String(log._id)
-      };
-    }
-    await attempt.save({ session });
+    const gatewayResponseExtras = parsed.bankRef ? {
+      bankRef: parsed.bankRef,
+      rawStatus: parsed.rawStatus,
+      logId: String(log._id)
+    } : undefined;
 
-    let invoice = null;
-    if (attempt.invoiceId) {
-      invoice = await FeeInvoice.findOne({
-        _id: attempt.invoiceId,
-        tenantId: attempt.tenantId
-      }).session(session);
-
-      if (invoice) {
-        invoice.paidAmount = roundToRupee(
-          toNumber(invoice.paidAmount) + toNumber(attempt.amount)
-        );
-        await invoice.save({ session });
-      }
-    }
-
-    let receiptNumber = null;
-    if (invoice) {
-      receiptNumber = await Receipt.generateReceiptNumber(attempt.tenantId);
-      await Receipt.create([{
-        tenantId: attempt.tenantId,
-        paymentAttemptId: attempt._id,
-        studentId: attempt.studentId,
-        invoiceId: invoice._id,
-        receiptNumber
-      }], { session });
-    }
-
-    await PaymentAuditLog.create([{
-      tenantId: attempt.tenantId,
-      paymentAttemptId: attempt._id,
-      previousStatus,
-      newStatus: 'SUCCESS',
+    result = await settleSuccessfulAttempt(attempt, session, {
+      gatewayResponseExtras,
+      paymentMode: 'ONLINE',
+      paymentDate: new Date(),
+      transactionRefId: parsed.bankRef || attempt.gatewayRefId || null,
+      initiatedBy: 'student',
       triggerSource: 'BACKGROUND_JOB',
       note: `Settled via ICICI Orange callback. Bank ref: ${parsed.bankRef || 'n/a'}. Log: ${log._id}.`
-    }], { session });
+    });
 
     log.processed = true;
     log.processedAt = new Date();
@@ -333,29 +301,8 @@ async function _applySuccess(attempt, parsed, log) {
     await log.save({ session });
 
     await session.commitTransaction();
-    session.endSession();
-
-    // Balance recalc is best-effort — it runs outside the transaction
-    // because StudentBalance has its own recompute-from-source logic
-    // and we don't want a balance-calc hiccup to revert a valid credit.
-    if (invoice) {
-      try {
-        await StudentBalance.updateBalance(
-          attempt.tenantId,
-          attempt.studentId,
-          invoice.academicSessionId
-        );
-      } catch (balErr) {
-        logger.error('iciciOrangeCallbackProcessor: balance recalc failed', {
-          studentId: String(attempt.studentId),
-          tenantId: String(attempt.tenantId),
-          error: balErr.message
-        });
-      }
-    }
   } catch (err) {
     await session.abortTransaction();
-    session.endSession();
     logger.error('iciciOrangeCallbackProcessor: success transaction failed', {
       attemptId: String(attempt._id),
       logId: String(log._id),
@@ -363,6 +310,17 @@ async function _applySuccess(attempt, parsed, log) {
       stack: err.stack
     });
     throw err;
+  } finally {
+    session.endSession();
+  }
+
+  if (result && !result.alreadySettled) {
+    await runPostSettlementSideEffects(attempt, result.invoices, {
+      receipts: result.receipts,
+      paymentMode: 'Online',
+      paymentDate: new Date(),
+      transactionRefId: parsed.bankRef || attempt.gatewayRefId || null
+    });
   }
 }
 

@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
-const FeeInvoice = require('../models/FeeInvoice');
 const PaymentAttempt = require('../models/PaymentAttempt');
 const PaymentAuditLog = require('../models/PaymentAuditLog');
-const Receipt = require('../models/Receipt');
-const StudentBalance = require('../models/StudentBalance');
 const Tenant = require('../models/Tenant');
 const { getGateway } = require('../services/payment/GatewayFactory');
 const iciciOrangeCallbackProcessor = require('../services/payment/iciciOrangeCallbackProcessor');
 const { logger } = require('../middleware/errorHandler');
-const { toNumber, roundToRupee } = require('../utils/money');
+const {
+  settleSuccessfulAttempt,
+  runPostSettlementSideEffects
+} = require('../services/paymentSettlementService');
 
 // Prevent overlapping runs
 let isRunning = false;
@@ -159,63 +159,36 @@ async function _sweepPaymentAttempts() {
   }
 }
 
-async function _applyReconciledSuccess(attempt, previousStatus) {
+async function _applyReconciledSuccess(attempt, _previousStatus) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
+  let result;
   try {
-    attempt.status = 'SUCCESS';
-    await attempt.save({ session });
-
-    // Tenant-scoped invoice lookup — never settle an invoice that
-    // belongs to a different tenant even if invoiceId were somehow
-    // copied across (defence-in-depth).
-    const invoice = await FeeInvoice.findOne({
-      _id: attempt.invoiceId,
-      tenantId: attempt.tenantId
-    }).session(session);
-
-    if (invoice) {
-      invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + toNumber(attempt.amount));
-      await invoice.save({ session });
-
-      const receiptNum = await Receipt.generateReceiptNumber(attempt.tenantId);
-      await Receipt.create([{
-        tenantId: attempt.tenantId,
-        paymentAttemptId: attempt._id,
-        studentId: attempt.studentId,
-        invoiceId: invoice._id,
-        receiptNumber: receiptNum
-      }], { session });
-    }
-
-    await PaymentAuditLog.create([{
-      tenantId: attempt.tenantId,
-      paymentAttemptId: attempt._id,
-      previousStatus,
-      newStatus: 'SUCCESS',
+    result = await settleSuccessfulAttempt(attempt, session, {
+      paymentMode: 'ONLINE',
+      paymentDate: new Date(),
+      transactionRefId: attempt.gatewayRefId || null,
+      initiatedBy: 'student',
       triggerSource: 'BACKGROUND_JOB',
       note: 'Status reconciled from gateway polling.'
-    }], { session });
+    });
 
     await session.commitTransaction();
-    session.endSession();
-
-    if (invoice) {
-      try {
-        await StudentBalance.updateBalance(
-          attempt.tenantId,
-          attempt.studentId,
-          invoice.academicSessionId
-        );
-      } catch (balErr) {
-        logger.error(`Balance update failed for student ${attempt.studentId}`, balErr);
-      }
-    }
   } catch (txErr) {
     await session.abortTransaction();
-    session.endSession();
     throw txErr;
+  } finally {
+    session.endSession();
+  }
+
+  if (result && !result.alreadySettled) {
+    await runPostSettlementSideEffects(attempt, result.invoices, {
+      receipts: result.receipts,
+      paymentMode: 'Online',
+      paymentDate: new Date(),
+      transactionRefId: attempt.gatewayRefId || null
+    });
   }
 }
 
@@ -234,9 +207,12 @@ async function _sweepIciciOrangeWebhookLogs() {
  * Start the polling interval
  */
 function startJob() {
-  const INTERVAL_MS = 5 * 60 * 1000;
+  const INTERVAL_MS = 90 * 1000;
+  // Kick off an immediate sweep so a server restart doesn't add a full
+  // interval of latency for any payments that landed during the restart.
+  setTimeout(runReconciliation, 5 * 1000);
   setInterval(runReconciliation, INTERVAL_MS);
-  logger.info('Reconciliation Job scheduled to run every 5 minutes');
+  logger.info('Reconciliation Job scheduled to run every 90 seconds');
 }
 
 module.exports = { startJob, runReconciliation };
