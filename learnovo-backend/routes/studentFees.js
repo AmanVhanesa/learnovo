@@ -247,6 +247,26 @@ router.get('/summary', protect, authorize('student', 'parent'), async(req, res) 
  * @route   GET /api/student-fees/:id
  * @access  Private (Student)
  */
+// IMPORTANT: must come before the /:id catch-all below — otherwise
+// Express casts "gateway-status" as an ObjectId and 500s on CastError.
+router.get('/gateway-status', protect, authorize('student', 'parent'), async(req, res) => {
+  try {
+    const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway').lean();
+    if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });
+
+    const pg = tenant.paymentGateway || {};
+    res.json({
+      success: true,
+      data: {
+        gatewayEnabled: pg.isActive && pg.provider !== 'none',
+        provider: pg.isActive ? pg.provider : 'none'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 router.get('/:id', protect, authorize('student', 'parent'), async(req, res) => {
   try {
     const { studentId, error } = resolveStudentId(req);
@@ -1300,24 +1320,6 @@ router.get('/receipt/:id/pdf', protect, authorize('student', 'parent'), async(re
   } catch (error) {
     console.error('Student receipt PDF error:', error);
     if (!res.headersSent) res.status(500).json({ success: false, message: 'Server error generating receipt PDF' });
-  }
-});
-
-router.get('/gateway-status', protect, authorize('student', 'parent'), async(req, res) => {
-  try {
-    const tenant = await Tenant.findById(req.user.tenantId).select('paymentGateway').lean();
-    if (!tenant) return res.status(404).json({ success: false, message: 'Tenant not found' });
-
-    const pg = tenant.paymentGateway || {};
-    res.json({
-      success: true,
-      data: {
-        gatewayEnabled: pg.isActive && pg.provider !== 'none',
-        provider: pg.isActive ? pg.provider : 'none'
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
   }
 });
 
