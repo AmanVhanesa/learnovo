@@ -120,13 +120,20 @@ router.get('/history', protect, authorize('student', 'parent'), async(req, res) 
     if (error) return res.status(400).json({ success: false, message: error });
 
     // Opportunistic refresh: ping the gateway for any in-flight attempts
-    // older than 30s and flip clearly-FAILED ones so the SPA polling sees
-    // an updated status without waiting for the background reconciliation
-    // job. SUCCESS transitions are intentionally left to webhook /
-    // returnURL / reconciliation paths (full settlement is heavy and must
-    // run inside a transaction).
+    // and flip clearly-FAILED ones so the SPA polling sees an updated
+    // status without waiting for the background reconciliation job.
+    // SUCCESS transitions are intentionally left to webhook / returnURL /
+    // reconciliation paths (full settlement is heavy and must run inside
+    // a transaction).
+    //
+    // The 3-second floor is a tiny grace window so we don't race with the
+    // gateway-redirect handoff (the attempt row is created ~immediately
+    // before the browser navigates to ICICI). Anything older is fair game
+    // — students who cancel at the gateway typically return to /fees
+    // within 5-15 seconds, and waiting 30s+ to detect that left the UI
+    // showing "Cancel & Retry" instead of "Pay Now".
     try {
-      const refreshCutoff = new Date(Date.now() - 30 * 1000);
+      const refreshCutoff = new Date(Date.now() - 3 * 1000);
       const inFlight = await PaymentAttempt.find({
         studentId,
         tenantId: req.user.tenantId,
