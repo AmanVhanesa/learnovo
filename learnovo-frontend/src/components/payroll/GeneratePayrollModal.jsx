@@ -126,7 +126,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                             <select
                                 value={formData.month}
                                 onChange={(e) => setFormData({ ...formData, month: parseInt(e.target.value) })}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#1C1C1E] dark:text-white"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-[#1C1C1E] dark:text-white"
                                 required
                             >
                                 {monthNames.map((month, index) => (
@@ -145,7 +145,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                 onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
                                 min="2000"
                                 max="2100"
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                 required
                             />
                         </div>
@@ -195,7 +195,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                             <button
                                                 type="button"
                                                 onClick={toggleAllFiltered}
-                                                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                                className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
                                             >
                                                 {allFilteredSelected ? 'Deselect all' : 'Select all'}
                                             </button>
@@ -206,7 +206,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                             value={search}
                                             onChange={(e) => setSearch(e.target.value)}
                                             placeholder="Search employee by name or ID..."
-                                            className="w-full mb-2 px-3 py-2 text-sm border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                            className="w-full mb-2 px-3 py-2 text-sm border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
                                         />
 
                                         <div className="max-h-64 overflow-y-auto pr-1 border border-gray-200 dark:border-[#38383A] rounded-md">
@@ -225,7 +225,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                                                         type="checkbox"
                                                                         checked={checked}
                                                                         onChange={() => toggleOne(emp._id)}
-                                                                        className="h-4 w-4 rounded border-gray-300 dark:border-[#38383A] text-blue-600 focus:ring-blue-500"
+                                                                        className="h-4 w-4 rounded border-gray-300 dark:border-[#38383A] text-emerald-600 focus:ring-emerald-500"
                                                                     />
                                                                     <span className={`text-sm truncate ${checked ? 'text-gray-800 dark:text-white' : 'text-gray-500 dark:text-[#8E8E93]'}`}>
                                                                         {emp.name} <span className="text-gray-400 dark:text-[#636366]">({emp.employeeId})</span>
@@ -257,7 +257,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 dark:disabled:bg-[#38383A]"
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition disabled:bg-gray-400 dark:disabled:bg-[#38383A]"
                             disabled={loading || selectedEmployees.length === 0}
                         >
                             {loading ? 'Generating...' : `Generate Payroll${selectedEmployees.length ? ` (${selectedEmployees.length})` : ''}`}
