@@ -81,6 +81,16 @@ const receiptSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Combined-pay produces one Receipt row per (paymentAttemptId, invoiceId)
+// pair, so the uniqueness constraint must be the compound. An older
+// single-column unique index on paymentAttemptId existed in some
+// production databases (a leftover from the single-invoice-per-attempt
+// design) and would reject the second receipt insert with E11000,
+// aborting the whole settlement transaction. Declaring the right
+// compound index here ensures Mongoose's syncIndexes will replace the
+// stale one on next boot for any environment that still has it.
+receiptSchema.index({ paymentAttemptId: 1, invoiceId: 1 }, { unique: true });
+
 // Static method to generate receipt number (with collision recovery)
 receiptSchema.statics.generateReceiptNumber = async function(tenantId) {
   const year = new Date().getFullYear();
