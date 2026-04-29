@@ -184,6 +184,8 @@ class ICICIOrangeGateway extends PaymentGateway {
       currencyCode: '356', // INR per ISO 4217 numeric
       payType: '0',        // 0 = both debit + credit allowed; matches bank reference samples
       customerEmailID: customer.email || '',
+      customerID: customer.admissionNumber ? String(customer.admissionNumber).slice(0, 60) : '',
+      invoiceNumber: params.invoiceNumber ? String(params.invoiceNumber).slice(0, 60) : '',
       transactionType: 'SALE',
       returnURL: this.returnURL,
       txnDate: this._formatTxnDate(),

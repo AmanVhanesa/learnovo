@@ -369,7 +369,13 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
         amount: amountToPay,
         currency: 'INR',
         reference: idempotencyKey,
-        customerInfo: { name: req.user.fullName, email: req.user.email, phone: req.user.phone }
+        invoiceNumber: invoice.invoiceNumber,
+        customerInfo: {
+          name: req.user.fullName,
+          email: req.user.email,
+          phone: req.user.phone,
+          admissionNumber: req.user.admissionNumber
+        }
       });
 
       // Success call update status isolated
@@ -544,11 +550,18 @@ router.post('/pay-combined', protect, authorize('student'), [
     }
 
     try {
+      const combinedInvoiceLabel = invoices.map(inv => inv.invoiceNumber).filter(Boolean).join(',').slice(0, 60);
       const gatewayResult = await gateway.initiatePayment({
         amount: totalAmount,
         currency: 'INR',
         reference: idempotencyKey,
-        customerInfo: { name: req.user.fullName, email: req.user.email, phone: req.user.phone }
+        invoiceNumber: combinedInvoiceLabel,
+        customerInfo: {
+          name: req.user.fullName,
+          email: req.user.email,
+          phone: req.user.phone,
+          admissionNumber: req.user.admissionNumber
+        }
       });
 
       await PaymentAttempt.findByIdAndUpdate(attempt._id, {
