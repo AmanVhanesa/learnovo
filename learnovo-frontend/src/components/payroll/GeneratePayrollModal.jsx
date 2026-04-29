@@ -140,19 +140,20 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                 </div>
 
                                 {employees.length > 0 && (
-                                    <div className="max-h-40 overflow-y-auto">
-                                        <p className="text-xs text-gray-500 dark:text-[#636366] mb-2">Employees to be included:</p>
-                                        <ul className="text-sm text-gray-700 dark:text-[#8E8E93] space-y-1">
-                                            {employees.slice(0, 10).map(emp => (
-                                                <li key={emp._id} className="flex justify-between">
-                                                    <span>{emp.name} ({emp.employeeId})</span>
-                                                    <span className="font-semibold dark:text-white">₹{emp.salary?.toLocaleString('en-IN')}</span>
-                                                </li>
-                                            ))}
-                                            {employees.length > 10 && (
-                                                <li className="text-gray-500 dark:text-[#636366] italic">...and {employees.length - 10} more</li>
-                                            )}
-                                        </ul>
+                                    <div>
+                                        <p className="text-xs text-gray-500 dark:text-[#636366] mb-2">
+                                            Employees to be included ({employees.length}):
+                                        </p>
+                                        <div className="max-h-64 overflow-y-auto pr-2 border border-gray-200 dark:border-[#38383A] rounded-md p-2">
+                                            <ul className="text-sm text-gray-700 dark:text-[#8E8E93] space-y-1">
+                                                {employees.map(emp => (
+                                                    <li key={emp._id} className="flex justify-between gap-3">
+                                                        <span className="truncate">{emp.name} ({emp.employeeId})</span>
+                                                        <span className="font-semibold dark:text-white whitespace-nowrap">₹{emp.salary?.toLocaleString('en-IN')}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
                                     </div>
                                 )}
                             </>

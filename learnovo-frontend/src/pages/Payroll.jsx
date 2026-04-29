@@ -344,7 +344,7 @@ const Payroll = () => {
             const link = document.createElement('a');
             link.href = url;
             const monthAbbr = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][filters.month - 1];
-            link.download = `ICICI_NPAB_${monthAbbr}_${filters.year}.xls`;
+            link.download = `ICICINPAB${monthAbbr}.xls`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);

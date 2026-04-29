@@ -212,7 +212,7 @@ router.get('/bank-sheet/icici/:year/:month', protect, authorize('admin'), async(
 
     const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'biff8' });
 
-    const filename = `ICICI_NPAB_${NPAB_MONTH_ABBR[month - 1]}_${year}.xls`;
+    const filename = `ICICINPAB${NPAB_MONTH_ABBR[month - 1]}.xls`;
     res.setHeader('Content-Type', 'application/vnd.ms-excel');
     res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
     res.setHeader('X-NPAB-Included', String(included));
