@@ -509,7 +509,9 @@ router.post('/:id/pay', protect, authorize('student', 'parent'), async(req, res)
 
   try {
     const { student, error: stuErr } = await resolveStudent(req);
-    if (stuErr) { await session.abortTransaction(); session.endSession(); return res.status(400).json({ success: false, message: stuErr }); }
+    if (stuErr) {
+      await session.abortTransaction(); session.endSession(); return res.status(400).json({ success: false, message: stuErr });
+    }
 
     const invoice = await FeeInvoice.findOne({
       _id: req.params.id,
@@ -754,7 +756,9 @@ router.post('/pay-combined', protect, authorize('student', 'parent'), [
     const { invoiceIds } = req.body;
 
     const { student, error: stuErr } = await resolveStudent(req);
-    if (stuErr) { await session.abortTransaction(); session.endSession(); return res.status(400).json({ success: false, message: stuErr }); }
+    if (stuErr) {
+      await session.abortTransaction(); session.endSession(); return res.status(400).json({ success: false, message: stuErr });
+    }
 
     // Validate all invoices belong to this student and have balance
     const invoices = await FeeInvoice.find({
