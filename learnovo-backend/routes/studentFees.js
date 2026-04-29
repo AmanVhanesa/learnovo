@@ -200,11 +200,32 @@ router.get('/history', protect, authorize('student', 'parent'), async(req, res) 
                   });
                 }
               }
-            } catch (_) { /* gateway flaky or settlement raced — reconciliation job will retry */ }
+            } catch (err) {
+              // Log every reconciliation failure so we can see *why* polls
+              // aren't converging (signature mismatch, network, settlement
+              // racing, etc.) — the previous silent catch made stuck
+              // payments invisible until a user complained.
+              try {
+                const { logger } = require('../middleware/errorHandler');
+                logger.warn('Inline /history reconcile failed for attempt', {
+                  attemptId: String(attempt._id),
+                  gatewayRefId: attempt.gatewayRefId,
+                  tenantId: String(attempt.tenantId),
+                  error: err?.message || String(err),
+                  stack: err?.stack
+                });
+              } catch (_) { /* logger not available — skip */ }
+            }
           }));
         }
       }
-    } catch (_) { /* never block the history response on refresh errors */ }
+    } catch (err) {
+      // Log but don't fail the history response.
+      try {
+        const { logger } = require('../middleware/errorHandler');
+        logger.warn('History opportunistic refresh threw', { error: err?.message, stack: err?.stack });
+      } catch (_) { /* logger not available */ }
+    }
 
     const attempts = await PaymentAttempt.find({
       studentId,
@@ -219,6 +240,120 @@ router.get('/history', protect, authorize('student', 'parent'), async(req, res) 
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching history' });
+  }
+});
+
+/**
+ * @desc    Force-reconcile a single stuck payment attempt against the
+ *          gateway. Use when the student paid at the bank but the
+ *          browser was closed before returnURL fired and the
+ *          opportunistic /history poll didn't converge (e.g. transient
+ *          gateway hash failure on one tick). Surfaces the raw gateway
+ *          response so support can diagnose if it still won't settle.
+ * @route   POST /api/student-fees/reconcile/:attemptId
+ * @access  Private (Student)
+ */
+router.post('/reconcile/:attemptId', protect, authorize('student', 'parent'), async(req, res) => {
+  try {
+    const { attemptId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(attemptId)) {
+      return res.status(400).json({ success: false, message: 'Invalid attempt id' });
+    }
+
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
+    const attempt = await PaymentAttempt.findOne({
+      _id: attemptId,
+      studentId,
+      tenantId: req.user.tenantId
+    });
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: 'Payment attempt not found' });
+    }
+    if (['SUCCESS', 'VERIFIED'].includes(attempt.status)) {
+      return res.json({ success: true, message: 'Already settled', data: { status: attempt.status } });
+    }
+    if (!attempt.gatewayRefId) {
+      return res.status(400).json({ success: false, message: 'This is a manual payment — wait for admin verification' });
+    }
+
+    const tenant = await Tenant.findById(req.user.tenantId).lean();
+    const gateway = tenant ? getGateway(tenant) : null;
+    if (!gateway || typeof gateway.checkStatus !== 'function') {
+      return res.status(400).json({ success: false, message: 'Gateway does not support manual reconciliation' });
+    }
+
+    let gwResult;
+    try {
+      gwResult = await gateway.checkStatus(attempt.gatewayRefId, attempt.idempotencyKey);
+    } catch (gwErr) {
+      return res.status(502).json({
+        success: false,
+        message: 'Could not reach the payment gateway. Please try again in a moment.',
+        debug: process.env.NODE_ENV !== 'production' ? gwErr.message : undefined
+      });
+    }
+
+    if (gwResult?.status === 'SUCCESS') {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      let settleResult;
+      try {
+        settleResult = await settleSuccessfulAttempt(attempt, session, {
+          paymentMode: 'ONLINE',
+          paymentDate: new Date(),
+          transactionRefId: attempt.gatewayRefId || null,
+          initiatedBy: 'student',
+          triggerSource: 'STUDENT_PORTAL',
+          note: 'Force-reconciled by student via /reconcile endpoint.'
+        });
+        await session.commitTransaction();
+      } catch (txErr) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(500).json({ success: false, message: 'Settlement failed', debug: process.env.NODE_ENV !== 'production' ? txErr.message : undefined });
+      }
+      session.endSession();
+
+      if (settleResult && !settleResult.alreadySettled) {
+        await runPostSettlementSideEffects(attempt, settleResult.invoices, {
+          receipts: settleResult.receipts,
+          paymentMode: 'Online',
+          paymentDate: new Date(),
+          transactionRefId: attempt.gatewayRefId || null
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: settleResult?.alreadySettled ? 'Already settled' : 'Payment confirmed and applied to invoices',
+        data: { status: 'SUCCESS', invoicesUpdated: settleResult?.invoices?.length || 0 }
+      });
+    }
+
+    if (gwResult?.status === 'FAILED') {
+      const previousStatus = attempt.status;
+      attempt.status = 'FAILED';
+      await attempt.save();
+      await PaymentAuditLog.create({
+        tenantId: attempt.tenantId,
+        paymentAttemptId: attempt._id,
+        previousStatus,
+        newStatus: 'FAILED',
+        triggerSource: 'STUDENT_PORTAL',
+        note: 'Force-reconciled by student — gateway reported failure.'
+      });
+      return res.json({ success: true, message: 'Gateway reported this payment failed. You can retry now.', data: { status: 'FAILED' } });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Gateway still processing. Please wait a minute and try again.',
+      data: { status: gwResult?.status || 'PENDING', raw: gwResult?.raw }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message || 'Reconcile failed' });
   }
 });
 
