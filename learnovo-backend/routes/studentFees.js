@@ -411,9 +411,9 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
         status: 'FAILED',
         gatewayResponse: { error: gatewayErr.message }
       });
-      await createAuditLog(attempt._id, null, req.user.tenantId, 'INITIATED', 'FAILED', 'STUDENT_PORTAL', 'Gateway error establishing session');
+      await createAuditLog(attempt._id, null, req.user.tenantId, 'INITIATED', 'FAILED', 'STUDENT_PORTAL', `Gateway error establishing session: ${gatewayErr.message}`);
 
-      res.status(502).json({ success: false, message: 'Payment gateway could not be reached right now. Try again later.' });
+      res.status(502).json({ success: false, message: 'Payment gateway could not be reached right now. Try again later.', debug: process.env.NODE_ENV !== 'production' ? gatewayErr.message : undefined });
     }
 
   } catch (error) {

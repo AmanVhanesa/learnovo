@@ -177,6 +177,19 @@ class ICICIOrangeGateway extends PaymentGateway {
     const amount = Number(params.amount).toFixed(2);
     const customer = params.customerInfo || {};
 
+    // addlParam1/addlParam2 are the only documented merchant-defined fields
+    // on this bank's PG that flow through to the settlement CSV
+    // (AdditionalParameter1/AdditionalParameter2 columns). We carry the
+    // admission number + invoice number there so finance ops can reconcile
+    // settlements without joining back to our DB. Tenant code is implied
+    // by the merchantId in the report row, so we don't need to send it.
+    const addlParam1 = customer.admissionNumber
+      ? String(customer.admissionNumber).slice(0, 60)
+      : (params.reference ? String(params.reference).slice(0, 60) : '');
+    const addlParam2 = params.invoiceNumber
+      ? String(params.invoiceNumber).slice(0, 60)
+      : (this.tenantCode || '');
+
     const requestPayload = {
       merchantId: this.merchantId,
       merchantTxnNo,
@@ -184,15 +197,13 @@ class ICICIOrangeGateway extends PaymentGateway {
       currencyCode: '356', // INR per ISO 4217 numeric
       payType: '0',        // 0 = both debit + credit allowed; matches bank reference samples
       customerEmailID: customer.email || '',
-      customerID: customer.admissionNumber ? String(customer.admissionNumber).slice(0, 60) : '',
-      invoiceNumber: params.invoiceNumber ? String(params.invoiceNumber).slice(0, 60) : '',
       transactionType: 'SALE',
       returnURL: this.returnURL,
       txnDate: this._formatTxnDate(),
       customerMobileNo: this._normalisePhone(customer.phone),
       customerName: (customer.name || 'Student').toString().slice(0, 100),
-      addlParam1: params.reference ? String(params.reference).slice(0, 60) : '',
-      addlParam2: this.tenantCode || ''
+      addlParam1,
+      addlParam2
     };
 
     if (this.aggregatorId) {
