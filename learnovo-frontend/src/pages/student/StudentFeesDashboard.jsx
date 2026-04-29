@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee, Filter, ChevronDown, ArrowUpDown, RotateCcw, SlidersHorizontal, Eye } from 'lucide-react';
@@ -141,6 +141,56 @@ const StudentFeesDashboard = () => {
         return () => { clearInterval(poll); document.removeEventListener('visibilitychange', onVisible); };
     }, [hasPendingPayments, queryClient]);
 
+    // Tracks the most recent ICICI attempt the student opened in a new tab
+    // so we can auto-abandon it when they return to /fees without paying.
+    const pendingIciciAttemptRef = useRef(null);
+
+    // When the student tabs back to /fees with an in-flight ICICI attempt,
+    // give the gateway a moment to deliver any returnURL/webhook, then ask
+    // the backend to abandon it. The /attempts/:id/abandon endpoint
+    // re-checks with the gateway and refuses if the payment actually
+    // succeeded, so this is safe.
+    useEffect(() => {
+        const onVisible = async () => {
+            if (document.hidden) return;
+            const pending = pendingIciciAttemptRef.current;
+            if (!pending) return;
+            // 4s grace so a real returnURL/webhook lands first.
+            const elapsed = Date.now() - pending.startedAt;
+            const wait = Math.max(0, 4000 - elapsed);
+            setTimeout(async () => {
+                const stillPending = pendingIciciAttemptRef.current;
+                if (!stillPending || stillPending.attemptId !== pending.attemptId) return;
+                // If the latest history already shows this attempt as terminal,
+                // skip the abandon call.
+                const fresh = await queryClient.fetchQuery({
+                    queryKey: ['student-payment-history', selectedChildId],
+                    queryFn: async () => {
+                        const res = await studentFeesService.getHistory(selectedChildId);
+                        return res.data?.data || [];
+                    }
+                });
+                const row = fresh.find(h => h._id === pending.attemptId);
+                if (!row || ['SUCCESS', 'VERIFIED', 'FAILED'].includes(row.status)) {
+                    pendingIciciAttemptRef.current = null;
+                    return;
+                }
+                try {
+                    await studentFeesService.abandonAttempt(pending.attemptId);
+                } catch (_) { /* abandon can refuse if payment really succeeded — ignore */ }
+                pendingIciciAttemptRef.current = null;
+                queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
+                queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
+            }, wait);
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        window.addEventListener('focus', onVisible);
+        return () => {
+            document.removeEventListener('visibilitychange', onVisible);
+            window.removeEventListener('focus', onVisible);
+        };
+    }, [queryClient, selectedChildId]);
+
     // Gateway payment flow — supports both ICICI (redirect) and Razorpay (popup)
     const [isGatewayPaying, setIsGatewayPaying] = useState(false);
     const handleGatewayPayment = async (invoiceId) => {
@@ -151,7 +201,17 @@ const StudentFeesDashboard = () => {
             if (!res.data?.success || !data) throw new Error('Failed to initiate payment');
 
             if (data.paymentUrl) {
-                // ICICI / redirect-based flow
+                // ICICI / redirect-based flow. Track the attemptId so that
+                // when the student tabs back to /fees (visibilitychange) we
+                // can auto-abandon the attempt — ICICI's STATUS query returns
+                // PENDING/UNKNOWN for tab-closed-without-acting cases, which
+                // the backend refresh can't safely flip to FAILED on its own.
+                if (data.paymentAttemptId) {
+                    pendingIciciAttemptRef.current = {
+                        attemptId: data.paymentAttemptId,
+                        startedAt: Date.now()
+                    };
+                }
                 const paymentWindow = window.open(data.paymentUrl, '_blank');
                 if (!paymentWindow) window.location.href = data.paymentUrl;
                 toast.success('Redirecting to payment gateway...');
