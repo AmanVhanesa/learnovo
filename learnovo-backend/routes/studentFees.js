@@ -41,9 +41,12 @@ function resolveStudentId(req) {
     return { studentId: req.user._id };
   }
   if (req.user.role === 'parent') {
-    const childId = req.query.childId;
+    // Body-based override for POST routes — frontend can put childId in
+    // either the query string or the JSON body. POST endpoints (pay,
+    // pay-combined, abandon) read from the body so the URL stays clean.
+    const childId = req.query.childId || req.body?.childId;
     if (!childId) {
-      return { error: 'childId query parameter is required for parent access' };
+      return { error: 'childId is required for parent access (query or body)' };
     }
     const children = (req.user.children || []).map(c => c.toString());
     if (!children.includes(childId.toString())) {
@@ -52,6 +55,26 @@ function resolveStudentId(req) {
     return { studentId: childId };
   }
   return { error: 'Unauthorized role' };
+}
+
+/**
+ * Resolve the full student User record for the current request. For
+ * students this is just req.user; for parents we look up the child so
+ * that downstream gateway calls get the right name / email /
+ * admissionNumber on the customer record (not the parent's). Returns
+ * { student, error }.
+ */
+async function resolveStudent(req) {
+  const { studentId, error } = resolveStudentId(req);
+  if (error) return { error };
+  if (req.user.role === 'student') return { student: req.user };
+  const student = await User.findOne({
+    _id: studentId,
+    tenantId: req.user.tenantId,
+    role: 'student'
+  }).lean();
+  if (!student) return { error: 'Child student record not found' };
+  return { student };
 }
 
 /**
@@ -439,7 +462,14 @@ router.get('/gateway-status', protect, authorize('student', 'parent'), async(req
   }
 });
 
-router.get('/:id', protect, authorize('student', 'parent'), async(req, res) => {
+// Constrain :id to a MongoDB ObjectId so word routes declared later in
+// this file (e.g. /receipts, /receipt/:id) don't get shadowed. Without
+// the regex, GET /api/student-fees/receipts was matching this handler
+// with id="receipts", which then CastError'd inside the FeeInvoice
+// lookup and returned a generic 'Server error' — masking the real
+// receipts route entirely. Any new word-prefixed GET added below must
+// either be declared before this handler or remain non-ObjectId-shaped.
+router.get('/:id([0-9a-fA-F]{24})', protect, authorize('student', 'parent'), async(req, res) => {
   try {
     const { studentId, error } = resolveStudentId(req);
     if (error) return res.status(400).json({ success: false, message: error });
@@ -473,14 +503,17 @@ router.get('/:id', protect, authorize('student', 'parent'), async(req, res) => {
  * @route   POST /api/student-fees/:id/pay
  * @access  Private (Student)
  */
-router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
+router.post('/:id/pay', protect, authorize('student', 'parent'), async(req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    const { student, error: stuErr } = await resolveStudent(req);
+    if (stuErr) { await session.abortTransaction(); session.endSession(); return res.status(400).json({ success: false, message: stuErr }); }
+
     const invoice = await FeeInvoice.findOne({
       _id: req.params.id,
-      studentId: req.user._id,
+      studentId: student._id,
       tenantId: req.user.tenantId
     }).session(session);
 
@@ -504,18 +537,18 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
     // Idempotency key: unique per attempt. The stuck-attempt check above is the
     // real idempotency guard (blocks if PENDING/PROCESSING exists). This key just
     // prevents MongoDB-level race conditions on concurrent inserts.
-    const idempotencyKey = `idmp_${invoice._id}_${req.user._id}_${Date.now()}`;
+    const idempotencyKey = `idmp_${invoice._id}_${student._id}_${Date.now()}`;
     const amountToPay = invoice.balanceAmount;
 
     // 1. Create INITIATED attempt record FIRST before calling gateway
     const attempt = new PaymentAttempt({
       tenantId: req.user.tenantId,
       idempotencyKey,
-      studentId: req.user._id,
+      studentId: student._id,
       invoiceId: invoice._id,
       amount: amountToPay,
       status: 'INITIATED',
-      triggerSource: 'STUDENT_PORTAL'
+      triggerSource: req.user.role === 'parent' ? 'PARENT_PORTAL' : 'STUDENT_PORTAL'
     });
 
     await attempt.save({ session });
@@ -544,10 +577,10 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
         reference: idempotencyKey,
         invoiceNumber: invoice.invoiceNumber,
         customerInfo: {
-          name: req.user.fullName,
-          email: req.user.email,
-          phone: req.user.phone,
-          admissionNumber: req.user.admissionNumber
+          name: student.fullName || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Student',
+          email: student.email || req.user.email,
+          phone: student.phone || req.user.phone,
+          admissionNumber: student.admissionNumber
         }
       });
 
@@ -602,11 +635,14 @@ router.post('/:id/pay', protect, authorize('student'), async(req, res) => {
  * @route   POST /api/student-fees/attempts/:attemptId/abandon
  * @access  Private (Student)
  */
-router.post('/attempts/:attemptId/abandon', protect, authorize('student'), async(req, res) => {
+router.post('/attempts/:attemptId/abandon', protect, authorize('student', 'parent'), async(req, res) => {
   try {
+    const { studentId, error: stuErr } = resolveStudentId(req);
+    if (stuErr) return res.status(400).json({ success: false, message: stuErr });
+
     const attempt = await PaymentAttempt.findOne({
       _id: req.params.attemptId,
-      studentId: req.user._id,
+      studentId,
       tenantId: req.user.tenantId
     });
 
@@ -707,7 +743,7 @@ router.post('/attempts/:attemptId/abandon', protect, authorize('student'), async
  * @route   POST /api/student-fees/pay-combined
  * @access  Private (Student)
  */
-router.post('/pay-combined', protect, authorize('student'), [
+router.post('/pay-combined', protect, authorize('student', 'parent'), [
   body('invoiceIds').isArray({ min: 2 }).withMessage('At least 2 invoice IDs required'),
   handleValidationErrors
 ], async(req, res) => {
@@ -717,10 +753,13 @@ router.post('/pay-combined', protect, authorize('student'), [
   try {
     const { invoiceIds } = req.body;
 
+    const { student, error: stuErr } = await resolveStudent(req);
+    if (stuErr) { await session.abortTransaction(); session.endSession(); return res.status(400).json({ success: false, message: stuErr }); }
+
     // Validate all invoices belong to this student and have balance
     const invoices = await FeeInvoice.find({
       _id: { $in: invoiceIds },
-      studentId: req.user._id,
+      studentId: student._id,
       tenantId: req.user.tenantId,
       status: { $nin: ['Paid', 'Cancelled'] }
     }).session(session);
@@ -743,17 +782,17 @@ router.post('/pay-combined', protect, authorize('student'), [
     }
 
     const totalAmount = roundToRupee(invoices.reduce((sum, inv) => sum + toNumber(inv.balanceAmount), 0));
-    const idempotencyKey = `idmp_combined_${req.user._id}_${Date.now()}`;
+    const idempotencyKey = `idmp_combined_${student._id}_${Date.now()}`;
 
     const attempt = new PaymentAttempt({
       tenantId: req.user.tenantId,
       idempotencyKey,
-      studentId: req.user._id,
+      studentId: student._id,
       invoiceId: invoices[0]._id, // primary invoice (backward compat)
       invoiceIds: invoices.map(inv => inv._id),
       amount: totalAmount,
       status: 'INITIATED',
-      triggerSource: 'STUDENT_PORTAL'
+      triggerSource: req.user.role === 'parent' ? 'PARENT_PORTAL' : 'STUDENT_PORTAL'
     });
 
     await attempt.save({ session });
@@ -789,10 +828,10 @@ router.post('/pay-combined', protect, authorize('student'), [
         reference: idempotencyKey,
         invoiceNumber: combinedInvoiceLabel,
         customerInfo: {
-          name: req.user.fullName,
-          email: req.user.email,
-          phone: req.user.phone,
-          admissionNumber: req.user.admissionNumber
+          name: student.fullName || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Student',
+          email: student.email || req.user.email,
+          phone: student.phone || req.user.phone,
+          admissionNumber: student.admissionNumber
         }
       });
 
