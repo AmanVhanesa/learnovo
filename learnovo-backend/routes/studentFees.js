@@ -13,7 +13,9 @@ const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
 const {
-  applyPaymentToInvoices: sharedApplyPaymentToInvoices
+  applyPaymentToInvoices: sharedApplyPaymentToInvoices,
+  settleSuccessfulAttempt,
+  runPostSettlementSideEffects
 } = require('../services/paymentSettlementService');
 
 // Payment gateway — resolved per tenant via factory
@@ -162,8 +164,43 @@ router.get('/history', protect, authorize('student', 'parent'), async(req, res) 
                   triggerSource: 'STUDENT_PORTAL',
                   note: 'Status reconciled during history fetch.'
                 });
+              } else if (result?.status === 'SUCCESS') {
+                // Student paid at the gateway but closed the browser
+                // before the returnURL POST fired. Settle inline so the
+                // page doesn't sit on "pending" until the 90s
+                // reconciliation tick. settleSuccessfulAttempt is
+                // idempotent via (paymentAttemptId, invoiceId), so a
+                // simultaneous reconciliation run will no-op.
+                const session = await mongoose.startSession();
+                session.startTransaction();
+                let settleResult;
+                try {
+                  settleResult = await settleSuccessfulAttempt(attempt, session, {
+                    paymentMode: 'ONLINE',
+                    paymentDate: new Date(),
+                    transactionRefId: attempt.gatewayRefId || null,
+                    initiatedBy: 'student',
+                    triggerSource: 'STUDENT_PORTAL',
+                    note: 'Reconciled inline during /history fetch — student returned to portal after closing gateway window.'
+                  });
+                  await session.commitTransaction();
+                } catch (txErr) {
+                  await session.abortTransaction();
+                  throw txErr;
+                } finally {
+                  session.endSession();
+                }
+
+                if (settleResult && !settleResult.alreadySettled) {
+                  await runPostSettlementSideEffects(attempt, settleResult.invoices, {
+                    receipts: settleResult.receipts,
+                    paymentMode: 'Online',
+                    paymentDate: new Date(),
+                    transactionRefId: attempt.gatewayRefId || null
+                  });
+                }
               }
-            } catch (_) { /* gateway flaky — ignore, reconciliation will retry */ }
+            } catch (_) { /* gateway flaky or settlement raced — reconciliation job will retry */ }
           }));
         }
       }
