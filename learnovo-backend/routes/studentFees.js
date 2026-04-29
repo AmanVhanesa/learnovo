@@ -7,6 +7,7 @@ const PaymentAttempt = require('../models/PaymentAttempt');
 const PaymentAuditLog = require('../models/PaymentAuditLog');
 const PaymentDispute = require('../models/PaymentDispute');
 const Receipt = require('../models/Receipt');
+const Payment = require('../models/Payment');
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
@@ -550,7 +551,16 @@ router.post('/pay-combined', protect, authorize('student'), [
     }
 
     try {
-      const combinedInvoiceLabel = invoices.map(inv => inv.invoiceNumber).filter(Boolean).join(',').slice(0, 60);
+      // ICICI invoiceNo is alphanumeric, max 32 chars. We can't pack a
+      // comma-separated list of Learnovo invoice numbers in there (commas
+      // aren't in the alphanumeric set the bank accepts, and 3+ invoices
+      // overflow 32 chars and get truncated mid-number). Send a synthetic
+      // representative tag instead — same character set as a normal invoice
+      // number, fits, and finance ops can still spot it in the CSV.
+      const firstInvoiceNo = invoices.find(inv => inv.invoiceNumber)?.invoiceNumber || '';
+      const combinedInvoiceLabel = firstInvoiceNo
+        ? `MULTI-${invoices.length}-${firstInvoiceNo}`.slice(0, 32)
+        : '';
       const gatewayResult = await gateway.initiatePayment({
         amount: totalAmount,
         currency: 'INR',
@@ -586,7 +596,7 @@ router.post('/pay-combined', protect, authorize('student'), [
       return res.json({ success: true, message: `Payment initiated for ${invoices.length} invoices.`, data: responseData });
     } catch (gatewayErr) {
       await PaymentAttempt.findByIdAndUpdate(attempt._id, { status: 'FAILED', gatewayResponse: { error: gatewayErr.message } });
-      res.status(502).json({ success: false, message: 'Payment gateway could not be reached. Try again later.' });
+      res.status(502).json({ success: false, message: 'Payment gateway could not be reached. Try again later.', debug: process.env.NODE_ENV !== 'production' ? gatewayErr.message : undefined });
     }
   } catch (error) {
     await session.abortTransaction();
@@ -914,16 +924,73 @@ router.get('/receipts', protect, authorize('student', 'parent'), async(req, res)
     const { studentId, error } = resolveStudentId(req);
     if (error) return res.status(400).json({ success: false, message: error });
 
-    const receipts = await Receipt.find({
-      studentId,
-      tenantId: req.user.tenantId
-    })
+    const tenantId = req.user.tenantId;
+
+    const receipts = await Receipt.find({ studentId, tenantId })
       .populate('invoiceId', 'invoiceNumber totalAmount items')
       .populate('paymentAttemptId', 'gatewayRefId amount status paymentMode transactionRefId paymentDate triggerSource')
       .populate('verifiedByUserId', 'name fullName')
-      .sort({ issuedAt: -1 });
+      .sort({ issuedAt: -1 })
+      .lean();
 
-    res.json({ success: true, data: receipts });
+    // Surface confirmed Payment rows that have no matching Receipt
+    // (legacy ICICI settlements pre-fix, admin-recorded cash/cheque
+    // payments, partial backfills). Normalise them into the same shape
+    // the frontend renders so the student panel never silently misses
+    // a payment that the admin panel shows.
+    const coveredAttemptInvoicePairs = new Set(
+      receipts.map(r => `${r.paymentAttemptId?._id || r.paymentAttemptId || ''}::${r.invoiceId?._id || r.invoiceId || ''}`)
+    );
+    const coveredInvoiceIds = new Set(
+      receipts.filter(r => r.invoiceId).map(r => String(r.invoiceId?._id || r.invoiceId))
+    );
+
+    const payments = await Payment.find({ studentId, tenantId, isConfirmed: true })
+      .populate('invoiceId', 'invoiceNumber totalAmount items')
+      .sort({ paymentDate: -1 })
+      .lean();
+
+    const orphanReceipts = [];
+    for (const p of payments) {
+      const attemptId = p.transactionDetails?.transactionId || '';
+      const invoiceId = String(p.invoiceId?._id || p.invoiceId || '');
+      const pairKey = `${attemptId}::${invoiceId}`;
+      // Skip if already represented by a Receipt (matched by attempt+invoice,
+      // or by invoice alone for non-gateway payments).
+      if (attemptId && coveredAttemptInvoicePairs.has(pairKey)) continue;
+      if (!attemptId && invoiceId && coveredInvoiceIds.has(invoiceId)) continue;
+
+      orphanReceipts.push({
+        _id: p._id,
+        tenantId: p.tenantId,
+        studentId: p.studentId,
+        invoiceId: p.invoiceId,
+        receiptNumber: p.receiptNumber,
+        amount: p.amount,
+        paymentMode: p.paymentMethod,
+        paymentDate: p.paymentDate,
+        transactionRefId: p.transactionDetails?.referenceNumber || null,
+        initiatedBy: 'admin',
+        issuedAt: p.confirmedAt || p.paymentDate || p.createdAt,
+        paymentAttemptId: attemptId
+          ? {
+            _id: attemptId,
+            gatewayRefId: p.transactionDetails?.referenceNumber || null,
+            amount: p.amount,
+            status: 'SUCCESS',
+            paymentMode: p.paymentMethod,
+            transactionRefId: p.transactionDetails?.referenceNumber || null,
+            paymentDate: p.paymentDate
+          }
+          : null,
+        _source: 'payment'
+      });
+    }
+
+    const combined = [...receipts, ...orphanReceipts]
+      .sort((a, b) => new Date(b.issuedAt || 0) - new Date(a.issuedAt || 0));
+
+    res.json({ success: true, data: combined });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error fetching receipts' });
   }
