@@ -177,19 +177,13 @@ class ICICIOrangeGateway extends PaymentGateway {
     const amount = Number(params.amount).toFixed(2);
     const customer = params.customerInfo || {};
 
-    // addlParam1/addlParam2 are the only documented merchant-defined fields
-    // on this bank's PG that flow through to the settlement CSV
-    // (AdditionalParameter1/AdditionalParameter2 columns). We carry the
-    // admission number + invoice number there so finance ops can reconcile
-    // settlements without joining back to our DB. Tenant code is implied
-    // by the merchantId in the report row, so we don't need to send it.
-    const addlParam1 = customer.admissionNumber
-      ? String(customer.admissionNumber).slice(0, 60)
-      : (params.reference ? String(params.reference).slice(0, 60) : '');
-    const addlParam2 = params.invoiceNumber
-      ? String(params.invoiceNumber).slice(0, 60)
-      : (this.tenantCode || '');
-
+    // Per ICICI PG Direct spec (Chapter 3 §3.1):
+    //   customerID  → "User ID" column on the settlement CSV (alphanumeric, max 48)
+    //   invoiceNo   → "Invoice Number" column on the settlement CSV (alphanumeric, max 32)
+    //   addlParam1/2 → "AdditionalParameter1/2" columns (alphanumeric, max 64)
+    // We use the bank-defined columns where available so the report shows
+    // human-readable values, and keep the idempotency key in addlParam1 +
+    // tenant code in addlParam2 for support correlation.
     const requestPayload = {
       merchantId: this.merchantId,
       merchantTxnNo,
@@ -201,10 +195,17 @@ class ICICIOrangeGateway extends PaymentGateway {
       returnURL: this.returnURL,
       txnDate: this._formatTxnDate(),
       customerMobileNo: this._normalisePhone(customer.phone),
-      customerName: (customer.name || 'Student').toString().slice(0, 100),
-      addlParam1,
-      addlParam2
+      customerName: (customer.name || 'Student').toString().slice(0, 45),
+      addlParam1: params.reference ? String(params.reference).slice(0, 64) : '',
+      addlParam2: (this.tenantCode || '').slice(0, 64)
     };
+
+    if (customer.admissionNumber) {
+      requestPayload.customerID = String(customer.admissionNumber).slice(0, 48);
+    }
+    if (params.invoiceNumber) {
+      requestPayload.invoiceNo = String(params.invoiceNumber).slice(0, 32);
+    }
 
     if (this.aggregatorId) {
       requestPayload.aggregatorID = this.aggregatorId;
