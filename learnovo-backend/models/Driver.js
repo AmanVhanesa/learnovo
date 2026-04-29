@@ -120,6 +120,23 @@ const driverSchema = new mongoose.Schema({
     min: 0
   },
 
+  // Bank Account (for salary disbursement)
+  bankName: {
+    type: String,
+    trim: true
+  },
+
+  accountNumber: {
+    type: String,
+    trim: true
+  },
+
+  ifscCode: {
+    type: String,
+    trim: true,
+    uppercase: true
+  },
+
   // Emergency Contact
   emergencyContact: {
     name: {

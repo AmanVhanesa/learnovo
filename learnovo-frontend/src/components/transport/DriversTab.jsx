@@ -265,6 +265,9 @@ const DriverModal = ({ driver, onClose }) => {
         dateOfJoining: driver?.dateOfJoining ? new Date(driver.dateOfJoining).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         salary: driver?.salary || '',
         experience: driver?.experience || '',
+        bankName: driver?.bankName || '',
+        accountNumber: driver?.accountNumber || '',
+        ifscCode: driver?.ifscCode || '',
         emergencyContact: {
             name: driver?.emergencyContact?.name || '',
             phone: driver?.emergencyContact?.phone || '',
@@ -619,6 +622,47 @@ const DriverModal = ({ driver, onClose }) => {
                                 value={formData.experience}
                                 onChange={handleChange}
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
+                            />
+                        </div>
+
+                        {/* Bank Account */}
+                        <div className="md:col-span-2 mt-4">
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Bank Account (for salary)</h3>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Bank Name</label>
+                            <input
+                                type="text"
+                                name="bankName"
+                                value={formData.bankName}
+                                onChange={handleChange}
+                                placeholder="e.g. ICICI Bank"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Account Number</label>
+                            <input
+                                type="text"
+                                name="accountNumber"
+                                value={formData.accountNumber}
+                                onChange={handleChange}
+                                inputMode="numeric"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">IFSC Code</label>
+                            <input
+                                type="text"
+                                name="ifscCode"
+                                value={formData.ifscCode}
+                                onChange={handleChange}
+                                placeholder="e.g. ICIC0001234"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white uppercase"
                             />
                         </div>
 

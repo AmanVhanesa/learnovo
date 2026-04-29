@@ -22,13 +22,17 @@ const payrollService = {
       console.log('Month:', month, 'Year:', year);
       console.log('Options:', options);
 
-      // Get all active employees with salary
-      const employees = await User.find({
+      // Get all active employees with salary, optionally restricted to a chosen subset
+      const employeeFilter = {
         tenantId,
         role: { $in: ['admin', 'teacher', 'accountant', 'staff'] },
         isActive: true,
         salary: { $exists: true, $ne: null, $gt: 0 }
-      }).select('_id name employeeId salary leaveDeductionPerDay');
+      };
+      if (Array.isArray(options.employeeIds) && options.employeeIds.length > 0) {
+        employeeFilter._id = { $in: options.employeeIds };
+      }
+      const employees = await User.find(employeeFilter).select('_id name employeeId salary leaveDeductionPerDay');
 
       console.log('Found employees:', employees.length);
       console.log('Employee details:', employees.map(e => ({ name: e.name, salary: e.salary, isActive: e.isActive })));

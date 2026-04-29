@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import payrollService from '../../services/payrollService';
 import employeesService from '../../services/employeesService';
@@ -11,6 +11,8 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
         overwrite: false
     });
     const [employees, setEmployees] = useState([]);
+    const [selectedIds, setSelectedIds] = useState(() => new Set());
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
     const [error, setError] = useState('');
@@ -24,10 +26,11 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
     const fetchEmployees = async () => {
         try {
             setPreviewLoading(true);
-            setError(''); // Clear any previous errors
+            setError('');
             const response = await employeesService.list({ limit: 100, status: 'active' });
             const employeesWithSalary = (response.data || []).filter(emp => emp.salary && emp.salary > 0);
             setEmployees(employeesWithSalary);
+            setSelectedIds(new Set(employeesWithSalary.map(e => e._id)));
         } catch (err) {
             setError('Failed to fetch employees: ' + (err.message || 'Unknown error'));
         } finally {
@@ -35,13 +38,53 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
+    const toggleOne = (id) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const filteredEmployees = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return employees;
+        return employees.filter(e =>
+            (e.name || '').toLowerCase().includes(q) ||
+            (e.employeeId || '').toLowerCase().includes(q)
+        );
+    }, [employees, search]);
+
+    const allFilteredSelected = filteredEmployees.length > 0 &&
+        filteredEmployees.every(e => selectedIds.has(e._id));
+
+    const toggleAllFiltered = () => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (allFilteredSelected) {
+                filteredEmployees.forEach(e => next.delete(e._id));
+            } else {
+                filteredEmployees.forEach(e => next.add(e._id));
+            }
+            return next;
+        });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
-        setLoading(true);
 
+        if (selectedIds.size === 0) {
+            setError('Select at least one employee to generate payroll for');
+            return;
+        }
+
+        setLoading(true);
         try {
-            const result = await payrollService.generateMonthlyPayroll(formData);
+            const result = await payrollService.generateMonthlyPayroll({
+                ...formData,
+                employeeIds: Array.from(selectedIds)
+            });
             onSuccess(result);
             onClose();
         } catch (err) {
@@ -51,7 +94,8 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
-    const totalSalary = employees.reduce((sum, emp) => sum + (emp.salary || 0), 0);
+    const selectedEmployees = employees.filter(e => selectedIds.has(e._id));
+    const totalSalary = selectedEmployees.reduce((sum, emp) => sum + (emp.salary || 0), 0);
 
     const monthNames = [
         'January', 'February', 'March', 'April', 'May', 'June',
@@ -130,8 +174,11 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                             <>
                                 <div className="grid grid-cols-2 gap-4 mb-3">
                                     <div>
-                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Total Employees</p>
-                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">{employees.length}</p>
+                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Selected Employees</p>
+                                        <p className="text-2xl font-bold text-gray-800 dark:text-white">
+                                            {selectedEmployees.length}
+                                            <span className="text-base font-medium text-gray-500 dark:text-[#636366]"> / {employees.length}</span>
+                                        </p>
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Total Salary Amount</p>
@@ -141,17 +188,56 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
 
                                 {employees.length > 0 && (
                                     <div>
-                                        <p className="text-xs text-gray-500 dark:text-[#636366] mb-2">
-                                            Employees to be included ({employees.length}):
-                                        </p>
-                                        <div className="max-h-64 overflow-y-auto pr-2 border border-gray-200 dark:border-[#38383A] rounded-md p-2">
-                                            <ul className="text-sm text-gray-700 dark:text-[#8E8E93] space-y-1">
-                                                {employees.map(emp => (
-                                                    <li key={emp._id} className="flex justify-between gap-3">
-                                                        <span className="truncate">{emp.name} ({emp.employeeId})</span>
-                                                        <span className="font-semibold dark:text-white whitespace-nowrap">₹{emp.salary?.toLocaleString('en-IN')}</span>
+                                        <div className="flex items-center justify-between gap-2 mb-2">
+                                            <p className="text-xs text-gray-500 dark:text-[#636366]">
+                                                Tick the employees to include
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={toggleAllFiltered}
+                                                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                            >
+                                                {allFilteredSelected ? 'Deselect all' : 'Select all'}
+                                            </button>
+                                        </div>
+
+                                        <input
+                                            type="text"
+                                            value={search}
+                                            onChange={(e) => setSearch(e.target.value)}
+                                            placeholder="Search employee by name or ID..."
+                                            className="w-full mb-2 px-3 py-2 text-sm border border-gray-300 dark:border-[#38383A] rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-[#1C1C1E] dark:text-white dark:placeholder-[#636366]"
+                                        />
+
+                                        <div className="max-h-64 overflow-y-auto pr-1 border border-gray-200 dark:border-[#38383A] rounded-md">
+                                            <ul className="divide-y divide-gray-100 dark:divide-[#38383A]">
+                                                {filteredEmployees.length === 0 ? (
+                                                    <li className="px-3 py-4 text-sm text-center text-gray-500 dark:text-[#636366]">
+                                                        No employees match your search
                                                     </li>
-                                                ))}
+                                                ) : filteredEmployees.map(emp => {
+                                                    const checked = selectedIds.has(emp._id);
+                                                    return (
+                                                        <li key={emp._id}>
+                                                            <label className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#38383A] transition">
+                                                                <div className="flex items-center gap-3 min-w-0">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={checked}
+                                                                        onChange={() => toggleOne(emp._id)}
+                                                                        className="h-4 w-4 rounded border-gray-300 dark:border-[#38383A] text-blue-600 focus:ring-blue-500"
+                                                                    />
+                                                                    <span className={`text-sm truncate ${checked ? 'text-gray-800 dark:text-white' : 'text-gray-500 dark:text-[#8E8E93]'}`}>
+                                                                        {emp.name} <span className="text-gray-400 dark:text-[#636366]">({emp.employeeId})</span>
+                                                                    </span>
+                                                                </div>
+                                                                <span className={`font-semibold whitespace-nowrap text-sm ${checked ? 'text-gray-800 dark:text-white' : 'text-gray-400 dark:text-[#636366] line-through'}`}>
+                                                                    ₹{emp.salary?.toLocaleString('en-IN')}
+                                                                </span>
+                                                            </label>
+                                                        </li>
+                                                    );
+                                                })}
                                             </ul>
                                         </div>
                                     </div>
@@ -172,9 +258,9 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                         <button
                             type="submit"
                             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:bg-gray-400 dark:disabled:bg-[#38383A]"
-                            disabled={loading || employees.length === 0}
+                            disabled={loading || selectedEmployees.length === 0}
                         >
-                            {loading ? 'Generating...' : 'Generate Payroll'}
+                            {loading ? 'Generating...' : `Generate Payroll${selectedEmployees.length ? ` (${selectedEmployees.length})` : ''}`}
                         </button>
                     </div>
                 </form>

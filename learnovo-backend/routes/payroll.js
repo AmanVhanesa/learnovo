@@ -302,10 +302,12 @@ router.post('/generate', protect, authorize('admin'), [
   body('month').isInt({ min: 1, max: 12 }).withMessage('Month must be between 1 and 12'),
   body('year').isInt({ min: 2000 }).withMessage('Invalid year'),
   body('overwrite').optional().isBoolean().withMessage('Overwrite must be boolean'),
+  body('employeeIds').optional().isArray().withMessage('employeeIds must be an array'),
+  body('employeeIds.*').optional().isMongoId().withMessage('Invalid employee ID'),
   handleValidationErrors
 ], async(req, res) => {
   try {
-    const { month, year, overwrite, bonuses, deductions } = req.body;
+    const { month, year, overwrite, bonuses, deductions, employeeIds } = req.body;
 
     // Look up active academic session for this tenant
     const AcademicSession = require('../models/AcademicSession');
@@ -316,7 +318,7 @@ router.post('/generate', protect, authorize('admin'), [
       month,
       year,
       req.user._id,
-      { overwrite, bonuses, deductions, academicSessionId: activeSession?._id }
+      { overwrite, bonuses, deductions, employeeIds, academicSessionId: activeSession?._id }
     );
 
     if (!result.success) {

@@ -194,7 +194,8 @@ router.post('/', protect, authorize('admin'), [
     const {
       name, phone, email, licenseNumber, licenseExpiry, licenseType,
       dateOfBirth, gender, bloodGroup, address, dateOfJoining, salary,
-      experience, emergencyContact, photo, documents, notes
+      experience, bankName, accountNumber, ifscCode,
+      emergencyContact, photo, documents, notes
     } = req.body;
 
     const tenantId = req.user.tenantId;
@@ -254,6 +255,9 @@ router.post('/', protect, authorize('admin'), [
       dateOfJoining: dateOfJoining || new Date(),
       salary,
       experience,
+      bankName: bankName ? bankName.trim() : undefined,
+      accountNumber: accountNumber ? accountNumber.trim() : undefined,
+      ifscCode: ifscCode ? ifscCode.trim().toUpperCase() : undefined,
       emergencyContact,
       photo,
       documents,
