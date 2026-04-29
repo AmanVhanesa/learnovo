@@ -161,7 +161,10 @@ router.get('/bank-sheet/icici/:year/:month', protect, authorize('admin'), async(
         skipped.push({ employee: empName, reason: 'Missing bank account number' });
         continue;
       }
-      if (paymentMode !== 'FT' && !ifsc) {
+      // ICICI accounts (IFSC starts with ICIC) → FT; everyone else uses the selected mode
+      const isIciciAccount = ifsc.startsWith('ICIC');
+      const rowMode = isIciciAccount ? 'FT' : paymentMode;
+      if (rowMode !== 'FT' && !ifsc) {
         skipped.push({ employee: empName, reason: 'Missing IFSC code' });
         continue;
       }
@@ -172,11 +175,11 @@ router.get('/bank-sheet/icici/:year/:month', protect, authorize('admin'), async(
 
       rows.push([
         'PAB_VENDOR',
-        paymentMode,
+        rowMode,
         debitAccountNo.toString().trim(),
         npabSanitizeAlpha(empName, 100),
         acctNo,
-        paymentMode === 'FT' ? '' : ifsc,
+        rowMode === 'FT' ? '' : ifsc,
         Number(netSalary.toFixed(2)),
         debitNarr,
         creditNarr,

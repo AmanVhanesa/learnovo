@@ -985,6 +985,7 @@ const Payroll = () => {
                                     <option value="IMPS">IMPS (instant)</option>
                                     <option value="FT">FT (ICICI to ICICI only)</option>
                                 </select>
+                                <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] mt-1">Employees with ICICI accounts (IFSC starting with ICIC) automatically use FT regardless of this selection.</p>
                             </div>
 
                             <div>
