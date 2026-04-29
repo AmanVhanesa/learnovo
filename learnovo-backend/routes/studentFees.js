@@ -626,9 +626,59 @@ router.post('/attempts/:attemptId/abandon', protect, authorize('student'), async
         if (gateway && typeof gateway.checkStatus === 'function') {
           const result = await gateway.checkStatus(attempt.gatewayRefId, attempt.idempotencyKey);
           if (result && ['SUCCESS', 'VERIFIED'].includes(result.status)) {
-            return res.status(409).json({
-              success: false,
-              message: 'This payment actually succeeded at the gateway. Refresh the page to see the receipt.'
+            // The previous version returned 409 and asked the student to
+            // "refresh the page to see the receipt" — but no other path
+            // would actually apply the settlement (the combined-pay
+            // attempt covers multiple invoices, and the bank's payment
+            // advice webhook isn't always wired). The result was both
+            // invoices stuck on Pending forever and Q2 showing Pay Now
+            // even though the student had already paid for it inside
+            // the combined transaction. Settle inline here so cancel-
+            // and-retry self-heals when the student returns from a
+            // closed gateway window.
+            const session = await mongoose.startSession();
+            session.startTransaction();
+            let settleResult;
+            try {
+              settleResult = await settleSuccessfulAttempt(attempt, session, {
+                paymentMode: 'ONLINE',
+                paymentDate: new Date(),
+                transactionRefId: attempt.gatewayRefId || null,
+                initiatedBy: 'student',
+                triggerSource: 'STUDENT_PORTAL',
+                note: 'Cancel-and-retry detected the payment had succeeded at the gateway — settled inline.'
+              });
+              await session.commitTransaction();
+            } catch (txErr) {
+              await session.abortTransaction();
+              session.endSession();
+              return res.status(500).json({
+                success: false,
+                message: 'Payment was confirmed at the bank but we could not record it. Please contact the school office.',
+                debug: process.env.NODE_ENV !== 'production' ? txErr.message : undefined
+              });
+            }
+            session.endSession();
+
+            if (settleResult && !settleResult.alreadySettled) {
+              await runPostSettlementSideEffects(attempt, settleResult.invoices, {
+                receipts: settleResult.receipts,
+                paymentMode: 'Online',
+                paymentDate: new Date(),
+                transactionRefId: attempt.gatewayRefId || null
+              });
+            }
+
+            return res.json({
+              success: true,
+              message: settleResult?.alreadySettled
+                ? 'This payment had already been settled. Refresh to see the receipt.'
+                : `Payment confirmed at the bank. ${settleResult?.invoices?.length || 1} invoice(s) marked as paid.`,
+              data: {
+                status: 'SUCCESS',
+                invoicesSettled: settleResult?.invoices?.length || 0,
+                alreadySettled: !!settleResult?.alreadySettled
+              }
             });
           }
         }
