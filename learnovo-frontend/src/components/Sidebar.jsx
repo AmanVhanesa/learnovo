@@ -32,7 +32,9 @@ import {
   LayoutGrid,
   CircleDollarSign,
   PieChart,
-  Merge
+  Merge,
+  Library,
+  Bookmark
 } from 'lucide-react'
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -101,6 +103,23 @@ const Sidebar = ({ isOpen, onClose }) => {
 
     if (feesFinanceItems.length > 0) {
       sections.push({ label: 'Fees & Finance', items: feesFinanceItems })
+    }
+
+    // ── Library ───────────────────────────────────────────────────
+    const libraryItems = [
+      { name: 'Library', href: '/app/library', icon: Library, roles: ['admin', 'librarian', 'principal', 'vice_principal'], end: true },
+      { name: 'Books', href: '/app/library/books', icon: BookOpen, roles: ['admin', 'librarian'] },
+      { name: 'Issue / Return', href: '/app/library/issues', icon: BookCheck, roles: ['admin', 'librarian'] },
+      { name: 'Members', href: '/app/library/members', icon: Users, roles: ['admin', 'librarian'] },
+      { name: 'Reservations', href: '/app/library/reservations', icon: Bookmark, roles: ['admin', 'librarian'] },
+      { name: 'Fines', href: '/app/library/fines', icon: ReceiptText, roles: ['admin', 'librarian'] },
+      { name: 'Library Reports', href: '/app/library/reports', icon: BarChart3, roles: ['admin', 'librarian'] },
+      { name: 'Library Settings', href: '/app/library/settings', icon: Settings, roles: ['admin', 'librarian'] },
+      { name: 'My Library', href: '/app/library/my', icon: Library, roles: ['student', 'parent', 'teacher'] },
+    ].filter(i => i.roles.includes(r))
+
+    if (libraryItems.length > 0) {
+      sections.push({ label: 'Library', items: libraryItems })
     }
 
     // ── Operations ────────────────────────────────────────────────

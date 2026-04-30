@@ -56,6 +56,9 @@ const PLANS = {
       whiteLabel: false,
       onPremise: false,
 
+      // Library — NOT on free
+      library: false,
+
       // Support
       emailSupport: true,
       prioritySupport: false,
@@ -93,6 +96,7 @@ const PLANS = {
       basicReports: true,
       csvImport: true,
       parentPortal: true,
+      library: true,
 
       // NOT on basic
       advancedAnalytics: false,
@@ -144,6 +148,7 @@ const PLANS = {
       apiAccess: true,
       paymentGateway: true,
       smsWhatsappAlerts: true,
+      library: true,
       emailSupport: true,
       prioritySupport: true,
       phoneSupport: true,
@@ -189,6 +194,7 @@ const PLANS = {
       apiAccess: true,
       paymentGateway: true,
       smsWhatsappAlerts: true,
+      library: true,
       customIntegrations: true,
       whiteLabel: true,
       onPremise: true,

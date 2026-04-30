@@ -64,7 +64,7 @@ const incomeSchema = new mongoose.Schema({
   // Cross-module reference for auto-created records (fee payments, etc.)
   referenceType: {
     type: String,
-    enum: ['fee_payment', 'manual'],
+    enum: ['fee_payment', 'library_fine', 'manual'],
     default: 'manual'
   },
   referenceId: {
@@ -72,7 +72,7 @@ const incomeSchema = new mongoose.Schema({
   },
   referenceModel: {
     type: String,
-    enum: ['Payment', 'PaymentAttempt', 'FeePaymentOrder'],
+    enum: ['Payment', 'PaymentAttempt', 'FeePaymentOrder', 'LibraryFine'],
     default: null
   },
   // System-generated records (from fee payments) cannot be edited/deleted by users

@@ -52,7 +52,9 @@ const notificationSchema = new mongoose.Schema({
       // Parent categories
       'report_card', 'parent_meeting', 'fee_reminder',
       // General categories
-      'admission', 'admission_status', 'announcement', 'system', 'academic', 'employee', 'exam'
+      'admission', 'admission_status', 'announcement', 'system', 'academic', 'employee', 'exam',
+      // Library
+      'library'
     ],
     required: [true, 'Category is required']
   },

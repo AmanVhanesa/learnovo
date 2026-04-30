@@ -333,6 +333,9 @@ app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/advance-salary', require('./routes/advanceSalary'));
 app.use('/api/homework', require('./routes/homework'));
 
+// Library Management
+app.use('/api/library', require('./routes/library'));
+
 // Expense Management
 app.use('/api/expenses', require('./routes/expenses'));
 
@@ -412,6 +415,13 @@ if (isPrimaryInstance) {
     trialExpiryJob.startJob();
   } catch (e) {
     console.error('Failed to start trial expiry job:', e);
+  }
+
+  try {
+    const libraryOverdueJob = require('./jobs/libraryOverdueJob');
+    libraryOverdueJob.startJob();
+  } catch (e) {
+    console.error('Failed to start library overdue job:', e);
   }
 } else {
   console.log(`Skipping cron jobs on PM2 instance ${process.env.NODE_APP_INSTANCE}`);
