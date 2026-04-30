@@ -1,6 +1,7 @@
 const Payroll = require('../models/Payroll');
 const AdvanceSalary = require('../models/AdvanceSalary');
 const User = require('../models/User');
+const Driver = require('../models/Driver');
 
 /**
  * Payroll Service - Business logic for payroll management
@@ -32,10 +33,43 @@ const payrollService = {
       if (Array.isArray(options.employeeIds) && options.employeeIds.length > 0) {
         employeeFilter._id = { $in: options.employeeIds };
       }
-      const employees = await User.find(employeeFilter).select('_id name employeeId salary leaveDeductionPerDay');
+      const userEmployees = await User.find(employeeFilter).select('_id name employeeId salary leaveDeductionPerDay');
 
-      console.log('Found employees:', employees.length);
-      console.log('Employee details:', employees.map(e => ({ name: e.name, salary: e.salary, isActive: e.isActive })));
+      // Also include drivers (active, with salary, optionally restricted)
+      const driverFilter = {
+        tenantId,
+        isActive: true,
+        salary: { $exists: true, $ne: null, $gt: 0 }
+      };
+      if (Array.isArray(options.driverIds) && options.driverIds.length > 0) {
+        driverFilter._id = { $in: options.driverIds };
+      } else if (Array.isArray(options.employeeIds) && options.employeeIds.length > 0 && (!Array.isArray(options.driverIds))) {
+        // Backwards compat: when only employeeIds is sent, do not include drivers
+        driverFilter._id = { $in: [] };
+      }
+      const drivers = await Driver.find(driverFilter).select('_id name driverId salary');
+
+      // Normalize into a unified workers list
+      const employees = [
+        ...userEmployees.map(u => ({
+          _id: u._id,
+          name: u.name,
+          employeeId: u.employeeId,
+          salary: u.salary,
+          leaveDeductionPerDay: u.leaveDeductionPerDay,
+          employeeType: 'User'
+        })),
+        ...drivers.map(d => ({
+          _id: d._id,
+          name: d.name,
+          employeeId: d.driverId,
+          salary: d.salary,
+          leaveDeductionPerDay: 0,
+          employeeType: 'Driver'
+        }))
+      ];
+
+      console.log('Found employees:', employees.length, '(', userEmployees.length, 'users +', drivers.length, 'drivers )');
 
       if (employees.length === 0) {
         return {
@@ -63,20 +97,25 @@ const payrollService = {
           const existing = await Payroll.findOne({
             tenantId,
             employeeId: employee._id,
+            employeeType: employee.employeeType,
             month,
             year
           });
 
-          console.log(`Existing payroll for ${employee.name}:`, existing ? 'YES' : 'NO');
+          console.log(`Existing payroll for ${employee.name}:`, existing ? (existing.isDeleted ? 'YES (soft-deleted)' : 'YES') : 'NO');
 
-          if (existing && !options.overwrite) {
+          // Soft-deleted records should be regenerated automatically (admin deleted them
+          // intending to redo this month). Only skip when an active record exists and
+          // overwrite is not set.
+          if (existing && !existing.isDeleted && !options.overwrite) {
             console.log(`Skipping ${employee.name} - already exists and overwrite=false`);
             results.skipped++;
             continue;
           }
 
           // Get pending advance salaries for this employee
-          const pendingAdvances = await AdvanceSalary.find({
+          // (Drivers don't currently support advance salary; skip lookup for them)
+          const pendingAdvances = employee.employeeType === 'Driver' ? [] : await AdvanceSalary.find({
             tenantId,
             employeeId: employee._id,
             status: 'approved',
@@ -117,6 +156,7 @@ const payrollService = {
           const payrollData = {
             tenantId,
             employeeId: employee._id,
+            employeeType: employee.employeeType,
             month,
             year,
             baseSalary,
@@ -135,11 +175,19 @@ const payrollService = {
           console.log(`Creating payroll for ${employee.name} with data:`, JSON.stringify(payrollData, null, 2));
 
           let payroll;
-          if (existing && options.overwrite) {
-            console.log(`Updating existing payroll for ${employee.name}`);
+          if (existing) {
+            console.log(`Updating existing payroll for ${employee.name}${existing.isDeleted ? ' (restoring soft-deleted record)' : ''}`);
             payroll = await Payroll.findByIdAndUpdate(
               existing._id,
-              { ...payrollData, updatedBy: generatedBy },
+              {
+                $set: {
+                  ...payrollData,
+                  updatedBy: generatedBy,
+                  isDeleted: false,
+                  paymentStatus: existing.isDeleted ? 'pending' : (existing.paymentStatus || 'pending')
+                },
+                $unset: { deletedAt: '', deletedBy: '' }
+              },
               { new: true, runValidators: true }
             );
           } else {
@@ -191,19 +239,23 @@ const payrollService = {
       const limit = options.limit || 20;
       const skip = (page - 1) * limit;
 
-      // Exclude payroll records for inactive employees so their salary isn't shown
+      // Exclude payroll records for inactive employees/drivers so their salary isn't shown
       if (filter.tenantId && !filter.employeeId) {
-        const inactiveEmployees = await User.find({
-          tenantId: filter.tenantId,
-          isActive: false
-        }).select('_id').lean();
-        if (inactiveEmployees.length > 0) {
-          filter.employeeId = { $nin: inactiveEmployees.map(e => e._id) };
+        const [inactiveUsers, inactiveDrivers] = await Promise.all([
+          User.find({ tenantId: filter.tenantId, isActive: false }).select('_id').lean(),
+          Driver.find({ tenantId: filter.tenantId, isActive: false }).select('_id').lean()
+        ]);
+        const inactiveIds = [
+          ...inactiveUsers.map(e => e._id),
+          ...inactiveDrivers.map(d => d._id)
+        ];
+        if (inactiveIds.length > 0) {
+          filter.employeeId = { $nin: inactiveIds };
         }
       }
 
       const records = await Payroll.find(filter)
-        .populate('employeeId', 'name employeeId email phone designation department accountNumber ifscCode bankName')
+        .populate('employeeId', 'name employeeId driverId email phone designation department accountNumber ifscCode bankName')
         .populate('generatedBy', 'name email')
         .sort(options.sort || { year: -1, month: -1, createdAt: -1 })
         .skip(skip)
