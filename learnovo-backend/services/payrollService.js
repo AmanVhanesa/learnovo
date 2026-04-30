@@ -41,10 +41,11 @@ const payrollService = {
         isActive: true,
         salary: { $exists: true, $ne: null, $gt: 0 }
       };
-      if (Array.isArray(options.driverIds) && options.driverIds.length > 0) {
+      if (Array.isArray(options.driverIds)) {
+        // Empty array means "no drivers selected"; non-empty restricts to those IDs
         driverFilter._id = { $in: options.driverIds };
-      } else if (Array.isArray(options.employeeIds) && options.employeeIds.length > 0 && (!Array.isArray(options.driverIds))) {
-        // Backwards compat: when only employeeIds is sent, do not include drivers
+      } else if (Array.isArray(options.employeeIds) && options.employeeIds.length > 0) {
+        // Backwards compat: when only employeeIds is sent (legacy clients), do not include drivers
         driverFilter._id = { $in: [] };
       }
       const drivers = await Driver.find(driverFilter).select('_id name driverId salary');
@@ -93,11 +94,13 @@ const payrollService = {
         try {
           console.log(`Processing employee: ${employee.name} (${employee._id})`);
 
-          // Check if payroll already exists for this employee/month/year
+          // Check if payroll already exists for this employee/month/year.
+          // Do NOT filter by employeeType here — legacy records (pre-backfill) have
+          // employeeType undefined, and the unique index {employeeId, month, year, tenantId}
+          // would otherwise let create() fail with a duplicate-key error.
           const existing = await Payroll.findOne({
             tenantId,
             employeeId: employee._id,
-            employeeType: employee.employeeType,
             month,
             year
           });
