@@ -1451,7 +1451,7 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                                     </button>
                                 </div>
                                 {coScholastic.map((item, idx) => (
-                                    <div key={idx} className="grid grid-cols-[1fr_80px_80px] gap-2 mb-2 items-center">
+                                    <div key={idx} className="grid grid-cols-[1fr_80px_80px_36px] gap-2 mb-2 items-center">
                                         <input type="text" className="input text-sm" value={item.area} onChange={e => setCoScholastic(prev => prev.map((c, i) => i === idx ? { ...c, area: e.target.value } : c))} placeholder="Area name" />
                                         <select className="input text-sm text-center" value={item.term1Grade} onChange={e => setCoScholastic(prev => prev.map((c, i) => i === idx ? { ...c, term1Grade: e.target.value } : c))}>
                                             <option value="">T1</option>
@@ -1461,8 +1461,24 @@ const CustomReportCardModal = ({ onClose, students = [], classes = [], subjects:
                                             <option value="">T2</option>
                                             <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option><option value="E">E</option>
                                         </select>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCoScholastic(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev)}
+                                            disabled={coScholastic.length <= 1}
+                                            className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-400 hover:text-red-500 hover:border-red-300 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                                            title="Remove area"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
                                     </div>
                                 ))}
+                                <button
+                                    type="button"
+                                    onClick={() => setCoScholastic(prev => [...prev, { area: '', term1Grade: '', term2Grade: '' }])}
+                                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium border border-dashed border-gray-300 dark:border-[#48484A] text-gray-600 dark:text-gray-300 hover:text-primary-600 hover:border-primary-300 dark:hover:border-primary-500/40 transition"
+                                >
+                                    <Plus className="h-3.5 w-3.5" /> Add Area
+                                </button>
                             </SectionBlock>
 
                             {/* ── Result ── */}
