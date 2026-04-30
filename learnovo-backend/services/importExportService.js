@@ -399,22 +399,26 @@ class ImportExportService {
      */
   static async getExportHeaderInfo(tenantId, reportTitle) {
     let schoolName = '';
+    let logo = '';
     try {
       const Settings = require('mongoose').model('Settings');
       const settings = await Settings.findOne({ tenantId });
       schoolName = settings?.institution?.name || '';
+      logo = settings?.institution?.logo || '';
     } catch (_e) {
       // Fallback: try Tenant model
       try {
         const Tenant = require('../models/Tenant');
-        const tenant = await Tenant.findById(tenantId).select('schoolName').lean();
+        const tenant = await Tenant.findById(tenantId).select('schoolName logo').lean();
         schoolName = tenant?.schoolName || '';
+        logo = tenant?.logo || '';
       } catch (_e2) {
         // silently continue without school name
       }
     }
     return {
       schoolName,
+      logo,
       reportTitle,
       dateTime: `Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}`
     };

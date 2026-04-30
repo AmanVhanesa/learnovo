@@ -784,6 +784,26 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
         { width: 13 }   // Amount
       ];
 
+      // ── School logo (top-left) ──
+      if (headerInfo.logo) {
+        try {
+          const axios = require('axios');
+          const resp = await axios.get(headerInfo.logo, { responseType: 'arraybuffer', timeout: 5000 });
+          const m = headerInfo.logo.match(/\.(png|jpe?g|gif)(?:\?|$)/i);
+          const ext = (m?.[1] || 'png').toLowerCase().replace('jpg', 'jpeg');
+          const imageId = workbook.addImage({
+            buffer: Buffer.from(resp.data),
+            extension: ext
+          });
+          ws.addImage(imageId, {
+            tl: { col: 0, row: 0 },
+            ext: { width: 80, height: 80 }
+          });
+        } catch (e) {
+          logger.warn('Failed to embed logo in receipts export', { error: e.message });
+        }
+      }
+
       // ── Header block (centered) ──
       if (headerInfo.schoolName) {
         ws.addRow([headerInfo.schoolName]);
@@ -949,7 +969,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
 
     // ── Receipt details (primary, placed first) ──
     lines.push(centered('RECEIPT DETAILS'));
-    const csvHeaders = ['#', 'Receipt No.', 'Date', 'Adm. No.', 'Student Name', 'Father Name', 'Phone', 'Class', 'Method', 'Amount (INR)'];
+    const csvHeaders = ['#', 'Receipt No.', 'Date', 'Adm. No.', 'Student Name', 'Father Name', 'Phone', 'Class', 'Method', 'Amount'];
     lines.push(csvHeaders.map(q).join(','));
 
     payments.forEach((p, idx) => {
