@@ -30,7 +30,10 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
             setError('');
             const [empResponse, drvResponse] = await Promise.all([
                 employeesService.list({ limit: 100, status: 'active' }),
-                transportService.getDrivers({ limit: 200, status: 'active' }).catch(() => ({ data: [] }))
+                transportService.getDrivers({ limit: 100, status: 'active' }).catch(err => {
+                    console.error('Failed to fetch drivers for payroll:', err);
+                    return { data: [] };
+                })
             ]);
             const employeesWithSalary = (empResponse.data || [])
                 .filter(emp => emp.salary && emp.salary > 0)
