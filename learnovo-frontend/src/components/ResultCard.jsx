@@ -395,6 +395,13 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
     const t1Exams = twoTermData?.term1?.exams || [];
     const t2Exams = twoTermData?.term2?.exams || [];
 
+    const customExamNames = filterSeries === 'Custom'
+        ? [...new Set((subjects || []).map(s => s.examName).filter(Boolean))].join(' / ')
+        : '';
+    const examTitle = filterSeries === 'Custom' && customExamNames
+        ? customExamNames
+        : `${filterSeries} Examination`;
+
     return ReactDOM.createPortal(
         <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div className="bg-white dark:bg-[#1C1C1E] rounded-none sm:rounded-2xl shadow-glass-lg w-full max-w-4xl sm:mx-4 h-full sm:h-auto sm:max-h-[92vh] flex flex-col">
@@ -527,7 +534,7 @@ const ResultCard = ({ studentId, studentName, defaultExamSeries, onClose }) => {
                                 <div className="flex justify-between items-baseline mb-7">
                                     <span className="text-[15px] font-semibold uppercase" style={{ color: brandColor, letterSpacing: '0.1em' }}>Student Report Card</span>
                                     <div className="text-right">
-                                        <span className="block text-[12px] font-semibold text-gray-500 dark:text-[#8E8E93]">{isFullYear ? `Full Year ${twoTermData?.session?.name || ''}`.trim() : `${filterSeries} Examination`}</span>
+                                        <span className="block text-[12px] font-semibold text-gray-500 dark:text-[#8E8E93]">{isFullYear ? `Full Year ${twoTermData?.session?.name || ''}`.trim() : examTitle}</span>
                                         <span className="block text-[12px] text-gray-400 dark:text-[#636366]">Issued: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                                     </div>
                                 </div>
