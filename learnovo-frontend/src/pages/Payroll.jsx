@@ -56,13 +56,15 @@ const Payroll = () => {
         month: currentDate.getMonth() + 1,
         year: currentDate.getFullYear(),
         status: '',
-        page: 1
+        page: 1,
+        limit: 50
     });
 
     const [advanceFilters, setAdvanceFilters] = useState({
         status: '',
         deductionStatus: '',
-        page: 1
+        page: 1,
+        limit: 50
     });
 
     // Close export menu on outside click
@@ -782,15 +784,30 @@ const Payroll = () => {
                         )}
 
                         {/* Pagination */}
-                        {payrollPagination.pages > 1 && (
-                            <div className="px-5 py-3 border-t border-gray-100 dark:border-[#38383A] flex items-center justify-between">
-                                <div className="text-[13px] text-gray-500 dark:text-[#8E8E93]">
-                                    Page {payrollPagination.current} of {payrollPagination.pages} &middot; {payrollPagination.total} records
+                        {payrollPagination.total > 0 && (
+                            <div className="px-5 py-3 border-t border-gray-100 dark:border-[#38383A] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-[#8E8E93]">
+                                    <span>Show</span>
+                                    <select
+                                        value={filters.limit}
+                                        onChange={(e) => setFilters({ ...filters, limit: parseInt(e.target.value), page: 1 })}
+                                        className="input !py-1 !px-2 !text-[13px]"
+                                    >
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                        <option value={200}>200</option>
+                                        <option value={500}>500</option>
+                                    </select>
+                                    <span>of {payrollPagination.total} records</span>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setFilters({ ...filters, page: filters.page - 1 })} disabled={filters.page === 1} className="btn btn-sm btn-outline">Previous</button>
-                                    <button onClick={() => setFilters({ ...filters, page: filters.page + 1 })} disabled={filters.page === payrollPagination.pages} className="btn btn-sm btn-outline">Next</button>
-                                </div>
+                                {payrollPagination.pages > 1 && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[13px] text-gray-500 dark:text-[#8E8E93]">Page {payrollPagination.current} of {payrollPagination.pages}</span>
+                                        <button onClick={() => setFilters({ ...filters, page: filters.page - 1 })} disabled={filters.page === 1} className="btn btn-sm btn-outline">Previous</button>
+                                        <button onClick={() => setFilters({ ...filters, page: filters.page + 1 })} disabled={filters.page === payrollPagination.pages} className="btn btn-sm btn-outline">Next</button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -902,15 +919,30 @@ const Payroll = () => {
                             />
                         )}
 
-                        {advancePagination.pages > 1 && (
-                            <div className="px-5 py-3 border-t border-gray-100 dark:border-[#38383A] flex items-center justify-between">
-                                <div className="text-[13px] text-gray-500 dark:text-[#8E8E93]">
-                                    Page {advancePagination.current} of {advancePagination.pages} &middot; {advancePagination.total} records
+                        {advancePagination.total > 0 && (
+                            <div className="px-5 py-3 border-t border-gray-100 dark:border-[#38383A] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 text-[13px] text-gray-500 dark:text-[#8E8E93]">
+                                    <span>Show</span>
+                                    <select
+                                        value={advanceFilters.limit}
+                                        onChange={(e) => setAdvanceFilters({ ...advanceFilters, limit: parseInt(e.target.value), page: 1 })}
+                                        className="input !py-1 !px-2 !text-[13px]"
+                                    >
+                                        <option value={25}>25</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
+                                        <option value={200}>200</option>
+                                        <option value={500}>500</option>
+                                    </select>
+                                    <span>of {advancePagination.total} records</span>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setAdvanceFilters({ ...advanceFilters, page: advanceFilters.page - 1 })} disabled={advanceFilters.page === 1} className="btn btn-sm btn-outline">Previous</button>
-                                    <button onClick={() => setAdvanceFilters({ ...advanceFilters, page: advanceFilters.page + 1 })} disabled={advanceFilters.page === advancePagination.pages} className="btn btn-sm btn-outline">Next</button>
-                                </div>
+                                {advancePagination.pages > 1 && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[13px] text-gray-500 dark:text-[#8E8E93]">Page {advancePagination.current} of {advancePagination.pages}</span>
+                                        <button onClick={() => setAdvanceFilters({ ...advanceFilters, page: advanceFilters.page - 1 })} disabled={advanceFilters.page === 1} className="btn btn-sm btn-outline">Previous</button>
+                                        <button onClick={() => setAdvanceFilters({ ...advanceFilters, page: advanceFilters.page + 1 })} disabled={advanceFilters.page === advancePagination.pages} className="btn btn-sm btn-outline">Next</button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
