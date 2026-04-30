@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import payrollService from '../../services/payrollService';
 import employeesService from '../../services/employeesService';
+import transportService from '../../services/transportService';
 
 const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
     const currentDate = new Date();
@@ -27,10 +28,24 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
         try {
             setPreviewLoading(true);
             setError('');
-            const response = await employeesService.list({ limit: 100, status: 'active' });
-            const employeesWithSalary = (response.data || []).filter(emp => emp.salary && emp.salary > 0);
-            setEmployees(employeesWithSalary);
-            setSelectedIds(new Set(employeesWithSalary.map(e => e._id)));
+            const [empResponse, drvResponse] = await Promise.all([
+                employeesService.list({ limit: 100, status: 'active' }),
+                transportService.getDrivers({ limit: 200, status: 'active' }).catch(() => ({ data: [] }))
+            ]);
+            const employeesWithSalary = (empResponse.data || [])
+                .filter(emp => emp.salary && emp.salary > 0)
+                .map(emp => ({ ...emp, _kind: 'employee' }));
+            const driversWithSalary = (drvResponse.data || [])
+                .filter(d => d.salary && d.salary > 0)
+                .map(d => ({
+                    ...d,
+                    _kind: 'driver',
+                    employeeId: d.driverId,
+                    designation: 'Driver'
+                }));
+            const combined = [...employeesWithSalary, ...driversWithSalary];
+            setEmployees(combined);
+            setSelectedIds(new Set(combined.map(e => e._id)));
         } catch (err) {
             setError('Failed to fetch employees: ' + (err.message || 'Unknown error'));
         } finally {
@@ -81,9 +96,13 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
 
         setLoading(true);
         try {
+            const selected = employees.filter(e => selectedIds.has(e._id));
+            const employeeIds = selected.filter(e => e._kind !== 'driver').map(e => e._id);
+            const driverIds = selected.filter(e => e._kind === 'driver').map(e => e._id);
             const result = await payrollService.generateMonthlyPayroll({
                 ...formData,
-                employeeIds: Array.from(selectedIds)
+                employeeIds,
+                driverIds
             });
             onSuccess(result);
             onClose();
@@ -229,6 +248,9 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                                                     />
                                                                     <span className={`text-sm truncate ${checked ? 'text-gray-800 dark:text-white' : 'text-gray-500 dark:text-[#8E8E93]'}`}>
                                                                         {emp.name} <span className="text-gray-400 dark:text-[#636366]">({emp.employeeId})</span>
+                                                                        {emp._kind === 'driver' && (
+                                                                            <span className="ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">Driver</span>
+                                                                        )}
                                                                     </span>
                                                                 </div>
                                                                 <span className={`font-semibold whitespace-nowrap text-sm ${checked ? 'text-gray-800 dark:text-white' : 'text-gray-400 dark:text-[#636366] line-through'}`}>

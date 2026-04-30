@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, User } from 'lucide-react';
+import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, Eye, Power, PowerOff, Loader2, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
 import { formatDate } from '../../utils/formatDate';
@@ -11,6 +11,7 @@ const DriversTab = ({ onStatsUpdate }) => {
     const [loading, setLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [editingDriver, setEditingDriver] = useState(null);
+    const [viewingDriver, setViewingDriver] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -48,6 +49,25 @@ const DriversTab = ({ onStatsUpdate }) => {
     const handleEditDriver = (driver) => {
         setEditingDriver(driver);
         setShowModal(true);
+    };
+
+    const handleViewDriver = (driver) => {
+        setViewingDriver(driver);
+    };
+
+    const handleToggleStatus = async (driver) => {
+        const action = driver.isActive ? 'deactivate' : 'activate';
+        const reason = driver.isActive ? window.prompt('Reason for deactivation:') : null;
+        if (driver.isActive && !reason) return;
+
+        try {
+            await transportService.toggleDriverStatus(driver._id, reason);
+            toast.success(`Driver ${action}d successfully`);
+            fetchDrivers();
+            onStatsUpdate();
+        } catch (error) {
+            toast.error(error.response?.data?.message || `Failed to ${action} driver`);
+        }
     };
 
     const handleDeleteDriver = async (driver) => {
@@ -217,18 +237,36 @@ const DriversTab = ({ onStatsUpdate }) => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <button
-                                            onClick={() => handleEditDriver(driver)}
-                                            className="text-primary-600 hover:text-primary-900 mr-4"
-                                        >
-                                            <Edit className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteDriver(driver)}
-                                            className="text-red-600 hover:text-red-900"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={() => handleViewDriver(driver)}
+                                                className="text-blue-600 hover:text-blue-800"
+                                                title="View Details"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleEditDriver(driver)}
+                                                className="text-primary-600 hover:text-primary-900"
+                                                title="Edit Driver"
+                                            >
+                                                <Edit className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleToggleStatus(driver)}
+                                                className={driver.isActive ? 'text-amber-600 hover:text-amber-800' : 'text-green-600 hover:text-green-800'}
+                                                title={driver.isActive ? 'Deactivate' : 'Activate'}
+                                            >
+                                                {driver.isActive ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteDriver(driver)}
+                                                className="text-red-600 hover:text-red-900"
+                                                title="Delete Driver"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -244,7 +282,116 @@ const DriversTab = ({ onStatsUpdate }) => {
                     onClose={handleModalClose}
                 />
             )}
+
+            {/* Driver Details (View) Modal */}
+            {viewingDriver && (
+                <DriverDetailsModal
+                    driver={viewingDriver}
+                    onClose={() => setViewingDriver(null)}
+                />
+            )}
         </div>
+    );
+};
+
+// Read-only Driver Details Modal
+const DriverDetailsModal = ({ driver, onClose }) => {
+    const Field = ({ label, value }) => (
+        <div>
+            <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{label}</p>
+            <p className="text-sm text-gray-900 dark:text-white mt-0.5">{value || '—'}</p>
+        </div>
+    );
+    const initials = driver.name ? driver.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'DR';
+    return createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Driver Details</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-[#8E8E93]">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-6">
+                    <div className="flex items-center gap-4 pb-4 border-b border-gray-100 dark:border-[#2C2C2E]">
+                        {driver.photo ? (
+                            <img src={driver.photo} alt={driver.name} className="w-20 h-20 rounded-full object-cover border-2 border-gray-200 dark:border-[#38383A]" />
+                        ) : (
+                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center text-white text-2xl font-semibold">
+                                {initials}
+                            </div>
+                        )}
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{driver.name}</h3>
+                            <p className="text-sm text-gray-500 dark:text-[#8E8E93]">{driver.driverId}</p>
+                            <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${driver.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                {driver.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Personal Information</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <Field label="Phone" value={driver.phone} />
+                            <Field label="Email" value={driver.email} />
+                            <Field label="Date of Birth" value={driver.dateOfBirth ? formatDate(driver.dateOfBirth) : ''} />
+                            <Field label="Gender" value={driver.gender} />
+                            <Field label="Blood Group" value={driver.bloodGroup} />
+                            <Field label="National ID" value={driver.nationalId} />
+                            <div className="sm:col-span-2 md:col-span-3">
+                                <Field label="Address" value={driver.address} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">License Information</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <Field label="License Number" value={driver.licenseNumber} />
+                            <Field label="License Type" value={driver.licenseType} />
+                            <Field label="License Expiry" value={driver.licenseExpiry ? formatDate(driver.licenseExpiry) : ''} />
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Employment Information</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <Field label="Date of Joining" value={driver.dateOfJoining ? formatDate(driver.dateOfJoining) : ''} />
+                            <Field label="Salary" value={driver.salary ? `₹${Number(driver.salary).toLocaleString('en-IN')}` : ''} />
+                            <Field label="Experience (years)" value={driver.experience} />
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Emergency Contact</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <Field label="Contact Name" value={driver.emergencyContact?.name} />
+                            <Field label="Contact Phone" value={driver.emergencyContact?.phone} />
+                            <Field label="Relation" value={driver.emergencyContact?.relation} />
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Bank Details</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            <Field label="IFSC Code" value={driver.ifscCode} />
+                            <Field label="Bank Name" value={driver.bankName} />
+                            <Field label="Account Number" value={driver.accountNumber} />
+                        </div>
+                    </div>
+                </div>
+                <div className="sticky bottom-0 bg-white dark:bg-[#1C1C1E] border-t border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body
     );
 };
 
@@ -278,6 +425,42 @@ const DriverModal = ({ driver, onClose }) => {
     const [loading, setLoading] = useState(false);
     const [photoUploading, setPhotoUploading] = useState(false);
     const [photoPreview, setPhotoPreview] = useState(driver?.photo || '');
+    const [ifscLoading, setIfscLoading] = useState(false);
+    const [ifscVerified, setIfscVerified] = useState(false);
+
+    // Auto-fetch bank name from IFSC (Razorpay public API)
+    useEffect(() => {
+        const fetchBankFromIFSC = async () => {
+            const ifsc = formData.ifscCode?.trim();
+            if (!ifsc || ifsc.length !== 11) {
+                setIfscVerified(false);
+                return;
+            }
+            if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+                setIfscVerified(false);
+                return;
+            }
+            try {
+                setIfscLoading(true);
+                const response = await fetch(`https://ifsc.razorpay.com/${ifsc}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data?.BANK) {
+                        setFormData(prev => ({ ...prev, bankName: data.BANK }));
+                        setIfscVerified(true);
+                    }
+                } else {
+                    setIfscVerified(false);
+                }
+            } catch {
+                setIfscVerified(false);
+            } finally {
+                setIfscLoading(false);
+            }
+        };
+        const timer = setTimeout(fetchBankFromIFSC, 500);
+        return () => clearTimeout(timer);
+    }, [formData.ifscCode]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -625,47 +808,6 @@ const DriverModal = ({ driver, onClose }) => {
                             />
                         </div>
 
-                        {/* Bank Account */}
-                        <div className="md:col-span-2 mt-4">
-                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Bank Account (for salary)</h3>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Bank Name</label>
-                            <input
-                                type="text"
-                                name="bankName"
-                                value={formData.bankName}
-                                onChange={handleChange}
-                                placeholder="e.g. ICICI Bank"
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Account Number</label>
-                            <input
-                                type="text"
-                                name="accountNumber"
-                                value={formData.accountNumber}
-                                onChange={handleChange}
-                                inputMode="numeric"
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">IFSC Code</label>
-                            <input
-                                type="text"
-                                name="ifscCode"
-                                value={formData.ifscCode}
-                                onChange={handleChange}
-                                placeholder="e.g. ICIC0001234"
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white uppercase"
-                            />
-                        </div>
-
                         {/* Emergency Contact */}
                         <div className="md:col-span-2 mt-4">
                             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Emergency Contact</h3>
@@ -700,6 +842,61 @@ const DriverModal = ({ driver, onClose }) => {
                                 name="emergency.relation"
                                 value={formData.emergencyContact.relation}
                                 onChange={handleChange}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
+                            />
+                        </div>
+
+                        {/* Bank Details */}
+                        <div className="md:col-span-2 mt-4">
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Bank Details</h3>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">IFSC Code</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    name="ifscCode"
+                                    value={formData.ifscCode}
+                                    onChange={(e) => {
+                                        let v = e.target.value.replace(/\s/g, '').toUpperCase();
+                                        if (v.length >= 5 && v[4] === 'O') {
+                                            v = v.slice(0, 4) + '0' + v.slice(5);
+                                        }
+                                        setFormData(prev => ({ ...prev, ifscCode: v }));
+                                    }}
+                                    placeholder="e.g., BARB0DBKOLI"
+                                    maxLength={11}
+                                    className={`w-full px-3 py-2 pr-9 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white uppercase ${ifscVerified ? 'border-green-500' : 'border-gray-300 dark:border-[#38383A]'}`}
+                                />
+                                {ifscLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />}
+                                {ifscVerified && !ifscLoading && <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />}
+                            </div>
+                            {ifscVerified && <p className="text-xs text-green-600 mt-1">Bank verified from IFSC</p>}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Bank Name</label>
+                            <input
+                                type="text"
+                                name="bankName"
+                                value={formData.bankName}
+                                onChange={handleChange}
+                                placeholder={ifscLoading ? 'Fetching bank name...' : 'e.g., State Bank of India'}
+                                readOnly={ifscVerified}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-2">Account Number</label>
+                            <input
+                                type="text"
+                                name="accountNumber"
+                                value={formData.accountNumber}
+                                onChange={handleChange}
+                                inputMode="numeric"
+                                placeholder="e.g., 1234567890"
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent dark:bg-[#1C1C1E] dark:text-white"
                             />
                         </div>

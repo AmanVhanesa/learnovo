@@ -693,8 +693,13 @@ const Payroll = () => {
                                                                 </span>
                                                             </div>
                                                             <div>
-                                                                <div className="text-sm font-medium text-gray-900 dark:text-white">{record.employeeId?.name}</div>
-                                                                <div className="text-[11px] text-gray-400 dark:text-[#636366]">{record.employeeId?.employeeId}</div>
+                                                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                                    {record.employeeId?.name}
+                                                                    {record.employeeType === 'Driver' && (
+                                                                        <span className="ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">Driver</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-[11px] text-gray-400 dark:text-[#636366]">{record.employeeId?.employeeId || record.employeeId?.driverId}</div>
                                                             </div>
                                                         </div>
                                                     </td>

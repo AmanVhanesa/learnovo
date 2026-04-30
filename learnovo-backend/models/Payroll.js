@@ -9,10 +9,16 @@ const payrollSchema = new mongoose.Schema({
     index: true
   },
 
-  // Employee reference
+  // Employee reference (User or Driver)
+  employeeType: {
+    type: String,
+    enum: ['User', 'Driver'],
+    default: 'User',
+    required: true
+  },
   employeeId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    refPath: 'employeeType',
     required: true,
     index: true
   },
