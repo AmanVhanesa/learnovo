@@ -1,3 +1,8 @@
+// Force IST timezone for all Date formatting (toLocale*, etc.) regardless of
+// host VPS timezone. Must run before any Date operation. Honors a TZ env var
+// override if explicitly set.
+process.env.TZ = process.env.TZ || 'Asia/Kolkata';
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
