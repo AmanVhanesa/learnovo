@@ -227,7 +227,17 @@ const Exams = () => {
         },
     });
 
-    const availableClasses = useMemo(() => sortClassObjects(availableClassesRaw, 'grade'), [availableClassesRaw]);
+    const availableClasses = useMemo(() => {
+        const seen = new Set();
+        const unique = [];
+        for (const c of availableClassesRaw) {
+            const key = `${(c.name || '').trim().toLowerCase()}|${(c.grade ?? '').toString().trim().toLowerCase()}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            unique.push(c);
+        }
+        return sortClassObjects(unique, 'grade');
+    }, [availableClassesRaw]);
 
     const { data: teachers = [] } = useQuery({
         queryKey: ['exams-teachers'],
