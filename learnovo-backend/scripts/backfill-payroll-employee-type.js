@@ -16,7 +16,7 @@ if (!mongoUri) {
   process.exit(1);
 }
 
-(async () => {
+(async() => {
   await mongoose.connect(mongoUri);
   const result = await mongoose.connection.db
     .collection('payrolls')
