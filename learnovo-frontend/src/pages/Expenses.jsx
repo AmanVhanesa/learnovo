@@ -875,16 +875,28 @@ const Expenses = () => {
             {/* Print/Export */}
             <div className="flex gap-2">
               <button onClick={async () => { if (!printRef.current) return; setIsPrintLoading(true); try { await highQualityPrint(printRef.current, 'Expense-Report', { scale: 2, format: 'a4', orientation: 'portrait', margin: 10 }); } catch (e) { console.error('Print failed:', e); toast.error('Failed to prepare print.'); } finally { setIsPrintLoading(false); } }} disabled={isPrintLoading} className="btn btn-sm btn-outline"><Printer className="h-3.5 w-3.5 mr-1.5" />{isPrintLoading ? 'Preparing...' : 'Print Report'}</button>
-              <ExportColumnPicker
-                data={expenses}
-                columns={expenseExportColumns}
-                presets={expenseExportPresets}
-                filename="expenses_report"
-                title="Export Expenses"
-                sheetName="Expenses"
-                buttonLabel="Export"
-                buttonClassName="btn btn-sm btn-outline"
-              />
+              <button
+                onClick={async () => {
+                  const toastId = toast.loading('Exporting Excel...')
+                  try {
+                    const startDate = new Date(reportYear, reportMonth - 1, 1).toISOString()
+                    const endDate = new Date(reportYear, reportMonth, 0, 23, 59, 59).toISOString()
+                    const blob = await expenseReportsService.exportReport({
+                      startDate, endDate, academicSessionId: currentSession?._id
+                    }, 'excel')
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `expenses_${new Date().toISOString().split('T')[0]}.xlsx`
+                    document.body.appendChild(a); a.click(); a.remove()
+                    URL.revokeObjectURL(url)
+                    toast.dismiss(toastId); toast.success('Exported successfully')
+                  } catch {
+                    toast.dismiss(toastId); toast.error('Failed to export')
+                  }
+                }}
+                className="btn btn-sm btn-outline"
+              >Export Excel</button>
             </div>
           </>
         ) : (

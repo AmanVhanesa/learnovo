@@ -92,7 +92,7 @@ export const expenseReportsService = {
     return res.data
   },
 
-  exportCsv: async (filters = {}) => {
+  exportReport: async (filters = {}, format = 'excel') => {
     const params = new URLSearchParams()
     if (filters.startDate) params.append('startDate', filters.startDate)
     if (filters.endDate) params.append('endDate', filters.endDate)
@@ -100,11 +100,15 @@ export const expenseReportsService = {
     if (filters.status) params.append('status', filters.status)
     if (filters.paymentMethod) params.append('paymentMethod', filters.paymentMethod)
     if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
+    params.append('format', format)
 
-    const token = localStorage.getItem('token')
-    const url = `/expenses/export${params.toString() ? `?${params.toString()}` : ''}&token=${token}`
+    const url = `/expenses/export?${params.toString()}`
     const res = await api.get(url, { responseType: 'blob' })
     return res.data
+  },
+
+  exportCsv: async (filters = {}) => {
+    return expenseReportsService.exportReport(filters, 'csv')
   }
 }
 

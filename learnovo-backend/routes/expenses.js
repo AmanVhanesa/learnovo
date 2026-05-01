@@ -1,9 +1,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 const router = express.Router();
 const { body, query, param } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const { logger } = require('../middleware/errorHandler');
+const { roundToRupee, sumMoney } = require('../utils/money');
 const Expense = require('../models/Expense');
 const ExpenseCategory = require('../models/ExpenseCategory');
 const ExpenseBudget = require('../models/ExpenseBudget');
@@ -150,7 +153,8 @@ router.get('/summary/dashboard', async(req, res, next) => {
 // ── GET /api/expenses/export ─────────────────────────────────────────────────
 router.get('/export', async(req, res, next) => {
   try {
-    const { startDate, endDate, category, status, paymentMethod, academicSessionId } = req.query;
+    const { startDate, endDate, category, status, paymentMethod, academicSessionId, format } = req.query;
+    const fmt = (format || 'excel').toLowerCase();
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
     if (academicSessionId) filter.academicSessionId = academicSessionId;
 
@@ -170,11 +174,258 @@ router.get('/export', async(req, res, next) => {
       .sort({ expenseDate: -1 })
       .lean();
 
-    // Get school name for header
     const ImportExportService = require('../services/importExportService');
-    const headerInfo = await ImportExportService.getExportHeaderInfo(req.user.tenantId, 'Expense Report');
 
-    // Build CSV
+    // Period label
+    const sd = startDate ? new Date(startDate) : null;
+    const ed = endDate ? new Date(endDate) : null;
+    let periodText = 'All Dates';
+    if (sd && ed) {
+      const sameMonth = sd.getMonth() === ed.getMonth() && sd.getFullYear() === ed.getFullYear();
+      const monthName = sd.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+      const range = `${sd.toLocaleDateString('en-IN')} to ${ed.toLocaleDateString('en-IN')}`;
+      periodText = sameMonth ? `${range} (${monthName})` : range;
+    } else if (sd) periodText = `From ${sd.toLocaleDateString('en-IN')}`;
+    else if (ed) periodText = `Until ${ed.toLocaleDateString('en-IN')}`;
+
+    const methodLabel = paymentMethod ? `Method: ${paymentMethod}` : 'All Payment Methods';
+    const statusLabel = status ? `Status: ${status}` : 'All Statuses';
+    const headerInfo = await ImportExportService.getExportHeaderInfo(
+      req.user.tenantId,
+      `Expense Report - ${periodText}`
+    );
+
+    // Totals by category & method
+    const categoryTotals = {};
+    const categoryCounts = {};
+    const methodTotals = {};
+    const methodCounts = {};
+    expenses.forEach(e => {
+      const c = e.category?.name || 'Uncategorized';
+      const m = e.paymentMethod || 'Unknown';
+      categoryTotals[c] = (categoryTotals[c] || 0) + Number(e.amount || 0);
+      categoryCounts[c] = (categoryCounts[c] || 0) + 1;
+      methodTotals[m] = (methodTotals[m] || 0) + Number(e.amount || 0);
+      methodCounts[m] = (methodCounts[m] || 0) + 1;
+    });
+    const grandTotal = sumMoney(expenses.map(e => e.amount));
+    const grandCount = expenses.length;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    if (fmt === 'excel' || fmt === 'xlsx') {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Learnovo';
+      const ws = workbook.addWorksheet('Expenses', {
+        pageSetup: {
+          paperSize: 9, orientation: 'portrait', fitToPage: true,
+          fitToWidth: 1, fitToHeight: 0, horizontalCentered: true,
+          margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
+        }
+      });
+
+      const colCount = 10;
+      ws.columns = [
+        { width: 5 },   // #
+        { width: 11 },  // Date
+        { width: 24 },  // Title
+        { width: 16 },  // Category
+        { width: 13 },  // Amount
+        { width: 13 },  // Method
+        { width: 14 },  // Reference
+        { width: 11 },  // Status
+        { width: 16 },  // Added By
+        { width: 16 }   // Approved By
+      ];
+
+      // ── Logo ──
+      if (headerInfo.logo) {
+        try {
+          const axios = require('axios');
+          const resp = await axios.get(headerInfo.logo, { responseType: 'arraybuffer', timeout: 5000 });
+          const m = headerInfo.logo.match(/\.(png|jpe?g|gif)(?:\?|$)/i);
+          const ext = (m?.[1] || 'png').toLowerCase().replace('jpg', 'jpeg');
+          const imageId = workbook.addImage({
+            buffer: Buffer.from(resp.data),
+            extension: ext
+          });
+          ws.addImage(imageId, {
+            tl: { col: 0, row: 0 },
+            ext: { width: 80, height: 80 }
+          });
+        } catch (e) {
+          logger.warn('Failed to embed logo in expense export', { error: e.message });
+        }
+      }
+
+      // ── Header block ──
+      if (headerInfo.schoolName) {
+        ws.addRow([headerInfo.schoolName]);
+        ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+        ws.lastRow.font = { bold: true, size: 16 };
+        ws.lastRow.alignment = { horizontal: 'center' };
+      }
+      ws.addRow(['Expense Report']);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.font = { bold: true, size: 12 };
+      ws.lastRow.alignment = { horizontal: 'center' };
+
+      ws.addRow([`${periodText} · ${methodLabel} · ${statusLabel}`]);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.font = { size: 10 };
+      ws.lastRow.alignment = { horizontal: 'center' };
+
+      ws.addRow([headerInfo.dateTime]);
+      ws.mergeCells(ws.lastRow.number, 1, ws.lastRow.number, colCount);
+      ws.lastRow.alignment = { horizontal: 'center' };
+      ws.lastRow.font = { italic: true, size: 9, color: { argb: 'FF666666' } };
+      ws.addRow([]);
+
+      // ── Expense details ──
+      const listTitle = ws.addRow(['EXPENSE DETAILS']);
+      ws.mergeCells(listTitle.number, 1, listTitle.number, colCount);
+      listTitle.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      listTitle.alignment = { horizontal: 'center' };
+      listTitle.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+
+      const headerRow = ws.addRow(['#', 'Date', 'Title', 'Category', 'Amount', 'Method', 'Reference', 'Status', 'Added By', 'Approved By']);
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' }, bottom: { style: 'thin' } };
+      });
+      headerRow.height = 22;
+
+      expenses.forEach((e, idx) => {
+        const row = ws.addRow([
+          idx + 1,
+          e.expenseDate ? new Date(e.expenseDate).toLocaleDateString('en-IN') : '',
+          e.title || '',
+          e.category?.name || '-',
+          Number(e.amount || 0),
+          e.paymentMethod || '-',
+          e.paymentReference || '-',
+          e.status || '-',
+          e.addedBy?.name || '-',
+          e.approvedBy?.name || '-'
+        ]);
+        row.height = 18;
+        row.eachCell((cell, colNumber) => {
+          cell.border = { top: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' }, bottom: { style: 'hair' } };
+          if (colNumber === 5) {
+            cell.numFmt = '₹#,##0.00'; cell.alignment = { horizontal: 'right' };
+          } else if (colNumber === 1 || colNumber === 2 || colNumber === 6 || colNumber === 8) {
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          } else cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        });
+        if (idx % 2 === 1) row.eachCell(c => {
+          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F8F8' } };
+        });
+      });
+
+      // Grand total
+      const totalRow = ws.addRow(['', '', '', 'TOTAL', Number(roundToRupee(grandTotal)), '', '', '', '', '']);
+      ws.mergeCells(totalRow.number, 1, totalRow.number, 4);
+      totalRow.eachCell((cell, colNumber) => {
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
+        cell.border = { top: { style: 'medium' }, bottom: { style: 'medium' } };
+        if (colNumber === 5) {
+          cell.numFmt = '₹#,##0.00'; cell.alignment = { horizontal: 'right' };
+        } else cell.alignment = { horizontal: 'right' };
+      });
+      totalRow.height = 20;
+      ws.addRow([]);
+
+      // ── Category summary ──
+      const catTitle = ws.addRow(['CATEGORY SUMMARY']);
+      ws.mergeCells(catTitle.number, 1, catTitle.number, colCount);
+      catTitle.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      catTitle.alignment = { horizontal: 'center' };
+      catTitle.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+
+      const ch = ws.addRow(['Category', '', '', 'Transactions', '', '', 'Amount (INR)', '', '', '']);
+      ws.mergeCells(ch.number, 1, ch.number, 3);
+      ws.mergeCells(ch.number, 4, ch.number, 6);
+      ws.mergeCells(ch.number, 7, ch.number, 10);
+      ch.font = { bold: true, size: 10 };
+      ch.eachCell(c => {
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
+        c.alignment = { horizontal: 'center' };
+        c.border = { bottom: { style: 'thin' } };
+      });
+      Object.keys(categoryTotals).sort((a, b) => categoryTotals[b] - categoryTotals[a]).forEach(c => {
+        const r = ws.addRow([c, '', '', categoryCounts[c] || 0, '', '', Number(roundToRupee(categoryTotals[c] || 0)), '', '', '']);
+        ws.mergeCells(r.number, 1, r.number, 3);
+        ws.mergeCells(r.number, 4, r.number, 6);
+        ws.mergeCells(r.number, 7, r.number, 10);
+        r.getCell(1).alignment = { horizontal: 'center' };
+        r.getCell(4).alignment = { horizontal: 'center' };
+        r.getCell(7).alignment = { horizontal: 'center' };
+        r.getCell(7).numFmt = '₹#,##0.00';
+        r.font = { size: 10 };
+      });
+      ws.addRow([]);
+
+      // ── Method summary ──
+      const mTitle = ws.addRow(['PAYMENT METHOD SUMMARY']);
+      ws.mergeCells(mTitle.number, 1, mTitle.number, colCount);
+      mTitle.font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      mTitle.alignment = { horizontal: 'center' };
+      mTitle.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
+
+      const mh = ws.addRow(['Payment Method', '', '', 'Transactions', '', '', 'Amount (INR)', '', '', '']);
+      ws.mergeCells(mh.number, 1, mh.number, 3);
+      ws.mergeCells(mh.number, 4, mh.number, 6);
+      ws.mergeCells(mh.number, 7, mh.number, 10);
+      mh.font = { bold: true, size: 10 };
+      mh.eachCell(c => {
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
+        c.alignment = { horizontal: 'center' };
+        c.border = { bottom: { style: 'thin' } };
+      });
+      Object.keys(methodTotals).sort((a, b) => methodTotals[b] - methodTotals[a]).forEach(m => {
+        const r = ws.addRow([m, '', '', methodCounts[m] || 0, '', '', Number(roundToRupee(methodTotals[m] || 0)), '', '', '']);
+        ws.mergeCells(r.number, 1, r.number, 3);
+        ws.mergeCells(r.number, 4, r.number, 6);
+        ws.mergeCells(r.number, 7, r.number, 10);
+        r.getCell(1).alignment = { horizontal: 'center' };
+        r.getCell(4).alignment = { horizontal: 'center' };
+        r.getCell(7).alignment = { horizontal: 'center' };
+        r.getCell(7).numFmt = '₹#,##0.00';
+        r.font = { size: 10 };
+      });
+
+      const grandLine = ws.addRow(['GRAND TOTAL', '', '', grandCount, '', '', Number(roundToRupee(grandTotal)), '', '', '']);
+      ws.mergeCells(grandLine.number, 1, grandLine.number, 3);
+      ws.mergeCells(grandLine.number, 4, grandLine.number, 6);
+      ws.mergeCells(grandLine.number, 7, grandLine.number, 10);
+      grandLine.eachCell(c => {
+        c.font = { bold: true, size: 11 };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF5EC' } };
+        c.alignment = { horizontal: 'center' };
+        c.border = { top: { style: 'medium' }, bottom: { style: 'medium' } };
+      });
+      grandLine.getCell(7).numFmt = '₹#,##0.00';
+
+      ws.addRow([]); ws.addRow([]);
+      const sigRow = ws.addRow(['Prepared by: ______________________', '', '', '', '', 'Verified by: ______________________', '', '', '', '']);
+      ws.mergeCells(sigRow.number, 1, sigRow.number, 5);
+      ws.mergeCells(sigRow.number, 6, sigRow.number, colCount);
+      sigRow.font = { size: 10 };
+      sigRow.getCell(1).alignment = { horizontal: 'left' };
+      sigRow.getCell(6).alignment = { horizontal: 'right' };
+
+      ws.pageSetup.printTitlesRow = `${headerRow.number}:${headerRow.number}`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=expenses_${today}.xlsx`);
+      await workbook.xlsx.write(res);
+      return res.end();
+    }
+
+    // CSV fallback
     const headers = ['Date', 'Title', 'Category', 'Amount', 'Payment Method', 'Reference', 'Status', 'Added By', 'Approved By', 'Description'];
     const rows = expenses.map(e => [
       new Date(e.expenseDate).toLocaleDateString('en-IN'),
@@ -198,7 +449,7 @@ router.get('/export', async(req, res, next) => {
     const csv = [...reportHeader, headers.join(','), ...rows.map(r => r.join(','))].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=expenses.csv');
+    res.setHeader('Content-Disposition', `attachment; filename=expenses_${today}.csv`);
     res.send(csv);
   } catch (error) {
     next(error);
