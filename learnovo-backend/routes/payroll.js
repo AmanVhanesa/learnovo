@@ -461,6 +461,13 @@ router.delete('/:id', protect, authorize('admin'), async(req, res) => {
     payroll.deletedBy = req.user._id;
     await payroll.save();
 
+    // Reverse the linked expense (if any) — idempotent and safe to call regardless of paymentStatus
+    try {
+      await reversePayrollExpense(payroll.tenantId, payroll._id);
+    } catch (syncErr) {
+      console.error('[Finance-AutoSync] payroll delete reverse failed (non-fatal):', syncErr.message);
+    }
+
     res.json({
       success: true,
       message: 'Payroll record deleted successfully'
