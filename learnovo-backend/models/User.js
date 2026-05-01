@@ -168,6 +168,75 @@ const userSchema = new mongoose.Schema({
     trim: true
   },
 
+  // ── Service Book fields ─────────────────────────────────────────
+  maritalStatus: {
+    type: String,
+    enum: ['', 'single', 'married', 'divorced', 'widowed'],
+    default: ''
+  },
+  employmentType: {
+    type: String,
+    enum: ['', 'permanent', 'probation', 'contract', 'temporary', 'visiting'],
+    default: ''
+  },
+  appointmentOrderNo: {
+    type: String,
+    trim: true
+  },
+  probationEndDate: {
+    type: Date
+  },
+  reportingTo: {
+    type: String,
+    trim: true
+  },
+  specialization: {
+    type: String,
+    trim: true
+  },
+  previousEmployer: {
+    type: String,
+    trim: true
+  },
+  previousDesignation: {
+    type: String,
+    trim: true
+  },
+  certifications: [{
+    type: String,
+    trim: true
+  }],
+  postings: [{
+    fromDate: { type: Date },
+    toDate: { type: Date },
+    post: { type: String, trim: true },
+    location: { type: String, trim: true },
+    remarks: { type: String, trim: true }
+  }],
+  promotions: [{
+    date: { type: Date },
+    fromDesignation: { type: String, trim: true },
+    toDesignation: { type: String, trim: true },
+    orderNo: { type: String, trim: true },
+    remarks: { type: String, trim: true }
+  }],
+  trainings: [{
+    name: { type: String, trim: true },
+    fromDate: { type: Date },
+    toDate: { type: Date },
+    institute: { type: String, trim: true },
+    remarks: { type: String, trim: true }
+  }],
+  awards: [{
+    name: { type: String, trim: true },
+    date: { type: Date },
+    description: { type: String, trim: true }
+  }],
+  serviceRemarks: {
+    type: String,
+    trim: true
+  },
+
   inactiveReason: {
     type: String,
     trim: true

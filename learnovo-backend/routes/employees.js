@@ -186,7 +186,12 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       education, experience, homeAddress, photo, password,
       bankName, accountNumber, ifscCode,
       subjects, emergencyContact,
-      createLogin
+      createLogin,
+      // Service-book fields
+      maritalStatus, nationality, employmentType, appointmentOrderNo,
+      probationEndDate, reportingTo, specialization, previousEmployer,
+      previousDesignation, certifications, qualifications,
+      postings, promotions, trainings, awards, serviceRemarks
     } = req.body;
 
     const tenantId = req.user.tenantId;
@@ -293,10 +298,27 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       accountNumber: accountNumber ? accountNumber.replace(/\s/g, '') : undefined,
       ifscCode: normalizedIfsc || undefined,
       subjects: role === 'teacher' ? subjects : undefined,
+      qualifications,
       emergencyContact,
       leaveBalance: { casual: 12, sick: 12, earned: 15 },
       isActive: true,
-      loginEnabled: shouldCreateLogin
+      loginEnabled: shouldCreateLogin,
+      // Service-book fields
+      maritalStatus,
+      nationality,
+      employmentType,
+      appointmentOrderNo,
+      probationEndDate,
+      reportingTo,
+      specialization,
+      previousEmployer,
+      previousDesignation,
+      certifications: Array.isArray(certifications) ? certifications : undefined,
+      postings: Array.isArray(postings) ? postings : undefined,
+      promotions: Array.isArray(promotions) ? promotions : undefined,
+      trainings: Array.isArray(trainings) ? trainings : undefined,
+      awards: Array.isArray(awards) ? awards : undefined,
+      serviceRemarks
     };
 
     const employee = await User.create(employeeData);
