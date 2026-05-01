@@ -770,6 +770,40 @@ router.patch('/:id/leave-balance', protect, authorize('admin'), async(req, res) 
 const { uploadSingleFile } = require('../middleware/fileUpload');
 const EmployeeImportService = require('../services/employeeImportService');
 const ImportExportService = require('../services/importExportService');
+const serviceBookPdfService = require('../services/serviceBookPdfService');
+
+// @desc    Download Service Book PDF for an employee
+// @route   GET /api/employees/:id/service-book.pdf
+// @access  Private (Admin or self)
+router.get('/:id/service-book.pdf', protect, async(req, res) => {
+  try {
+    const employee = await User.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+      role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] }
+    }).lean();
+
+    if (!employee) {
+      return res.status(404).json({ success: false, message: 'Employee not found' });
+    }
+
+    if (req.user.role !== 'admin' && req.user._id.toString() !== employee._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    const pdfBuffer = await serviceBookPdfService.generateServiceBook(employee._id, req.user.tenantId);
+    const safeName = (employee.name || 'employee').replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+    const filename = `service_book_${safeName}_${employee.employeeId || employee._id}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Generate service book PDF error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error generating service book PDF' });
+  }
+});
 
 // @desc    Download CSV template
 // @route   GET /api/employees/import/template

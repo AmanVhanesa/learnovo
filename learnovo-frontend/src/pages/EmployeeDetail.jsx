@@ -161,6 +161,23 @@ const EmployeeDetail = () => {
         updateEmployeeMutation.mutate(formData)
     }
 
+    const handleDownloadServiceBook = async () => {
+        try {
+            const blob = await employeesService.downloadServiceBook(employee._id)
+            const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+            const link = document.createElement('a')
+            link.href = url
+            const safe = (employee.name || 'employee').replace(/[^a-z0-9]+/gi, '_').toLowerCase()
+            link.setAttribute('download', `service_book_${safe}_${employee.employeeId || employee._id}.pdf`)
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            window.URL.revokeObjectURL(url)
+        } catch {
+            toast.error('Failed to download service book')
+        }
+    }
+
     const handleDownloadSlip = async (payrollId) => {
         try {
             const blob = await payrollService.downloadSalarySlip(payrollId)
@@ -300,6 +317,10 @@ const EmployeeDetail = () => {
                                     Activate
                                 </>
                             )}
+                        </button>
+                        <button onClick={handleDownloadServiceBook} className="btn btn-outline w-full sm:w-auto text-sm" title="Download Service Book PDF">
+                            <Download className="h-4 w-4 mr-1 sm:mr-2" />
+                            Service Book
                         </button>
                         <button onClick={() => setShowEditForm(true)} className="btn btn-primary w-full sm:w-auto text-sm">
                             <Edit className="h-4 w-4 mr-1 sm:mr-2" />

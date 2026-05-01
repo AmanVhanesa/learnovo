@@ -108,6 +108,11 @@ export const employeesService = {
     importExecute: async (validData, options) => {
         const res = await api.post('/employees/import/execute', { validData, options })
         return res.data
+    },
+
+    downloadServiceBook: async (id) => {
+        const res = await api.get(`/employees/${id}/service-book.pdf`, { responseType: 'blob' })
+        return res.data
     }
 }
 
