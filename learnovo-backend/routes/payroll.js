@@ -343,6 +343,88 @@ router.post('/generate', protect, authorize('admin'), [
   }
 });
 
+// @desc    Bulk mark payroll records as paid
+// @route   POST /api/payroll/bulk-mark-paid
+// @access  Private (Admin)
+router.post('/bulk-mark-paid', protect, authorize('admin'), [
+  body('ids').isArray({ min: 1 }).withMessage('ids must be a non-empty array'),
+  body('ids.*').isMongoId().withMessage('Invalid payroll ID'),
+  body('paymentDate').optional().isISO8601().withMessage('Invalid paymentDate'),
+  body('paymentMethod').optional().isString(),
+  body('paymentReference').optional().isString(),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const { ids, paymentDate, paymentMethod, paymentReference } = req.body;
+    const effectivePaymentDate = paymentDate ? new Date(paymentDate) : new Date();
+
+    const AcademicSession = require('../models/AcademicSession');
+    const activeSession = await AcademicSession.findOne({ tenantId: req.user.tenantId, isActive: true }).select('_id').lean();
+
+    const records = await Payroll.find({
+      _id: { $in: ids },
+      tenantId: req.user.tenantId,
+      isDeleted: { $ne: true }
+    });
+
+    const results = { updated: 0, skipped: 0, failed: 0, errors: [] };
+
+    for (const payroll of records) {
+      try {
+        const previousStatus = payroll.paymentStatus;
+        if (previousStatus === 'paid') {
+          results.skipped += 1;
+          continue;
+        }
+
+        payroll.paymentStatus = 'paid';
+        payroll.paymentDate = effectivePaymentDate;
+        if (paymentMethod !== undefined) payroll.paymentMethod = paymentMethod;
+        if (paymentReference !== undefined) payroll.paymentReference = paymentReference;
+        payroll.updatedBy = req.user._id;
+        await payroll.save();
+
+        try {
+          const employee = await User.findById(payroll.employeeId).select('name fullName').lean();
+          await syncPayrollToExpense({
+            tenantId: payroll.tenantId,
+            payrollId: payroll._id,
+            netSalary: payroll.netSalary,
+            paymentDate: payroll.paymentDate,
+            paymentMethod: payroll.paymentMethod,
+            month: payroll.month,
+            year: payroll.year,
+            employeeName: employee?.fullName || employee?.name || 'Employee',
+            addedBy: req.user._id,
+            paymentReference: payroll.paymentReference,
+            academicSessionId: activeSession?._id
+          });
+        } catch (syncErr) {
+          console.error('[Finance-AutoSync] payroll paid sync failed (non-fatal):', syncErr.message);
+        }
+
+        results.updated += 1;
+      } catch (err) {
+        results.failed += 1;
+        results.errors.push({ id: payroll._id.toString(), message: err.message });
+      }
+    }
+
+    const notFound = ids.length - records.length;
+    res.json({
+      success: true,
+      message: `Bulk mark paid: ${results.updated} updated, ${results.skipped} skipped, ${results.failed} failed${notFound > 0 ? `, ${notFound} not found` : ''}`,
+      data: { ...results, notFound }
+    });
+  } catch (error) {
+    console.error('Bulk mark paid error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while bulk updating payroll'
+    });
+  }
+});
+
 // @desc    Update payroll record
 // @route   PUT /api/payroll/:id
 // @access  Private (Admin)

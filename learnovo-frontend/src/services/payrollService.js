@@ -180,13 +180,11 @@ const payrollService = {
      */
     bulkMarkAsPaid: async (ids) => {
         try {
-            const results = await Promise.all(
-                ids.map(id => api.put(`/payroll/${id}`, {
-                    paymentStatus: 'paid',
-                    paymentDate: new Date().toISOString()
-                }))
-            );
-            return results;
+            const response = await api.post('/payroll/bulk-mark-paid', {
+                ids,
+                paymentDate: new Date().toISOString()
+            }, { timeout: 120000 });
+            return response.data;
         } catch (error) {
             throw error.response?.data || error;
         }
