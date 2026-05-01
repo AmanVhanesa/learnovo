@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import { expensesService, expenseReportsService, expenseCategoriesService, expenseBudgetService } from '../services/expensesService'
 import { academicSessionsService } from '../services/academicsService'
-import ExportColumnPicker from '../components/ExportColumnPicker'
 import { formatCurrency } from '../utils/formatCurrency'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -289,26 +288,6 @@ const Expenses = () => {
     } catch (error) {
       toast.error('Bulk delete failed')
     }
-  }
-
-  const expenseExportColumns = [
-    { key: 'date', label: 'Date', group: 'Basic', getValue: e => e.date ? new Date(e.date).toLocaleDateString() : '' },
-    { key: 'title', label: 'Title', group: 'Basic', getValue: e => e.title || '' },
-    { key: 'category', label: 'Category', group: 'Basic', getValue: e => e.category?.name || e.category || '' },
-    { key: 'amount', label: 'Amount', group: 'Basic', getValue: e => e.amount || 0 },
-    { key: 'status', label: 'Status', group: 'Basic', getValue: e => e.status || '' },
-    { key: 'paymentMethod', label: 'Payment Method', group: 'Payment', getValue: e => e.paymentMethod || '' },
-    { key: 'reference', label: 'Reference', group: 'Payment', getValue: e => e.reference || '' },
-    { key: 'vendor', label: 'Vendor', group: 'Payment', getValue: e => e.vendor || '' },
-    { key: 'description', label: 'Description', group: 'Details', getValue: e => e.description || '' },
-    { key: 'addedBy', label: 'Added By', group: 'Audit', getValue: e => e.addedBy?.name || '' },
-    { key: 'approvedBy', label: 'Approved By', group: 'Audit', getValue: e => e.approvedBy?.name || '' },
-  ]
-
-  const expenseExportPresets = {
-    basic: { label: 'Basic', fields: ['date', 'title', 'category', 'amount', 'status'] },
-    accounting: { label: 'Accounting', fields: ['date', 'title', 'category', 'amount', 'paymentMethod', 'reference', 'vendor'] },
-    audit: { label: 'Audit Trail', fields: ['date', 'title', 'amount', 'status', 'addedBy', 'approvedBy'] },
   }
 
   const handleSaveCategory = async (data) => {
@@ -614,16 +593,31 @@ const Expenses = () => {
             )}
             {selectedIds.length === 0 && (<p className="text-xs text-gray-400 dark:text-[#8E8E93]">{pagination.total > 0 ? `${pagination.total} expense${pagination.total !== 1 ? 's' : ''} found` : ''}</p>)}
           </div>
-          <ExportColumnPicker
-            data={expenses}
-            columns={expenseExportColumns}
-            presets={expenseExportPresets}
-            filename="expenses"
-            title="Export Expenses"
-            sheetName="Expenses"
-            buttonLabel="Export"
-            buttonClassName="btn btn-sm btn-outline"
-          />
+          <button
+            onClick={async () => {
+              const toastId = toast.loading('Exporting Excel...')
+              try {
+                const blob = await expenseReportsService.exportReport({
+                  startDate: debouncedFilters.startDate,
+                  endDate: debouncedFilters.endDate,
+                  category: debouncedFilters.category,
+                  status: debouncedFilters.status,
+                  paymentMethod: debouncedFilters.paymentMethod,
+                  academicSessionId: currentSession?._id
+                }, 'excel')
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `expenses_${new Date().toISOString().split('T')[0]}.xlsx`
+                document.body.appendChild(a); a.click(); a.remove()
+                URL.revokeObjectURL(url)
+                toast.dismiss(toastId); toast.success('Exported successfully')
+              } catch {
+                toast.dismiss(toastId); toast.error('Failed to export')
+              }
+            }}
+            className="btn btn-sm btn-outline"
+          >Export Excel</button>
         </div>
 
         {/* Table */}
