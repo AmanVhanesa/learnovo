@@ -306,10 +306,11 @@ router.post('/generate', protect, authorize('admin'), [
   body('employeeIds.*').optional().isMongoId().withMessage('Invalid employee ID'),
   body('driverIds').optional().isArray().withMessage('driverIds must be an array'),
   body('driverIds.*').optional().isMongoId().withMessage('Invalid driver ID'),
+  body('leaveDays').optional().isObject().withMessage('leaveDays must be an object'),
   handleValidationErrors
 ], async(req, res) => {
   try {
-    const { month, year, overwrite, bonuses, deductions, employeeIds, driverIds } = req.body;
+    const { month, year, overwrite, bonuses, deductions, employeeIds, driverIds, leaveDays } = req.body;
 
     // Look up active academic session for this tenant
     const AcademicSession = require('../models/AcademicSession');
@@ -320,7 +321,7 @@ router.post('/generate', protect, authorize('admin'), [
       month,
       year,
       req.user._id,
-      { overwrite, bonuses, deductions, employeeIds, driverIds, academicSessionId: activeSession?._id }
+      { overwrite, bonuses, deductions, employeeIds, driverIds, leaveDays, academicSessionId: activeSession?._id }
     );
 
     if (!result.success) {

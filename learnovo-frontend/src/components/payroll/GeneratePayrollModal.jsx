@@ -13,6 +13,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
     });
     const [employees, setEmployees] = useState([]);
     const [selectedIds, setSelectedIds] = useState(() => new Set());
+    const [leaveDaysMap, setLeaveDaysMap] = useState({});
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [previewLoading, setPreviewLoading] = useState(false);
@@ -102,10 +103,16 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
             const selected = employees.filter(e => selectedIds.has(e._id));
             const employeeIds = selected.filter(e => e._kind !== 'driver').map(e => e._id);
             const driverIds = selected.filter(e => e._kind === 'driver').map(e => e._id);
+            const leaveDays = {};
+            selected.forEach(e => {
+                const days = leaveDaysMap[e._id] || 0;
+                if (days > 0) leaveDays[e._id] = days;
+            });
             const result = await payrollService.generateMonthlyPayroll({
                 ...formData,
                 employeeIds,
-                driverIds
+                driverIds,
+                leaveDays
             });
             onSuccess(result);
             onClose();
@@ -116,8 +123,20 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
+    const adjustLeave = (id, delta) => {
+        setLeaveDaysMap(prev => {
+            const current = prev[id] || 0;
+            const next = Math.max(0, current + delta);
+            return { ...prev, [id]: next };
+        });
+    };
+
     const selectedEmployees = employees.filter(e => selectedIds.has(e._id));
     const totalSalary = selectedEmployees.reduce((sum, emp) => sum + (emp.salary || 0), 0);
+    const totalLeaveDeduction = selectedEmployees.reduce((sum, emp) => {
+        const days = leaveDaysMap[emp._id] || 0;
+        return sum + days * (emp.leaveDeductionPerDay || 0);
+    }, 0);
 
     const monthNames = [
         'January', 'February', 'March', 'April', 'May', 'June',
@@ -194,7 +213,7 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                             <p className="text-gray-600 dark:text-[#8E8E93]">Loading employees...</p>
                         ) : (
                             <>
-                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                <div className="grid grid-cols-3 gap-4 mb-3">
                                     <div>
                                         <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Selected Employees</p>
                                         <p className="text-2xl font-bold text-gray-800 dark:text-white">
@@ -203,8 +222,12 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Total Salary Amount</p>
+                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Total Salary</p>
                                         <p className="text-2xl font-bold text-green-600 dark:text-emerald-400">₹{totalSalary.toLocaleString('en-IN')}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-600 dark:text-[#8E8E93]">Leave Deduction</p>
+                                        <p className="text-2xl font-bold text-red-600 dark:text-red-400">-₹{totalLeaveDeduction.toLocaleString('en-IN')}</p>
                                     </div>
                                 </div>
 
@@ -239,10 +262,13 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                                     </li>
                                                 ) : filteredEmployees.map(emp => {
                                                     const checked = selectedIds.has(emp._id);
+                                                    const days = leaveDaysMap[emp._id] || 0;
+                                                    const perDay = emp.leaveDeductionPerDay || 0;
+                                                    const empLeaveDeduction = days * perDay;
                                                     return (
                                                         <li key={emp._id}>
-                                                            <label className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#38383A] transition">
-                                                                <div className="flex items-center gap-3 min-w-0">
+                                                            <div className="flex items-center justify-between gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-[#38383A] transition">
+                                                                <label className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer">
                                                                     <input
                                                                         type="checkbox"
                                                                         checked={checked}
@@ -255,11 +281,38 @@ const GeneratePayrollModal = ({ isOpen, onClose, onSuccess }) => {
                                                                             <span className="ml-2 inline-block px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">Driver</span>
                                                                         )}
                                                                     </span>
+                                                                </label>
+                                                                <div className="flex items-center gap-3 shrink-0">
+                                                                    {checked && emp._kind !== 'driver' && (
+                                                                        <div className="flex items-center gap-1" title={perDay ? `₹${perDay}/day leave deduction` : 'Set leaveDeductionPerDay on employee profile'}>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => adjustLeave(emp._id, -1)}
+                                                                                disabled={days === 0}
+                                                                                className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 dark:bg-[#38383A] text-gray-700 dark:text-white hover:bg-gray-300 dark:hover:bg-[#48484A] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-bold"
+                                                                            >
+                                                                                −
+                                                                            </button>
+                                                                            <span className="min-w-[2.25rem] text-center text-xs font-medium text-gray-700 dark:text-white">
+                                                                                {days}d
+                                                                            </span>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => adjustLeave(emp._id, 1)}
+                                                                                className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-200 dark:bg-[#38383A] text-gray-700 dark:text-white hover:bg-gray-300 dark:hover:bg-[#48484A] text-sm font-bold"
+                                                                            >
+                                                                                +
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                    <span className={`font-semibold whitespace-nowrap text-sm text-right ${checked ? 'text-gray-800 dark:text-white' : 'text-gray-400 dark:text-[#636366] line-through'}`}>
+                                                                        ₹{emp.salary?.toLocaleString('en-IN')}
+                                                                        {checked && empLeaveDeduction > 0 && (
+                                                                            <span className="block text-[10px] font-normal text-red-500 dark:text-red-400">-₹{empLeaveDeduction.toLocaleString('en-IN')}</span>
+                                                                        )}
+                                                                    </span>
                                                                 </div>
-                                                                <span className={`font-semibold whitespace-nowrap text-sm ${checked ? 'text-gray-800 dark:text-white' : 'text-gray-400 dark:text-[#636366] line-through'}`}>
-                                                                    ₹{emp.salary?.toLocaleString('en-IN')}
-                                                                </span>
-                                                            </label>
+                                                            </div>
                                                         </li>
                                                     );
                                                 })}
