@@ -629,10 +629,14 @@ router.delete('/:id', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
-    // Check if system-generated before deleting
+    // Check if system-generated before deleting — block only if source payroll still exists & is active
     const expenseCheck = await Expense.findOne({ _id: req.params.id, tenantId: req.user.tenantId, isDeleted: false });
-    if (expenseCheck && expenseCheck.isSystemGenerated) {
-      return res.status(403).json({ success: false, message: 'System-generated expense records cannot be deleted. This record was auto-created from payroll.', requestId: req.requestId });
+    if (expenseCheck && expenseCheck.isSystemGenerated && expenseCheck.referenceType === 'payroll' && expenseCheck.referenceId) {
+      const Payroll = require('../models/Payroll');
+      const sourcePayroll = await Payroll.findOne({ _id: expenseCheck.referenceId, tenantId: req.user.tenantId, isDeleted: { $ne: true } }).select('_id').lean();
+      if (sourcePayroll) {
+        return res.status(403).json({ success: false, message: 'This expense is auto-synced from an active payroll record. Delete or cancel the payroll record to remove it.', requestId: req.requestId });
+      }
     }
 
     const expense = await Expense.findOneAndUpdate(
@@ -725,9 +729,26 @@ router.delete('/bulk/delete', [
   handleValidationErrors
 ], async(req, res, next) => {
   try {
-    // Only delete manual records — skip system-generated ones
+    const Payroll = require('../models/Payroll');
+    const candidates = await Expense.find({
+      _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false
+    }).select('_id isSystemGenerated referenceType referenceId').lean();
+
+    const deletableIds = [];
+    for (const exp of candidates) {
+      if (!exp.isSystemGenerated) {
+        deletableIds.push(exp._id);
+        continue;
+      }
+      // System-generated: only deletable if its source payroll is deleted/missing
+      if (exp.referenceType === 'payroll' && exp.referenceId) {
+        const active = await Payroll.findOne({ _id: exp.referenceId, tenantId: req.user.tenantId, isDeleted: { $ne: true } }).select('_id').lean();
+        if (!active) deletableIds.push(exp._id);
+      }
+    }
+
     const result = await Expense.updateMany(
-      { _id: { $in: req.body.ids }, tenantId: req.user.tenantId, isDeleted: false, isSystemGenerated: { $ne: true } },
+      { _id: { $in: deletableIds }, tenantId: req.user.tenantId, isDeleted: false },
       { isDeleted: true }
     );
 
