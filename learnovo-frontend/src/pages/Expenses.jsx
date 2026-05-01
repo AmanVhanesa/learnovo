@@ -52,7 +52,10 @@ const Expenses = () => {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [isPrintLoading, setIsPrintLoading] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showReportExportMenu, setShowReportExportMenu] = useState(false)
   const printRef = useRef(null)
+  const listTableRef = useRef(null)
 
   // List
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
@@ -287,6 +290,30 @@ const Expenses = () => {
       queryClient.invalidateQueries({ queryKey: ['expenses-list'] })
     } catch (error) {
       toast.error('Bulk delete failed')
+    }
+  }
+
+  const handleExportList = async (fmt, filterArgs) => {
+    const toastId = toast.loading(`Exporting ${fmt.toUpperCase()}...`)
+    try {
+      if (fmt === 'pdf') {
+        const target = filterArgs.target?.current
+        if (!target) { toast.dismiss(toastId); toast.error('Nothing to export'); return }
+        await highQualityPrint(target, filterArgs.pdfName || 'Expenses', { scale: 2, format: 'a4', orientation: 'landscape', margin: 10 })
+        toast.dismiss(toastId); toast.success('Exported successfully')
+        return
+      }
+      const blob = await expenseReportsService.exportReport(filterArgs.params, fmt)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const ext = fmt === 'excel' ? 'xlsx' : 'csv'
+      a.download = `expenses_${new Date().toISOString().split('T')[0]}.${ext}`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+      toast.dismiss(toastId); toast.success('Exported successfully')
+    } catch {
+      toast.dismiss(toastId); toast.error('Failed to export')
     }
   }
 
@@ -593,35 +620,41 @@ const Expenses = () => {
             )}
             {selectedIds.length === 0 && (<p className="text-xs text-gray-400 dark:text-[#8E8E93]">{pagination.total > 0 ? `${pagination.total} expense${pagination.total !== 1 ? 's' : ''} found` : ''}</p>)}
           </div>
-          <button
-            onClick={async () => {
-              const toastId = toast.loading('Exporting Excel...')
-              try {
-                const blob = await expenseReportsService.exportReport({
-                  startDate: debouncedFilters.startDate,
-                  endDate: debouncedFilters.endDate,
-                  category: debouncedFilters.category,
-                  status: debouncedFilters.status,
-                  paymentMethod: debouncedFilters.paymentMethod,
-                  academicSessionId: currentSession?._id
-                }, 'excel')
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `expenses_${new Date().toISOString().split('T')[0]}.xlsx`
-                document.body.appendChild(a); a.click(); a.remove()
-                URL.revokeObjectURL(url)
-                toast.dismiss(toastId); toast.success('Exported successfully')
-              } catch {
-                toast.dismiss(toastId); toast.error('Failed to export')
-              }
-            }}
-            className="btn btn-sm btn-outline"
-          >Export Excel</button>
+          <div className="relative">
+            <button onClick={() => setShowExportMenu(v => !v)} className="btn btn-sm btn-outline">Export</button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg shadow-lg z-20 py-1">
+                  {['excel', 'csv', 'pdf'].map(fmt => (
+                    <button
+                      key={fmt}
+                      onClick={() => {
+                        setShowExportMenu(false)
+                        handleExportList(fmt, {
+                          params: {
+                            startDate: debouncedFilters.startDate,
+                            endDate: debouncedFilters.endDate,
+                            category: debouncedFilters.category,
+                            status: debouncedFilters.status,
+                            paymentMethod: debouncedFilters.paymentMethod,
+                            academicSessionId: currentSession?._id
+                          },
+                          target: listTableRef,
+                          pdfName: 'Expenses-List'
+                        })
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#2C2C2E] text-gray-700 dark:text-white"
+                    >Export as {fmt.toUpperCase()}</button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Table */}
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden" ref={listTableRef}>
           {listLoading ? <LoadingSpinner /> : expenses.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[800px] text-sm">
@@ -869,28 +902,32 @@ const Expenses = () => {
             {/* Print/Export */}
             <div className="flex gap-2">
               <button onClick={async () => { if (!printRef.current) return; setIsPrintLoading(true); try { await highQualityPrint(printRef.current, 'Expense-Report', { scale: 2, format: 'a4', orientation: 'portrait', margin: 10 }); } catch (e) { console.error('Print failed:', e); toast.error('Failed to prepare print.'); } finally { setIsPrintLoading(false); } }} disabled={isPrintLoading} className="btn btn-sm btn-outline"><Printer className="h-3.5 w-3.5 mr-1.5" />{isPrintLoading ? 'Preparing...' : 'Print Report'}</button>
-              <button
-                onClick={async () => {
-                  const toastId = toast.loading('Exporting Excel...')
-                  try {
-                    const startDate = new Date(reportYear, reportMonth - 1, 1).toISOString()
-                    const endDate = new Date(reportYear, reportMonth, 0, 23, 59, 59).toISOString()
-                    const blob = await expenseReportsService.exportReport({
-                      startDate, endDate, academicSessionId: currentSession?._id
-                    }, 'excel')
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url
-                    a.download = `expenses_${new Date().toISOString().split('T')[0]}.xlsx`
-                    document.body.appendChild(a); a.click(); a.remove()
-                    URL.revokeObjectURL(url)
-                    toast.dismiss(toastId); toast.success('Exported successfully')
-                  } catch {
-                    toast.dismiss(toastId); toast.error('Failed to export')
-                  }
-                }}
-                className="btn btn-sm btn-outline"
-              >Export Excel</button>
+              <div className="relative">
+                <button onClick={() => setShowReportExportMenu(v => !v)} className="btn btn-sm btn-outline">Export</button>
+                {showReportExportMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowReportExportMenu(false)} />
+                    <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-[#38383A] rounded-lg shadow-lg z-20 py-1">
+                      {['excel', 'csv', 'pdf'].map(fmt => (
+                        <button
+                          key={fmt}
+                          onClick={() => {
+                            setShowReportExportMenu(false)
+                            const startDate = new Date(reportYear, reportMonth - 1, 1).toISOString()
+                            const endDate = new Date(reportYear, reportMonth, 0, 23, 59, 59).toISOString()
+                            handleExportList(fmt, {
+                              params: { startDate, endDate, academicSessionId: currentSession?._id },
+                              target: printRef,
+                              pdfName: 'Expense-Report'
+                            })
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#2C2C2E] text-gray-700 dark:text-white"
+                        >Export as {fmt.toUpperCase()}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </>
         ) : (
