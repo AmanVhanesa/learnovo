@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Upload, User, Camera, Eye, EyeOff, AlertCircle, Loader2, Briefcase, GraduationCap, BookMarked, FileText, Plus, Trash2 } from 'lucide-react'
+import { X, Upload, User, Camera, Eye, EyeOff, AlertCircle, Loader2, Briefcase, GraduationCap, BookMarked, FileText, Plus, Trash2, IndianRupee, Loader } from 'lucide-react'
+import axios from 'axios'
 import employeesService from '../../services/employeesService'
 
 const ROLE_OPTIONS = [
@@ -77,6 +78,13 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         trainings: employee?.trainings || [],
         awards: employee?.awards || [],
 
+        // Salary & Bank
+        salary: employee?.salary || '',
+        leaveDeductionPerDay: employee?.leaveDeductionPerDay || '',
+        bankName: employee?.bankName || '',
+        accountNumber: employee?.accountNumber || '',
+        ifscCode: employee?.ifscCode || '',
+
         // Other
         emergencyContact: employee?.emergencyContact || { name: '', phone: '', relation: '' },
         leaveBalance: employee?.leaveBalance || { casual: 12, sick: 12, earned: 15 },
@@ -92,7 +100,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         { id: 1, name: 'Appointment', icon: Briefcase },
         { id: 2, name: 'Qualifications', icon: GraduationCap },
         { id: 3, name: 'Service Record', icon: BookMarked },
-        { id: 4, name: 'Other Details', icon: FileText },
+        { id: 4, name: 'Salary & Bank', icon: IndianRupee },
+        { id: 5, name: 'Other Details', icon: FileText },
     ]
 
     const [formErrors, setFormErrors] = useState({})
@@ -102,6 +111,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
     const [showPassword, setShowPassword] = useState(false)
     const [subjectInput, setSubjectInput] = useState('')
     const [certInput, setCertInput] = useState('')
+    const [ifscLookup, setIfscLookup] = useState({ loading: false, error: '' })
 
     const updateField = (field, value) => {
         setForm(prev => ({ ...prev, [field]: value }))
@@ -134,6 +144,25 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         setCertInput('')
     }
     const removeCert = (i) => updateField('certifications', form.certifications.filter((_, idx) => idx !== i))
+
+    const handleIfscChange = (raw) => {
+        // Auto-correct common O→0 mistake at position 5 and uppercase
+        let v = String(raw || '').toUpperCase().replace(/\s/g, '')
+        if (v.length >= 5 && v[4] === 'O') v = `${v.substring(0, 4)}0${v.substring(5)}`
+        updateField('ifscCode', v)
+        setIfscLookup({ loading: false, error: '' })
+        if (v.length === 11 && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v)) {
+            setIfscLookup({ loading: true, error: '' })
+            axios.get(`https://ifsc.razorpay.com/${v}`, { timeout: 6000 })
+                .then(res => {
+                    const bank = res?.data?.BANK
+                    const branch = res?.data?.BRANCH
+                    if (bank) updateField('bankName', branch ? `${bank} — ${branch}` : bank)
+                    setIfscLookup({ loading: false, error: '' })
+                })
+                .catch(() => setIfscLookup({ loading: false, error: 'Could not auto-fetch bank — enter manually' }))
+        }
+    }
 
     const validateForm = () => {
         const errors = {}
@@ -171,6 +200,18 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
 
         if (form.experience && Number(form.experience) < 0) errors.experience = 'Experience cannot be negative'
 
+        if (form.salary !== '' && form.salary !== null && form.salary !== undefined) {
+            if (Number(form.salary) < 0) errors.salary = 'Salary cannot be negative'
+        }
+
+        if (form.ifscCode) {
+            if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.ifscCode)) errors.ifscCode = 'IFSC must be 11 chars (e.g., HDFC0001234)'
+        }
+        if (form.accountNumber) {
+            const a = form.accountNumber.replace(/\s/g, '')
+            if (!/^\d{9,18}$/.test(a)) errors.accountNumber = 'Account number must be 9–18 digits'
+        }
+
         return errors
     }
 
@@ -182,6 +223,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
             if (errors.name || errors.phone || errors.email || errors.dateOfBirth || errors.nationalId) setActiveSection(0)
             else if (errors.dateOfJoining) setActiveSection(1)
             else if (errors.experience) setActiveSection(2)
+            else if (errors.salary || errors.ifscCode || errors.accountNumber) setActiveSection(4)
             return
         }
         setFormErrors({})
@@ -193,6 +235,8 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         if (!payload.probationEndDate) delete payload.probationEndDate
         if (payload.subjects?.length === 0) delete payload.subjects
         if (payload.certifications?.length === 0) delete payload.certifications
+        if (payload.salary === '') delete payload.salary
+        if (payload.leaveDeductionPerDay === '') delete payload.leaveDeductionPerDay
         onSave(payload, _pendingPhotoFile)
     }
 
@@ -627,8 +671,59 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                             </div>
                         )}
 
-                        {/* ── Section 4: Other Details ── */}
+                        {/* ── Section 4: Salary & Bank ── */}
                         {activeSection === 4 && (
+                            <div className="space-y-6">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Salary</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="label">Monthly Salary</label>
+                                            <div className="relative">
+                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                                <input type="number" className={`input pl-9 ${formErrors.salary ? 'border-red-500' : ''}`} value={form.salary} onChange={(e) => updateField('salary', e.target.value)} onWheel={(e) => e.target.blur()} min="0" placeholder="0" />
+                                            </div>
+                                            <FieldError field="salary" />
+                                        </div>
+                                        <div>
+                                            <label className="label">Leave Deduction (per day)</label>
+                                            <div className="relative">
+                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                                <input type="number" className="input pl-9" value={form.leaveDeductionPerDay} onChange={(e) => updateField('leaveDeductionPerDay', e.target.value)} onWheel={(e) => e.target.blur()} min="0" placeholder="Auto-calculated if blank" />
+                                            </div>
+                                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Used by payroll for unpaid leaves. Defaults to salary ÷ 30 if left empty.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-gray-100 dark:border-[#38383A] pt-4">
+                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Bank Account Details</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="label">IFSC Code</label>
+                                            <div className="relative">
+                                                <input className={`input uppercase ${formErrors.ifscCode ? 'border-red-500' : ''}`} value={form.ifscCode} onChange={(e) => handleIfscChange(e.target.value)} placeholder="HDFC0001234" maxLength={11} />
+                                                {ifscLookup.loading && <Loader className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />}
+                                            </div>
+                                            <FieldError field="ifscCode" />
+                                            {ifscLookup.error && <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{ifscLookup.error}</p>}
+                                        </div>
+                                        <div>
+                                            <label className="label">Bank Name & Branch</label>
+                                            <input className="input" value={form.bankName} onChange={(e) => updateField('bankName', e.target.value)} placeholder="Auto-filled from IFSC" />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="label">Account Number</label>
+                                            <input className={`input ${formErrors.accountNumber ? 'border-red-500' : ''}`} value={form.accountNumber} onChange={(e) => updateField('accountNumber', e.target.value.replace(/\D/g, ''))} placeholder="9 to 18 digits" maxLength={18} />
+                                            <FieldError field="accountNumber" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Section 5: Other Details ── */}
+                        {activeSection === 5 && (
                             <div className="space-y-6">
                                 <div>
                                     <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Emergency Contact</h4>
