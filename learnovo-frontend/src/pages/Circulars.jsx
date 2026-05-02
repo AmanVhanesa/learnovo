@@ -227,14 +227,28 @@ const Circulars = () => {
         referenceNumber: ''
     });
 
-    const school = useMemo(() => ({
-        name: settings?.institution?.name || user?.tenantName || 'School',
-        logo: settings?.institution?.logo?.url || settings?.institution?.logo || '',
-        address: settings?.institution?.address || '',
-        phone: settings?.institution?.phone || '',
-        email: settings?.institution?.email || '',
-        principalName: settings?.institution?.principalName || ''
-    }), [settings, user]);
+    const school = useMemo(() => {
+        const inst = settings?.institution || {};
+        const addr = inst.address;
+        let addressStr = '';
+        if (typeof addr === 'string') {
+            addressStr = addr;
+        } else if (addr && typeof addr === 'object') {
+            addressStr = [addr.street, addr.city, addr.state, addr.pincode, addr.country]
+                .filter(Boolean)
+                .join(', ');
+        }
+        const contact = inst.contact || {};
+        return {
+            name: inst.name || user?.tenantName || 'School',
+            logo: (typeof inst.logo === 'object' ? inst.logo?.url : inst.logo) || '',
+            address: addressStr,
+            phone: contact.phone || inst.phone || '',
+            email: contact.email || inst.email || '',
+            website: contact.website || '',
+            principalName: inst.principalName || ''
+        };
+    }, [settings, user]);
 
     const { data: circulars = [], isLoading } = useQuery({
         queryKey: ['circulars', categoryFilter],
