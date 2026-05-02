@@ -298,6 +298,7 @@ app.use('/api/student-lists', require('./routes/studentLists'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/announcements', require('./routes/announcements'));
+app.use('/api/circulars', require('./routes/circulars'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/sub-departments', require('./routes/subDepartments'));
 app.use('/api/certificates', require('./routes/certificates'));

@@ -97,6 +97,7 @@ const MyLibrary = lazy(() => import('./pages/library/MyLibrary'))
 const Admissions = lazy(() => import('./pages/Admissions'))
 const Activities = lazy(() => import('./pages/Activities'))
 const Announcements = lazy(() => import('./pages/Announcements'))
+const Circulars = lazy(() => import('./pages/Circulars'))
 const Notifications = lazy(() => import('./pages/Notifications'))
 const NotificationPreferences = lazy(() => import('./pages/NotificationPreferences'))
 const Transport = lazy(() => import('./pages/Transport'))
@@ -434,6 +435,7 @@ function App() {
                         </ProtectedRoute>
                       } />
                       <Route path="announcements" element={<Announcements />} />
+                      <Route path="circulars" element={<Circulars />} />
                       <Route path="notifications" element={<Notifications />} />
                       <Route path="notification-preferences" element={<NotificationPreferences />} />
 

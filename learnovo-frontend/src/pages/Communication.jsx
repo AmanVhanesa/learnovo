@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Megaphone, Settings, MessageSquare } from 'lucide-react'
+import { Bell, Megaphone, Settings, MessageSquare, FileText } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../contexts/NotificationContext'
 
@@ -16,6 +16,14 @@ const Communication = () => {
             icon: Megaphone,
             path: '/app/announcements',
             color: 'bg-purple-500',
+            badge: null
+        },
+        {
+            title: 'Circulars',
+            description: 'Issue, share, print and archive official school circulars',
+            icon: FileText,
+            path: '/app/circulars',
+            color: 'bg-teal-500',
             badge: null
         },
         {
