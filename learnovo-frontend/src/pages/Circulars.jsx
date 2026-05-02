@@ -113,11 +113,11 @@ const buildCircularHTML = (circular, school, mode = 'print') => {
   .subject-lbl{font-size:8.5px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px}
   .subject-text{font-size:11.5px;font-weight:700;color:#111827;line-height:1.45}
   .body{margin-top:16px;font-size:11px;color:#1f2937;line-height:1.85;text-align:justify;white-space:normal}
-  .signature{margin-top:auto;padding-top:30px;display:flex;justify-content:flex-end}
-  .sig-block{text-align:center;min-width:180px;display:flex;flex-direction:column;align-items:center}
-  .sig-img{max-height:60px;max-width:160px;object-fit:contain;margin-bottom:2px}
-  .sig-line{width:160px;height:1px;background:#9ca3af;margin:6px auto 4px}
-  .sig-line-empty{width:160px;height:1px;background:#9ca3af;margin:36px auto 4px}
+  .signature{margin-top:auto;padding-top:24px;display:flex;justify-content:flex-end}
+  .sig-block{text-align:center;min-width:240px;display:flex;flex-direction:column;align-items:center}
+  .sig-img{max-height:120px;max-width:240px;object-fit:contain;margin-bottom:-8px}
+  .sig-line{width:220px;height:1px;background:#9ca3af;margin:4px auto 4px}
+  .sig-line-empty{width:220px;height:1px;background:#9ca3af;margin:60px auto 4px}
   .sig-name{font-size:11px;font-weight:700;color:#111827}
   .sig-desig{font-size:9px;color:#4b5563;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-top:1px}
   .footer{padding:8px 0 0;border-top:1px solid #e5e7eb;text-align:center;margin-top:14px}
