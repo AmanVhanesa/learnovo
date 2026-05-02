@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     Plus, FileText, Users, Calendar, Trash2, X, Search,
-    Printer, Download, ArrowLeft, Eye, AlertCircle
+    Printer, Download, ArrowLeft, Eye, AlertCircle, Pencil
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -226,6 +226,7 @@ const Circulars = () => {
     const isAdmin = user?.role === 'admin' || user?.role === 'principal';
 
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [editingCircular, setEditingCircular] = useState(null);
     const [searchText, setSearchText] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [previewCircular, setPreviewCircular] = useState(null);
@@ -315,6 +316,27 @@ const Circulars = () => {
         }
     });
 
+    const updateMutation = useMutation({
+        mutationFn: ({ id, payload }) => circularsService.updateCircular(id, payload),
+        onSuccess: () => {
+            toast.success('Circular updated');
+            setShowCreateModal(false);
+            setEditingCircular(null);
+            setFormData({
+                title: '', subject: '', body: '', category: 'general', priority: 'medium',
+                targetAudience: ['all'], issueDate: new Date().toISOString().split('T')[0],
+                signedByName: '', signedByDesignation: 'Principal', referenceNumber: ''
+            });
+            queryClient.invalidateQueries({ queryKey: ['circulars'] });
+        },
+        onError: (err) => {
+            const msg = err?.response?.data?.errors?.[0]?.msg
+                || err?.response?.data?.message
+                || 'Failed to update circular';
+            toast.error(msg);
+        }
+    });
+
     const deleteMutation = useMutation({
         mutationFn: (id) => circularsService.deleteCircular(id),
         onMutate: (id) => setDeletingId(id),
@@ -331,7 +353,7 @@ const Circulars = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (createMutation.isPending) return;
+        if (createMutation.isPending || updateMutation.isPending) return;
         if (!formData.title.trim() || !formData.subject.trim() || !formData.body.trim()) {
             toast.error('Title, subject, and body are required');
             return;
@@ -340,7 +362,40 @@ const Circulars = () => {
             toast.error('Please select at least one audience');
             return;
         }
-        createMutation.mutate(formData);
+        if (editingCircular) {
+            updateMutation.mutate({ id: editingCircular._id, payload: formData });
+        } else {
+            createMutation.mutate(formData);
+        }
+    };
+
+    const handleEdit = (c) => {
+        setEditingCircular(c);
+        setFormData({
+            title: c.title || '',
+            subject: c.subject || '',
+            body: c.body || '',
+            category: c.category || 'general',
+            priority: c.priority || 'medium',
+            targetAudience: (c.targetAudience && c.targetAudience.length > 0) ? c.targetAudience : ['all'],
+            issueDate: c.issueDate
+                ? new Date(c.issueDate).toISOString().split('T')[0]
+                : (c.createdAt ? new Date(c.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+            signedByName: c.signedByName || '',
+            signedByDesignation: c.signedByDesignation || 'Principal',
+            referenceNumber: c.referenceNumber || ''
+        });
+        setShowCreateModal(true);
+    };
+
+    const handleCloseModal = () => {
+        setShowCreateModal(false);
+        setEditingCircular(null);
+        setFormData({
+            title: '', subject: '', body: '', category: 'general', priority: 'medium',
+            targetAudience: ['all'], issueDate: new Date().toISOString().split('T')[0],
+            signedByName: '', signedByDesignation: 'Principal', referenceNumber: ''
+        });
     };
 
     const handleAudienceChange = (audience) => {
@@ -527,6 +582,15 @@ const Circulars = () => {
                                     )}
                                     {isAdmin && (
                                         <button
+                                            onClick={() => handleEdit(c)}
+                                            title="Edit"
+                                            className="p-2 text-gray-500 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                    {isAdmin && (
+                                        <button
                                             onClick={() => handleDelete(c._id)}
                                             title="Delete"
                                             disabled={deletingId === c._id}
@@ -572,8 +636,10 @@ const Circulars = () => {
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
                     <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-[#38383A] sticky top-0 bg-white dark:bg-[#1C1C1E] z-10">
-                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">New Circular</h2>
-                            <button onClick={() => setShowCreateModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-full">
+                            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                                {editingCircular ? `Edit Circular ${editingCircular.circularNumber}` : 'New Circular'}
+                            </h2>
+                            <button onClick={handleCloseModal} className="p-2 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-full">
                                 <X className="h-5 w-5 text-gray-400 dark:text-[#636366]" />
                             </button>
                         </div>
@@ -721,15 +787,17 @@ const Circulars = () => {
                             </div>
 
                             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-gray-100 dark:border-[#38383A]">
-                                <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-outline w-full sm:w-auto">
+                                <button type="button" onClick={handleCloseModal} className="btn btn-outline w-full sm:w-auto">
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={createMutation.isPending}
+                                    disabled={createMutation.isPending || updateMutation.isPending}
                                     className="btn btn-primary w-full sm:w-auto"
                                 >
-                                    {createMutation.isPending ? 'Publishing...' : 'Publish & Notify'}
+                                    {editingCircular
+                                        ? (updateMutation.isPending ? 'Saving...' : 'Save Changes')
+                                        : (createMutation.isPending ? 'Publishing...' : 'Publish & Notify')}
                                 </button>
                             </div>
                         </form>

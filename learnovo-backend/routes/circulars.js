@@ -89,6 +89,13 @@ router.put('/:id', protect, authorize('admin', 'principal'), [
   body('body').optional().trim().isLength({ min: 10, max: 10000 }),
   body('category').optional().isIn(['general', 'academic', 'event', 'holiday', 'exam', 'fee', 'urgent', 'other']),
   body('priority').optional().isIn(['low', 'medium', 'high']),
+  body('targetAudience').optional().isArray({ min: 1 }),
+  body('targetAudience.*').optional().isIn(['student', 'teacher', 'parent', 'admin', 'all']),
+  body('targetClasses').optional().isArray(),
+  body('targetClasses.*').optional().isMongoId(),
+  body('signedByName').optional().isString(),
+  body('signedByDesignation').optional().isString(),
+  body('referenceNumber').optional().isString(),
   body('issueDate').optional().isISO8601(),
   body('isActive').optional().isBoolean(),
   handleValidationErrors

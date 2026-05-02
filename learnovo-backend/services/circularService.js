@@ -185,6 +185,7 @@ async function updateCircular(circularId, tenantId, updates) {
   if (!circular) throw new Error('Circular not found');
   const allowed = [
     'title', 'subject', 'body', 'category', 'priority',
+    'targetAudience', 'targetClasses',
     'signedByName', 'signedByDesignation', 'referenceNumber', 'issueDate', 'isActive'
   ];
   allowed.forEach((k) => {
