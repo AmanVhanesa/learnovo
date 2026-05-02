@@ -188,8 +188,8 @@ ${action}
               ${school.principalSignature
                 ? `<img src="${school.principalSignature}" class="sig-img" alt="Principal signature" /><div class="sig-line"></div>`
                 : `<div class="sig-line-empty"></div>`}
-              <div class="sig-name">${escapeHtml(circular.signedByName || school.principalName || '')}</div>
-              <div class="sig-desig">${escapeHtml(circular.signedByDesignation || 'Principal')}</div>
+              <div class="sig-name">${escapeHtml(circular.signedByDesignation || 'Principal')}</div>
+              <div class="sig-desig">${escapeHtml(school.name || '')}</div>
             </div>
           </div>
 
