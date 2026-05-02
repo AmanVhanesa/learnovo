@@ -116,8 +116,8 @@ const buildCircularHTML = (circular, school, mode = 'print') => {
   .signature{margin-top:auto;padding-top:24px;display:flex;justify-content:flex-end}
   .sig-block{text-align:center;min-width:240px;display:flex;flex-direction:column;align-items:center}
   .sig-img{max-height:120px;max-width:240px;object-fit:contain;margin-bottom:-8px}
-  .sig-line{width:220px;height:1px;background:#9ca3af;margin:4px auto 4px}
-  .sig-line-empty{width:220px;height:1px;background:#9ca3af;margin:60px auto 4px}
+  .sig-line{width:150px;height:1px;background:#9ca3af;margin:4px auto 4px}
+  .sig-line-empty{width:150px;height:1px;background:#9ca3af;margin:60px auto 4px}
   .sig-name{font-size:11px;font-weight:700;color:#111827}
   .sig-desig{font-size:9px;color:#4b5563;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-top:1px}
   .footer{padding:8px 0 0;border-top:1px solid #e5e7eb;text-align:center;margin-top:14px}
