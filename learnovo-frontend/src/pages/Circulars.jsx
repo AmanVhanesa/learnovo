@@ -86,8 +86,8 @@ const buildCircularHTML = (circular, school, mode = 'print') => {
   *{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   @page{size:A4 portrait;margin:0}
   body{font-family:'Helvetica Neue',Arial,sans-serif;background:#e5e7eb;color:#111827;font-size:13px;-webkit-font-smoothing:antialiased}
-  .page{width:595px;min-height:842px;position:relative;overflow:hidden;background:#f9fafb;margin:0 auto}
-  .card{position:absolute;top:14px;left:14px;right:14px;bottom:14px;background:#fff;border-radius:14px;box-shadow:0 2px 24px rgba(0,0,0,0.07);overflow:hidden;display:flex;flex-direction:column}
+  .page{width:210mm;height:297mm;position:relative;overflow:hidden;background:#f9fafb;margin:0 auto;page-break-after:avoid}
+  .card{position:absolute;top:5mm;left:5mm;right:5mm;bottom:5mm;background:#fff;border-radius:14px;box-shadow:0 2px 24px rgba(0,0,0,0.07);overflow:hidden;display:flex;flex-direction:column}
   .deco{position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden;border-radius:14px}
   .deco .c1{position:absolute;top:-60px;right:-40px;width:240px;height:240px;background:rgba(62,196,177,0.06);border-radius:50%}
   .deco .c2{position:absolute;bottom:-40px;left:-45px;width:195px;height:195px;background:rgba(62,196,177,0.05);border-radius:50%}
@@ -132,9 +132,9 @@ const buildCircularHTML = (circular, school, mode = 'print') => {
   .page-body{padding-top:${mode === 'download' ? '0' : '54px'};display:flex;justify-content:center;padding-bottom:40px}
   @media print{
     .toolbar{display:none!important}
-    .page-body{padding:0!important}
-    body{background:#fff}
-    .page{box-shadow:none}
+    .page-body{padding:0!important;display:block!important}
+    html,body{margin:0!important;padding:0!important;background:#fff!important;width:210mm;height:297mm}
+    .page{box-shadow:none;margin:0!important;width:210mm!important;height:297mm!important}
   }
 </style>
 </head>
