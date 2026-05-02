@@ -103,16 +103,16 @@ const buildCircularHTML = (circular, school, mode = 'print') => {
   .badge{background:#edf9f7;border-radius:10px;padding:8px 24px;display:inline-flex;flex-direction:column;align-items:center}
   .badge-title{font-size:13px;font-weight:700;color:#0a5c56;letter-spacing:3.5px;text-transform:uppercase;line-height:1}
   .badge-line{width:50px;height:2px;margin-top:6px;background:linear-gradient(90deg,transparent,#3EC4B1,transparent);border-radius:2px}
-  .meta-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:10px;color:#374151;flex-wrap:wrap;gap:6px}
+  .meta-row{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;color:#374151;flex-wrap:wrap;gap:6px}
   .meta-row strong{color:#111827;font-weight:700}
   .meta-row .num{color:#0a5c56;font-weight:700}
-  .info-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin-top:14px;font-size:10.5px}
-  .info-grid .lbl{color:#6b7280;font-weight:600;text-transform:uppercase;font-size:8.5px;letter-spacing:0.6px;padding-top:2px}
+  .info-grid{display:grid;grid-template-columns:auto 1fr;gap:8px 18px;margin-top:14px;font-size:12.5px}
+  .info-grid .lbl{color:#6b7280;font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:0.6px;padding-top:2px}
   .info-grid .val{color:#111827;font-weight:600}
-  .subject{margin-top:16px;padding:10px 14px;background:#fff7ed;border-left:4px solid #f59e0b;border-radius:6px}
-  .subject-lbl{font-size:8.5px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px}
-  .subject-text{font-size:11.5px;font-weight:700;color:#111827;line-height:1.45}
-  .body{margin-top:16px;font-size:11px;color:#1f2937;line-height:1.85;text-align:justify;white-space:normal}
+  .subject{margin-top:16px;padding:12px 16px;background:#fff7ed;border-left:4px solid #f59e0b;border-radius:6px}
+  .subject-lbl{font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px}
+  .subject-text{font-size:14px;font-weight:700;color:#111827;line-height:1.45}
+  .body{margin-top:18px;font-size:13.5px;color:#1f2937;line-height:1.85;text-align:justify;white-space:normal}
   .signature{margin-top:auto;padding-top:24px;display:flex;justify-content:flex-end}
   .sig-block{text-align:center;min-width:240px;display:flex;flex-direction:column;align-items:center}
   .sig-img{max-height:120px;max-width:240px;object-fit:contain;margin-bottom:-8px}
