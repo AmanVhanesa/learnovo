@@ -100,9 +100,8 @@ const buildCircularHTML = (circular, school, mode = 'print') => {
   .header-divider{height:1px;background:#e5e7eb;margin:0 20px;flex-shrink:0}
   .body-wrap{padding:0 26px;display:flex;flex-direction:column;flex:1}
   .badge-row{display:flex;justify-content:center;margin:18px 0 10px}
-  .badge{background:#edf9f7;border-radius:10px;padding:8px 24px;display:inline-flex;flex-direction:column;align-items:center}
-  .badge-title{font-size:13px;font-weight:700;color:#0a5c56;letter-spacing:3.5px;text-transform:uppercase;line-height:1}
-  .badge-line{width:50px;height:2px;margin-top:6px;background:linear-gradient(90deg,transparent,#3EC4B1,transparent);border-radius:2px}
+  .badge{background:#edf9f7;border-radius:10px;padding:10px 28px;display:inline-flex;align-items:center;justify-content:center;line-height:1}
+  .badge-title{font-size:14px;font-weight:700;color:#0a5c56;letter-spacing:3.5px;text-transform:uppercase;line-height:1;text-align:center}
   .meta-row{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;color:#374151;flex-wrap:wrap;gap:6px}
   .meta-row strong{color:#111827;font-weight:700}
   .meta-row .num{color:#0a5c56;font-weight:700}
@@ -160,7 +159,6 @@ ${action}
           <div class="badge-row">
             <div class="badge">
               <div class="badge-title">Circular</div>
-              <div class="badge-line"></div>
             </div>
           </div>
 
