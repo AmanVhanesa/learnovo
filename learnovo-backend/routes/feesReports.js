@@ -299,8 +299,16 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, 
 
     // Optional due-date range filter on invoices
     const dueDateRange = {};
-    if (startDate) { const s = new Date(startDate); s.setHours(0, 0, 0, 0); dueDateRange.$gte = s; }
-    if (endDate) { const e = new Date(endDate); e.setHours(23, 59, 59, 999); dueDateRange.$lte = e; }
+    if (startDate) {
+      const s = new Date(startDate);
+      s.setHours(0, 0, 0, 0);
+      dueDateRange.$gte = s;
+    }
+    if (endDate) {
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      dueDateRange.$lte = e;
+    }
     const hasDueDateRange = Object.keys(dueDateRange).length > 0;
 
     // Enrich with overdue days, due date, and invoice IDs
@@ -392,8 +400,16 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
     if (minBalance) options.minBalance = parseFloat(minBalance);
 
     const dueDateRange = {};
-    if (startDate) { const s = new Date(startDate); s.setHours(0, 0, 0, 0); dueDateRange.$gte = s; }
-    if (endDate) { const e = new Date(endDate); e.setHours(23, 59, 59, 999); dueDateRange.$lte = e; }
+    if (startDate) {
+      const s = new Date(startDate);
+      s.setHours(0, 0, 0, 0);
+      dueDateRange.$gte = s;
+    }
+    if (endDate) {
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      dueDateRange.$lte = e;
+    }
     const hasDueDateRange = Object.keys(dueDateRange).length > 0;
 
     const defaulters = await StudentBalance.find({
