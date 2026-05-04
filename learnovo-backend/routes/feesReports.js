@@ -280,7 +280,7 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
 // @access  Private (Admin, Accountant)
 router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
-    const { academicSessionId, classId, minBalance } = req.query;
+    const { academicSessionId, classId, sectionId, minBalance, startDate, endDate } = req.query;
 
     const options = {};
     if (minBalance) options.minBalance = parseFloat(minBalance);
@@ -291,18 +291,32 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, 
       options
     );
 
+    // Deep-populate student's class and section so frontend can show / filter by name
+    await StudentBalance.populate(defaulters, [
+      { path: 'studentId.classId', select: 'name' },
+      { path: 'studentId.sectionId', select: 'name' }
+    ]);
+
+    // Optional due-date range filter on invoices
+    const dueDateRange = {};
+    if (startDate) { const s = new Date(startDate); s.setHours(0, 0, 0, 0); dueDateRange.$gte = s; }
+    if (endDate) { const e = new Date(endDate); e.setHours(23, 59, 59, 999); dueDateRange.$lte = e; }
+    const hasDueDateRange = Object.keys(dueDateRange).length > 0;
+
     // Enrich with overdue days, due date, and invoice IDs
     const now = new Date();
     const enrichedResults = await Promise.all(defaulters.map(async(defaulter) => {
       if (!defaulter.studentId) return null;
 
       // Get all unpaid invoices for this student (sorted by dueDate ascending)
-      const unpaidInvoices = await FeeInvoice.find({
+      const invoiceQuery = {
         tenantId: req.user.tenantId,
         studentId: defaulter.studentId._id,
         academicSessionId: academicSessionId || defaulter.academicSessionId?._id,
         status: { $in: ['Pending', 'Partial', 'Overdue'] }
-      }).sort({ dueDate: 1 }).select('_id dueDate status balanceAmount');
+      };
+      if (hasDueDateRange) invoiceQuery.dueDate = dueDateRange;
+      const unpaidInvoices = await FeeInvoice.find(invoiceQuery).sort({ dueDate: 1 }).select('_id dueDate status balanceAmount');
 
       // Skip if no unpaid invoices exist (balance may be stale)
       if (unpaidInvoices.length === 0) return null;
@@ -331,12 +345,18 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, 
     // Filter out nulls (paid students, missing data)
     const enriched = enrichedResults.filter(Boolean);
 
-    // Optionally filter by classId on the populated studentId
+    // Optionally filter by classId / sectionId on the populated studentId
     let filtered = enriched;
     if (classId) {
-      filtered = enriched.filter(d => {
-        const sClassId = d.studentId?.classId;
+      filtered = filtered.filter(d => {
+        const sClassId = d.studentId?.classId?._id || d.studentId?.classId;
         return sClassId && sClassId.toString() === classId;
+      });
+    }
+    if (sectionId) {
+      filtered = filtered.filter(d => {
+        const sSectionId = d.studentId?.sectionId?._id || d.studentId?.sectionId;
+        return sSectionId && sSectionId.toString() === sectionId;
       });
     }
 
@@ -358,7 +378,7 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, 
 // @access  Private (Admin, Accountant)
 router.get('/defaulters/export', protect, authorize('admin', 'accountant'), async(req, res) => {
   try {
-    const { academicSessionId, classId, minBalance, format: fmt } = req.query;
+    const { academicSessionId, classId, sectionId, minBalance, startDate, endDate, format: fmt } = req.query;
     const tenantId = req.user.tenantId;
 
     if (!academicSessionId) {
@@ -370,6 +390,11 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
 
     const options = {};
     if (minBalance) options.minBalance = parseFloat(minBalance);
+
+    const dueDateRange = {};
+    if (startDate) { const s = new Date(startDate); s.setHours(0, 0, 0, 0); dueDateRange.$gte = s; }
+    if (endDate) { const e = new Date(endDate); e.setHours(23, 59, 59, 999); dueDateRange.$lte = e; }
+    const hasDueDateRange = Object.keys(dueDateRange).length > 0;
 
     const defaulters = await StudentBalance.find({
       tenantId: new mongoose.Types.ObjectId(tenantId),
@@ -392,13 +417,16 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
     const enriched = (await Promise.all(defaulters.map(async(d) => {
       if (!d.studentId) return null;
       if (classId && (!d.studentId.classId || d.studentId.classId._id.toString() !== classId)) return null;
+      if (sectionId && (!d.studentId.sectionId || d.studentId.sectionId._id.toString() !== sectionId)) return null;
 
-      const unpaidInvoices = await FeeInvoice.find({
+      const invoiceQuery = {
         tenantId,
         studentId: d.studentId._id,
         academicSessionId,
         status: { $in: ['Pending', 'Partial', 'Overdue'] }
-      }).sort({ dueDate: 1 }).select('_id dueDate status balanceAmount');
+      };
+      if (hasDueDateRange) invoiceQuery.dueDate = dueDateRange;
+      const unpaidInvoices = await FeeInvoice.find(invoiceQuery).sort({ dueDate: 1 }).select('_id dueDate status balanceAmount');
 
       if (unpaidInvoices.length === 0) return null;
 

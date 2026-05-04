@@ -233,7 +233,10 @@ export const feesReportsService = {
     const params = new URLSearchParams()
     if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
     if (filters.classId) params.append('classId', filters.classId)
+    if (filters.sectionId) params.append('sectionId', filters.sectionId)
     if (filters.minBalance) params.append('minBalance', filters.minBalance)
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
 
     const url = `/fees/defaulters${params.toString() ? `?${params.toString()}` : ''}`
     const res = await api.get(url)
@@ -275,7 +278,10 @@ export const feesReportsService = {
     const params = new URLSearchParams()
     if (filters.academicSessionId) params.append('academicSessionId', filters.academicSessionId)
     if (filters.classId) params.append('classId', filters.classId)
+    if (filters.sectionId) params.append('sectionId', filters.sectionId)
     if (filters.minBalance) params.append('minBalance', filters.minBalance)
+    if (filters.startDate) params.append('startDate', filters.startDate)
+    if (filters.endDate) params.append('endDate', filters.endDate)
     params.append('format', filters.format || 'excel')
 
     const url = `/fees/defaulters/export?${params.toString()}`

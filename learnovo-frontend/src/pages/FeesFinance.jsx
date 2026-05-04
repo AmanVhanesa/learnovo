@@ -118,14 +118,26 @@ const FeesFinance = () => {
   })
 
   const { data: classes = [] } = useQuery({
-    queryKey: ['fees-classes'],
-    queryFn: async () => { const res = await classesService.list(); return sortClassObjects(res.data || [], 'name') },
+    queryKey: ['fees-classes', activeSession?.name],
+    queryFn: async () => {
+      const res = await classesService.list(activeSession?.name ? { academicYear: activeSession.name } : {})
+      return sortClassObjects(res.data || [], 'name')
+    },
     enabled: !!activeSession && (activeTab === 'feeStructure' || activeTab === 'invoices' || activeTab === 'defaulters'),
   })
 
+  const [defaultersDateFilter, setDefaultersDateFilter] = useState({ startDate: '', endDate: '' })
+
   const { data: defaulters = [], isLoading: defaultersLoading } = useQuery({
-    queryKey: ['fees-defaulters', activeSession?._id],
-    queryFn: async () => { const res = await feesReportsService.getDefaulters({ academicSessionId: activeSession?._id }); return res.data || [] },
+    queryKey: ['fees-defaulters', activeSession?._id, defaultersDateFilter.startDate, defaultersDateFilter.endDate],
+    queryFn: async () => {
+      const res = await feesReportsService.getDefaulters({
+        academicSessionId: activeSession?._id,
+        startDate: defaultersDateFilter.startDate || undefined,
+        endDate: defaultersDateFilter.endDate || undefined,
+      })
+      return res.data || []
+    },
     enabled: !!activeSession && activeTab === 'defaulters',
   })
 
@@ -135,7 +147,10 @@ const FeesFinance = () => {
       const blob = await feesReportsService.exportDefaulters({
         academicSessionId: activeSession?._id,
         classId: filters.classId,
+        sectionId: filters.sectionId,
         minBalance: filters.minBalance,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
         format: fmt
       })
       const url = URL.createObjectURL(blob)
@@ -383,7 +398,7 @@ const FeesFinance = () => {
         {activeTab === 'feeStructure' && <FeeStructureTab feeStructures={feeStructures} classes={classes} onCreateNew={() => { setEditingFeeStructure(null); setShowFeeStructureModal(true) }} onEdit={(s) => { setEditingFeeStructure(s); setShowFeeStructureModal(true) }} onDelete={async (id) => { if (window.confirm('Delete this fee structure?')) { try { await feeStructuresService.delete(id); toast.success('Deleted'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } } }} onDuplicate={async (s) => { try { await feeStructuresService.create({ classId: typeof s.classId === 'object' ? s.classId._id : s.classId, sectionId: s.sectionId ? (typeof s.sectionId === 'object' ? s.sectionId._id : s.sectionId) : null, academicSessionId: activeSession._id, feeHeads: s.feeHeads.map(h => ({ name: h.name, amount: h.amount, frequency: h.frequency, isCompulsory: h.isCompulsory, dueDay: h.dueDay })), isActive: true }); toast.success('Duplicated'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } }} />}
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
         {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
-        {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} onExport={handleExportDefaulters} />}
+        {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} onExport={handleExportDefaulters} dateFilter={defaultersDateFilter} onDateFilterChange={setDefaultersDateFilter} />}
         {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
@@ -945,17 +960,28 @@ const CollectPaymentTab = ({ dashboardData, selectedStudent, onSelectStudent }) 
 
 // ── Defaulters Tab ──
 
-const DefaultersTab = ({ defaulters, loading, classes = [], onExport }) => {
+const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter = { startDate: '', endDate: '' }, onDateFilterChange = () => {} }) => {
   const queryClient = useQueryClient()
   const [applyingLateFee, setApplyingLateFee] = useState(false)
   const [lateFeeModal, setLateFeeModal] = useState({ isOpen: false, invoiceId: null, studentName: '' })
   const [lateFeeAmount, setLateFeeAmount] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [classFilter, setClassFilter] = useState('')
+  const [sectionFilter, setSectionFilter] = useState('')
   const [minBalanceFilter, setMinBalanceFilter] = useState('')
   const [overdueOnly, setOverdueOnly] = useState(false)
   const [sortField, setSortField] = useState('totalBalance')
   const [sortAsc, setSortAsc] = useState(false)
+
+  // Dedupe classes by name (multiple academic-year duplicates can exist)
+  const uniqueClasses = []
+  const seenClassNames = new Set()
+  for (const c of classes) {
+    const key = (c.name || '').toLowerCase().trim()
+    if (key && !seenClassNames.has(key)) { seenClassNames.add(key); uniqueClasses.push(c) }
+  }
+  const selectedClass = uniqueClasses.find(c => c._id === classFilter)
+  const sectionsForClass = selectedClass?.sections || []
 
   const handleApplyLateFee = async () => {
     if (!lateFeeModal.invoiceId || !lateFeeAmount || parseFloat(lateFeeAmount) <= 0) { toast.error('Enter a valid amount'); return }
@@ -971,8 +997,13 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport }) => {
       if (!match) return false
     }
     if (classFilter) {
-      const sClassId = d.studentId?.classId?._id || d.studentId?.classId
-      if (!sClassId || sClassId.toString() !== classFilter) return false
+      const studentClassName = (d.studentId?.classId?.name || '').toLowerCase().trim()
+      const filterClassName = (selectedClass?.name || '').toLowerCase().trim()
+      if (!studentClassName || studentClassName !== filterClassName) return false
+    }
+    if (sectionFilter) {
+      const sSectionId = d.studentId?.sectionId?._id || d.studentId?.sectionId
+      if (!sSectionId || sSectionId.toString() !== sectionFilter) return false
     }
     if (minBalanceFilter && !isNaN(parseFloat(minBalanceFilter))) {
       if ((d.liveBalance ?? d.totalBalance ?? 0) < parseFloat(minBalanceFilter)) return false
@@ -981,7 +1012,7 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport }) => {
     return true
   })
 
-  const clearFilters = () => { setSearchQuery(''); setClassFilter(''); setMinBalanceFilter(''); setOverdueOnly(false) }
+  const clearFilters = () => { setSearchQuery(''); setClassFilter(''); setSectionFilter(''); setMinBalanceFilter(''); setOverdueOnly(false); onDateFilterChange({ startDate: '', endDate: '' }) }
 
   const handlePrint = () => {
     const rows = sortedDefaulters.map((d, i) => {
@@ -1054,7 +1085,10 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport }) => {
       <div className="card p-3 sm:p-4">
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
           <div className="w-full sm:flex-1 sm:min-w-[200px]"><label className="label mb-1 block text-xs">Search</label><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" /><input type="text" placeholder="Name, admission no, phone..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input pl-9 text-sm" /></div></div>
-          <div className="w-full sm:w-auto sm:min-w-[160px]"><label className="label mb-1 block text-xs">Class</label><select value={classFilter} onChange={e => setClassFilter(e.target.value)} className="input text-sm"><option value="">All Classes</option>{classes.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select></div>
+          <div className="w-full sm:w-auto sm:min-w-[160px]"><label className="label mb-1 block text-xs">Class</label><select value={classFilter} onChange={e => { setClassFilter(e.target.value); setSectionFilter('') }} className="input text-sm"><option value="">All Classes</option>{uniqueClasses.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select></div>
+          <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">Section</label><select value={sectionFilter} onChange={e => setSectionFilter(e.target.value)} className="input text-sm" disabled={!classFilter || sectionsForClass.length === 0}><option value="">All Sections</option>{sectionsForClass.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}</select></div>
+          <div className="w-full sm:w-auto sm:min-w-[150px]"><label className="label mb-1 block text-xs">Due From</label><input type="date" value={dateFilter.startDate} onChange={e => onDateFilterChange({ ...dateFilter, startDate: e.target.value })} className="input text-sm" /></div>
+          <div className="w-full sm:w-auto sm:min-w-[150px]"><label className="label mb-1 block text-xs">Due To</label><input type="date" value={dateFilter.endDate} onChange={e => onDateFilterChange({ ...dateFilter, endDate: e.target.value })} className="input text-sm" /></div>
           <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">Min Balance</label><input type="number" min="0" placeholder="e.g. 1000" value={minBalanceFilter} onChange={e => setMinBalanceFilter(e.target.value)} className="input text-sm" /></div>
           <div className="w-full sm:w-auto"><label className="label mb-1 block text-xs">&nbsp;</label><label className="flex items-center gap-2 px-3 py-2 border border-gray-200 dark:border-[#38383A] rounded-xl text-sm cursor-pointer"><input type="checkbox" checked={overdueOnly} onChange={e => setOverdueOnly(e.target.checked)} className="h-4 w-4" /><span className="dark:text-white">Overdue only</span></label></div>
           <button onClick={clearFilters} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><X className="h-3.5 w-3.5" /> Clear</button>
@@ -1062,8 +1096,8 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport }) => {
           <div className="relative group">
             <button className="btn btn-outline btn-sm flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
             <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-10 hidden group-hover:block">
-              <button onClick={() => onExport && onExport('csv', { classId: classFilter, minBalance: minBalanceFilter })} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
-              <button onClick={() => onExport && onExport('excel', { classId: classFilter, minBalance: minBalanceFilter })} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+              <button onClick={() => onExport && onExport('csv', { classId: classFilter, sectionId: sectionFilter, minBalance: minBalanceFilter, startDate: dateFilter.startDate, endDate: dateFilter.endDate })} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
+              <button onClick={() => onExport && onExport('excel', { classId: classFilter, sectionId: sectionFilter, minBalance: minBalanceFilter, startDate: dateFilter.startDate, endDate: dateFilter.endDate })} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
             </div>
           </div>
         </div>
