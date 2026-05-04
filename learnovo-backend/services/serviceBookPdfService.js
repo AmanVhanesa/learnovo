@@ -75,13 +75,30 @@ function fmtDate(d) {
     return '—';
   }
 }
+function hasVal(v) {
+  if (v === null || v === undefined) return false;
+  if (typeof v === 'string' && v.trim() === '') return false;
+  if (Array.isArray(v) && v.length === 0) return false;
+  return true;
+}
 function val(v) {
-  if (v === null || v === undefined || v === '') return '—';
+  if (!hasVal(v)) return '—';
   return String(v);
 }
 function titleCase(s) {
-  if (!s) return '—';
+  if (!s) return '';
   return String(s).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+function fmtDateOpt(d) {
+  if (!d) return '';
+  try {
+    return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+function filterPairs(pairs) {
+  return pairs.filter(([, v]) => hasVal(v));
 }
 
 /* ── TC-style header: centred school info, logo on left, title badge ─────── */
@@ -173,6 +190,8 @@ function sectionTitle(doc, L, R, Y, label) {
 }
 
 function drawKvGrid(doc, L, R, Y, pairs, cols = 2, rowH = 22) {
+  pairs = filterPairs(pairs);
+  if (pairs.length === 0) return Y;
   const colW = (R - L) / cols;
   const rows = Math.ceil(pairs.length / cols);
   for (let r = 0; r < rows; r++) {
@@ -273,10 +292,15 @@ async function generateServiceBook(employeeId, tenantId) {
   }
   const nx = L + 8 + photoSize + 14;
   doc.fontSize(14).font('Helvetica-Bold').fillColor(C.black).text(employee.name || '—', nx, Y + 10, { width: R - nx - 110 });
-  doc.fontSize(8.5).font('Helvetica').fillColor(C.label)
-    .text(`${titleCase(employee.role)}${employee.designation ? ` · ${employee.designation}` : ''}${employee.department ? ` · ${employee.department}` : ''}`, nx, Y + 30, { width: R - nx - 110 });
-  doc.fontSize(8).font('Helvetica').fillColor(C.label)
-    .text(`Date of Joining: ${fmtDate(employee.dateOfJoining)}`, nx, Y + 46, { width: R - nx - 110 });
+  const subtitleParts = [titleCase(employee.role), employee.designation, employee.department].filter(Boolean);
+  if (subtitleParts.length) {
+    doc.fontSize(8.5).font('Helvetica').fillColor(C.label)
+      .text(subtitleParts.join(' · '), nx, Y + 30, { width: R - nx - 110 });
+  }
+  if (employee.dateOfJoining) {
+    doc.fontSize(8).font('Helvetica').fillColor(C.label)
+      .text(`Date of Joining: ${fmtDate(employee.dateOfJoining)}`, nx, Y + 46, { width: R - nx - 110 });
+  }
 
   // Right side: Employee ID box
   const idBoxW = 100;
@@ -289,10 +313,9 @@ async function generateServiceBook(employeeId, tenantId) {
   Y += stripH + 12;
 
   // Personal Info
-  Y = sectionTitle(doc, L, R, Y, 'Personal Information');
-  Y = drawKvGrid(doc, L, R, Y, [
+  const personalPairs = filterPairs([
     ['Full Name', employee.name],
-    ['Date of Birth', fmtDate(employee.dateOfBirth)],
+    ['Date of Birth', fmtDateOpt(employee.dateOfBirth)],
     ['Gender', titleCase(employee.gender)],
     ['Marital Status', titleCase(employee.maritalStatus)],
     ['Father / Husband Name', employee.fatherOrHusbandName],
@@ -303,33 +326,44 @@ async function generateServiceBook(employeeId, tenantId) {
     ['Phone', employee.phone],
     ['Email', employee.email],
     ['Home Address', employee.homeAddress]
-  ], 2, 22);
-  Y += 4;
+  ]);
+  if (personalPairs.length) {
+    Y = sectionTitle(doc, L, R, Y, 'Personal Information');
+    Y = drawKvGrid(doc, L, R, Y, personalPairs, 2, 22);
+    Y += 4;
+  }
 
   // Appointment Details
-  Y = sectionTitle(doc, L, R, Y, 'Appointment Details');
-  Y = drawKvGrid(doc, L, R, Y, [
+  const appointmentPairs = filterPairs([
     ['Role', titleCase(employee.role)],
     ['Designation', employee.designation],
     ['Department', employee.department],
-    ['Date of Joining', fmtDate(employee.dateOfJoining)],
+    ['Date of Joining', fmtDateOpt(employee.dateOfJoining)],
     ['Employment Type', titleCase(employee.employmentType)],
     ['Appointment Order No.', employee.appointmentOrderNo],
-    ['Probation End Date', fmtDate(employee.probationEndDate)],
+    ['Probation End Date', fmtDateOpt(employee.probationEndDate)],
     ['Reporting To', employee.reportingTo]
-  ], 2, 22);
-  Y += 4;
+  ]);
+  if (appointmentPairs.length) {
+    Y = sectionTitle(doc, L, R, Y, 'Appointment Details');
+    Y = drawKvGrid(doc, L, R, Y, appointmentPairs, 2, 22);
+    Y += 4;
+  }
 
   // Qualifications & Experience
-  Y = sectionTitle(doc, L, R, Y, 'Qualifications & Experience');
-  Y = drawKvGrid(doc, L, R, Y, [
+  const qualPairs = filterPairs([
     ['Highest Education', employee.education],
     ['Specialization', employee.specialization],
-    ['Total Experience', employee.experience !== undefined && employee.experience !== null && employee.experience !== '' ? `${employee.experience} year(s)` : '—'],
+    ['Total Experience', hasVal(employee.experience) ? `${employee.experience} year(s)` : ''],
     ['Previous Employer', employee.previousEmployer],
     ['Previous Designation', employee.previousDesignation],
-    ['Subjects', Array.isArray(employee.subjects) && employee.subjects.length ? employee.subjects.join(', ') : '—']
-  ], 2, 22);
+    ['Subjects', Array.isArray(employee.subjects) && employee.subjects.length ? employee.subjects.join(', ') : '']
+  ]);
+  const hasQualSection = qualPairs.length || employee.qualifications || (Array.isArray(employee.certifications) && employee.certifications.length);
+  if (hasQualSection) {
+    Y = sectionTitle(doc, L, R, Y, 'Qualifications & Experience');
+    Y = drawKvGrid(doc, L, R, Y, qualPairs, 2, 22);
+  }
 
   if (employee.qualifications) {
     doc.fontSize(7).font('Helvetica').fillColor(C.label).text('DETAILED QUALIFICATIONS', L, Y, { width: R - L, characterSpacing: 0.5 });
@@ -352,62 +386,65 @@ async function generateServiceBook(employeeId, tenantId) {
   Y = drawHeader(doc, schoolData, logoBuffer, L, R, doc.page.margins.top, 'Page 2 of 2');
 
   // Postings
-  Y = sectionTitle(doc, L, R, Y, 'Postings / Transfers');
-  {
+  if (Array.isArray(employee.postings) && employee.postings.length) {
+    Y = sectionTitle(doc, L, R, Y, 'Postings / Transfers');
     const w = R - L;
     Y = drawTable(doc, L, R, Y,
       ['From', 'To', 'Post', 'Location', 'Remarks'],
-      (employee.postings || []).map(p => [fmtDate(p.fromDate), fmtDate(p.toDate), val(p.post), val(p.location), val(p.remarks)]),
+      employee.postings.map(p => [fmtDate(p.fromDate), fmtDate(p.toDate), val(p.post), val(p.location), val(p.remarks)]),
       [w * 0.14, w * 0.14, w * 0.22, w * 0.22, w * 0.28]
     );
+    Y += 6;
   }
-  Y += 6;
 
   // Promotions
-  Y = sectionTitle(doc, L, R, Y, 'Promotions');
-  {
+  if (Array.isArray(employee.promotions) && employee.promotions.length) {
+    Y = sectionTitle(doc, L, R, Y, 'Promotions');
     const w = R - L;
     Y = drawTable(doc, L, R, Y,
       ['Date', 'From', 'To', 'Order No.', 'Remarks'],
-      (employee.promotions || []).map(p => [fmtDate(p.date), val(p.fromDesignation), val(p.toDesignation), val(p.orderNo), val(p.remarks)]),
+      employee.promotions.map(p => [fmtDate(p.date), val(p.fromDesignation), val(p.toDesignation), val(p.orderNo), val(p.remarks)]),
       [w * 0.14, w * 0.22, w * 0.22, w * 0.18, w * 0.24]
     );
+    Y += 6;
   }
-  Y += 6;
 
   // Trainings
-  Y = sectionTitle(doc, L, R, Y, 'Trainings Attended');
-  {
+  if (Array.isArray(employee.trainings) && employee.trainings.length) {
+    Y = sectionTitle(doc, L, R, Y, 'Trainings Attended');
     const w = R - L;
     Y = drawTable(doc, L, R, Y,
       ['Training', 'From', 'To', 'Institute', 'Remarks'],
-      (employee.trainings || []).map(t => [val(t.name), fmtDate(t.fromDate), fmtDate(t.toDate), val(t.institute), val(t.remarks)]),
+      employee.trainings.map(t => [val(t.name), fmtDate(t.fromDate), fmtDate(t.toDate), val(t.institute), val(t.remarks)]),
       [w * 0.24, w * 0.14, w * 0.14, w * 0.22, w * 0.26]
     );
+    Y += 6;
   }
-  Y += 6;
 
   // Awards
-  Y = sectionTitle(doc, L, R, Y, 'Awards & Recognitions');
-  {
+  if (Array.isArray(employee.awards) && employee.awards.length) {
+    Y = sectionTitle(doc, L, R, Y, 'Awards & Recognitions');
     const w = R - L;
     Y = drawTable(doc, L, R, Y,
       ['Award', 'Date', 'Description'],
-      (employee.awards || []).map(a => [val(a.name), fmtDate(a.date), val(a.description)]),
+      employee.awards.map(a => [val(a.name), fmtDate(a.date), val(a.description)]),
       [w * 0.30, w * 0.18, w * 0.52]
     );
+    Y += 6;
   }
-  Y += 6;
 
   // Emergency contact
-  Y = sectionTitle(doc, L, R, Y, 'Emergency Contact');
   const ec = employee.emergencyContact || {};
-  Y = drawKvGrid(doc, L, R, Y, [
+  const ecPairs = filterPairs([
     ['Contact Name', ec.name],
     ['Contact Phone', ec.phone],
     ['Relationship', ec.relation]
-  ], 3, 22);
-  Y += 2;
+  ]);
+  if (ecPairs.length) {
+    Y = sectionTitle(doc, L, R, Y, 'Emergency Contact');
+    Y = drawKvGrid(doc, L, R, Y, ecPairs, 3, 22);
+    Y += 2;
+  }
 
   // Service remarks
   if (employee.serviceRemarks) {
