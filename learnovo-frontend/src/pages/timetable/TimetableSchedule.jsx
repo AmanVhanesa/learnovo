@@ -6,6 +6,7 @@ import {
   BookOpen, User, MapPin, Timer, ArrowRight, Eye
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { dedupeClassesByName } from '../../utils/classOrder'
 import { timetableService } from '../../services/timetableService'
 import { attendanceService } from '../../services/attendanceService'
 import TimetableGrid from '../../components/timetable/TimetableGrid'
@@ -87,7 +88,7 @@ const TimetableSchedule = () => {
     queryFn: async () => {
       const res = await api.get('/classes')
       const data = res.data?.data || res.data
-      return Array.isArray(data) ? data : []
+      return Array.isArray(data) ? dedupeClassesByName(data) : []
     },
     enabled: isAdmin
   })

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2, Loader2, Search, UserCheck } from 'lucide-react'
 import api from '../../services/authService'
 import transportService from '../../services/transportService'
+import { dedupeClassesByName, sortClassObjects } from '../../utils/classOrder'
 import { SERVER_URL } from '../../constants/config'
 import ImageCropModal from '../ImageCropModal'
 import CameraCaptureModal from '../CameraCaptureModal'
@@ -108,19 +109,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             }
         }
 
-        const fetchClasses = async () => {
-            try {
-                setClassesLoading(true)
-                const response = await api.get('/classes')
-                if (response.data.success) {
-                    setClassOptions(response.data.data)
-                }
-            } catch (error) {
-            } finally {
-                setClassesLoading(false)
-            }
-        }
-
         const fetchAcademicYears = async () => {
             try {
                 setAcademicYearsLoading(true)
@@ -149,9 +137,28 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
         fetchSubDepartments()
         fetchDrivers()
-        fetchClasses()
         fetchAcademicYears()
     }, [])
+
+    // Fetch classes scoped to the selected academic year (and dedupe defensively)
+    useEffect(() => {
+        const fetchClasses = async () => {
+            try {
+                setClassesLoading(true)
+                const params = form.academicYear ? `?academicYear=${encodeURIComponent(form.academicYear)}` : ''
+                const response = await api.get(`/classes${params}`)
+                if (response.data.success) {
+                    const all = response.data.data || []
+                    const deduped = dedupeClassesByName(all, form.academicYear || null)
+                    setClassOptions(sortClassObjects(deduped, 'name'))
+                }
+            } catch (error) {
+            } finally {
+                setClassesLoading(false)
+            }
+        }
+        fetchClasses()
+    }, [form.academicYear])
 
     // Fetch sections when class changes
     useEffect(() => {

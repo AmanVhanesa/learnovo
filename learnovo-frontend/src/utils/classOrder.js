@@ -74,4 +74,23 @@ export function getPreviousClass(currentClass, allClasses) {
   return sorted[idx - 1]
 }
 
-export default { getClassOrder, sortClasses, sortClassObjects, getNextClass, getPreviousClass }
+/**
+ * Dedupe class objects by name (case-insensitive). When preferredAcademicYear
+ * is given, a record matching that year wins over other duplicates.
+ */
+export function dedupeClassesByName(items, preferredAcademicYear = null) {
+  if (!items || !Array.isArray(items)) return []
+  const byKey = new Map()
+  for (const c of items) {
+    const key = (c?.name || '').toString().trim().toLowerCase()
+    if (!key) continue
+    const existing = byKey.get(key)
+    if (!existing) { byKey.set(key, c); continue }
+    if (preferredAcademicYear && c.academicYear === preferredAcademicYear && existing.academicYear !== preferredAcademicYear) {
+      byKey.set(key, c)
+    }
+  }
+  return Array.from(byKey.values())
+}
+
+export default { getClassOrder, sortClasses, sortClassObjects, getNextClass, getPreviousClass, dedupeClassesByName }

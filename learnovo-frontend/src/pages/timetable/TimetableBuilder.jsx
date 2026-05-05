@@ -14,7 +14,7 @@ import TimetableGrid from '../../components/timetable/TimetableGrid'
 import TemplateSelector from '../../components/timetable/TemplateSelector'
 import ConflictBadge from '../../components/timetable/ConflictBadge'
 import api from '../../services/authService'
-import { sortClassObjects } from '../../utils/classOrder'
+import { sortClassObjects, dedupeClassesByName } from '../../utils/classOrder'
 
 const TABS = [
   { id: 'templates', label: 'Templates', icon: LayoutGrid },
@@ -165,7 +165,7 @@ const TimetableBuilder = () => {
   // Dropdown data
   const { data: classesData } = useQuery({
     queryKey: ['classes'],
-    queryFn: async () => { const r = await api.get('/classes'); return sortClassObjects(r.data?.data || r.data || [], 'name') }
+    queryFn: async () => { const r = await api.get('/classes'); return sortClassObjects(dedupeClassesByName(r.data?.data || r.data || []), 'name') }
   })
   const classes = classesData || []
 

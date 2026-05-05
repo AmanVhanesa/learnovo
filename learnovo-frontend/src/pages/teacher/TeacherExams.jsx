@@ -235,9 +235,18 @@ const TeacherExams = () => {
 
   // Only show teacher's assigned classes in the create form
   const teacherClasses = useMemo(() => {
-    return availableClasses.filter(c =>
+    const filtered = availableClasses.filter(c =>
       myClassNames.has(c.grade) || myClassNames.has(c.name)
     )
+    const seen = new Set()
+    const unique = []
+    for (const c of filtered) {
+      const key = (c?.name || '').toString().trim().toLowerCase()
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      unique.push(c)
+    }
+    return unique
   }, [availableClasses, myClassNames])
 
   const handleField = (key, value) => {

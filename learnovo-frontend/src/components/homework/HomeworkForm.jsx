@@ -7,7 +7,7 @@ import { subjectsService } from '../../services/subjectsService';
 import { attendanceService } from '../../services/attendanceService';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { sortClassObjects, getClassOrder } from '../../utils/classOrder';
+import { sortClassObjects, getClassOrder, dedupeClassesByName } from '../../utils/classOrder';
 
 const HomeworkForm = ({ homework, onClose, onSuccess }) => {
     const { user } = useAuth();
@@ -128,14 +128,14 @@ const HomeworkForm = ({ homework, onClose, onSuccess }) => {
                     attendanceService.getTeacherClasses(),
                     subjectsService.list()
                 ]);
-                setClasses(sortClassObjects(classesRes?.data || [], 'name'));
+                setClasses(sortClassObjects(dedupeClassesByName(classesRes?.data || []), 'name'));
                 setAllSubjects(subjectsRes.success ? (subjectsRes.data || []) : []);
             } else {
                 const [classesRes, subjectsRes] = await Promise.all([
                     classesService.list(),
                     subjectsService.list()
                 ]);
-                if (classesRes.success) setClasses(sortClassObjects(classesRes.data || [], 'name'));
+                if (classesRes.success) setClasses(sortClassObjects(dedupeClassesByName(classesRes.data || []), 'name'));
                 if (subjectsRes.success) setAllSubjects(subjectsRes.data || []);
             }
         } catch (error) {

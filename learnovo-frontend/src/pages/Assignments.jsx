@@ -11,6 +11,7 @@ import { teacherAssignmentsService } from '../services/academicsService'
 import { exportReport } from '../utils/exportHelpers'
 import { useSettings } from '../contexts/SettingsContext'
 import { formatDate } from '../utils/formatDate'
+import { dedupeClassesByName } from '../utils/classOrder'
 import toast from 'react-hot-toast'
 
 const Assignments = () => {
@@ -45,13 +46,13 @@ const Assignments = () => {
     queryFn: async () => {
       if (user?.role === 'teacher') {
         const res = await attendanceService.getTeacherClasses()
-        return (res?.data || []).map(cls => ({
+        return dedupeClassesByName(res?.data || []).map(cls => ({
           id: cls._id || cls.id,
           name: cls.name || `${cls.grade} ${cls.section || ''}`.trim()
         }))
       }
       const res = await classesService.list()
-      return (res?.data || res || []).map(cls => ({
+      return dedupeClassesByName(res?.data || res || []).map(cls => ({
         id: cls._id || cls.id,
         name: cls.name || `${cls.grade} ${cls.section || ''}`.trim()
       }))

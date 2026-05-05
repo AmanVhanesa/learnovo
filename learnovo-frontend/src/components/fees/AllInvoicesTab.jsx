@@ -10,7 +10,7 @@ import { classesService } from '../../services/academicsService'
 import { formatCurrency } from '../../utils/formatCurrency'
 import StatusBadge from '../StatusBadge'
 import EmptyState from '../EmptyState'
-import { sortClassObjects } from '../../utils/classOrder'
+import { sortClassObjects, dedupeClassesByName } from '../../utils/classOrder'
 import LoadingSpinner from '../LoadingSpinner'
 import InvoiceDetailModal from './InvoiceDetailModal'
 import DiscountModal from './DiscountModal'
@@ -54,7 +54,7 @@ const AllInvoicesTab = ({
 
   const { data: classes = [] } = useQuery({
     queryKey: ['fees-classes'],
-    queryFn: async () => { const res = await classesService.list(); return sortClassObjects(res.data || [], 'name') },
+    queryFn: async () => { const res = await classesService.list(); return sortClassObjects(dedupeClassesByName(res.data || [], activeSession?.name), 'name') },
   })
 
   // Server-side paginated query
