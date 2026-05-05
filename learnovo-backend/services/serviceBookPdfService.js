@@ -269,8 +269,23 @@ async function generateServiceBook(employeeId, tenantId) {
   const L = doc.page.margins.left;
   const R = doc.page.width - doc.page.margins.right;
 
+  const ec = employee.emergencyContact || {};
+  const ecPairs = filterPairs([
+    ['Contact Name', ec.name],
+    ['Contact Phone', ec.phone],
+    ['Relationship', ec.relation]
+  ]);
+  const hasPage2Content = (
+    (Array.isArray(employee.postings) && employee.postings.length) ||
+    (Array.isArray(employee.promotions) && employee.promotions.length) ||
+    (Array.isArray(employee.trainings) && employee.trainings.length) ||
+    (Array.isArray(employee.awards) && employee.awards.length) ||
+    ecPairs.length ||
+    !!employee.serviceRemarks
+  );
+
   /* ════════ PAGE 1 ════════ */
-  let Y = drawHeader(doc, schoolData, logoBuffer, L, R, doc.page.margins.top, 'Page 1 of 2');
+  let Y = drawHeader(doc, schoolData, logoBuffer, L, R, doc.page.margins.top, hasPage2Content ? 'Page 1 of 2' : 'Page 1 of 1');
 
   // Identity strip with photo, name, role, employee id
   const stripH = 70;
@@ -376,14 +391,16 @@ async function generateServiceBook(employeeId, tenantId) {
     Y = doc.y + 4;
   }
 
-  // Page 1 footer
-  const p1FooterY = doc.page.height - doc.page.margins.bottom - 12;
-  doc.fontSize(7).font('Helvetica-Oblique').fillColor(C.muted)
-    .text(`Service Book — ${employee.name || ''} (${employee.employeeId || ''})   ·   continued on next page`, L, p1FooterY, { width: R - L, align: 'center' });
+  if (hasPage2Content) {
+    // Page 1 footer
+    const p1FooterY = doc.page.height - doc.page.margins.bottom - 12;
+    doc.fontSize(7).font('Helvetica-Oblique').fillColor(C.muted)
+      .text(`Service Book — ${employee.name || ''} (${employee.employeeId || ''})   ·   continued on next page`, L, p1FooterY, { width: R - L, align: 'center' });
 
-  /* ════════ PAGE 2 ════════ */
-  doc.addPage();
-  Y = drawHeader(doc, schoolData, logoBuffer, L, R, doc.page.margins.top, 'Page 2 of 2');
+    /* ════════ PAGE 2 ════════ */
+    doc.addPage();
+    Y = drawHeader(doc, schoolData, logoBuffer, L, R, doc.page.margins.top, 'Page 2 of 2');
+  }
 
   // Postings
   if (Array.isArray(employee.postings) && employee.postings.length) {
@@ -434,12 +451,6 @@ async function generateServiceBook(employeeId, tenantId) {
   }
 
   // Emergency contact
-  const ec = employee.emergencyContact || {};
-  const ecPairs = filterPairs([
-    ['Contact Name', ec.name],
-    ['Contact Phone', ec.phone],
-    ['Relationship', ec.relation]
-  ]);
   if (ecPairs.length) {
     Y = sectionTitle(doc, L, R, Y, 'Emergency Contact');
     Y = drawKvGrid(doc, L, R, Y, ecPairs, 3, 22);
@@ -465,10 +476,10 @@ async function generateServiceBook(employeeId, tenantId) {
     .text(`Date: ${fmtDate(new Date())}`, L, sigY + 22, { width: sigW, align: 'center' })
     .text('Principal / HR Head', R - sigW, sigY + 22, { width: sigW, align: 'center' });
 
-  // Page 2 footer
-  const p2FooterY = doc.page.height - doc.page.margins.bottom - 12;
+  // Final footer (page 2 if added, otherwise page 1)
+  const finalFooterY = doc.page.height - doc.page.margins.bottom - 12;
   doc.fontSize(7).font('Helvetica-Oblique').fillColor(C.muted)
-    .text(`Generated on ${fmtDate(new Date())} · ${schoolData.schoolName} · Confidential`, L, p2FooterY, { width: R - L, align: 'center' });
+    .text(`Generated on ${fmtDate(new Date())} · ${schoolData.schoolName} · Confidential`, L, finalFooterY, { width: R - L, align: 'center' });
 
   doc.end();
   return done;
