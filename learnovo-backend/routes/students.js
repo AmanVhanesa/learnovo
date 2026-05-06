@@ -2208,6 +2208,87 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       }
     }
 
+    // ── Duplicate student detection ───────────────────────────────────────
+    // Catches accidental re-entry of the same student. Admin can override
+    // by re-submitting with confirmDuplicate: true (intentional edge cases:
+    // namesakes, re-admissions, etc.).
+    if (!req.body.confirmDuplicate) {
+      const candidateName = (fullName || name || '').trim();
+      const normalizedName = candidateName.toLowerCase().replace(/\s+/g, ' ');
+
+      const guardianPhones = Array.isArray(guardians)
+        ? guardians
+          .map(g => (g && g.phone ? String(g.phone).replace(/[\s\-+]/g, '') : ''))
+          .filter(p => p && p.length >= 10)
+        : [];
+
+      if (normalizedName && normalizedName.length >= 2) {
+        const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const nameRegex = new RegExp(`^${escapeRegex(normalizedName)}$`, 'i');
+
+        const orClauses = [];
+        if (dateOfBirth) {
+          const dob = new Date(dateOfBirth);
+          if (!isNaN(dob.getTime())) {
+            const dobStart = new Date(dob); dobStart.setHours(0, 0, 0, 0);
+            const dobEnd = new Date(dob); dobEnd.setHours(23, 59, 59, 999);
+            orClauses.push({ dateOfBirth: { $gte: dobStart, $lte: dobEnd } });
+          }
+        }
+        if (guardianPhones.length) {
+          orClauses.push({ 'guardians.phone': { $in: guardianPhones } });
+        }
+        if (studentClass && section) {
+          orClauses.push({
+            class: studentClass.trim(),
+            section: section.trim()
+          });
+        }
+
+        if (orClauses.length) {
+          const candidates = await User.find({
+            tenantId,
+            role: 'student',
+            isActive: { $ne: false },
+            $and: [
+              {
+                $or: [
+                  { name: nameRegex },
+                  { fullName: nameRegex }
+                ]
+              },
+              { $or: orClauses }
+            ]
+          })
+            .select('_id name fullName admissionNumber class section dateOfBirth guardians')
+            .limit(5)
+            .lean();
+
+          if (candidates.length) {
+            return res.status(409).json({
+              success: false,
+              potentialDuplicate: true,
+              message: 'A student with similar details already exists. Please confirm to add anyway.',
+              duplicates: candidates.map(c => {
+                const primaryGuardian = (c.guardians || []).find(g => g.isPrimary) || (c.guardians || [])[0] || {};
+                return {
+                  id: c._id,
+                  name: c.fullName || c.name,
+                  admissionNumber: c.admissionNumber,
+                  class: c.class,
+                  section: c.section,
+                  dateOfBirth: c.dateOfBirth,
+                  guardianName: primaryGuardian.name,
+                  guardianPhone: primaryGuardian.phone
+                };
+              }),
+              requestId: req.requestId
+            });
+          }
+        }
+      }
+    }
+
     // Generate Admission Number (if not provided)
     let admissionNumber = req.body.admissionNumber ? req.body.admissionNumber.trim() : null;
 

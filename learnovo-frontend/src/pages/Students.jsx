@@ -209,8 +209,22 @@ const Students = () => {
       }
       setShowForm(false)
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       const data = error.response?.data
+      if (data?.potentialDuplicate && Array.isArray(data.duplicates) && data.duplicates.length) {
+        const lines = data.duplicates.map((d, i) => {
+          const cls = [d.class, d.section].filter(Boolean).join(' / ')
+          const adm = d.admissionNumber ? ` • Adm# ${d.admissionNumber}` : ''
+          const cl = cls ? ` • ${cls}` : ''
+          const guardian = d.guardianName ? ` • Guardian: ${d.guardianName}${d.guardianPhone ? ' (' + d.guardianPhone + ')' : ''}` : ''
+          return `${i + 1}. ${d.name}${adm}${cl}${guardian}`
+        }).join('\n')
+        const msg = `A student with similar details already exists:\n\n${lines}\n\nAdd this student anyway?`
+        if (window.confirm(msg)) {
+          saveMutation.mutate({ ...variables, confirmDuplicate: true })
+        }
+        return
+      }
       if (data?.errors && Array.isArray(data.errors)) {
         const msgs = data.errors.map(e => e.msg || e.message).filter(Boolean)
         if (msgs.length) {
