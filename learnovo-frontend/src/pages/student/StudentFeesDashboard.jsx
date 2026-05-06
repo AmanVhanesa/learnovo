@@ -143,18 +143,60 @@ const StudentFeesDashboard = () => {
 
     // Tracks the most recent ICICI attempt the student opened in a new tab
     // so we can auto-abandon it when they return to /fees without paying.
+    // Persisted to localStorage so the flow survives a full page reload —
+    // critical for in-app webviews where window.open falls through to a
+    // top-level navigation and unloads React state.
+    const PENDING_KEY = `learnovo:pendingIciciAttempt:${selectedChildId || 'self'}`;
     const pendingIciciAttemptRef = useRef(null);
 
-    // When the student tabs back to /fees with an in-flight ICICI attempt,
+    const readPendingFromStorage = useCallback(() => {
+        try {
+            const raw = localStorage.getItem(PENDING_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed?.attemptId || !parsed?.startedAt) return null;
+            // Stale entries (>30 min) get dropped — gateway sessions don't live that long.
+            if (Date.now() - parsed.startedAt > 30 * 60 * 1000) {
+                localStorage.removeItem(PENDING_KEY);
+                return null;
+            }
+            return parsed;
+        } catch {
+            return null;
+        }
+    }, [PENDING_KEY]);
+
+    const setPendingAttempt = useCallback((attemptId) => {
+        const entry = { attemptId, startedAt: Date.now() };
+        pendingIciciAttemptRef.current = entry;
+        try { localStorage.setItem(PENDING_KEY, JSON.stringify(entry)); } catch { /* ignore quota */ }
+    }, [PENDING_KEY]);
+
+    const clearPendingAttempt = useCallback(() => {
+        pendingIciciAttemptRef.current = null;
+        try { localStorage.removeItem(PENDING_KEY); } catch { /* ignore */ }
+    }, [PENDING_KEY]);
+
+    // When the student returns to /fees with an in-flight ICICI attempt,
     // give the gateway a moment to deliver any returnURL/webhook, then ask
     // the backend to abandon it. The /attempts/:id/abandon endpoint
     // re-checks with the gateway and refuses if the payment actually
-    // succeeded, so this is safe.
+    // succeeded, so this is safe. Runs on visibilitychange, focus, AND on
+    // initial mount — the last one is what makes webviews work, since they
+    // typically reload the page instead of restoring the prior tab.
     useEffect(() => {
-        const onVisible = async () => {
+        // Hydrate from storage in case we just came back from a top-level
+        // redirect (webview / popup-blocker fallback).
+        if (!pendingIciciAttemptRef.current) {
+            const stored = readPendingFromStorage();
+            if (stored) pendingIciciAttemptRef.current = stored;
+        }
+
+        const reconcile = async () => {
             if (document.hidden) return;
-            const pending = pendingIciciAttemptRef.current;
+            const pending = pendingIciciAttemptRef.current || readPendingFromStorage();
             if (!pending) return;
+            pendingIciciAttemptRef.current = pending;
             // 4s grace so a real returnURL/webhook lands first.
             const elapsed = Date.now() - pending.startedAt;
             const wait = Math.max(0, 4000 - elapsed);
@@ -172,24 +214,32 @@ const StudentFeesDashboard = () => {
                 });
                 const row = fresh.find(h => h._id === pending.attemptId);
                 if (!row || ['SUCCESS', 'VERIFIED', 'FAILED'].includes(row.status)) {
-                    pendingIciciAttemptRef.current = null;
+                    clearPendingAttempt();
+                    queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
+                    queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
                     return;
                 }
                 try {
                     await studentFeesService.abandonAttempt(pending.attemptId);
                 } catch (_) { /* abandon can refuse if payment really succeeded — ignore */ }
-                pendingIciciAttemptRef.current = null;
+                clearPendingAttempt();
                 queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
                 queryClient.invalidateQueries({ queryKey: ['student-payment-history'] });
             }, wait);
         };
-        document.addEventListener('visibilitychange', onVisible);
-        window.addEventListener('focus', onVisible);
+
+        // Run once on mount — handles the webview reload case.
+        reconcile();
+
+        document.addEventListener('visibilitychange', reconcile);
+        window.addEventListener('focus', reconcile);
+        window.addEventListener('pageshow', reconcile);
         return () => {
-            document.removeEventListener('visibilitychange', onVisible);
-            window.removeEventListener('focus', onVisible);
+            document.removeEventListener('visibilitychange', reconcile);
+            window.removeEventListener('focus', reconcile);
+            window.removeEventListener('pageshow', reconcile);
         };
-    }, [queryClient, selectedChildId]);
+    }, [queryClient, selectedChildId, readPendingFromStorage, clearPendingAttempt]);
 
     // Gateway payment flow — supports both ICICI (redirect) and Razorpay (popup)
     const [isGatewayPaying, setIsGatewayPaying] = useState(false);
@@ -206,12 +256,7 @@ const StudentFeesDashboard = () => {
                 // can auto-abandon the attempt — ICICI's STATUS query returns
                 // PENDING/UNKNOWN for tab-closed-without-acting cases, which
                 // the backend refresh can't safely flip to FAILED on its own.
-                if (data.paymentAttemptId) {
-                    pendingIciciAttemptRef.current = {
-                        attemptId: data.paymentAttemptId,
-                        startedAt: Date.now()
-                    };
-                }
+                if (data.paymentAttemptId) setPendingAttempt(data.paymentAttemptId);
                 const paymentWindow = window.open(data.paymentUrl, '_blank');
                 if (!paymentWindow) window.location.href = data.paymentUrl;
                 toast.success('Redirecting to payment gateway...');
@@ -308,6 +353,7 @@ const StudentFeesDashboard = () => {
             if (!res.data?.success || !data) throw new Error('Failed to initiate combined payment');
 
             if (data.paymentUrl) {
+                if (data.paymentAttemptId) setPendingAttempt(data.paymentAttemptId);
                 const paymentWindow = window.open(data.paymentUrl, '_blank');
                 if (!paymentWindow) window.location.href = data.paymentUrl;
                 toast.success(`Redirecting to pay ${data.invoiceCount} invoices...`);
