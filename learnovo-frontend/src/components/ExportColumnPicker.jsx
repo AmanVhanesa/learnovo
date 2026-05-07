@@ -43,6 +43,12 @@ const ExportColumnPicker = ({
     sheetName = 'Sheet1',
     disabled = false,
     emptyMessage = 'No data to export',
+    // Optional: async function returning the full dataset matching current
+    // filters (across all pages). When provided, the modal shows a "Export all
+    // matching filters" toggle that uses this instead of the paged `data`.
+    fetchAllData,
+    // Optional total count for the "all matching" option label.
+    totalRecords,
     // Controlled-mode props: when `externalOpen` is provided (not undefined),
     // the modal's open state is driven by the parent. `hideTrigger` optionally
     // hides the built-in button so the parent can provide its own trigger.
@@ -63,6 +69,7 @@ const ExportColumnPicker = ({
     };
     const [exporting, setExporting] = useState(false);
     const [selectedFormat, setSelectedFormat] = useState(formats[0] || 'excel');
+    const [exportAll, setExportAll] = useState(false);
 
     // Default selection: any column with defaultSelected !== false
     const defaultKeys = useMemo(
@@ -125,7 +132,30 @@ const ExportColumnPicker = ({
         }
         const orderedCols = columns.filter(c => selectedKeys.includes(c.key));
         const headers = orderedCols.map(c => c.label);
-        const rows = data.map(row =>
+        const dateStr = new Date().toISOString().split('T')[0];
+        const safeBase = filename.replace(/\s+/g, '_');
+        const toastId = `${safeBase}-export`;
+
+        let exportData = data;
+        if (exportAll && typeof fetchAllData === 'function') {
+            try {
+                setExporting(true);
+                toast.loading('Loading all records…', { id: toastId });
+                const all = await fetchAllData();
+                if (!Array.isArray(all) || all.length === 0) {
+                    toast.error(emptyMessage, { id: toastId });
+                    setExporting(false);
+                    return;
+                }
+                exportData = all;
+            } catch (err) {
+                toast.error('Failed to load all records', { id: toastId });
+                setExporting(false);
+                return;
+            }
+        }
+
+        const rows = exportData.map(row =>
             orderedCols.map(c => {
                 try {
                     const v = c.getValue ? c.getValue(row) : row[c.key];
@@ -135,9 +165,6 @@ const ExportColumnPicker = ({
                 }
             })
         );
-        const dateStr = new Date().toISOString().split('T')[0];
-        const safeBase = filename.replace(/\s+/g, '_');
-        const toastId = `${safeBase}-export`;
 
         try {
             setExporting(true);
@@ -308,6 +335,43 @@ const ExportColumnPicker = ({
                                 </div>
                             </div>
 
+                            {/* Scope toggle */}
+                            {typeof fetchAllData === 'function' && (
+                                <div className="mt-5">
+                                    <h3 className="text-xs font-semibold text-gray-700 dark:text-[#8E8E93] uppercase tracking-wide mb-2">
+                                        Records to Export
+                                    </h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setExportAll(false)}
+                                            className={`text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
+                                                !exportAll
+                                                    ? 'border-primary-500 bg-primary-50 dark:bg-[rgba(62,196,177,0.12)] text-primary-700 dark:text-[#3EC4B1]'
+                                                    : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
+                                            }`}
+                                        >
+                                            <div className="font-medium">Current page</div>
+                                            <div className="text-xs opacity-75 mt-0.5">{data.length} record{data.length !== 1 ? 's' : ''}</div>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setExportAll(true)}
+                                            className={`text-left px-4 py-3 rounded-lg border text-sm transition-colors ${
+                                                exportAll
+                                                    ? 'border-primary-500 bg-primary-50 dark:bg-[rgba(62,196,177,0.12)] text-primary-700 dark:text-[#3EC4B1]'
+                                                    : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
+                                            }`}
+                                        >
+                                            <div className="font-medium">All matching filters</div>
+                                            <div className="text-xs opacity-75 mt-0.5">
+                                                {typeof totalRecords === 'number' ? `${totalRecords} record${totalRecords !== 1 ? 's' : ''}` : 'Fetches across all pages'}
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Selected count */}
                             <div className="mt-5 p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-md">
                                 <p className="text-xs text-blue-900 dark:text-blue-400">
@@ -334,7 +398,12 @@ const ExportColumnPicker = ({
                                 className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                             >
                                 <Download className="w-4 h-4" />
-                                {exporting ? 'Exporting…' : `Export ${selectedKeys.length} Column${selectedKeys.length !== 1 ? 's' : ''}`}
+                                {exporting
+                                    ? 'Exporting…'
+                                    : (() => {
+                                        const cnt = exportAll && typeof totalRecords === 'number' ? totalRecords : data.length;
+                                        return `Export ${cnt} Record${cnt !== 1 ? 's' : ''} • ${selectedKeys.length} Column${selectedKeys.length !== 1 ? 's' : ''}`;
+                                    })()}
                             </button>
                         </div>
                     </div>

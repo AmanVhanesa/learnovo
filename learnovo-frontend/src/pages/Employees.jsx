@@ -208,13 +208,39 @@ const Employees = () => {
         { key: 'dateOfBirth', label: 'Date of Birth', group: 'Employment', getValue: e => e.dateOfBirth ? formatDate(e.dateOfBirth) : '' },
         { key: 'gender', label: 'Gender', group: 'Employment', getValue: e => e.gender || '' },
         { key: 'salary', label: 'Salary', group: 'Employment', getValue: e => e.salary || '' },
-        { key: 'qualification', label: 'Qualification', group: 'Employment', getValue: e => e.qualification || '' },
+        { key: 'education', label: 'Education', group: 'Employment', getValue: e => e.education || '' },
+        { key: 'qualifications', label: 'Qualifications', group: 'Employment', getValue: e => e.qualifications || '' },
+        { key: 'experience', label: 'Experience (years)', group: 'Employment', getValue: e => (e.experience ?? '') },
+        { key: 'subjects', label: 'Subjects', group: 'Employment', getValue: e => Array.isArray(e.subjects) ? e.subjects.join(', ') : (e.subjects || '') },
     ], [])
 
     const employeeExportPresets = {
         basic: { label: 'Basic Details', fields: ['employeeId', 'name', 'role', 'department', 'isActive'] },
         contact: { label: 'Contact Info', fields: ['employeeId', 'name', 'phone', 'email', 'address'] },
-        full: { label: 'Full Record', fields: ['employeeId', 'name', 'role', 'designation', 'department', 'phone', 'email', 'address', 'dateOfJoining', 'dateOfBirth', 'gender', 'salary', 'qualification', 'isActive'] },
+        full: { label: 'Full Record', fields: ['employeeId', 'name', 'role', 'designation', 'department', 'phone', 'email', 'address', 'dateOfJoining', 'dateOfBirth', 'gender', 'salary', 'education', 'qualifications', 'experience', 'subjects', 'isActive'] },
+    }
+
+    const fetchAllEmployees = async () => {
+        const baseFilters = {
+            search: debouncedSearchQuery,
+            role: roleFilter,
+            department: departmentFilter,
+            status: statusFilter,
+            limit: 100,
+        }
+        const all = []
+        let page = 1
+        // Hard cap to avoid runaway loops
+        const maxPages = 200
+        while (page <= maxPages) {
+            const response = await employeesService.list({ ...baseFilters, page })
+            const batch = Array.isArray(response?.data) ? response.data : []
+            all.push(...batch)
+            const totalPages = response?.pagination?.pages
+            if (!totalPages || page >= totalPages || batch.length === 0) break
+            page += 1
+        }
+        return all
     }
 
     const clearFilters = () => {
@@ -382,6 +408,8 @@ const Employees = () => {
                             filename="employees"
                             title="Export Employees"
                             sheetName="Employees"
+                            fetchAllData={fetchAllEmployees}
+                            totalRecords={totalEmployees}
                             buttonClassName="btn btn-outline w-full sm:w-auto col-span-2 sm:col-span-1"
                         />
                     </div>
