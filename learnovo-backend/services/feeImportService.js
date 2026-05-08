@@ -78,6 +78,35 @@ class FeeImportService {
         .allow('', null)
         .trim(),
 
+      concessionAmount: Joi.number()
+        .min(0)
+        .default(0)
+        .messages({ 'number.base': 'Concession must be a number' }),
+
+      lateFeeAmount: Joi.number()
+        .min(0)
+        .default(0)
+        .messages({ 'number.base': 'Late fee must be a number' }),
+
+      transactionReference: Joi.string()
+        .allow('', null)
+        .trim()
+        .max(100),
+
+      chequeDate: Joi.date()
+        .allow('', null)
+        .messages({ 'date.base': 'Invalid cheque date' }),
+
+      bankName: Joi.string()
+        .allow('', null)
+        .trim()
+        .max(100),
+
+      collectedBy: Joi.string()
+        .allow('', null)
+        .trim()
+        .max(100),
+
       remarks: Joi.string()
         .allow('', null)
         .trim()
@@ -208,6 +237,35 @@ class FeeImportService {
       discountreason: 'discountReason',
       discount_reason: 'discountReason',
       'discount reason': 'discountReason',
+      concessionamount: 'concessionAmount',
+      concession_amount: 'concessionAmount',
+      'concession amount': 'concessionAmount',
+      concession: 'concessionAmount',
+      latefeeamount: 'lateFeeAmount',
+      late_fee_amount: 'lateFeeAmount',
+      'late fee amount': 'lateFeeAmount',
+      'late fee': 'lateFeeAmount',
+      'late/extra fees': 'lateFeeAmount',
+      latefee: 'lateFeeAmount',
+      transactionreference: 'transactionReference',
+      transaction_reference: 'transactionReference',
+      'transaction reference': 'transactionReference',
+      'transaction id': 'transactionReference',
+      transactionid: 'transactionReference',
+      'reference number': 'transactionReference',
+      'utr': 'transactionReference',
+      chequedate: 'chequeDate',
+      cheque_date: 'chequeDate',
+      'cheque date': 'chequeDate',
+      bankname: 'bankName',
+      bank_name: 'bankName',
+      'bank name': 'bankName',
+      bank: 'bankName',
+      collectedby: 'collectedBy',
+      collected_by: 'collectedBy',
+      'collected by': 'collectedBy',
+      'user name': 'collectedBy',
+      username: 'collectedBy',
       academicsession: 'academicSession',
       academic_session: 'academicSession',
       'academic session': 'academicSession',
@@ -226,6 +284,8 @@ class FeeImportService {
     if (norm.annualAmount !== undefined) norm.annualAmount = parseFloat(norm.annualAmount) || 0;
     if (norm.paidAmount !== undefined) norm.paidAmount = parseFloat(norm.paidAmount) || 0;
     if (norm.discountAmount !== undefined) norm.discountAmount = parseFloat(norm.discountAmount) || 0;
+    if (norm.concessionAmount !== undefined) norm.concessionAmount = parseFloat(norm.concessionAmount) || 0;
+    if (norm.lateFeeAmount !== undefined) norm.lateFeeAmount = parseFloat(norm.lateFeeAmount) || 0;
 
     return norm;
   }
@@ -304,26 +364,50 @@ class FeeImportService {
         });
       }
 
-      // Paid amount cannot exceed annual amount
-      if (toNumber(row.paidAmount) > toNumber(row.annualAmount)) {
+      // Paid amount cannot exceed annual amount + late fee
+      const payable = toNumber(row.annualAmount) + toNumber(row.lateFeeAmount);
+      if (toNumber(row.paidAmount) > payable) {
         errors.push({
           row: rowNumber,
           rowIndex: index,
           field: 'paidAmount',
-          message: `Paid amount (${row.paidAmount}) exceeds annual amount (${row.annualAmount})`,
+          message: `Paid amount (${row.paidAmount}) exceeds payable amount (${payable})`,
           value: row.paidAmount
         });
       }
 
-      // Discount cannot exceed annual amount
-      if (toNumber(row.discountAmount) > toNumber(row.annualAmount)) {
+      // Discount + concession cannot exceed annual amount
+      const totalDeduction = toNumber(row.discountAmount) + toNumber(row.concessionAmount);
+      if (totalDeduction > toNumber(row.annualAmount)) {
         errors.push({
           row: rowNumber,
           rowIndex: index,
           field: 'discountAmount',
-          message: `Discount (${row.discountAmount}) exceeds annual amount (${row.annualAmount})`,
-          value: row.discountAmount
+          message: `Discount + concession (${totalDeduction}) exceeds annual amount (${row.annualAmount})`,
+          value: totalDeduction
         });
+      }
+
+      // Cheque payments require cheque date and bank name
+      if (row.paymentMethod === 'Cheque' && toNumber(row.paidAmount) > 0) {
+        if (!row.chequeDate) {
+          errors.push({
+            row: rowNumber,
+            rowIndex: index,
+            field: 'chequeDate',
+            message: 'Cheque date is required for cheque payments',
+            value: ''
+          });
+        }
+        if (!row.transactionReference) {
+          errors.push({
+            row: rowNumber,
+            rowIndex: index,
+            field: 'transactionReference',
+            message: 'Cheque number (transactionReference) is required for cheque payments',
+            value: ''
+          });
+        }
       }
     });
 
@@ -430,8 +514,11 @@ class FeeImportService {
 
     const totalAnnualAmount = roundToRupee(sumMoney(allocatedFeeHeads.map(h => h.annualAmount)));
     const totalDiscount = roundToRupee(sumMoney(rows.map(r => toNumber(r.discountAmount))));
+    const totalConcession = roundToRupee(sumMoney(rows.map(r => toNumber(r.concessionAmount))));
+    const totalLateFee = roundToRupee(sumMoney(rows.map(r => toNumber(r.lateFeeAmount))));
     const totalPaid = roundToRupee(sumMoney(rows.map(r => toNumber(r.paidAmount))));
-    const balance = roundToRupee(totalAnnualAmount - totalPaid - totalDiscount);
+    // Concession reduces the payable amount alongside discount; late fee adds to it.
+    const balance = roundToRupee(totalAnnualAmount + totalLateFee - totalPaid - totalDiscount - totalConcession);
 
     // Try to find matching fee structure
     const fsKey = `${student.classId}_${session._id}`;
@@ -470,6 +557,9 @@ class FeeImportService {
       status: balance <= 0 ? 'completed' : 'active',
       discountFixed: totalDiscount,
       discountReason: rows.find(r => r.discountReason)?.discountReason || '',
+      concessionReason: totalConcession > 0
+        ? (rows.find(r => r.concessionAmount > 0 && r.discountReason)?.discountReason || 'Imported concession')
+        : '',
       generatedBy: userId
     });
 
@@ -484,8 +574,10 @@ class FeeImportService {
       feeHeadName: row.feeHead,
       fullAnnualAmount: roundToRupee(row.annualAmount),
       periodAmount: roundToRupee(row.annualAmount),
-      discount: roundToRupee(toNumber(row.discountAmount)),
-      netAmount: roundToRupee(toNumber(row.annualAmount) - toNumber(row.discountAmount)),
+      discount: roundToRupee(toNumber(row.discountAmount) + toNumber(row.concessionAmount)),
+      netAmount: roundToRupee(
+        toNumber(row.annualAmount) - toNumber(row.discountAmount) - toNumber(row.concessionAmount)
+      ),
       type: row.feeType || 'recurring'
     }));
 
@@ -506,11 +598,13 @@ class FeeImportService {
       periodEnd: session.endDate,
       totalAmount: invoiceTotalAmount,
       paidAmount: totalPaid,
-      balanceAmount: Math.max(0, roundToRupee(invoiceTotalAmount - totalPaid)),
-      status: totalPaid >= invoiceTotalAmount ? 'Paid' : totalPaid > 0 ? 'Partial' : 'Pending',
+      lateFeeApplied: totalLateFee,
+      lateFeeAppliedDate: totalLateFee > 0 ? new Date() : undefined,
+      balanceAmount: Math.max(0, roundToRupee(invoiceTotalAmount + totalLateFee - totalPaid)),
+      status: totalPaid >= (invoiceTotalAmount + totalLateFee) ? 'Paid' : totalPaid > 0 ? 'Partial' : 'Pending',
       dueDate: new Date(dueDate),
       issuedDate: new Date(),
-      discountAmount: totalDiscount,
+      discountAmount: roundToRupee(totalDiscount + totalConcession),
       discountReason: rows.find(r => r.discountReason)?.discountReason || 'Imported discount',
       billingPeriod: {
         year: new Date(session.startDate).getFullYear(),
@@ -534,6 +628,23 @@ class FeeImportService {
       // Use imported receipt number or generate one
       const receiptNumber = paidRows[0].receiptNumber || await Payment.generateReceiptNumber(tenantId);
 
+      // Pull payment-detail fields from the first row that has them
+      const refRow = paidRows.find(r => r.transactionReference || r.chequeDate || r.bankName) || paidRows[0];
+      const transactionDetails = {};
+      if (refRow.bankName) transactionDetails.bankName = refRow.bankName;
+      if (refRow.chequeDate) transactionDetails.chequeDate = new Date(refRow.chequeDate);
+      if (refRow.transactionReference) {
+        if (paymentMethod === 'Cheque') {
+          transactionDetails.chequeNumber = refRow.transactionReference;
+        } else {
+          transactionDetails.referenceNumber = refRow.transactionReference;
+        }
+      }
+
+      const collectedByName = paidRows.find(r => r.collectedBy)?.collectedBy;
+      const baseRemarks = paidRows[0].remarks || 'Imported payment record';
+      const remarks = collectedByName ? `${baseRemarks} (Collected by: ${collectedByName})` : baseRemarks;
+
       const payment = new Payment({
         tenantId,
         receiptNumber,
@@ -542,11 +653,12 @@ class FeeImportService {
         amount: paymentAmount,
         paymentMethod,
         paymentDate: new Date(paymentDate),
+        transactionDetails: Object.keys(transactionDetails).length > 0 ? transactionDetails : undefined,
         allocation: paidRows.map(r => ({
           feeHeadName: r.feeHead,
           amount: roundToRupee(toNumber(r.paidAmount))
         })),
-        remarks: paidRows[0].remarks || 'Imported payment record',
+        remarks,
         isConfirmed: true,
         confirmedAt: new Date(),
         confirmedBy: userId,
@@ -571,9 +683,15 @@ class FeeImportService {
       { key: 'paymentDate', header: 'paymentDate' },
       { key: 'paymentMethod', header: 'paymentMethod' },
       { key: 'receiptNumber', header: 'receiptNumber' },
+      { key: 'transactionReference', header: 'transactionReference' },
+      { key: 'chequeDate', header: 'chequeDate' },
+      { key: 'bankName', header: 'bankName' },
+      { key: 'collectedBy', header: 'collectedBy' },
       { key: 'dueDate', header: 'dueDate' },
       { key: 'discountAmount', header: 'discountAmount' },
       { key: 'discountReason', header: 'discountReason' },
+      { key: 'concessionAmount', header: 'concessionAmount' },
+      { key: 'lateFeeAmount', header: 'lateFeeAmount' },
       { key: 'academicSession', header: 'academicSession' },
       { key: 'remarks', header: 'remarks' }
     ];
@@ -588,9 +706,15 @@ class FeeImportService {
         paymentDate: '2025-06-15',
         paymentMethod: 'Cash',
         receiptNumber: 'RCP-2025-00001',
+        transactionReference: '',
+        chequeDate: '',
+        bankName: '',
+        collectedBy: 'Admin',
         dueDate: '2025-06-10',
         discountAmount: '0',
         discountReason: '',
+        concessionAmount: '0',
+        lateFeeAmount: '0',
         academicSession: '2025-2026',
         remarks: 'Paid in full'
       },
@@ -601,13 +725,19 @@ class FeeImportService {
         annualAmount: '12000',
         paidAmount: '6000',
         paymentDate: '2025-06-15',
-        paymentMethod: 'Cash',
+        paymentMethod: 'Online',
         receiptNumber: '',
+        transactionReference: 'UPI-114407091364',
+        chequeDate: '',
+        bankName: 'Union Bank',
+        collectedBy: 'Admin',
         dueDate: '2025-06-10',
         discountAmount: '0',
         discountReason: '',
+        concessionAmount: '0',
+        lateFeeAmount: '500',
         academicSession: '2025-2026',
-        remarks: 'Partial payment'
+        remarks: 'Partial payment with late fee'
       },
       {
         admissionNumber: 'ANE2024002',
@@ -618,11 +748,17 @@ class FeeImportService {
         paymentDate: '',
         paymentMethod: '',
         receiptNumber: '',
+        transactionReference: '',
+        chequeDate: '',
+        bankName: '',
+        collectedBy: '',
         dueDate: '2025-07-10',
-        discountAmount: '5000',
-        discountReason: 'Sibling discount',
+        discountAmount: '0',
+        discountReason: '',
+        concessionAmount: '5000',
+        lateFeeAmount: '0',
         academicSession: '2025-2026',
-        remarks: ''
+        remarks: 'Sibling concession'
       }
     ];
 
