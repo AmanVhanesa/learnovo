@@ -1155,7 +1155,8 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
       .cls-head td{background:#1F7A3A;color:#fff;font-weight:700;font-size:10.5px}
       .cls-sub td{background:#eef5ee;font-weight:700}
       tfoot td{font-weight:700;background:#fafafa}
-      .totals{margin-top:12px;font-size:11px;display:flex;justify-content:space-between;border-top:2px solid #1F7A3A;padding-top:6px}
+      tfoot .grand td{background:#1F7A3A;color:#fff;font-size:12px;padding:8px 7px}
+      .totals{margin-top:14px;font-size:12px;display:flex;justify-content:space-between;border-top:2px solid #1F7A3A;padding-top:8px;font-weight:700}
       @media print{.noprint{display:none}}
     </style></head><body>
       <div class="head">
@@ -1183,12 +1184,19 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
       <table>
         <thead><tr><th>#</th><th>Adm. No.</th><th>Student</th><th>Class &amp; Section</th><th>Phone</th><th style="text-align:right">Pending</th><th style="text-align:center">Inv.</th><th>Oldest Due</th><th>Overdue</th></tr></thead>
         <tbody>${groupedRows || '<tr><td colspan="9" style="text-align:center;padding:20px">No defaulters</td></tr>'}</tbody>
-        <tfoot><tr><td colspan="5" style="text-align:right">Grand Total</td><td style="text-align:right">${formatCurrency(total)}</td><td colspan="3"></td></tr></tfoot>
+        <tfoot>
+          <tr class="grand">
+            <td colspan="2" style="text-align:left">GRAND TOTAL</td>
+            <td colspan="3" style="text-align:right">Total Students: ${sortedDefaulters.length}</td>
+            <td style="text-align:right">${formatCurrency(total)}</td>
+            <td colspan="3"></td>
+          </tr>
+        </tfoot>
       </table>
 
       <div class="totals">
-        <span>Total Students: <b>${sortedDefaulters.length}</b></span>
-        <span>Total Outstanding: <b>${formatCurrency(total)}</b></span>
+        <span>Total Students: ${sortedDefaulters.length}</span>
+        <span>Total Outstanding: ${formatCurrency(total)}</span>
       </div>
 
       <script>window.onload=function(){setTimeout(function(){window.print()},150)}</script>
