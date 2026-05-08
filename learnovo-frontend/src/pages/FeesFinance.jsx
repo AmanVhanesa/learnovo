@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar,
@@ -13,6 +13,7 @@ import {
 import { academicSessionsService, classesService } from '../services/academicsService'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useSettings } from '../contexts/SettingsContext'
 import { formatCurrency } from '../utils/formatCurrency'
 import { formatDate } from '../utils/formatDate'
 import { sortByRelevance } from '../utils/searchRelevance'
@@ -398,7 +399,7 @@ const FeesFinance = () => {
         {activeTab === 'feeStructure' && <FeeStructureTab feeStructures={feeStructures} classes={classes} onCreateNew={() => { setEditingFeeStructure(null); setShowFeeStructureModal(true) }} onEdit={(s) => { setEditingFeeStructure(s); setShowFeeStructureModal(true) }} onDelete={async (id) => { if (window.confirm('Delete this fee structure?')) { try { await feeStructuresService.delete(id); toast.success('Deleted'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } } }} onDuplicate={async (s) => { try { await feeStructuresService.create({ classId: typeof s.classId === 'object' ? s.classId._id : s.classId, sectionId: s.sectionId ? (typeof s.sectionId === 'object' ? s.sectionId._id : s.sectionId) : null, academicSessionId: activeSession._id, feeHeads: s.feeHeads.map(h => ({ name: h.name, amount: h.amount, frequency: h.frequency, isCompulsory: h.isCompulsory, dueDay: h.dueDay })), isActive: true }); toast.success('Duplicated'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } }} />}
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
         {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
-        {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} onExport={handleExportDefaulters} dateFilter={defaultersDateFilter} onDateFilterChange={setDefaultersDateFilter} />}
+        {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} activeSession={activeSession} onExport={handleExportDefaulters} dateFilter={defaultersDateFilter} onDateFilterChange={setDefaultersDateFilter} />}
         {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
@@ -960,8 +961,9 @@ const CollectPaymentTab = ({ dashboardData, selectedStudent, onSelectStudent }) 
 
 // ── Defaulters Tab ──
 
-const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter = { startDate: '', endDate: '' }, onDateFilterChange = () => {} }) => {
+const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExport, dateFilter = { startDate: '', endDate: '' }, onDateFilterChange = () => {} }) => {
   const queryClient = useQueryClient()
+  const { settings } = useSettings()
   const [applyingLateFee, setApplyingLateFee] = useState(false)
   const [lateFeeModal, setLateFeeModal] = useState({ isOpen: false, invoiceId: null, studentName: '' })
   const [lateFeeAmount, setLateFeeAmount] = useState('')
@@ -970,8 +972,51 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter
   const [sectionFilter, setSectionFilter] = useState('')
   const [minBalanceFilter, setMinBalanceFilter] = useState('')
   const [overdueOnly, setOverdueOnly] = useState(false)
+  const [periodPreset, setPeriodPreset] = useState('all')
   const [sortField, setSortField] = useState('totalBalance')
   const [sortAsc, setSortAsc] = useState(false)
+
+  // Indian-academic-year base year: from active session start, or heuristic (Apr-Mar)
+  const sessionStartYear = useMemo(() => {
+    if (activeSession?.startDate) return new Date(activeSession.startDate).getFullYear()
+    const now = new Date()
+    return now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1
+  }, [activeSession?.startDate])
+
+  const fmtYMD = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const monthFromYMD = (s) => (s ? s.slice(0, 7) : '')
+  const lastDay = (yy, mm /* 1-12 */) => new Date(yy, mm, 0).getDate()
+
+  const applyPreset = (preset) => {
+    setPeriodPreset(preset)
+    const now = new Date()
+    let s, e
+    if (preset === 'all') { onDateFilterChange({ startDate: '', endDate: '' }); return }
+    if (preset === 'thisMonth') { s = new Date(now.getFullYear(), now.getMonth(), 1); e = new Date(now.getFullYear(), now.getMonth() + 1, 0) }
+    else if (preset === 'lastMonth') { s = new Date(now.getFullYear(), now.getMonth() - 1, 1); e = new Date(now.getFullYear(), now.getMonth(), 0) }
+    else if (preset === 'q1') { s = new Date(sessionStartYear, 3, 1); e = new Date(sessionStartYear, 6, 0) }
+    else if (preset === 'q2') { s = new Date(sessionStartYear, 6, 1); e = new Date(sessionStartYear, 9, 0) }
+    else if (preset === 'q3') { s = new Date(sessionStartYear, 9, 1); e = new Date(sessionStartYear, 12, 0) }
+    else if (preset === 'q4') { s = new Date(sessionStartYear + 1, 0, 1); e = new Date(sessionStartYear + 1, 3, 0) }
+    else if (preset === 'fullYear') { s = new Date(sessionStartYear, 3, 1); e = new Date(sessionStartYear + 1, 2, 31) }
+    else return
+    onDateFilterChange({ startDate: fmtYMD(s), endDate: fmtYMD(e) })
+  }
+
+  const onMonthChange = (m, which) => {
+    setPeriodPreset('custom')
+    if (!m) {
+      onDateFilterChange({ ...dateFilter, [which === 'from' ? 'startDate' : 'endDate']: '' })
+      return
+    }
+    const [yy, mm] = m.split('-').map(Number)
+    if (which === 'from') {
+      onDateFilterChange({ ...dateFilter, startDate: `${yy}-${String(mm).padStart(2, '0')}-01` })
+    } else {
+      const ld = lastDay(yy, mm)
+      onDateFilterChange({ ...dateFilter, endDate: `${yy}-${String(mm).padStart(2, '0')}-${String(ld).padStart(2, '0')}` })
+    }
+  }
 
   // Dedupe classes by name (multiple academic-year duplicates can exist)
   const uniqueClasses = []
@@ -1030,46 +1075,124 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter
     return true
   })
 
-  const clearFilters = () => { setSearchQuery(''); setClassFilter(''); setSectionFilter(''); setMinBalanceFilter(''); setOverdueOnly(false); onDateFilterChange({ startDate: '', endDate: '' }) }
+  const clearFilters = () => { setSearchQuery(''); setClassFilter(''); setSectionFilter(''); setMinBalanceFilter(''); setOverdueOnly(false); setPeriodPreset('all'); onDateFilterChange({ startDate: '', endDate: '' }) }
+
+  const periodLabel = (() => {
+    if (!dateFilter.startDate && !dateFilter.endDate) return 'All Pending'
+    const labels = { thisMonth: 'This Month', lastMonth: 'Last Month', q1: 'Q1 (Apr–Jun)', q2: 'Q2 (Jul–Sep)', q3: 'Q3 (Oct–Dec)', q4: 'Q4 (Jan–Mar)', fullYear: 'Full Academic Year' }
+    if (labels[periodPreset]) return labels[periodPreset]
+    const fmt = (d) => d ? new Date(d).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }) : '—'
+    return `${fmt(dateFilter.startDate)} to ${fmt(dateFilter.endDate)}`
+  })()
 
   const handlePrint = () => {
-    const rows = sortedDefaulters.map((d, i) => {
-      const bal = d.liveBalance ?? d.totalBalance ?? 0
-      const ov = d.overdueDays ?? 0
-      const due = d.oldestDueDate ? new Date(d.oldestDueDate).toLocaleDateString('en-IN') : '-'
-      return `<tr>
-        <td>${i + 1}</td>
-        <td>${d.studentId?.admissionNumber || d.studentId?.studentId || '-'}</td>
-        <td>${d.studentId?.fullName || d.studentId?.name || 'N/A'}</td>
-        <td>${d.studentId?.classId?.name || '-'}</td>
-        <td>${d.studentId?.phone || '-'}</td>
-        <td style="text-align:right">${formatCurrency(bal)}</td>
-        <td>${d.unpaidInvoiceCount ?? d.invoiceIds?.length ?? '-'}</td>
-        <td>${due}</td>
-        <td>${ov > 0 ? `${ov} days` : 'Not yet due'}</td>
-      </tr>`
-    }).join('')
     const total = sortedDefaulters.reduce((s, d) => s + (d.liveBalance ?? d.totalBalance ?? 0), 0)
-    const html = `<!DOCTYPE html><html><head><title>Fee Defaulters</title><style>
-      body{font-family:Arial,sans-serif;padding:20px;color:#000}
-      h1{font-size:18px;margin:0 0 4px}
-      .meta{font-size:11px;color:#555;margin-bottom:14px}
-      table{width:100%;border-collapse:collapse;font-size:11px}
-      th,td{border:1px solid #999;padding:6px 8px;text-align:left}
-      th{background:#f0f0f0}
+
+    // Group by class for printed list
+    const grouped = {}
+    sortedDefaulters.forEach(d => {
+      const c = d.studentId?.classId?.name || 'Unknown'
+      if (!grouped[c]) grouped[c] = []
+      grouped[c].push(d)
+    })
+    const classOrder = Object.keys(grouped).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
+    const groupedRows = classOrder.map(cn => {
+      const list = grouped[cn]
+      const subtotal = list.reduce((s, d) => s + (d.liveBalance ?? d.totalBalance ?? 0), 0)
+      const inner = list.map((d, i) => {
+        const bal = d.liveBalance ?? d.totalBalance ?? 0
+        const ov = d.overdueDays ?? 0
+        const due = d.oldestDueDate ? new Date(d.oldestDueDate).toLocaleDateString('en-IN') : '-'
+        const sec = d.studentId?.sectionId?.name ? ` - ${d.studentId.sectionId.name}` : ''
+        return `<tr>
+          <td>${i + 1}</td>
+          <td>${d.studentId?.admissionNumber || d.studentId?.studentId || '-'}</td>
+          <td>${d.studentId?.fullName || d.studentId?.name || 'N/A'}</td>
+          <td>${cn}${sec}</td>
+          <td>${d.studentId?.phone || '-'}</td>
+          <td style="text-align:right">${formatCurrency(bal)}</td>
+          <td style="text-align:center">${d.unpaidInvoiceCount ?? d.invoiceIds?.length ?? '-'}</td>
+          <td>${due}</td>
+          <td>${ov > 0 ? `${ov} days` : 'Not yet due'}</td>
+        </tr>`
+      }).join('')
+      return `
+        <tr class="cls-head"><td colspan="9">Class: ${cn} &middot; ${list.length} student${list.length === 1 ? '' : 's'} &middot; Outstanding: ${formatCurrency(subtotal)}</td></tr>
+        ${inner}
+        <tr class="cls-sub"><td colspan="5" style="text-align:right">Class subtotal</td><td style="text-align:right">${formatCurrency(subtotal)}</td><td colspan="3"></td></tr>
+      `
+    }).join('')
+
+    const summaryRows = classWiseSummary.map(c => `
+      <tr><td>${c.className}</td><td style="text-align:center">${c.students}</td><td style="text-align:right">${formatCurrency(c.total)}</td></tr>
+    `).join('')
+
+    const schoolName = settings?.institution?.name || ''
+    const logo = settings?.institution?.logo || ''
+    const filterBits = []
+    if (classFilter) filterBits.push(`Class: ${selectedClass?.name || ''}`)
+    if (sectionFilter) filterBits.push(`Section: ${selectedSection?.name || ''}`)
+    if (overdueOnly) filterBits.push('Overdue only')
+    if (minBalanceFilter) filterBits.push(`Min balance: ${formatCurrency(minBalanceFilter)}`)
+    if (searchQuery) filterBits.push(`Search: "${searchQuery}"`)
+
+    const html = `<!DOCTYPE html><html><head><title>Pending Fees Report</title><style>
+      @page { size: A4; margin: 12mm }
+      body{font-family:Arial,sans-serif;color:#000;margin:0}
+      .head{display:flex;align-items:center;gap:12px;border-bottom:2px solid #1F7A3A;padding-bottom:8px;margin-bottom:10px}
+      .head img{height:56px;width:56px;object-fit:contain}
+      .head .school{font-size:18px;font-weight:700}
+      .head .title{font-size:13px;font-weight:600;color:#1F7A3A}
+      .meta{font-size:10px;color:#444;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:6px 14px}
+      .meta b{color:#000}
+      h2{font-size:12px;margin:14px 0 6px;color:#1F7A3A;border-bottom:1px solid #ddd;padding-bottom:3px}
+      table{width:100%;border-collapse:collapse;font-size:10.5px}
+      th,td{border:1px solid #bbb;padding:5px 7px;text-align:left;vertical-align:top}
+      th{background:#1F7A3A;color:#fff;font-weight:600}
+      .summary th{background:#eef5ee;color:#1F7A3A}
+      .cls-head td{background:#1F7A3A;color:#fff;font-weight:700;font-size:10.5px}
+      .cls-sub td{background:#eef5ee;font-weight:700}
       tfoot td{font-weight:700;background:#fafafa}
+      .totals{margin-top:12px;font-size:11px;display:flex;justify-content:space-between;border-top:2px solid #1F7A3A;padding-top:6px}
       @media print{.noprint{display:none}}
     </style></head><body>
-      <h1>Fee Defaulters Report</h1>
-      <div class="meta">Generated: ${new Date().toLocaleString('en-IN')} &middot; Total Students: ${sortedDefaulters.length} &middot; Total Outstanding: ${formatCurrency(total)}</div>
-      <table>
-        <thead><tr><th>#</th><th>Admission No.</th><th>Student</th><th>Class</th><th>Phone</th><th style="text-align:right">Total Pending</th><th>Unpaid Inv.</th><th>Oldest Due</th><th>Overdue</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="9" style="text-align:center;padding:20px">No defaulters</td></tr>'}</tbody>
-        <tfoot><tr><td colspan="5" style="text-align:right">Total</td><td style="text-align:right">${formatCurrency(total)}</td><td colspan="3"></td></tr></tfoot>
+      <div class="head">
+        ${logo ? `<img src="${logo}" alt="logo"/>` : ''}
+        <div>
+          ${schoolName ? `<div class="school">${schoolName}</div>` : ''}
+          <div class="title">Pending Fees Report</div>
+        </div>
+      </div>
+      <div class="meta">
+        <span><b>Period:</b> ${periodLabel}</span>
+        <span><b>Session:</b> ${activeSession?.name || '-'}</span>
+        ${filterBits.length ? `<span><b>Filters:</b> ${filterBits.join(' · ')}</span>` : ''}
+        <span><b>Generated:</b> ${new Date().toLocaleString('en-IN')}</span>
+      </div>
+
+      <h2>Class-wise Summary</h2>
+      <table class="summary">
+        <thead><tr><th>Class</th><th style="text-align:center">Students</th><th style="text-align:right">Outstanding</th></tr></thead>
+        <tbody>${summaryRows || '<tr><td colspan="3" style="text-align:center;padding:14px">No data</td></tr>'}</tbody>
+        <tfoot><tr><td>Total</td><td style="text-align:center">${sortedDefaulters.length}</td><td style="text-align:right">${formatCurrency(total)}</td></tr></tfoot>
       </table>
-      <script>window.onload=function(){window.print()}</script>
+
+      <h2>Defaulters Detail</h2>
+      <table>
+        <thead><tr><th>#</th><th>Adm. No.</th><th>Student</th><th>Class &amp; Section</th><th>Phone</th><th style="text-align:right">Pending</th><th style="text-align:center">Inv.</th><th>Oldest Due</th><th>Overdue</th></tr></thead>
+        <tbody>${groupedRows || '<tr><td colspan="9" style="text-align:center;padding:20px">No defaulters</td></tr>'}</tbody>
+        <tfoot><tr><td colspan="5" style="text-align:right">Grand Total</td><td style="text-align:right">${formatCurrency(total)}</td><td colspan="3"></td></tr></tfoot>
+      </table>
+
+      <div class="totals">
+        <span>Total Students: <b>${sortedDefaulters.length}</b></span>
+        <span>Total Outstanding: <b>${formatCurrency(total)}</b></span>
+      </div>
+
+      <script>window.onload=function(){setTimeout(function(){window.print()},150)}</script>
     </body></html>`
-    const win = window.open('', '_blank', 'width=1000,height=700')
+    const win = window.open('', '_blank', 'width=1100,height=800')
     if (win) { win.document.write(html); win.document.close() }
     else toast.error('Pop-up blocked — please allow pop-ups')
   }
@@ -1088,6 +1211,36 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter
   const handleSort = (f) => { if (sortField === f) setSortAsc(!sortAsc); else { setSortField(f); setSortAsc(false) } }
   const formatDueDate = (d) => { if (!d) return '-'; const dt = new Date(d); return isNaN(dt.getTime()) ? '-' : dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) }
 
+  // Class-wise summary computed from sorted (already filtered) list
+  const classWiseSummary = useMemo(() => {
+    const m = {}
+    sortedDefaulters.forEach(d => {
+      const c = d.studentId?.classId?.name || 'Unknown'
+      if (!m[c]) m[c] = { className: c, students: 0, total: 0 }
+      m[c].students += 1
+      m[c].total += (d.liveBalance ?? d.totalBalance ?? 0)
+    })
+    return Object.values(m).sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }))
+  }, [sortedDefaulters])
+
+  // Group sorted rows by class for the on-screen list (when no specific class filter)
+  const groupedSortedDefaulters = useMemo(() => {
+    if (classFilter) return null
+    const m = {}
+    sortedDefaulters.forEach(d => {
+      const c = d.studentId?.classId?.name || 'Unknown'
+      if (!m[c]) m[c] = []
+      m[c].push(d)
+    })
+    return Object.entries(m)
+      .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+      .map(([className, list]) => ({
+        className,
+        list,
+        subtotal: list.reduce((s, d) => s + (d.liveBalance ?? d.totalBalance ?? 0), 0)
+      }))
+  }, [sortedDefaulters, classFilter])
+
   if (loading) return <LoadingSpinner />
 
   return (
@@ -1105,8 +1258,21 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter
           <div className="w-full sm:flex-1 sm:min-w-[200px]"><label className="label mb-1 block text-xs">Search</label><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" /><input type="text" placeholder="Name, admission no, phone..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="input pl-9 text-sm" /></div></div>
           <div className="w-full sm:w-auto sm:min-w-[160px]"><label className="label mb-1 block text-xs">Class</label><select value={classFilter} onChange={e => { setClassFilter(e.target.value); setSectionFilter('') }} className="input text-sm"><option value="">All Classes</option>{uniqueClasses.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select></div>
           <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">Section</label><select value={sectionFilter} onChange={e => setSectionFilter(e.target.value)} className="input text-sm" disabled={!classFilter || sectionsForClass.length === 0}><option value="">All Sections</option>{sectionsForClass.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}</select></div>
-          <div className="w-full sm:w-auto sm:min-w-[150px]"><label className="label mb-1 block text-xs">Due From</label><input type="date" value={dateFilter.startDate} onChange={e => onDateFilterChange({ ...dateFilter, startDate: e.target.value })} className="input text-sm" /></div>
-          <div className="w-full sm:w-auto sm:min-w-[150px]"><label className="label mb-1 block text-xs">Due To</label><input type="date" value={dateFilter.endDate} onChange={e => onDateFilterChange({ ...dateFilter, endDate: e.target.value })} className="input text-sm" /></div>
+          <div className="w-full sm:w-auto sm:min-w-[150px]"><label className="label mb-1 block text-xs">Period</label>
+            <select value={periodPreset} onChange={e => applyPreset(e.target.value)} className="input text-sm">
+              <option value="all">All Pending</option>
+              <option value="thisMonth">This Month</option>
+              <option value="lastMonth">Last Month</option>
+              <option value="q1">Q1 (Apr–Jun)</option>
+              <option value="q2">Q2 (Jul–Sep)</option>
+              <option value="q3">Q3 (Oct–Dec)</option>
+              <option value="q4">Q4 (Jan–Mar)</option>
+              <option value="fullYear">Full Academic Year</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">From Month</label><input type="month" value={monthFromYMD(dateFilter.startDate)} onChange={e => onMonthChange(e.target.value, 'from')} className="input text-sm" /></div>
+          <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">To Month</label><input type="month" value={monthFromYMD(dateFilter.endDate)} onChange={e => onMonthChange(e.target.value, 'to')} className="input text-sm" /></div>
           <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">Min Balance</label><input type="number" min="0" placeholder="e.g. 1000" value={minBalanceFilter} onChange={e => setMinBalanceFilter(e.target.value)} className="input text-sm" /></div>
           <div className="w-full sm:w-auto"><label className="label mb-1 block text-xs">&nbsp;</label><label className="flex items-center gap-2 px-3 py-2 border border-gray-200 dark:border-[#38383A] rounded-xl text-sm cursor-pointer"><input type="checkbox" checked={overdueOnly} onChange={e => setOverdueOnly(e.target.checked)} className="h-4 w-4" /><span className="dark:text-white">Overdue only</span></label></div>
           <button onClick={clearFilters} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><X className="h-3.5 w-3.5" /> Clear</button>
@@ -1119,7 +1285,42 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter
             </div>
           </div>
         </div>
+        {(dateFilter.startDate || dateFilter.endDate) && (
+          <div className="mt-2 text-xs text-gray-500 dark:text-[#8E8E93]">Showing pending invoices with due dates in: <strong className="text-gray-700 dark:text-gray-200">{periodLabel}</strong></div>
+        )}
       </div>
+
+      {classWiseSummary.length > 0 && (
+        <div className="card p-4 sm:p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Class-wise Pending Summary</h3>
+            <span className="text-xs text-gray-500 dark:text-[#8E8E93]">{classWiseSummary.length} classes</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-[#8E8E93] border-b border-gray-100 dark:border-[#38383A]">
+                <th className="px-3 py-2">Class</th>
+                <th className="px-3 py-2 text-center">Students</th>
+                <th className="px-3 py-2 text-right">Outstanding</th>
+              </tr></thead>
+              <tbody>
+                {classWiseSummary.map(c => (
+                  <tr key={c.className} className="border-b border-gray-50 dark:border-[#2C2C2E]">
+                    <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{c.className}</td>
+                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{c.students}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400">{formatCurrency(c.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr className="border-t-2 border-gray-200 dark:border-[#38383A] font-semibold">
+                <td className="px-3 py-2 text-gray-900 dark:text-white">Total</td>
+                <td className="px-3 py-2 text-center text-gray-900 dark:text-white">{sortedDefaulters.length}</td>
+                <td className="px-3 py-2 text-right text-red-700 dark:text-red-400">{formatCurrency(sortedDefaulters.reduce((s, d) => s + (d.liveBalance ?? d.totalBalance ?? 0), 0))}</td>
+              </tr></tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="card p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
@@ -1136,20 +1337,36 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter
                 ))}
               </tr></thead>
               <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-100 dark:divide-[#38383A]">
-                {sortedDefaulters.map((d) => {
-                  const bal = d.liveBalance ?? d.totalBalance ?? 0, ov = d.overdueDays ?? 0
-                  return (
-                    <tr key={d._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
-                      <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{d.studentId?.fullName || d.studentId?.name || 'Unknown'}</div><div className="text-xs text-gray-500 dark:text-[#8E8E93]">{d.studentId?.admissionNumber || '-'}</div></td>
-                      <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">{formatCurrency(bal)}</td>
-                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDueDate(d.oldestDueDate)}</td>
-                      <td className="px-5 py-4 whitespace-nowrap"><span className={`inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-full ${ov > 60 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400' : ov > 30 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400' : ov > 0 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' : 'bg-gray-100 dark:bg-gray-800/30 text-gray-600 dark:text-gray-400'}`}>{ov > 0 ? `${ov} days` : 'Not yet due'}</span></td>
-                      <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{d.unpaidInvoiceCount ?? d.invoiceIds?.length ?? '-'} unpaid</td>
-                      <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm text-gray-600 dark:text-[#8E8E93]">{d.studentId?.phone || '-'}</div></td>
-                      <td className="px-5 py-4 whitespace-nowrap text-right">{d.invoiceIds?.[0] && <button onClick={() => setLateFeeModal({ isOpen: true, invoiceId: d.invoiceIds[0], studentName: d.studentId?.fullName || d.studentId?.name || 'Student' })} className="text-xs px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800/30 transition-colors">+ Late Fee</button>}</td>
-                    </tr>
-                  )
-                })}
+                {(() => {
+                  const renderRow = (d) => {
+                    const bal = d.liveBalance ?? d.totalBalance ?? 0, ov = d.overdueDays ?? 0
+                    return (
+                      <tr key={d._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
+                        <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{d.studentId?.fullName || d.studentId?.name || 'Unknown'}</div><div className="text-xs text-gray-500 dark:text-[#8E8E93]">{d.studentId?.admissionNumber || '-'}{d.studentId?.sectionId?.name ? ` · ${d.studentId.sectionId.name}` : ''}</div></td>
+                        <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">{formatCurrency(bal)}</td>
+                        <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDueDate(d.oldestDueDate)}</td>
+                        <td className="px-5 py-4 whitespace-nowrap"><span className={`inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-full ${ov > 60 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400' : ov > 30 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400' : ov > 0 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' : 'bg-gray-100 dark:bg-gray-800/30 text-gray-600 dark:text-gray-400'}`}>{ov > 0 ? `${ov} days` : 'Not yet due'}</span></td>
+                        <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{d.unpaidInvoiceCount ?? d.invoiceIds?.length ?? '-'} unpaid</td>
+                        <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm text-gray-600 dark:text-[#8E8E93]">{d.studentId?.phone || '-'}</div></td>
+                        <td className="px-5 py-4 whitespace-nowrap text-right">{d.invoiceIds?.[0] && <button onClick={() => setLateFeeModal({ isOpen: true, invoiceId: d.invoiceIds[0], studentName: d.studentId?.fullName || d.studentId?.name || 'Student' })} className="text-xs px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800/30 transition-colors">+ Late Fee</button>}</td>
+                      </tr>
+                    )
+                  }
+                  if (groupedSortedDefaulters) {
+                    return groupedSortedDefaulters.map(({ className, list, subtotal }) => (
+                      <React.Fragment key={className}>
+                        <tr className="bg-gray-50 dark:bg-[#2C2C2E]">
+                          <td colSpan={7} className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200">
+                            <span className="mr-3">{className}</span>
+                            <span className="text-gray-500 dark:text-[#8E8E93] font-normal">{list.length} student{list.length === 1 ? '' : 's'} · Outstanding {formatCurrency(subtotal)}</span>
+                          </td>
+                        </tr>
+                        {list.map(renderRow)}
+                      </React.Fragment>
+                    ))
+                  }
+                  return sortedDefaulters.map(renderRow)
+                })()}
               </tbody>
             </table>
           </div>
