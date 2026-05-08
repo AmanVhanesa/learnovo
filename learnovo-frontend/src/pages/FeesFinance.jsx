@@ -976,6 +976,7 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
   const [sortField, setSortField] = useState('totalBalance')
   const [sortAsc, setSortAsc] = useState(false)
   const [showClassSummary, setShowClassSummary] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
   // Indian-academic-year base year: from active session start, or heuristic (Apr-Mar)
   const sessionStartYear = useMemo(() => {
@@ -1289,12 +1290,17 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
           <div className="w-full sm:w-auto"><label className="label mb-1 block text-xs">&nbsp;</label><label className="flex items-center gap-2 px-3 py-2 border border-gray-200 dark:border-[#38383A] rounded-xl text-sm cursor-pointer"><input type="checkbox" checked={overdueOnly} onChange={e => setOverdueOnly(e.target.checked)} className="h-4 w-4" /><span className="dark:text-white">Overdue only</span></label></div>
           <button onClick={clearFilters} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><X className="h-3.5 w-3.5" /> Clear</button>
           <button onClick={handlePrint} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><FileText className="h-3.5 w-3.5" /> Print</button>
-          <div className="relative group">
-            <button className="btn btn-outline btn-sm flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
-            <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-10 hidden group-hover:block">
-              <button onClick={() => onExport && onExport('csv', { classId: classFilter, sectionId: sectionFilter, minBalance: minBalanceFilter, startDate: dateFilter.startDate, endDate: dateFilter.endDate })} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
-              <button onClick={() => onExport && onExport('excel', { classId: classFilter, sectionId: sectionFilter, minBalance: minBalanceFilter, startDate: dateFilter.startDate, endDate: dateFilter.endDate })} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
-            </div>
+          <div className="relative">
+            <button onClick={() => setShowExportMenu(v => !v)} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" /></button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-[#2C2C2E] border border-gray-200 dark:border-[#38383A] rounded-xl shadow-lg z-20">
+                  <button onClick={() => { setShowExportMenu(false); onExport && onExport('csv', { classId: classFilter, sectionId: sectionFilter, minBalance: minBalanceFilter, startDate: dateFilter.startDate, endDate: dateFilter.endDate }) }} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-t-xl">Export CSV</button>
+                  <button onClick={() => { setShowExportMenu(false); onExport && onExport('excel', { classId: classFilter, sectionId: sectionFilter, minBalance: minBalanceFilter, startDate: dateFilter.startDate, endDate: dateFilter.endDate }) }} className="w-full px-4 py-2 text-sm text-left text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#3A3A3C] rounded-b-xl">Export Excel</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
         {(dateFilter.startDate || dateFilter.endDate) && (
