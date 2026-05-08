@@ -3,13 +3,86 @@ const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 const FeeInvoice = require('../models/FeeInvoice');
 const Payment = require('../models/Payment');
-const StudentBalance = require('../models/StudentBalance');
 const { protect, authorize } = require('../middleware/auth');
 const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, sumMoney } = require('../utils/money');
 const ImportExportService = require('../services/importExportService');
 
 const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Online'];
+
+/**
+ * Fetch defaulters via a single aggregation on FeeInvoice.
+ * Replaces the previous N+1 pattern (StudentBalance.find + per-student FeeInvoice.find).
+ *
+ * Returns an array shaped like the legacy /defaulters response:
+ *   { studentId: { _id, name, fullName, phone, email, admissionNumber, studentId,
+ *                  classId: { _id, name }, sectionId: { _id, name } },
+ *     academicSessionId: { _id, name },
+ *     liveBalance, totalBalance, unpaidInvoiceCount, oldestDueDate, invoiceIds[], overdueDays }
+ */
+async function fetchDefaulters({ tenantId, academicSessionId, classId, sectionId, minBalance, dueDateRange, limit = 1000 }) {
+  const tenantOid = new mongoose.Types.ObjectId(tenantId);
+  const sessionOid = new mongoose.Types.ObjectId(academicSessionId);
+
+  const invoiceMatch = {
+    tenantId: tenantOid,
+    academicSessionId: sessionOid,
+    status: { $in: ['Pending', 'Partial', 'Overdue'] }
+  };
+  if (dueDateRange && Object.keys(dueDateRange).length > 0) {
+    invoiceMatch.dueDate = dueDateRange;
+  }
+
+  const studentMatch = {};
+  if (classId) studentMatch['studentId.classId'] = new mongoose.Types.ObjectId(classId);
+  if (sectionId) studentMatch['studentId.sectionId'] = new mongoose.Types.ObjectId(sectionId);
+
+  const balanceMatch = { liveBalance: { $gt: 0 } };
+  if (minBalance) balanceMatch.liveBalance.$gte = minBalance;
+
+  const pipeline = [
+    { $match: invoiceMatch },
+    { $sort: { dueDate: 1 } },
+    { $group: {
+      _id: '$studentId',
+      liveBalance: { $sum: '$balanceAmount' },
+      unpaidInvoiceCount: { $sum: 1 },
+      oldestDueDate: { $min: '$dueDate' },
+      invoiceIds: { $push: '$_id' }
+    } },
+    { $match: balanceMatch },
+    { $lookup: {
+      from: 'users',
+      localField: '_id',
+      foreignField: '_id',
+      as: 'studentId',
+      pipeline: [{ $project: { name: 1, fullName: 1, phone: 1, email: 1, admissionNumber: 1, studentId: 1, classId: 1, sectionId: 1 } }]
+    } },
+    { $unwind: '$studentId' },
+    ...(Object.keys(studentMatch).length ? [{ $match: studentMatch }] : []),
+    { $lookup: { from: 'classes', localField: 'studentId.classId', foreignField: '_id', as: '_class', pipeline: [{ $project: { name: 1 } }] } },
+    { $lookup: { from: 'sections', localField: 'studentId.sectionId', foreignField: '_id', as: '_section', pipeline: [{ $project: { name: 1 } }] } },
+    { $lookup: { from: 'academicsessions', localField: 'academicSessionId', foreignField: '_id', as: '_session', pipeline: [{ $project: { name: 1 } }] } },
+    { $addFields: {
+      'studentId.classId': { $arrayElemAt: ['$_class', 0] },
+      'studentId.sectionId': { $arrayElemAt: ['$_section', 0] },
+      academicSessionId: { $ifNull: [{ $arrayElemAt: ['$_session', 0] }, { _id: sessionOid }] },
+      totalBalance: '$liveBalance',
+      overdueDays: {
+        $cond: [
+          { $ifNull: ['$oldestDueDate', false] },
+          { $max: [0, { $floor: { $divide: [{ $subtract: ['$$NOW', '$oldestDueDate'] }, 86400000] } }] },
+          0
+        ]
+      }
+    } },
+    { $project: { _class: 0, _section: 0, _session: 0 } },
+    { $sort: { liveBalance: -1 } },
+    { $limit: limit }
+  ];
+
+  return FeeInvoice.aggregate(pipeline).allowDiskUse(true);
+}
 
 /**
  * Resolve a date range from query params.
@@ -282,22 +355,10 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, 
   try {
     const { academicSessionId, classId, sectionId, minBalance, startDate, endDate } = req.query;
 
-    const options = {};
-    if (minBalance) options.minBalance = parseFloat(minBalance);
+    if (!academicSessionId) {
+      return res.status(400).json({ success: false, message: 'academicSessionId is required' });
+    }
 
-    const defaulters = await StudentBalance.getDefaulters(
-      req.user.tenantId,
-      academicSessionId,
-      options
-    );
-
-    // Deep-populate student's class and section so frontend can show / filter by name
-    await StudentBalance.populate(defaulters, [
-      { path: 'studentId.classId', select: 'name' },
-      { path: 'studentId.sectionId', select: 'name' }
-    ]);
-
-    // Optional due-date range filter on invoices
     const dueDateRange = {};
     if (startDate) {
       const s = new Date(startDate);
@@ -309,69 +370,17 @@ router.get('/defaulters', protect, authorize('admin', 'accountant'), async(req, 
       e.setHours(23, 59, 59, 999);
       dueDateRange.$lte = e;
     }
-    const hasDueDateRange = Object.keys(dueDateRange).length > 0;
 
-    // Enrich with overdue days, due date, and invoice IDs
-    const now = new Date();
-    const enrichedResults = await Promise.all(defaulters.map(async(defaulter) => {
-      if (!defaulter.studentId) return null;
-
-      // Get all unpaid invoices for this student (sorted by dueDate ascending)
-      const invoiceQuery = {
-        tenantId: req.user.tenantId,
-        studentId: defaulter.studentId._id,
-        academicSessionId: academicSessionId || defaulter.academicSessionId?._id,
-        status: { $in: ['Pending', 'Partial', 'Overdue'] }
-      };
-      if (hasDueDateRange) invoiceQuery.dueDate = dueDateRange;
-      const unpaidInvoices = await FeeInvoice.find(invoiceQuery).sort({ dueDate: 1 }).select('_id dueDate status balanceAmount');
-
-      // Skip if no unpaid invoices exist (balance may be stale)
-      if (unpaidInvoices.length === 0) return null;
-
-      const oldestInvoice = unpaidInvoices[0];
-      const overdueDays = oldestInvoice.dueDate
-        ? Math.max(0, Math.floor((now - oldestInvoice.dueDate) / (1000 * 60 * 60 * 24)))
-        : 0;
-
-      // Compute live balance from unpaid invoices to avoid stale StudentBalance data
-      const liveBalance = sumMoney(unpaidInvoices.map(inv => inv.balanceAmount || 0));
-
-      // Skip students with zero or negative live balance (already paid)
-      if (liveBalance <= 0) return null;
-
-      return {
-        ...defaulter.toObject(),
-        overdueDays,
-        oldestDueDate: oldestInvoice.dueDate,
-        invoiceIds: unpaidInvoices.map(inv => inv._id),
-        unpaidInvoiceCount: unpaidInvoices.length,
-        liveBalance
-      };
-    }));
-
-    // Filter out nulls (paid students, missing data)
-    const enriched = enrichedResults.filter(Boolean);
-
-    // Optionally filter by classId / sectionId on the populated studentId
-    let filtered = enriched;
-    if (classId) {
-      filtered = filtered.filter(d => {
-        const sClassId = d.studentId?.classId?._id || d.studentId?.classId;
-        return sClassId && sClassId.toString() === classId;
-      });
-    }
-    if (sectionId) {
-      filtered = filtered.filter(d => {
-        const sSectionId = d.studentId?.sectionId?._id || d.studentId?.sectionId;
-        return sSectionId && sSectionId.toString() === sectionId;
-      });
-    }
-
-    res.json({
-      success: true,
-      data: filtered
+    const data = await fetchDefaulters({
+      tenantId: req.user.tenantId,
+      academicSessionId,
+      classId,
+      sectionId,
+      minBalance: minBalance ? parseFloat(minBalance) : undefined,
+      dueDateRange
     });
+
+    res.json({ success: true, data });
   } catch (error) {
     logger.error('Defaulters error', error);
     res.status(500).json({
@@ -396,9 +405,6 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
       });
     }
 
-    const options = {};
-    if (minBalance) options.minBalance = parseFloat(minBalance);
-
     const dueDateRange = {};
     if (startDate) {
       const s = new Date(startDate);
@@ -410,62 +416,29 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
       e.setHours(23, 59, 59, 999);
       dueDateRange.$lte = e;
     }
-    const hasDueDateRange = Object.keys(dueDateRange).length > 0;
 
-    const defaulters = await StudentBalance.find({
-      tenantId: new mongoose.Types.ObjectId(tenantId),
-      academicSessionId: new mongoose.Types.ObjectId(academicSessionId),
-      totalBalance: options.minBalance ? { $gte: options.minBalance, $gt: 0 } : { $gt: 0 }
-    })
-      .populate({
-        path: 'studentId',
-        select: 'name fullName studentId admissionNumber phone email classId sectionId',
-        populate: [
-          { path: 'classId', select: 'name' },
-          { path: 'sectionId', select: 'name' }
-        ]
-      })
-      .populate('academicSessionId', 'name')
-      .sort({ totalBalance: -1 })
-      .limit(5000);
+    const defaulters = await fetchDefaulters({
+      tenantId,
+      academicSessionId,
+      classId,
+      sectionId,
+      minBalance: minBalance ? parseFloat(minBalance) : undefined,
+      dueDateRange,
+      limit: 5000
+    });
 
-    const now = new Date();
-    const enriched = (await Promise.all(defaulters.map(async(d) => {
-      if (!d.studentId) return null;
-      if (classId && (!d.studentId.classId || d.studentId.classId._id.toString() !== classId)) return null;
-      if (sectionId && (!d.studentId.sectionId || d.studentId.sectionId._id.toString() !== sectionId)) return null;
-
-      const invoiceQuery = {
-        tenantId,
-        studentId: d.studentId._id,
-        academicSessionId,
-        status: { $in: ['Pending', 'Partial', 'Overdue'] }
-      };
-      if (hasDueDateRange) invoiceQuery.dueDate = dueDateRange;
-      const unpaidInvoices = await FeeInvoice.find(invoiceQuery).sort({ dueDate: 1 }).select('_id dueDate status balanceAmount');
-
-      if (unpaidInvoices.length === 0) return null;
-
-      const oldest = unpaidInvoices[0];
-      const overdueDays = oldest.dueDate
-        ? Math.max(0, Math.floor((now - oldest.dueDate) / (1000 * 60 * 60 * 24)))
-        : 0;
-      const liveBalance = sumMoney(unpaidInvoices.map(inv => inv.balanceAmount || 0));
-      if (liveBalance <= 0) return null;
-
-      return {
-        admissionNumber: d.studentId.admissionNumber || d.studentId.studentId || '-',
-        studentName: d.studentId.fullName || d.studentId.name || 'N/A',
-        className: d.studentId.classId?.name || '-',
-        sectionName: d.studentId.sectionId?.name || '-',
-        phone: d.studentId.phone || '-',
-        email: d.studentId.email || '-',
-        totalBalance: roundToRupee(liveBalance),
-        unpaidInvoiceCount: unpaidInvoices.length,
-        oldestDueDate: oldest.dueDate,
-        overdueDays
-      };
-    }))).filter(Boolean);
+    const enriched = defaulters.map((d) => ({
+      admissionNumber: d.studentId?.admissionNumber || d.studentId?.studentId || '-',
+      studentName: d.studentId?.fullName || d.studentId?.name || 'N/A',
+      className: d.studentId?.classId?.name || '-',
+      sectionName: d.studentId?.sectionId?.name || '-',
+      phone: d.studentId?.phone || '-',
+      email: d.studentId?.email || '-',
+      totalBalance: roundToRupee(d.liveBalance || 0),
+      unpaidInvoiceCount: d.unpaidInvoiceCount,
+      oldestDueDate: d.oldestDueDate,
+      overdueDays: d.overdueDays
+    }));
 
     const columns = [
       { key: 'admissionNumber', header: 'Admission No.' },
