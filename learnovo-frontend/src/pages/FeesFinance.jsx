@@ -1206,7 +1206,10 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
     return 0
   })
 
-  const totalOutstanding = safeDefaulters.reduce((sum, d) => sum + (d.liveBalance ?? d.totalBalance ?? 0), 0)
+  const totalOutstanding = filteredDefaulters.reduce((sum, d) => sum + (d.liveBalance ?? d.totalBalance ?? 0), 0)
+  const avgOverdueDays = filteredDefaulters.length
+    ? Math.round(filteredDefaulters.reduce((s, d) => s + (d.overdueDays || 0), 0) / filteredDefaulters.length)
+    : 0
   const SortIcon = ({ field }) => <span className="inline-block ml-1 text-[10px] opacity-50">{sortField === field ? (sortAsc ? '▲' : '▼') : '⇅'}</span>
   const handleSort = (f) => { if (sortField === f) setSortAsc(!sortAsc); else { setSortField(f); setSortAsc(false) } }
   const formatDueDate = (d) => { if (!d) return '-'; const dt = new Date(d); return isNaN(dt.getTime()) ? '-' : dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) }
@@ -1247,9 +1250,9 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
     <div className="space-y-4">
       {safeDefaulters.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Total Defaulters</p><p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{safeDefaulters.length}</p></div>
+          <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Total Defaulters</p><p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{filteredDefaulters.length}</p></div>
           <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Total Outstanding</p><p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{formatCurrency(totalOutstanding)}</p></div>
-          <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Avg. Overdue</p><p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{safeDefaulters.length ? Math.round(safeDefaulters.reduce((s, d) => s + (d.overdueDays || 0), 0) / safeDefaulters.length) : 0} days</p></div>
+          <div className="card p-4"><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Avg. Overdue</p><p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{avgOverdueDays} days</p></div>
         </div>
       )}
 
