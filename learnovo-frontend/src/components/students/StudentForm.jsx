@@ -285,10 +285,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         if (form.email && !/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/.test(form.email)) {
             errors.email = 'Invalid email format'
         }
-        // Email required if creating login
-        if (form.createLogin && !student && !form.email?.trim()) {
-            errors.email = 'Email is required when creating login credentials'
-        }
 
         // Phone validation - 10-digit Indian format
         if (form.phone) {
@@ -580,14 +576,13 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                 {/* Contact & Login */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="label">Email {form.createLogin && !student && <span className="text-red-500">*</span>}</label>
+                                        <label className="label">Email</label>
                                         <input
                                             type="email"
                                             autoComplete="off"
                                             className={`input ${formErrors.email ? 'border-red-500' : ''}`}
                                             value={form.email}
                                             onChange={(e) => { updateField('email', e.target.value); setFormErrors(prev => ({ ...prev, email: undefined })) }}
-                                            required={form.createLogin && !student}
                                         />
                                         {formErrors.email && (
                                             <p className="text-xs text-red-500 mt-1">{formErrors.email}</p>
