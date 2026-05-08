@@ -981,7 +981,25 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter
     if (key && !seenClassNames.has(key)) { seenClassNames.add(key); uniqueClasses.push(c) }
   }
   const selectedClass = uniqueClasses.find(c => c._id === classFilter)
-  const sectionsForClass = selectedClass?.sections || []
+  const selectedClassName = (selectedClass?.name || '').toLowerCase().trim()
+  // Pool sections from ALL classes sharing the selected class name (across years), deduped by section name.
+  // Prevents the section filter from dropping students whose sectionId belongs to a different year
+  // than the deduped dropdown entry.
+  const sectionsForClass = (() => {
+    if (!selectedClass) return []
+    const seen = new Set()
+    const out = []
+    for (const c of classes) {
+      if ((c.name || '').toLowerCase().trim() !== selectedClassName) continue
+      for (const s of (c.sections || [])) {
+        const k = (s?.name || '').toLowerCase().trim()
+        if (k && !seen.has(k)) { seen.add(k); out.push(s) }
+      }
+    }
+    return out
+  })()
+  const selectedSection = sectionsForClass.find(s => s._id === sectionFilter)
+  const selectedSectionName = (selectedSection?.name || '').toLowerCase().trim()
 
   const handleApplyLateFee = async () => {
     if (!lateFeeModal.invoiceId || !lateFeeAmount || parseFloat(lateFeeAmount) <= 0) { toast.error('Enter a valid amount'); return }
@@ -998,12 +1016,12 @@ const DefaultersTab = ({ defaulters, loading, classes = [], onExport, dateFilter
     }
     if (classFilter) {
       const studentClassName = (d.studentId?.classId?.name || '').toLowerCase().trim()
-      const filterClassName = (selectedClass?.name || '').toLowerCase().trim()
-      if (!studentClassName || studentClassName !== filterClassName) return false
+      if (!studentClassName || studentClassName !== selectedClassName) return false
     }
     if (sectionFilter) {
-      const sSectionId = d.studentId?.sectionId?._id || d.studentId?.sectionId
-      if (!sSectionId || sSectionId.toString() !== sectionFilter) return false
+      // Compare by name — section _ids differ across academic years even when names match.
+      const studentSectionName = (d.studentId?.sectionId?.name || '').toLowerCase().trim()
+      if (!studentSectionName || studentSectionName !== selectedSectionName) return false
     }
     if (minBalanceFilter && !isNaN(parseFloat(minBalanceFilter))) {
       if ((d.liveBalance ?? d.totalBalance ?? 0) < parseFloat(minBalanceFilter)) return false
