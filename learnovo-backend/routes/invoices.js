@@ -1581,6 +1581,199 @@ router.post('/collect-payment', protect, authorize('admin', 'accountant'), [
   }
 });
 
+// @desc    Collect a single payment that settles multiple invoices in one go
+// @route   POST /api/invoices/collect-bulk-payment
+// @access  Private (Admin, Accountant)
+router.post('/collect-bulk-payment', protect, authorize('admin', 'accountant'), [
+  body('studentId').notEmpty().withMessage('Student ID is required'),
+  body('items').isArray({ min: 1 }).withMessage('At least one invoice is required'),
+  body('items.*.invoiceId').notEmpty().withMessage('Invoice ID is required'),
+  body('items.*.amount').isNumeric().toFloat().custom(v => v > 0).withMessage('Each amount must be positive'),
+  body('paymentMethod').notEmpty().withMessage('Payment method is required'),
+  body('paymentDate').isISO8601().withMessage('Valid payment date is required'),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const { studentId, items, paymentMethod, paymentDate, transactionDetails, remarks, depositorName } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const invoiceIds = items.map(i => i.invoiceId);
+    const uniqueIds = new Set(invoiceIds.map(String));
+    if (uniqueIds.size !== invoiceIds.length) {
+      return res.status(400).json({ success: false, message: 'Duplicate invoice in the request' });
+    }
+
+    // Load and validate every invoice belongs to this tenant + student and is unpaid
+    const invoices = await FeeInvoice.find({ _id: { $in: invoiceIds }, tenantId, studentId });
+    if (invoices.length !== items.length) {
+      return res.status(404).json({ success: false, message: 'One or more invoices not found' });
+    }
+
+    const invoiceById = new Map(invoices.map(inv => [String(inv._id), inv]));
+    for (const item of items) {
+      const invoice = invoiceById.get(String(item.invoiceId));
+      if (invoice.status === 'Paid') {
+        return res.status(400).json({ success: false, message: `Invoice ${invoice.invoiceNumber} is already fully paid` });
+      }
+      if (toNumber(item.amount) > toNumber(invoice.balanceAmount) + 0.01) {
+        return res.status(400).json({
+          success: false,
+          message: `Amount for invoice ${invoice.invoiceNumber} exceeds balance ${roundToRupee(invoice.balanceAmount)}`
+        });
+      }
+    }
+
+    const totalAmount = roundToRupee(items.reduce((sum, i) => sum + toNumber(i.amount), 0));
+    const collectedPayments = [];
+    const updatedInvoices = [];
+
+    // Create a Payment per invoice (Payment.invoiceId is singular)
+    for (const item of items) {
+      const invoice = invoiceById.get(String(item.invoiceId));
+      const amount = toNumber(item.amount);
+      const receiptNumber = await Payment.generateReceiptNumber(tenantId);
+
+      const payment = new Payment({
+        tenantId,
+        studentId,
+        invoiceId: invoice._id,
+        academicSessionId: invoice.academicSessionId,
+        amount,
+        paymentMethod,
+        paymentDate: new Date(paymentDate),
+        transactionDetails: transactionDetails || {},
+        remarks,
+        depositorName: depositorName ? String(depositorName).trim() : undefined,
+        receiptNumber,
+        isConfirmed: true,
+        confirmedAt: new Date(),
+        confirmedBy: req.user._id,
+        collectedBy: req.user._id
+      });
+      await payment.save();
+
+      invoice.paidAmount = roundToRupee(toNumber(invoice.paidAmount) + amount);
+      await invoice.save();
+
+      collectedPayments.push({
+        _id: payment._id,
+        receiptNumber: payment.receiptNumber,
+        amount: payment.amount,
+        invoiceId: invoice._id,
+        invoiceNumber: invoice.invoiceNumber
+      });
+      updatedInvoices.push({
+        _id: invoice._id,
+        invoiceNumber: invoice.invoiceNumber,
+        totalAmount: invoice.totalAmount,
+        paidAmount: invoice.paidAmount,
+        balanceAmount: invoice.balanceAmount,
+        status: invoice.status
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Collected ${roundToRupee(totalAmount)} across ${items.length} invoice(s)`,
+      data: { payments: collectedPayments, invoices: updatedInvoices, totalAmount }
+    });
+
+    // ── Side-effects (best-effort, response already sent) ──
+    const paymentModeMap = { CASH: 'CASH', UPI: 'UPI' };
+    const upperMethod = (paymentMethod || '').toUpperCase();
+    const resolvedMode = paymentModeMap[upperMethod]
+      || (upperMethod.includes('BANK') ? 'BANK_TRANSFER' : 'OTHER');
+    const student = await User.findById(studentId).select('name fullName').lean().catch(() => null);
+    const studentName = student?.fullName || student?.name || 'Student';
+
+    for (const cp of collectedPayments) {
+      const invoice = invoiceById.get(String(cp.invoiceId));
+
+      try {
+        const attempt = new PaymentAttempt({
+          tenantId,
+          idempotencyKey: `admin_${cp.invoiceId}_${cp._id}`,
+          studentId,
+          invoiceId: cp.invoiceId,
+          amount: cp.amount,
+          status: 'VERIFIED',
+          triggerSource: 'ADMIN_MANUAL',
+          paymentMode: resolvedMode,
+          transactionRefId: transactionDetails?.referenceNumber || null,
+          paymentDate: new Date(paymentDate),
+          verifiedBy: req.user._id,
+          verifiedAt: new Date()
+        });
+        await attempt.save();
+
+        const studentReceiptNum = await Receipt.generateReceiptNumber(tenantId);
+        const studentReceipt = new Receipt({
+          tenantId,
+          paymentAttemptId: attempt._id,
+          studentId,
+          invoiceId: cp.invoiceId,
+          receiptNumber: studentReceiptNum,
+          initiatedBy: 'admin',
+          verifiedByUserId: req.user._id,
+          verifiedByName: req.user.name || req.user.fullName || 'Admin',
+          amount: cp.amount,
+          paymentMode: resolvedMode,
+          transactionRefId: transactionDetails?.referenceNumber || null,
+          paymentDate: new Date(paymentDate)
+        });
+        await studentReceipt.save();
+      } catch (portalErr) {
+        logger.error('Bulk: PaymentAttempt/Receipt creation failed (non-fatal)', { message: portalErr.message, paymentId: cp._id });
+      }
+
+      try {
+        await FeeAuditLog.logAction({
+          tenantId, action: 'PAYMENT_COLLECTED', entityType: 'Payment', entityId: cp._id,
+          userId: req.user._id, userName: req.user.name || req.user.fullName || 'Admin', userRole: req.user.role,
+          details: { invoiceNumber: invoice.invoiceNumber, receiptNumber: cp.receiptNumber, amount: cp.amount, paymentMethod, studentId, bulk: true },
+          ipAddress: req.ip
+        });
+      } catch (_) { /* non-fatal */ }
+
+      try {
+        await syncFeePaymentToIncome({
+          tenantId, paymentId: cp._id, amount: cp.amount, paymentDate: new Date(paymentDate), paymentMethod,
+          studentName,
+          invoiceNumber: invoice.invoiceNumber, addedBy: req.user._id,
+          paymentReference: transactionDetails?.referenceNumber || cp.receiptNumber, referenceModel: 'Payment',
+          academicSessionId: invoice.academicSessionId
+        });
+      } catch (_) { /* non-fatal */ }
+
+      if (invoice.status === 'Paid' && invoice.billingPeriod?.displayText === 'Admission Fee') {
+        try {
+          await User.updateOne({ _id: studentId, tenantId }, { $set: { admissionFeePaid: true } });
+        } catch (_) { /* non-fatal */ }
+      }
+    }
+
+    // Single balance recalculation for the student's session(s)
+    const sessionIds = [...new Set(invoices.map(i => String(i.academicSessionId)))];
+    for (const sid of sessionIds) {
+      try {
+        await StudentBalance.updateBalance(tenantId, studentId, sid);
+      } catch (_) { /* non-fatal */ }
+    }
+
+  } catch (error) {
+    logger.error('Collect bulk payment error', { message: error.message, stack: error.stack, code: error.code });
+    if (error.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Duplicate payment detected.' });
+    }
+    res.status(500).json({
+      success: false,
+      message: process.env.NODE_ENV === 'development'
+        ? `Payment error: ${error.message}`
+        : 'Server error while collecting payment'
+    });
+  }
+});
+
 // @desc    Edit non-financial fields of a payment (method/date/remarks/depositor/txn details)
 // @route   PUT /api/invoices/payments/:id
 // @access  Private (Admin)

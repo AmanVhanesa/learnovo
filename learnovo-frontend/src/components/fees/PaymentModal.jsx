@@ -21,8 +21,10 @@ const PAYMENT_METHODS = [
 
 const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDownloadReceipt, onClose, onSuccess }) => {
   const [activeTab, setActiveTab] = useState('collect')
+  const [collectMode, setCollectMode] = useState('single') // 'single' | 'multi'
   const [selectedQuarter, setSelectedQuarter] = useState('all')
   const [selectedInvoice, setSelectedInvoice] = useState(null)
+  const [bulkSelected, setBulkSelected] = useState({}) // { [invoiceId]: { checked, amount } }
   const [form, setForm] = useState({
     amount: '',
     paymentMethod: 'Cash',
@@ -146,6 +148,71 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
     }
   }
 
+  // Initialize/refresh bulk selection state when entering multi-mode or when filtered invoices change
+  useEffect(() => {
+    if (collectMode !== 'multi') return
+    setBulkSelected(prev => {
+      const next = {}
+      filteredInvoices.forEach(inv => {
+        const existing = prev[inv._id]
+        next[inv._id] = existing
+          ? { checked: existing.checked, amount: existing.amount }
+          : { checked: false, amount: String(inv.balanceAmount || 0) }
+      })
+      return next
+    })
+  }, [collectMode, filteredInvoices])
+
+  const bulkTotal = useMemo(() => {
+    return filteredInvoices.reduce((sum, inv) => {
+      const row = bulkSelected[inv._id]
+      if (!row?.checked) return sum
+      return sum + (parseFloat(row.amount) || 0)
+    }, 0)
+  }, [filteredInvoices, bulkSelected])
+
+  const bulkSelectedCount = useMemo(
+    () => Object.values(bulkSelected).filter(r => r?.checked).length,
+    [bulkSelected]
+  )
+
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault()
+    const items = filteredInvoices
+      .filter(inv => bulkSelected[inv._id]?.checked)
+      .map(inv => ({
+        invoiceId: inv._id,
+        amount: parseFloat(bulkSelected[inv._id].amount) || 0,
+        balance: inv.balanceAmount || 0,
+        invoiceNumber: inv.invoiceNumber,
+      }))
+
+    if (items.length === 0) { toast.error('Select at least one invoice'); return }
+    for (const it of items) {
+      if (!it.amount || it.amount <= 0) { toast.error(`Enter a valid amount for ${it.invoiceNumber}`); return }
+      if (it.amount > it.balance + 0.01) { toast.error(`Amount exceeds balance for ${it.invoiceNumber}`); return }
+    }
+
+    try {
+      setIsSaving(true)
+      await paymentsService.collectBulk({
+        studentId: student._id,
+        items: items.map(({ invoiceId, amount }) => ({ invoiceId, amount })),
+        paymentMethod: form.paymentMethod,
+        paymentDate: form.paymentDate,
+        transactionDetails: form.transactionDetails,
+        remarks: form.remarks,
+        depositorName: form.depositorName.trim(),
+      })
+      toast.success(`Collected payment for ${items.length} invoice(s)`)
+      onSuccess()
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to collect payment')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!selectedInvoice) { toast.error('Please select an invoice'); return }
@@ -215,6 +282,264 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
               <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">No Pending Invoices</h3>
               <p className="text-sm text-gray-500 dark:text-[#8E8E93]">This student has no pending dues. All fees are paid.</p>
             </div>
+          ) : collectMode === 'multi' ? (
+            <form onSubmit={handleBulkSubmit} className="space-y-5">
+              {/* Student info */}
+              <div className="flex items-center gap-3 p-3.5 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
+                <div className="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-primary-700 dark:text-primary-400">
+                    {(student.fullName || student.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{student.fullName || student.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-[#636366]">
+                    ID: {student.studentId || student.admissionNumber} &middot; Class: {student.classId?.name || student.class || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Mode toggle */}
+              <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-[#38383A]">
+                <button type="button" onClick={() => setCollectMode('single')} className="flex-1 py-2 text-xs font-medium bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]">
+                  Single Invoice
+                </button>
+                <button type="button" className="flex-1 py-2 text-xs font-medium bg-primary-600 text-white dark:bg-primary-500">
+                  Multiple Invoices
+                </button>
+              </div>
+
+              {/* Bulk invoice list */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="label">Select Invoices *</label>
+                  {filteredInvoices.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allChecked = filteredInvoices.every(inv => bulkSelected[inv._id]?.checked)
+                        setBulkSelected(prev => {
+                          const next = { ...prev }
+                          filteredInvoices.forEach(inv => {
+                            next[inv._id] = { ...(next[inv._id] || { amount: String(inv.balanceAmount || 0) }), checked: !allChecked }
+                          })
+                          return next
+                        })
+                      }}
+                      className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                    >
+                      {filteredInvoices.every(inv => bulkSelected[inv._id]?.checked) ? 'Deselect all' : 'Select all'}
+                    </button>
+                  )}
+                </div>
+                {filteredInvoices.length === 0 ? (
+                  <div className="text-center py-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
+                    <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No pending invoices</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-[#38383A] border border-gray-100 dark:border-[#38383A] rounded-xl overflow-hidden">
+                    {filteredInvoices.map((inv) => {
+                      const row = bulkSelected[inv._id] || { checked: false, amount: String(inv.balanceAmount || 0) }
+                      const period = inv.periodLabel || inv.billingPeriod?.displayText || ''
+                      return (
+                        <div key={inv._id} className={`px-3 py-2.5 flex items-center gap-3 ${row.checked ? 'bg-primary-50/40 dark:bg-primary-900/10' : 'bg-white dark:bg-[#1C1C1E]'}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!row.checked}
+                            onChange={(e) => setBulkSelected(prev => ({
+                              ...prev,
+                              [inv._id]: { ...(prev[inv._id] || { amount: String(inv.balanceAmount || 0) }), checked: e.target.checked }
+                            }))}
+                            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                              {inv.invoiceNumber}{period ? ` — ${period}` : ''}
+                            </p>
+                            <p className="text-[11px] text-gray-500 dark:text-[#636366]">
+                              Balance: {formatCurrency(inv.balanceAmount)} &middot; {inv.status}
+                            </p>
+                          </div>
+                          <input
+                            type="number"
+                            min="1"
+                            step="1"
+                            max={inv.balanceAmount}
+                            disabled={!row.checked}
+                            value={row.amount}
+                            onWheel={preventScrollChange}
+                            onChange={(e) => setBulkSelected(prev => ({
+                              ...prev,
+                              [inv._id]: { ...(prev[inv._id] || { checked: true }), amount: e.target.value }
+                            }))}
+                            className="input !py-1.5 !px-2 text-xs w-28 text-right"
+                            placeholder="Amount"
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Quarter / Period filter */}
+              {periodOptions.length > 0 && (
+                <div>
+                  <label className="label mb-1.5 block">Filter by Period</label>
+                  <div className="flex flex-wrap gap-2">
+                    {periodOptions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedQuarter('all')}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border-2 transition-all ${
+                          selectedQuarter === 'all'
+                            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-400'
+                            : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93]'
+                        }`}
+                      >
+                        All ({invoices.length})
+                      </button>
+                    )}
+                    {periodOptions.map((period) => {
+                      const count = invoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === period.value).length
+                      return (
+                        <button
+                          key={period.value}
+                          type="button"
+                          onClick={() => setSelectedQuarter(period.value)}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-lg border-2 transition-all ${
+                            selectedQuarter === period.value
+                              ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400 dark:border-primary-400'
+                              : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93]'
+                          }`}
+                        >
+                          {period.label} ({count})
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Payment method */}
+              <div>
+                <label className="label mb-1.5 block">Payment Method *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PAYMENT_METHODS.map((method) => {
+                    const Icon = method.icon
+                    const isSelected = form.paymentMethod === method.value
+                    return (
+                      <button
+                        key={method.value}
+                        type="button"
+                        onClick={() => setForm(prev => ({ ...prev, paymentMethod: method.value, transactionDetails: {} }))}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center ${
+                          isSelected
+                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
+                            : 'border-gray-200 dark:border-[#38383A]'
+                        }`}
+                      >
+                        <Icon className={`h-4 w-4 ${isSelected ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400'}`} />
+                        <span className={`text-xs font-medium ${isSelected ? 'text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-[#8E8E93]'}`}>
+                          {method.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Transaction details for digital payments */}
+              {['UPI', 'Bank Transfer', 'Cheque', 'Card', 'Online'].includes(form.paymentMethod) && (
+                <div className="bg-gray-50 dark:bg-[#2C2C2E] rounded-xl p-3 border border-gray-100 dark:border-[#38383A] space-y-3">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-[#636366] uppercase">Transaction Details</span>
+                  {form.paymentMethod === 'UPI' && (
+                    <input type="text" className="input text-sm" placeholder="UPI Transaction ID / Reference"
+                      value={form.transactionDetails.upiId || ''}
+                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, upiId: e.target.value } }))} />
+                  )}
+                  {form.paymentMethod === 'Bank Transfer' && (
+                    <input type="text" className="input text-sm" placeholder="Bank Transfer Reference Number"
+                      value={form.transactionDetails.referenceNumber || ''}
+                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, referenceNumber: e.target.value } }))} />
+                  )}
+                  {form.paymentMethod === 'Cheque' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <input type="text" className="input text-sm" placeholder="Cheque Number"
+                        value={form.transactionDetails.chequeNumber || ''}
+                        onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, chequeNumber: e.target.value } }))} />
+                      <input type="text" className="input text-sm" placeholder="Bank Name"
+                        value={form.transactionDetails.bankName || ''}
+                        onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, bankName: e.target.value } }))} />
+                    </div>
+                  )}
+                  {form.paymentMethod === 'Card' && (
+                    <input type="text" className="input text-sm" placeholder="Card Transaction Reference"
+                      value={form.transactionDetails.cardRef || ''}
+                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, cardRef: e.target.value } }))} />
+                  )}
+                  {form.paymentMethod === 'Online' && (
+                    <input type="text" className="input text-sm" placeholder="Online Payment Reference / Order ID"
+                      value={form.transactionDetails.onlineRef || ''}
+                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, onlineRef: e.target.value } }))} />
+                  )}
+                </div>
+              )}
+
+              {/* Payment date */}
+              <div>
+                <label className="label mb-1.5 block">Payment Date *</label>
+                <input
+                  type="date"
+                  className="input"
+                  value={form.paymentDate}
+                  onChange={(e) => setForm(prev => ({ ...prev, paymentDate: e.target.value }))}
+                  max={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+
+              {/* Depositor + remarks */}
+              <div>
+                <label className="label mb-1.5 block">Depositor Name</label>
+                <input type="text" className="input" value={form.depositorName}
+                  onChange={(e) => setForm(prev => ({ ...prev, depositorName: e.target.value }))}
+                  placeholder="Name of person depositing the fees" />
+              </div>
+              <div>
+                <label className="label mb-1.5 block">Remarks</label>
+                <input type="text" className="input" value={form.remarks}
+                  onChange={(e) => setForm(prev => ({ ...prev, remarks: e.target.value }))}
+                  placeholder="Optional notes about this payment" />
+              </div>
+
+              {/* Total summary */}
+              <div className="bg-primary-50 dark:bg-primary-900/15 border border-primary-200 dark:border-primary-800/30 rounded-xl p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-primary-800 dark:text-primary-300">
+                    Total ({bulkSelectedCount} invoice{bulkSelectedCount === 1 ? '' : 's'})
+                  </span>
+                  <span className="text-lg font-bold text-primary-700 dark:text-primary-400">
+                    {formatCurrency(bulkTotal)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-5 border-t border-gray-100 dark:border-[#38383A]">
+                <button type="button" onClick={onClose} className="btn btn-outline w-full sm:w-auto">Cancel</button>
+                <button type="submit" className="btn btn-primary w-full sm:w-auto" disabled={isSaving || bulkSelectedCount === 0}>
+                  {isSaving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Processing...
+                    </span>
+                  ) : (
+                    `Collect ${formatCurrency(bulkTotal)}`
+                  )}
+                </button>
+              </div>
+            </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Student info */}
@@ -231,6 +556,18 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                   </p>
                 </div>
               </div>
+
+              {/* Mode toggle */}
+              {invoices.length > 1 && (
+                <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-[#38383A]">
+                  <button type="button" className="flex-1 py-2 text-xs font-medium bg-primary-600 text-white dark:bg-primary-500">
+                    Single Invoice
+                  </button>
+                  <button type="button" onClick={() => setCollectMode('multi')} className="flex-1 py-2 text-xs font-medium bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]">
+                    Multiple Invoices
+                  </button>
+                </div>
+              )}
 
               {/* Quarter / Period filter */}
               {periodOptions.length > 0 && (

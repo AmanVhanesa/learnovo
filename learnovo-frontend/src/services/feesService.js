@@ -155,6 +155,11 @@ export const paymentsService = {
     return res.data
   },
 
+  collectBulk: async (data) => {
+    const res = await api.post('/invoices/collect-bulk-payment', data)
+    return res.data
+  },
+
   confirm: async (id) => {
     const res = await api.post(`/payments/${id}/confirm`)
     return res.data
