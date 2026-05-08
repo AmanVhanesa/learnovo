@@ -245,7 +245,7 @@ class ImportExportService {
      * @param {Object} headerInfo - Optional { schoolName, reportTitle, dateTime } for report header
      * @returns {Promise<Buffer>} CSV buffer
      */
-  static async exportToCSV(data, columns, headerInfo = null) {
+  static async exportToCSV(data, columns, headerInfo = null, footerRow = null) {
     return new Promise((resolve, reject) => {
       const csvRows = [];
 
@@ -262,7 +262,17 @@ class ImportExportService {
 
       stream.on('data', (row) => csvRows.push(row));
       stream.on('error', reject);
-      stream.on('end', () => resolve(Buffer.from(csvRows.join(''))));
+      stream.on('end', () => {
+        if (Array.isArray(footerRow) && footerRow.length) {
+          // Append a CSV footer row aligned to the columns
+          const escape = (v) => {
+            const s = v == null ? '' : String(v);
+            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+          };
+          csvRows.push(`${footerRow.map(escape).join(',')}\n`);
+        }
+        resolve(Buffer.from(csvRows.join('')));
+      });
 
       data.forEach(item => {
         const row = {};
@@ -285,7 +295,7 @@ class ImportExportService {
      * @param {Object} headerInfo - Optional { schoolName, reportTitle, dateTime } for report header
      * @returns {Buffer} Excel buffer
      */
-  static exportToExcel(data, columns, sheetName = 'Sheet1', headerInfo = null) {
+  static exportToExcel(data, columns, sheetName = 'Sheet1', headerInfo = null, footerRow = null) {
     // Prepare data with headers
     const headers = columns.map(col => col.header || col.key);
     const rows = data.map(item => {
@@ -305,8 +315,11 @@ class ImportExportService {
       topRows.push([]); // blank row
     }
 
+    // Optional footer row appended after data
+    const footerRows = Array.isArray(footerRow) && footerRow.length ? [footerRow] : [];
+
     // Create worksheet
-    const wsData = [...topRows, headers, ...rows];
+    const wsData = [...topRows, headers, ...rows, ...footerRows];
     const worksheet = xlsx.utils.aoa_to_sheet(wsData);
 
     // Style header info rows — merge across all columns
