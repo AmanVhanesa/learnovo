@@ -975,6 +975,7 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
   const [periodPreset, setPeriodPreset] = useState('all')
   const [sortField, setSortField] = useState('totalBalance')
   const [sortAsc, setSortAsc] = useState(false)
+  const [showClassSummary, setShowClassSummary] = useState(false)
 
   // Indian-academic-year base year: from active session start, or heuristic (Apr-Mar)
   const sessionStartYear = useMemo(() => {
@@ -1294,34 +1295,44 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
       </div>
 
       {classWiseSummary.length > 0 && (
-        <div className="card p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Class-wise Pending Summary</h3>
-            <span className="text-xs text-gray-500 dark:text-[#8E8E93]">{classWiseSummary.length} classes</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-[#8E8E93] border-b border-gray-100 dark:border-[#38383A]">
-                <th className="px-3 py-2">Class</th>
-                <th className="px-3 py-2 text-center">Students</th>
-                <th className="px-3 py-2 text-right">Outstanding</th>
-              </tr></thead>
-              <tbody>
-                {classWiseSummary.map(c => (
-                  <tr key={c.className} className="border-b border-gray-50 dark:border-[#2C2C2E]">
-                    <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{c.className}</td>
-                    <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{c.students}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400">{formatCurrency(c.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot><tr className="border-t-2 border-gray-200 dark:border-[#38383A] font-semibold">
-                <td className="px-3 py-2 text-gray-900 dark:text-white">Total</td>
-                <td className="px-3 py-2 text-center text-gray-900 dark:text-white">{sortedDefaulters.length}</td>
-                <td className="px-3 py-2 text-right text-red-700 dark:text-red-400">{formatCurrency(sortedDefaulters.reduce((s, d) => s + (d.liveBalance ?? d.totalBalance ?? 0), 0))}</td>
-              </tr></tfoot>
-            </table>
-          </div>
+        <div className="card overflow-hidden">
+          <button
+            onClick={() => setShowClassSummary(v => !v)}
+            className="w-full flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Class-wise Pending Summary</h3>
+              <span className="text-xs text-gray-500 dark:text-[#8E8E93]">({classWiseSummary.length} {classWiseSummary.length === 1 ? 'class' : 'classes'} · {formatCurrency(sortedDefaulters.reduce((s, d) => s + (d.liveBalance ?? d.totalBalance ?? 0), 0))})</span>
+            </div>
+            {showClassSummary ? <ChevronUp className="h-4 w-4 text-gray-500 dark:text-[#8E8E93]" /> : <ChevronDown className="h-4 w-4 text-gray-500 dark:text-[#8E8E93]" />}
+          </button>
+          {showClassSummary && (
+            <div className="px-4 sm:px-5 pb-4 border-t border-gray-100 dark:border-[#38383A]">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-[#8E8E93] border-b border-gray-100 dark:border-[#38383A]">
+                    <th className="px-3 py-2">Class</th>
+                    <th className="px-3 py-2 text-center">Students</th>
+                    <th className="px-3 py-2 text-right">Outstanding</th>
+                  </tr></thead>
+                  <tbody>
+                    {classWiseSummary.map(c => (
+                      <tr key={c.className} className="border-b border-gray-50 dark:border-[#2C2C2E]">
+                        <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{c.className}</td>
+                        <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{c.students}</td>
+                        <td className="px-3 py-2 text-right font-semibold text-red-600 dark:text-red-400">{formatCurrency(c.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr className="border-t-2 border-gray-200 dark:border-[#38383A] font-semibold">
+                    <td className="px-3 py-2 text-gray-900 dark:text-white">Total</td>
+                    <td className="px-3 py-2 text-center text-gray-900 dark:text-white">{sortedDefaulters.length}</td>
+                    <td className="px-3 py-2 text-right text-red-700 dark:text-red-400">{formatCurrency(sortedDefaulters.reduce((s, d) => s + (d.liveBalance ?? d.totalBalance ?? 0), 0))}</td>
+                  </tr></tfoot>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
