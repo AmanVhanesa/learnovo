@@ -57,7 +57,11 @@ const Income = require('../models/Income');
 
 // Optional models — load defensively
 function safeRequire(path) {
-  try { return require(path); } catch (e) { return null; }
+  try {
+    return require(path);
+  } catch (e) {
+    return null;
+  }
 }
 const Receipt = safeRequire('../models/Receipt');
 const PaymentAttempt = safeRequire('../models/PaymentAttempt');
@@ -98,60 +102,62 @@ async function run() {
 
   const plan = [
     ['Students',                 () => User.countDocuments({ tenantId, role: 'student' }),
-                                 () => User.deleteMany({ tenantId, role: 'student' })],
+      () => User.deleteMany({ tenantId, role: 'student' })],
     ['Generated Certificates',   () => GeneratedCertificate.countDocuments({ tenantId }),
-                                 () => GeneratedCertificate.deleteMany({ tenantId })],
+      () => GeneratedCertificate.deleteMany({ tenantId })],
     ['Fee Invoices',             () => FeeInvoice.countDocuments({ tenantId }),
-                                 () => FeeInvoice.deleteMany({ tenantId })],
+      () => FeeInvoice.deleteMany({ tenantId })],
     ['Receipts',                 Receipt && (() => Receipt.countDocuments({ tenantId })),
-                                 Receipt && (() => Receipt.deleteMany({ tenantId }))],
+      Receipt && (() => Receipt.deleteMany({ tenantId }))],
     ['Payments',                 () => Payment.countDocuments({ tenantId }),
-                                 () => Payment.deleteMany({ tenantId })],
+      () => Payment.deleteMany({ tenantId })],
     ['Payment Attempts',         PaymentAttempt && (() => PaymentAttempt.countDocuments({ tenantId })),
-                                 PaymentAttempt && (() => PaymentAttempt.deleteMany({ tenantId }))],
+      PaymentAttempt && (() => PaymentAttempt.deleteMany({ tenantId }))],
     ['Fee Payment Orders',       FeePaymentOrder && (() => FeePaymentOrder.countDocuments({ tenantId })),
-                                 FeePaymentOrder && (() => FeePaymentOrder.deleteMany({ tenantId }))],
+      FeePaymentOrder && (() => FeePaymentOrder.deleteMany({ tenantId }))],
     ['Payment Disputes',         PaymentDispute && (() => PaymentDispute.countDocuments({ tenantId })),
-                                 PaymentDispute && (() => PaymentDispute.deleteMany({ tenantId }))],
+      PaymentDispute && (() => PaymentDispute.deleteMany({ tenantId }))],
     ['Fee Audit Logs',           FeeAuditLog && (() => FeeAuditLog.countDocuments({ tenantId })),
-                                 FeeAuditLog && (() => FeeAuditLog.deleteMany({ tenantId }))],
+      FeeAuditLog && (() => FeeAuditLog.deleteMany({ tenantId }))],
     ['Payment Audit Logs',       PaymentAuditLog && (() => PaymentAuditLog.countDocuments({ tenantId })),
-                                 PaymentAuditLog && (() => PaymentAuditLog.deleteMany({ tenantId }))],
+      PaymentAuditLog && (() => PaymentAuditLog.deleteMany({ tenantId }))],
     ['Annual Fee Allocations',   () => AnnualFeeAllocation.countDocuments({ tenantId }),
-                                 () => AnnualFeeAllocation.deleteMany({ tenantId })],
+      () => AnnualFeeAllocation.deleteMany({ tenantId })],
     ['Student Balances',         () => StudentBalance.countDocuments({ tenantId }),
-                                 () => StudentBalance.deleteMany({ tenantId })],
+      () => StudentBalance.deleteMany({ tenantId })],
     ['Legacy Fees',              () => Fee.countDocuments({ tenantId }),
-                                 () => Fee.deleteMany({ tenantId })],
+      () => Fee.deleteMany({ tenantId })],
     ['Income (fee_payment only)', () => Income.countDocuments({ tenantId, referenceType: 'fee_payment' }),
-                                 () => Income.deleteMany({ tenantId, referenceType: 'fee_payment' })],
+      () => Income.deleteMany({ tenantId, referenceType: 'fee_payment' })],
     ['Exam Results',             () => Result.countDocuments({ tenantId }),
-                                 () => Result.deleteMany({ tenantId })],
+      () => Result.deleteMany({ tenantId })],
     ['Attendance Records',       () => Attendance.countDocuments({ tenantId }),
-                                 () => Attendance.deleteMany({ tenantId })],
+      () => Attendance.deleteMany({ tenantId })],
     ['Homework Submissions',     HomeworkSubmission && (() => HomeworkSubmission.countDocuments({ tenantId })),
-                                 HomeworkSubmission && (() => HomeworkSubmission.deleteMany({ tenantId }))],
+      HomeworkSubmission && (() => HomeworkSubmission.deleteMany({ tenantId }))],
     ['Student Class Histories',  StudentClassHistory && (() => StudentClassHistory.countDocuments({ tenantId })),
-                                 StudentClassHistory && (() => StudentClassHistory.deleteMany({ tenantId }))],
+      StudentClassHistory && (() => StudentClassHistory.deleteMany({ tenantId }))],
     ['Student Transport Assignments', StudentTransportAssignment && (() => StudentTransportAssignment.countDocuments({ tenantId })),
-                                 StudentTransportAssignment && (() => StudentTransportAssignment.deleteMany({ tenantId }))],
+      StudentTransportAssignment && (() => StudentTransportAssignment.deleteMany({ tenantId }))],
     ['Families',                 Family && (() => Family.countDocuments({ tenantId })),
-                                 Family && (() => Family.deleteMany({ tenantId }))],
+      Family && (() => Family.deleteMany({ tenantId }))],
     ['Admissions',               Admission && (() => Admission.countDocuments({ tenantId })),
-                                 Admission && (() => Admission.deleteMany({ tenantId }))],
+      Admission && (() => Admission.deleteMany({ tenantId }))],
     ['Student Lists',            StudentList && (() => StudentList.countDocuments({ tenantId })),
-                                 StudentList && (() => StudentList.deleteMany({ tenantId }))],
+      StudentList && (() => StudentList.deleteMany({ tenantId }))],
     ['Student Notifications',    () => studentIds.length ? Notification.countDocuments({ tenantId, userId: { $in: studentIds } }) : Promise.resolve(0),
-                                 () => studentIds.length ? Notification.deleteMany({ tenantId, userId: { $in: studentIds } }) : Promise.resolve({ deletedCount: 0 })],
+      () => studentIds.length ? Notification.deleteMany({ tenantId, userId: { $in: studentIds } }) : Promise.resolve({ deletedCount: 0 })],
     ['Counters (invoice/receipt/cert/admission — reset to 0)',
-                                 () => Counter.countDocuments({ tenantId }),
-                                 () => Counter.deleteMany({ tenantId })],
+      () => Counter.countDocuments({ tenantId }),
+      () => Counter.deleteMany({ tenantId })]
   ];
 
   console.log('=== PRE-DELETION COUNTS (SPIS only) ===');
   const counts = {};
   for (const [label, countFn] of plan) {
-    if (!countFn) { console.log(`  ${label}: (model not loaded — skipped)`); continue; }
+    if (!countFn) {
+      console.log(`  ${label}: (model not loaded — skipped)`); continue;
+    }
     counts[label] = await countFn();
     console.log(`  ${label}: ${counts[label]}`);
   }

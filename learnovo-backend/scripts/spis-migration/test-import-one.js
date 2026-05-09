@@ -36,7 +36,7 @@ function parseArgs() {
   return out;
 }
 
-(async () => {
+(async() => {
   const { admission, execute } = parseArgs();
 
   await mongoose.connect(process.env.MONGODB_URI);
@@ -56,7 +56,7 @@ function parseArgs() {
   const student = await User.findOne({
     tenantId: tenant._id,
     role: 'student',
-    admissionNumber: admission,
+    admissionNumber: admission
   }).select('_id firstName lastName name admissionNumber classId sectionId').lean();
   if (!student) {
     console.error(`❌ Student with admissionNumber ${admission} not found in SPIS tenant.`);
@@ -78,7 +78,7 @@ function parseArgs() {
   const existing = await AnnualFeeAllocation.findOne({
     tenantId: tenant._id,
     studentId: student._id,
-    academicSessionId: session._id,
+    academicSessionId: session._id
   }).lean();
   if (existing) {
     console.error(`\n❌ Allocation already exists for this student in ${session.name}.`);
@@ -98,7 +98,7 @@ function parseArgs() {
     process.exit(1);
   }
   const tempPath = path.join(os.tmpdir(), `spis-test-${admission}.csv`);
-  fs.writeFileSync(tempPath, [header, ...matched].join('\n') + '\n');
+  fs.writeFileSync(tempPath, `${[header, ...matched].join('\n')  }\n`);
   console.log(`Test rows for ${admission}:`);
   matched.forEach(r => {
     const cols = r.split(',');
@@ -138,7 +138,7 @@ function parseArgs() {
   // 8. Show what got created
   console.log('\n--- VERIFICATION ---');
   const allocation = await AnnualFeeAllocation.findOne({
-    tenantId: tenant._id, studentId: student._id, academicSessionId: session._id,
+    tenantId: tenant._id, studentId: student._id, academicSessionId: session._id
   }).lean();
   const invoice = allocation
     ? await FeeInvoice.findOne({ annualAllocationId: allocation._id }).lean()

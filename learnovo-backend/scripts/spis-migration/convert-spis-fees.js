@@ -39,18 +39,22 @@ function parseCsv(text) {
     const ch = text[i];
     if (inQuotes) {
       if (ch === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; }
-        else inQuotes = false;
+        if (text[i + 1] === '"') {
+          field += '"'; i++;
+        } else inQuotes = false;
       } else field += ch;
     } else {
       if (ch === '"') inQuotes = true;
-      else if (ch === ',') { row.push(field); field = ''; }
-      else if (ch === '\r') { /* skip */ }
-      else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
-      else field += ch;
+      else if (ch === ',') {
+        row.push(field); field = '';
+      } else if (ch === '\r') { /* skip */ } else if (ch === '\n') {
+        row.push(field); rows.push(row); row = []; field = '';
+      } else field += ch;
     }
   }
-  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field); rows.push(row);
+  }
   return rows;
 }
 
@@ -58,7 +62,7 @@ function csvEscape(s) {
   if (s == null) return '';
   const str = String(s);
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return '"' + str.replace(/"/g, '""') + '"';
+    return `"${  str.replace(/"/g, '""')  }"`;
   }
   return str;
 }
@@ -92,9 +96,13 @@ function main() {
   // Find header row
   let headerIdx = -1;
   for (let i = 0; i < rows.length; i++) {
-    if (rows[i][0] === 'Date' && rows[i].includes('Receipt No.')) { headerIdx = i; break; }
+    if (rows[i][0] === 'Date' && rows[i].includes('Receipt No.')) {
+      headerIdx = i; break;
+    }
   }
-  if (headerIdx < 0) { console.error('Could not find header row'); process.exit(1); }
+  if (headerIdx < 0) {
+    console.error('Could not find header row'); process.exit(1);
+  }
 
   const header = rows[headerIdx];
   const COL = {
@@ -113,7 +121,7 @@ function main() {
     chequeNo: header.indexOf('Cheque No'),
     chequeDate: header.indexOf('Cheque Date'),
     bankName: header.indexOf('Bank Name'),
-    remarks: header.indexOf('Remarks'),
+    remarks: header.indexOf('Remarks')
   };
 
   const groups = new Map();
@@ -160,7 +168,7 @@ function main() {
         gross,
         paid,
         reason: 'Old student with ≤₹1000 — possible misclassified registration fee',
-        remarks: r[COL.remarks] || '',
+        remarks: r[COL.remarks] || ''
       });
     }
 
@@ -173,7 +181,7 @@ function main() {
         lateFeeAmount: 0, discountAmount: 0,
         latestDate: '', latestMethod: '', latestRef: '',
         latestChequeDate: '', latestBank: '', latestRemarks: '',
-        receiptNos: [], collectedBy: '',
+        receiptNos: [], collectedBy: ''
       };
       groups.set(key, g);
     }
@@ -231,12 +239,12 @@ function main() {
       g.latestDate, g.latestMethod, `MIG-${g.regNo}-${safeName}`,
       g.latestRef, g.latestChequeDate, g.latestBank, g.collectedBy,
       g.latestDate, g.discountAmount, '',
-      g.concessionAmount, g.lateFeeAmount, session, remarks,
+      g.concessionAmount, g.lateFeeAmount, session, remarks
     ];
     out.push(row.map(csvEscape).join(','));
   }
 
-  fs.writeFileSync(output, out.join('\n') + '\n');
+  fs.writeFileSync(output, `${out.join('\n')  }\n`);
 
   console.log(`✅ Wrote ${out.length - 1} rows to ${output}`);
   console.log(`   Unique students: ${students.size}`);
@@ -246,13 +254,13 @@ function main() {
 
   // Write sanity-check sidecar of suspicious rows
   if (flagged.length > 0) {
-    const flagPath = output.replace(/\.csv$/i, '') + '-flagged.csv';
+    const flagPath = `${output.replace(/\.csv$/i, '')  }-flagged.csv`;
     const flagHeader = ['date', 'receiptNo', 'admissionNumber', 'studentName', 'type', 'grossFees', 'paidAmount', 'reason', 'spisRemarks'];
     const flagRows = [flagHeader.join(',')];
     for (const f of flagged) {
       flagRows.push([f.date, f.receipt, f.regNo, f.studentName, f.type, f.gross, f.paid, f.reason, f.remarks].map(csvEscape).join(','));
     }
-    fs.writeFileSync(flagPath, flagRows.join('\n') + '\n');
+    fs.writeFileSync(flagPath, `${flagRows.join('\n')  }\n`);
     console.log(`\n⚠️  ${flagged.length} suspicious row(s) flagged for review → ${flagPath}`);
     console.log('   Review these and decide whether to relabel them as "New" in the source CSV before re-running.');
   } else {

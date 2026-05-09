@@ -33,25 +33,27 @@ const User = require('../../models/User');
 const args = process.argv.slice(2);
 const EXECUTE = args.includes('--execute');
 
-(async () => {
+(async() => {
   await mongoose.connect(process.env.MONGODB_URI);
   console.log('✓ Connected to MongoDB');
 
   const tenant = await Tenant.findOne({ schoolCode: /spis/i }).lean();
-  if (!tenant) { console.error('SPIS tenant not found'); process.exit(1); }
+  if (!tenant) {
+    console.error('SPIS tenant not found'); process.exit(1);
+  }
   console.log(`✓ Tenant: ${tenant.schoolName} (${tenant.schoolCode})\n`);
 
   const classes = await Class.find({ tenantId: tenant._id }).select('_id name').sort({ name: 1 }).lean();
 
   let classesAffected = 0;
-  let classesSkipped = 0;
+  const classesSkipped = 0;
   const planned = [];
 
   for (const cls of classes) {
     const sections = await Section.find({
       tenantId: tenant._id,
       classId: cls._id,
-      name: { $in: ['F', 'I'] },
+      name: { $in: ['F', 'I'] }
     }).lean();
 
     const f = sections.find(s => s.name === 'F');

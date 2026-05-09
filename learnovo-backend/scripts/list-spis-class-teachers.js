@@ -8,13 +8,15 @@ const Section = require('../models/Section');
 const User = require('../models/User');
 const AcademicSession = require('../models/AcademicSession');
 
-(async () => {
+(async() => {
   await mongoose.connect(process.env.MONGODB_URI);
 
   const tenant = await Tenant.findOne({
     $or: [{ schoolCode: /spis/i }, { subdomain: /spis/i }, { schoolName: /spis/i }]
   }).lean();
-  if (!tenant) { console.log('SPIS tenant not found'); process.exit(1); }
+  if (!tenant) {
+    console.log('SPIS tenant not found'); process.exit(1);
+  }
   console.log(`Tenant: ${tenant.schoolName} (${tenant.schoolCode}) ${tenant._id}\n`);
 
   const session = await AcademicSession.findOne({ tenantId: tenant._id, isActive: true }).lean();
@@ -35,7 +37,7 @@ const AcademicSession = require('../models/AcademicSession');
     .select('_id name fullName firstName lastName employeeId email role').lean();
   const tMap = new Map(teachers.map(t => [String(t._id), t]));
 
-  const fmt = t => t ? `${t.fullName || t.name || `${t.firstName||''} ${t.lastName||''}`.trim()} [empId: ${t.employeeId || '-'}]` : '—';
+  const fmt = t => t ? `${t.fullName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim()} [empId: ${t.employeeId || '-'}]` : '—';
 
   console.log('=== CLASS TEACHERS (Class.classTeacher) ===');
   for (const c of classes) {
@@ -60,4 +62,6 @@ const AcademicSession = require('../models/AcademicSession');
   }
 
   await mongoose.disconnect();
-})().catch(e => { console.error(e); process.exit(1); });
+})().catch(e => {
+  console.error(e); process.exit(1);
+});

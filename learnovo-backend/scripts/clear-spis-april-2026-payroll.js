@@ -8,7 +8,7 @@ const YEAR = 2026;
 const SCHOOL_CODE = 'spis';
 const CONFIRM = process.argv.includes('--confirm');
 
-(async () => {
+(async() => {
   await mongoose.connect(process.env.MONGO_URI || process.env.MONGODB_URI);
 
   const tenant = await Tenant.findOne({ schoolCode: SCHOOL_CODE });
@@ -33,7 +33,7 @@ const CONFIRM = process.argv.includes('--confirm');
   const result = await Payroll.deleteMany(filter);
   console.log(`\nDeleted ${result.deletedCount} payroll record(s).`);
   await mongoose.disconnect();
-})().catch(async (err) => {
+})().catch(async(err) => {
   console.error(err);
   await mongoose.disconnect();
   process.exit(1);
