@@ -5,7 +5,7 @@ import {
   Users, FileText, Search, X, Plus, Receipt, Settings, History,
   Edit, Trash2, Eye, Printer, RotateCcw, Check, Ban, List,
   ArrowUpRight, ArrowDownRight, Download, ChevronDown, ChevronUp,
-  Copy, Upload
+  Copy, Upload, Loader2
 } from 'lucide-react'
 import {
   feesReportsService, invoicesService, paymentsService, feeStructuresService, refundsService, discountsService, allocationsService
@@ -173,15 +173,16 @@ const FeesFinance = () => {
 
   // Collection report query removed — ReportsTab now fetches its own data via getCollectionSummary
 
-  const { data: allReceipts = [], isLoading: receiptsLoading } = useQuery({
-    queryKey: ['fees-receipts', receiptFilters.paymentMethod, receiptFilters.startDate, receiptFilters.endDate, receiptFilters.search],
+  const { data: receiptsResp = { receipts: [], hasMore: false }, isLoading: receiptsLoading, isFetching: receiptsFetching } = useQuery({
+    queryKey: ['fees-receipts', receiptFilters.paymentMethod, receiptFilters.startDate, receiptFilters.endDate, receiptFilters.search, receiptLimit],
     queryFn: async () => {
-      const params = {}
+      const params = { limit: receiptLimit }
       if (receiptFilters.paymentMethod) params.paymentMethod = receiptFilters.paymentMethod
       if (receiptFilters.startDate) params.startDate = receiptFilters.startDate
       if (receiptFilters.endDate) params.endDate = receiptFilters.endDate
       const res = await paymentsService.list(params)
       let data = res.data || []
+      const hasMore = !!res.hasMore
       if (receiptFilters.search) {
         const q = receiptFilters.search.toLowerCase()
         data = data.filter(p =>
@@ -199,10 +200,13 @@ const FeesFinance = () => {
           { key: 'studentId.name', weight: 1 },
         ])
       }
-      return data
+      return { receipts: data, hasMore }
     },
     enabled: !!activeSession && activeTab === 'receipts',
+    keepPreviousData: true,
   })
+  const allReceipts = receiptsResp.receipts || []
+  const receiptsHasMore = !!receiptsResp.hasMore
 
   const { data: disputesData = { disputes: [], stuckPayments: [] }, isLoading: disputesLoading } = useQuery({
     queryKey: ['fees-disputes'],
@@ -401,7 +405,7 @@ const FeesFinance = () => {
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
         {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
         {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} activeSession={activeSession} onExport={handleExportDefaulters} dateFilter={defaultersDateFilter} onDateFilterChange={setDefaultersDateFilter} />}
-        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} filters={receiptFilters} onFilterChange={setReceiptFilters} onClearFilters={() => setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' })} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
+        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} fetching={receiptsFetching} hasMore={receiptsHasMore} onLoadMore={() => setReceiptLimit(l => l + 100)} filters={receiptFilters} onFilterChange={(f) => { setReceiptFilters(f); setReceiptLimit(100) }} onClearFilters={() => { setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' }); setReceiptLimit(100) }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
         {activeTab === 'reports' && <ReportsTab activeSession={activeSession} />}
@@ -1420,7 +1424,7 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
 
 // ── Receipts Tab ──
 
-const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport, onEditPayment, onReversePayment }) => {
+const ReceiptsTab = ({ receipts, loading, fetching, hasMore, onLoadMore, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport, onEditPayment, onReversePayment }) => {
   const [showExportMenu, setShowExportMenu] = useState(false)
   const handleExport = (fmt) => {
     setShowExportMenu(false)
@@ -1470,6 +1474,13 @@ const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilter
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {!loading && receipts.length > 0 && hasMore && (
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-[#38383A] flex justify-center">
+          <button onClick={onLoadMore} disabled={fetching} className="btn btn-outline btn-sm flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
+            {fetching ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading...</> : <><ChevronDown className="h-3.5 w-3.5" /> Load 100 more</>}
+          </button>
         </div>
       )}
     </div>
