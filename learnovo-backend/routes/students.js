@@ -2501,6 +2501,30 @@ router.put('/:id', protect, canAccessStudent, [
       delete updatePayload.password;
     }
 
+    // Email's unique index is partial on { email: { $type: 'string' } }, so an
+    // empty string still collides across students. If client sent blank email,
+    // unset the field rather than writing "".
+    let unsetFields = null;
+    if (Object.prototype.hasOwnProperty.call(updatePayload, 'email')) {
+      const e = typeof updatePayload.email === 'string' ? updatePayload.email.trim() : updatePayload.email;
+      if (!e) {
+        delete updatePayload.email;
+        unsetFields = { ...(unsetFields || {}), email: '' };
+      } else {
+        updatePayload.email = e.toLowerCase();
+      }
+    }
+    // Same idea for rollNumber: '0' / '' should clear the value rather than persist a placeholder.
+    if (Object.prototype.hasOwnProperty.call(updatePayload, 'rollNumber')) {
+      const rn = updatePayload.rollNumber == null ? '' : String(updatePayload.rollNumber).trim();
+      if (!rn || rn === '0') {
+        delete updatePayload.rollNumber;
+        unsetFields = { ...(unsetFields || {}), rollNumber: '' };
+      } else {
+        updatePayload.rollNumber = rn;
+      }
+    }
+
     // Keep name and fullName in sync (StudentForm sends 'name', but fullName is displayed)
     if (updatePayload.name && !updatePayload.fullName) {
       updatePayload.fullName = updatePayload.name;
@@ -2602,9 +2626,12 @@ router.put('/:id', protect, canAccessStudent, [
       } catch { /* non-critical */ }
     }
 
+    const updateOp = unsetFields
+      ? { $set: updatePayload, $unset: unsetFields }
+      : updatePayload;
     const updatedStudent = await User.findByIdAndUpdate(
       req.params.id,
-      updatePayload,
+      updateOp,
       { new: true, runValidators: true }
     ).select('-password');
 
