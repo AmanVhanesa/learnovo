@@ -78,28 +78,37 @@ async function applyPaymentToInvoices(attempt, session, opts = {}) {
     // dashboard's "Total Collected" / "This Month" / "Recent Payments" /
     // method-breakdown widgets all aggregate Payment, so a gateway
     // settlement that only writes Receipt would never show up. Dedupe
-    // via (paymentAttemptId, invoiceId) so a re-run doesn't duplicate.
+    // via (tenantId, invoiceId, paymentAttemptId) so a re-run doesn't
+    // duplicate.
     const existingPayment = await Payment.findOne({
       tenantId: attempt.tenantId,
-      'transactionDetails.transactionId': String(attempt._id),
+      paymentAttemptId: attempt._id,
       invoiceId: invoice._id
     }).session(session);
 
     if (!existingPayment) {
       const paymentReceiptNum = await Payment.generateReceiptNumber(attempt.tenantId);
-      const txnRef = opts.transactionRefId || attempt.gatewayRefId || null;
+      // Field convention (matches Razorpay flow):
+      //   transactionDetails.transactionId  → gateway's bank txn ID (UTR / RRN)
+      //   transactionDetails.referenceNumber → our merchant txn ref sent to bank
+      //   paymentAttemptId (top-level)      → internal PaymentAttempt link (dedup)
+      const gatewayTxnId = opts.transactionRefId || attempt.gatewayRefId || null;
+      const merchantRef = attempt.gatewayRefId || null;
       await Payment.create([{
         tenantId: attempt.tenantId,
         receiptNumber: paymentReceiptNum,
         studentId: attempt.studentId,
         invoiceId: invoice._id,
+        paymentAttemptId: attempt._id,
         academicSessionId: invoice.academicSessionId,
         amount: applyAmount,
         paymentMethod: 'Online',
         paymentDate: opts.paymentDate || new Date(),
         transactionDetails: {
-          transactionId: String(attempt._id),
-          referenceNumber: txnRef
+          transactionId: gatewayTxnId,
+          referenceNumber: merchantRef,
+          ...(opts.onlineMode ? { onlineMode: opts.onlineMode } : {}),
+          ...(opts.onlineMode === 'UPI' && gatewayTxnId ? { upiId: gatewayTxnId } : {})
         },
         remarks: opts.note || `Online payment via gateway (Attempt: ${attempt._id})`,
         isConfirmed: true,

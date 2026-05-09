@@ -40,6 +40,7 @@ const Tenant = require('../../models/Tenant');
 const ICICIOrangeGateway = require('./ICICIOrangeGateway');
 const { logger } = require('../../middleware/errorHandler');
 const { moneyEquals, toNumber } = require('../../utils/money');
+const { mapOnlineMode } = require('../../utils/onlineModeMap');
 const {
   settleSuccessfulAttempt,
   runPostSettlementSideEffects
@@ -284,9 +285,12 @@ async function _applySuccess(attempt, parsed, log) {
       logId: String(log._id)
     } : undefined;
 
+    const onlineMode = mapOnlineMode(parsed.rawPaymentMode);
+
     result = await settleSuccessfulAttempt(attempt, session, {
       gatewayResponseExtras,
       paymentMode: 'ONLINE',
+      onlineMode,
       paymentDate: new Date(),
       transactionRefId: parsed.bankRef || attempt.gatewayRefId || null,
       initiatedBy: 'student',
@@ -318,6 +322,7 @@ async function _applySuccess(attempt, parsed, log) {
     await runPostSettlementSideEffects(attempt, result.invoices, {
       receipts: result.receipts,
       paymentMode: 'Online',
+      onlineMode: mapOnlineMode(parsed.rawPaymentMode),
       paymentDate: new Date(),
       transactionRefId: parsed.bankRef || attempt.gatewayRefId || null
     });

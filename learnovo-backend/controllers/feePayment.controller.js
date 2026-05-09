@@ -6,6 +6,7 @@ const User = require('../models/User');
 const { toNumber } = require('../utils/money');
 const { logger } = require('../middleware/errorHandler');
 const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
+const { mapOnlineMode } = require('../utils/onlineModeMap');
 
 // ─── Initialize Razorpay (lazy load) ────────────────────────────
 let razorpayInstance = null;
@@ -276,7 +277,24 @@ exports.verifyPayment = async(req, res, next) => {
       await invoice.recordPayment(paymentOrder.amount);
     }
 
-    // 3. Create a Payment record (for receipts and accounting)
+    // 3. Fetch the payment from Razorpay to learn which sub-mode the
+    //    student actually used (UPI / card / netbanking / wallet …).
+    //    Best-effort: if the fetch fails, we still record the payment
+    //    without onlineMode rather than failing the verification.
+    let onlineMode;
+    if (razorpayInstance) {
+      try {
+        const rzpPayment = await razorpayInstance.payments.fetch(razorpay_payment_id);
+        onlineMode = mapOnlineMode(rzpPayment?.method);
+      } catch (fetchErr) {
+        logger.warn('Razorpay payment fetch failed (non-fatal)', {
+          paymentId: razorpay_payment_id,
+          error: fetchErr.message
+        });
+      }
+    }
+
+    // 4. Create a Payment record (for receipts and accounting)
     const receiptNumber = await Payment.generateReceiptNumber(paymentOrder.tenantId);
     await Payment.create({
       tenantId: paymentOrder.tenantId,
@@ -289,7 +307,9 @@ exports.verifyPayment = async(req, res, next) => {
       paymentDate: new Date(),
       transactionDetails: {
         transactionId: razorpay_payment_id,
-        referenceNumber: razorpay_order_id
+        referenceNumber: razorpay_order_id,
+        ...(onlineMode ? { onlineMode } : {}),
+        ...(onlineMode === 'UPI' ? { upiId: razorpay_payment_id } : {})
       },
       remarks: `Online payment via Razorpay (Order: ${razorpay_order_id})`,
       isConfirmed: true,            // Online payments are auto-confirmed
@@ -441,6 +461,7 @@ exports.handleWebhook = async(req, res) => {
       });
 
       if (!existingPayment) {
+        const onlineMode = mapOnlineMode(paymentEntity.method);
         const receiptNumber = await Payment.generateReceiptNumber(paymentOrder.tenantId);
         await Payment.create({
           tenantId: paymentOrder.tenantId,
@@ -453,7 +474,9 @@ exports.handleWebhook = async(req, res) => {
           paymentDate: new Date(),
           transactionDetails: {
             transactionId: paymentId,
-            referenceNumber: orderId
+            referenceNumber: orderId,
+            ...(onlineMode ? { onlineMode } : {}),
+            ...(onlineMode === 'UPI' ? { upiId: paymentId } : {})
           },
           remarks: `Online payment via Razorpay webhook (Order: ${orderId})`,
           isConfirmed: true,

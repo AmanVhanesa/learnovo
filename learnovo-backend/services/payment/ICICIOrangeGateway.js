@@ -324,6 +324,8 @@ class ICICIOrangeGateway extends PaymentGateway {
     const amount = payload.amount !== undefined && payload.amount !== null
       ? Number(payload.amount)
       : null;
+    const rawPaymentMode = payload.paymentMode || payload.payMode || payload.paymentMethod
+      || payload.paymentChannel || payload.txnMode || payload.payment_method || null;
 
     return {
       valid: true,
@@ -332,6 +334,7 @@ class ICICIOrangeGateway extends PaymentGateway {
       rawStatus,
       normalisedStatus: this._normaliseStatus(rawStatus),
       amount,
+      rawPaymentMode,
       raw: payload
     };
   }
@@ -376,6 +379,10 @@ class ICICIOrangeGateway extends PaymentGateway {
       'txnStatus', 'status', 'paymentStatus', 'respCode', 'responseCode', 'txnResponseCode'
     );
     const rawAmount = pick('amount', 'txnAmount', 'txn_amount', 'totalAmount');
+    const rawPaymentMode = pick(
+      'paymentMode', 'payMode', 'paymentMethod', 'paymentChannel',
+      'txnMode', 'payment_method', 'payment_mode'
+    );
 
     if (!merchantRef && !bankRef) return null;
 
@@ -384,7 +391,8 @@ class ICICIOrangeGateway extends PaymentGateway {
       bankRef,
       normalisedStatus: this._normaliseStatus(rawStatus),
       rawStatus,
-      amount: rawAmount !== null ? Number(rawAmount) : null
+      amount: rawAmount !== null ? Number(rawAmount) : null,
+      rawPaymentMode
     };
   }
 

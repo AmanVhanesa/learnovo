@@ -14,6 +14,7 @@ const PaymentEditModal = ({ payment, mode, onClose, onSuccess }) => {
   )
   const [depositorName, setDepositorName] = useState(payment.depositorName || '')
   const [referenceNumber, setReferenceNumber] = useState(payment.transactionDetails?.referenceNumber || '')
+  const [onlineMode, setOnlineMode] = useState(payment.transactionDetails?.onlineMode || '')
   const [remarks, setRemarks] = useState(payment.remarks || '')
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
@@ -32,7 +33,11 @@ const PaymentEditModal = ({ payment, mode, onClose, onSuccess }) => {
           paymentDate,
           depositorName,
           remarks,
-          transactionDetails: { ...(payment.transactionDetails || {}), referenceNumber },
+          transactionDetails: {
+            ...(payment.transactionDetails || {}),
+            referenceNumber,
+            ...(paymentMethod === 'Online' ? { onlineMode: onlineMode || undefined } : {})
+          },
         })
         toast.success('Payment updated')
       }
@@ -117,6 +122,24 @@ const PaymentEditModal = ({ payment, mode, onClose, onSuccess }) => {
                   placeholder="Optional"
                 />
               </div>
+              {paymentMethod === 'Online' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Online Mode</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-sm dark:bg-[#1C1C1E] dark:text-white"
+                    value={onlineMode}
+                    onChange={(e) => setOnlineMode(e.target.value)}
+                  >
+                    <option value="">Select online mode…</option>
+                    <option value="UPI">UPI</option>
+                    <option value="NEFT">NEFT</option>
+                    <option value="IMPS">IMPS</option>
+                    <option value="RTGS">RTGS</option>
+                    <option value="Net Banking">Net Banking</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Reference / Txn No.</label>
                 <input

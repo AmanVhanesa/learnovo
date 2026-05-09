@@ -100,16 +100,36 @@ function num(v) {
   return isNaN(n) ? 0 : n;
 }
 
+// SPIS-specific:
+//   - "Card" column in old ERP was used for QR-code UPI payments (no real POS card machine).
+//   - "SWIPE" in remarks meant UPI QR scan, not card swipe.
+//   - "Bank" column with "UNIFIED PAYMENTS" / "NEFT" / "IMPS" / "RTGS" in remarks
+//     stays as top-level "Online" with onlineMode set on transactionDetails.
 function inferPaymentMethod(receipt) {
   const remarks = (receipt.remarks || '').toUpperCase();
   const bn = (receipt.bankName || '').toUpperCase();
   if (receipt.cash > 0 && receipt.bank === 0 && receipt.card === 0) return 'Cash';
-  if (bn.includes('PHONEPAY') || bn.includes('GPAY') || bn.includes('GOOGLE') || remarks.includes('GPAY') || remarks.includes('PHONEPAY')) return 'UPI';
-  if (remarks.includes('UNIFIED PAYMENTS') || remarks.includes('UPI')) return 'UPI';
-  if (receipt.card > 0 || remarks.includes('SWIPE') || remarks.includes('DEBIT CARD')) return 'Card';
+  // Card column or SWIPE remarks at SPIS = UPI QR scan
+  if (receipt.card > 0 || remarks.includes('SWIPE')) return 'UPI';
+  if (bn.includes('PHONEPAY') || bn.includes('PHONEPE') || bn.includes('GPAY') || bn.includes('GOOGLE')) return 'UPI';
+  if (remarks.includes('GPAY') || remarks.includes('PHONEPAY') || remarks.includes('PHONEPE')) return 'UPI';
   if (receipt.bank > 0) return 'Online';
   if (receipt.cash > 0) return 'Cash';
   return 'Cash';
+}
+
+// Returns one of: 'UPI' | 'NEFT' | 'IMPS' | 'RTGS' | 'Net Banking' | 'Other'
+// for paymentMethod === 'Online' only. Used to populate transactionDetails.onlineMode.
+function inferOnlineMode(receipt) {
+  const remarks = (receipt.remarks || '').toUpperCase();
+  const bn = (receipt.bankName || '').toUpperCase();
+  const blob = `${remarks} ${bn}`;
+  if (blob.includes('NEFT')) return 'NEFT';
+  if (blob.includes('IMPS')) return 'IMPS';
+  if (blob.includes('RTGS')) return 'RTGS';
+  if (blob.includes('UNIFIED PAYMENTS') || blob.includes('UPI')) return 'UPI';
+  if (blob.includes('NET BANKING') || blob.includes('NETBANKING') || blob.includes('INB')) return 'Net Banking';
+  return 'Other';
 }
 
 function parseSpisReceipts(csvPath) {
@@ -278,6 +298,9 @@ async function importStudentReceipts({ tenant, session, student, receipts, execu
       } else {
         transactionDetails.referenceNumber = receipt.transactionRef;
       }
+    }
+    if (paymentMethod === 'Online') {
+      transactionDetails.onlineMode = inferOnlineMode(receipt);
     }
 
     for (const { invoice, applied, paidPortion, waiverPortion } of allocatedToInvoices) {

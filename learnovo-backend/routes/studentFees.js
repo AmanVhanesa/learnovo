@@ -1217,13 +1217,26 @@ router.get('/receipts', protect, authorize('student', 'parent'), async(req, res)
 
     const orphanReceipts = [];
     for (const p of payments) {
-      const attemptId = p.transactionDetails?.transactionId || '';
+      // Prefer the top-level paymentAttemptId (set by the new gateway flow).
+      // Fall back to the legacy ICICI convention where transactionDetails.transactionId
+      // held the attempt id — this keeps pre-migration rows displaying correctly
+      // until the swap-icici-payment-fields migration runs.
+      const attemptId = p.paymentAttemptId
+        ? String(p.paymentAttemptId)
+        : (p.transactionDetails?.transactionId || '');
       const invoiceId = String(p.invoiceId?._id || p.invoiceId || '');
       const pairKey = `${attemptId}::${invoiceId}`;
       // Skip if already represented by a Receipt (matched by attempt+invoice,
       // or by invoice alone for non-gateway payments).
       if (attemptId && coveredAttemptInvoicePairs.has(pairKey)) continue;
       if (!attemptId && invoiceId && coveredInvoiceIds.has(invoiceId)) continue;
+
+      // Bank/gateway txn ID — post-migration this lives in transactionId,
+      // pre-migration it lived in referenceNumber. Read both.
+      const gatewayTxnId = p.transactionDetails?.transactionId
+        && String(p.transactionDetails.transactionId) !== attemptId
+        ? p.transactionDetails.transactionId
+        : (p.transactionDetails?.referenceNumber || null);
 
       orphanReceipts.push({
         _id: p._id,
@@ -1234,17 +1247,17 @@ router.get('/receipts', protect, authorize('student', 'parent'), async(req, res)
         amount: p.amount,
         paymentMode: p.paymentMethod,
         paymentDate: p.paymentDate,
-        transactionRefId: p.transactionDetails?.referenceNumber || null,
+        transactionRefId: gatewayTxnId,
         initiatedBy: 'admin',
         issuedAt: p.confirmedAt || p.paymentDate || p.createdAt,
         paymentAttemptId: attemptId
           ? {
             _id: attemptId,
-            gatewayRefId: p.transactionDetails?.referenceNumber || null,
+            gatewayRefId: gatewayTxnId,
             amount: p.amount,
             status: 'SUCCESS',
             paymentMode: p.paymentMethod,
-            transactionRefId: p.transactionDetails?.referenceNumber || null,
+            transactionRefId: gatewayTxnId,
             paymentDate: p.paymentDate
           }
           : null,

@@ -150,13 +150,12 @@ async function main() {
         // Mirror into legacy Payment collection so the Fees & Finance
         // dashboard's Total Collected / This Month / Recent Payments
         // aggregations include this gateway settlement. Dedupe on
-        // (tenantId, transactionDetails.transactionId === attemptId,
-        // invoiceId).
+        // (tenantId, paymentAttemptId, invoiceId).
         if (!DRY_RUN) {
           try {
             const existingPayment = await Payment.findOne({
               tenantId: attempt.tenantId,
-              'transactionDetails.transactionId': String(attempt._id),
+              paymentAttemptId: attempt._id,
               invoiceId: invoice._id
             });
             if (!existingPayment) {
@@ -166,12 +165,14 @@ async function main() {
                 receiptNumber: paymentReceiptNum,
                 studentId: attempt.studentId,
                 invoiceId: invoice._id,
+                paymentAttemptId: attempt._id,
                 academicSessionId: invoice.academicSessionId,
                 amount: incomeAmount,
                 paymentMethod: 'Online',
                 paymentDate: receipt?.paymentDate || attempt.updatedAt || attempt.createdAt || new Date(),
                 transactionDetails: {
-                  transactionId: String(attempt._id),
+                  // gatewayTxnId (UTR/RRN) lives in transactionId; merchant ref in referenceNumber.
+                  transactionId: receipt?.transactionRefId || attempt.gatewayRefId || null,
                   referenceNumber: attempt.gatewayRefId || null
                 },
                 remarks: `Backfilled gateway payment (Attempt: ${attempt._id})`,

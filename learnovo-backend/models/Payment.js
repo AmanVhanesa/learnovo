@@ -41,6 +41,17 @@ const paymentSchema = new mongoose.Schema({
     index: true
   },
 
+  // Link to the originating gateway PaymentAttempt (ICICI Orange / Razorpay).
+  // Set only for gateway-initiated payments — null/absent for cash/cheque
+  // collections recorded directly via the admin UI. Used as the dedup key
+  // so a callback + sweep can't double-create the same Payment row.
+  paymentAttemptId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'PaymentAttempt',
+    index: true,
+    sparse: true
+  },
+
   academicSessionId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AcademicSession',
@@ -67,7 +78,12 @@ const paymentSchema = new mongoose.Schema({
     chequeNumber: String,
     chequeDate: Date,
     upiId: String,
-    referenceNumber: String
+    referenceNumber: String,
+    // Sub-mode when paymentMethod === 'Online'
+    onlineMode: {
+      type: String,
+      enum: ['UPI', 'NEFT', 'IMPS', 'RTGS', 'Net Banking', 'Other']
+    }
   },
 
   paymentDate: {
