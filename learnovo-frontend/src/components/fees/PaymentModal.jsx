@@ -281,7 +281,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
 
     try {
       setIsSaving(true)
-      await paymentsService.collect({
+      const res = await paymentsService.collect({
         studentId: student._id,
         invoiceId: selectedInvoice._id,
         amount,
@@ -291,7 +291,20 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
         remarks: form.remarks,
         depositorName: form.depositorName.trim(),
       })
-      onSuccess()
+      const p = res?.data?.payment
+      if (p?._id) {
+        setCollectedResult({
+          payments: [{
+            _id: p._id,
+            receiptNumber: p.receiptNumber,
+            amount: p.amount,
+            invoiceNumber: selectedInvoice.invoiceNumber,
+          }],
+          totalAmount: p.amount,
+        })
+      } else {
+        onSuccess()
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to collect payment')
     } finally {
@@ -304,6 +317,64 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
       ? 'border-primary-500 text-primary-600 dark:text-primary-400 dark:border-primary-400'
       : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white'
   }`
+
+  if (collectedResult) {
+    const single = collectedResult.payments.length === 1
+    return (
+      <ModalWrapper title="Payment Collected" onClose={onSuccess}>
+        <div className="p-6 sm:p-8 text-center">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="h-9 w-9 text-emerald-500 dark:text-emerald-400" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Payment Collected Successfully</h3>
+          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mb-5">
+            {formatCurrency(collectedResult.totalAmount)} • {collectedResult.payments.length} receipt{single ? '' : 's'}
+          </p>
+
+          <div className="space-y-2 mb-6 text-left">
+            {collectedResult.payments.map((p) => (
+              <div key={p._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(p.amount)}</p>
+                  {p.receiptNumber && (
+                    <p className="text-[11px] text-gray-400 dark:text-[#636366] font-mono">Receipt: {p.receiptNumber}</p>
+                  )}
+                  {p.invoiceNumber && (
+                    <p className="text-[11px] text-gray-400 dark:text-[#636366] truncate">Invoice: {p.invoiceNumber}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {onPrintReceipt && (
+                    <button onClick={() => onPrintReceipt(p._id)} className="btn-icon !p-2" title="Print Receipt">
+                      <Printer className="h-4 w-4" />
+                    </button>
+                  )}
+                  {onDownloadReceipt && (
+                    <button onClick={() => onDownloadReceipt(p._id)} className="btn-icon !p-2" title="Download PDF">
+                      <Download className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col-reverse sm:flex-row items-stretch justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-100 dark:border-[#38383A]">
+            <button type="button" onClick={onSuccess} className="btn btn-outline w-full sm:w-auto">Done</button>
+            {single && onPrintReceipt && (
+              <button
+                type="button"
+                onClick={() => onPrintReceipt(collectedResult.payments[0]._id)}
+                className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
+              >
+                <Printer className="h-4 w-4" /> Print Receipt
+              </button>
+            )}
+          </div>
+        </div>
+      </ModalWrapper>
+    )
+  }
 
   return (
     <ModalWrapper title="Collect Fee Payment" onClose={onClose}>
@@ -754,8 +825,8 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                 </div>
               )}
 
-              {/* Inline discount toggle */}
-              {selectedInvoice && !selectedInvoice.discountAmount && (
+              {/* Inline discount toggle (also used for editing existing discount) */}
+              {selectedInvoice && (!selectedInvoice.discountAmount || isEditingDiscount) && (
                 <div className="border border-gray-100 dark:border-[#38383A] rounded-xl overflow-hidden">
                   <button
                     type="button"
@@ -764,7 +835,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                   >
                     <span className="flex items-center gap-2">
                       <Tag className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                      Apply Discount / Waiver
+                      {isEditingDiscount ? 'Edit Discount / Waiver' : 'Apply Discount / Waiver'}
                     </span>
                     {showDiscount ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </button>
@@ -860,26 +931,68 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                         </div>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={handleApplyDiscount}
-                        disabled={isApplyingDiscount}
-                        className="btn btn-sm w-full bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
-                      >
-                        {isApplyingDiscount ? 'Applying...' : 'Apply Discount'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {isEditingDiscount && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingDiscount(false)
+                              setShowDiscount(false)
+                              setDiscountForm({ type: '', amount: '', percentage: '', reason: '' })
+                            }}
+                            disabled={isApplyingDiscount}
+                            className="btn btn-sm btn-outline disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleApplyDiscount}
+                          disabled={isApplyingDiscount}
+                          className="btn btn-sm flex-1 bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          {isApplyingDiscount
+                            ? (isEditingDiscount ? 'Updating...' : 'Applying...')
+                            : (isEditingDiscount ? 'Update Discount' : 'Apply Discount')}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Already has discount badge */}
-              {selectedInvoice?.discountAmount > 0 && (
+              {/* Already has discount badge with edit/remove */}
+              {selectedInvoice?.discountAmount > 0 && !isEditingDiscount && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
-                  <Tag className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
-                    Discount applied: {formatCurrency(selectedInvoice.discountAmount)}
-                  </span>
+                  <Tag className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                      Discount applied: {formatCurrency(selectedInvoice.discountAmount)}
+                    </p>
+                    {(selectedInvoice.discountType || selectedInvoice.discountReason) && (
+                      <p className="text-[11px] text-emerald-600/80 dark:text-emerald-400/70 truncate">
+                        {selectedInvoice.discountType}{selectedInvoice.discountReason ? ` — ${selectedInvoice.discountReason}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleEditDiscount}
+                    className="p-1.5 rounded-lg text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                    title="Edit discount"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemoveDiscount}
+                    disabled={isRemovingDiscount}
+                    className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                    title="Remove discount"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               )}
 
