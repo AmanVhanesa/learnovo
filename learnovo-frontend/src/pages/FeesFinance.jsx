@@ -94,7 +94,7 @@ const FeesFinance = () => {
   const [studentPayments, setStudentPayments] = useState([])
   const [editingInvoice, setEditingInvoice] = useState(null)
   const [paymentAction, setPaymentAction] = useState(null) // { payment, mode: 'edit' | 'reverse' }
-  const [receiptFilters, setReceiptFilters] = useState({ search: '', paymentMethod: '', startDate: '', endDate: '' })
+  const [receiptFilters, setReceiptFilters] = useState({ search: '', paymentMethod: '', quarter: '', startDate: '', endDate: '' })
   const [receiptLimit, setReceiptLimit] = useState(100)
   const [showFeeImportModal, setShowFeeImportModal] = useState(false)
   const [resolvingDispute, setResolvingDispute] = useState(null)
@@ -174,7 +174,7 @@ const FeesFinance = () => {
   // Collection report query removed — ReportsTab now fetches its own data via getCollectionSummary
 
   const { data: receiptsResp = { receipts: [], hasMore: false }, isLoading: receiptsLoading, isFetching: receiptsFetching } = useQuery({
-    queryKey: ['fees-receipts', receiptFilters.paymentMethod, receiptFilters.startDate, receiptFilters.endDate, receiptFilters.search, receiptLimit],
+    queryKey: ['fees-receipts', receiptFilters.paymentMethod, receiptFilters.quarter, receiptFilters.startDate, receiptFilters.endDate, receiptFilters.search, receiptLimit],
     queryFn: async () => {
       const params = { limit: receiptLimit }
       if (receiptFilters.paymentMethod) params.paymentMethod = receiptFilters.paymentMethod
@@ -183,6 +183,10 @@ const FeesFinance = () => {
       const res = await paymentsService.list(params)
       let data = res.data || []
       const hasMore = !!res.hasMore
+      if (receiptFilters.quarter) {
+        const q = parseInt(receiptFilters.quarter, 10)
+        data = data.filter(p => p.invoiceId?.billingPeriod?.quarter === q)
+      }
       if (receiptFilters.search) {
         const q = receiptFilters.search.toLowerCase()
         data = data.filter(p =>
@@ -405,7 +409,7 @@ const FeesFinance = () => {
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
         {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
         {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} activeSession={activeSession} onExport={handleExportDefaulters} dateFilter={defaultersDateFilter} onDateFilterChange={setDefaultersDateFilter} />}
-        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} fetching={receiptsFetching} hasMore={receiptsHasMore} onLoadMore={() => setReceiptLimit(l => l + 100)} filters={receiptFilters} onFilterChange={(f) => { setReceiptFilters(f); setReceiptLimit(100) }} onClearFilters={() => { setReceiptFilters({ search: '', paymentMethod: '', startDate: '', endDate: '' }); setReceiptLimit(100) }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
+        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} fetching={receiptsFetching} hasMore={receiptsHasMore} onLoadMore={() => setReceiptLimit(l => l + 100)} filters={receiptFilters} onFilterChange={(f) => { setReceiptFilters(f); setReceiptLimit(100) }} onClearFilters={() => { setReceiptFilters({ search: '', paymentMethod: '', quarter: '', startDate: '', endDate: '' }); setReceiptLimit(100) }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
         {activeTab === 'reports' && <ReportsTab activeSession={activeSession} />}
@@ -1436,6 +1440,7 @@ const ReceiptsTab = ({ receipts, loading, fetching, hasMore, onLoadMore, filters
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
         <div className="w-full sm:flex-1 sm:min-w-[200px]"><label className="label mb-1 block text-xs">Search</label><div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-[#636366]" /><input type="text" placeholder="Name, receipt no..." value={filters.search} onChange={e => onFilterChange({ ...filters, search: e.target.value })} className="input pl-9 text-sm" /></div></div>
         <div className="w-full sm:w-auto sm:min-w-[150px]"><label className="label mb-1 block text-xs">Method</label><select value={filters.paymentMethod} onChange={e => onFilterChange({ ...filters, paymentMethod: e.target.value })} className="input text-sm"><option value="">All</option>{['Cash', 'Online', 'Cheque', 'Bank Transfer', 'UPI', 'Card'].map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+        <div className="w-full sm:w-auto sm:min-w-[120px]"><label className="label mb-1 block text-xs">Quarter</label><select value={filters.quarter} onChange={e => onFilterChange({ ...filters, quarter: e.target.value })} className="input text-sm"><option value="">All</option>{[1, 2, 3, 4].map(q => <option key={q} value={q}>{`Q${q}`}</option>)}</select></div>
         <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">From</label><input type="date" value={filters.startDate} onChange={e => onFilterChange({ ...filters, startDate: e.target.value })} className="input text-sm" /></div>
         <div className="w-full sm:w-auto sm:min-w-[140px]"><label className="label mb-1 block text-xs">To</label><input type="date" value={filters.endDate} onChange={e => onFilterChange({ ...filters, endDate: e.target.value })} className="input text-sm" /></div>
         <button onClick={onClearFilters} className="btn btn-outline btn-sm flex items-center justify-center gap-1"><X className="h-3.5 w-3.5" /> Clear</button>
