@@ -42,6 +42,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false)
   const [isEditingDiscount, setIsEditingDiscount] = useState(false)
   const [isRemovingDiscount, setIsRemovingDiscount] = useState(false)
+  const [applyDiscountToAll, setApplyDiscountToAll] = useState(false)
 
   // Post-collection success view (popup-within-modal for receipt printing)
   const [collectedResult, setCollectedResult] = useState(null) // { payments: [{_id, receiptNumber, amount}], totalAmount }
@@ -102,6 +103,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
   useEffect(() => {
     setShowDiscount(false)
     setDiscountForm({ type: '', amount: '', percentage: '', reason: '' })
+    setApplyDiscountToAll(false)
   }, [selectedInvoice?._id])
 
   const discountCalcAmount = useMemo(() => {
@@ -126,6 +128,60 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
     if (!selectedInvoice) return
     if (!discountForm.type) { toast.error('Select a discount type'); return }
     if (!discountForm.reason.trim()) { toast.error('Provide a reason'); return }
+
+    // Bulk apply across all filtered invoices
+    if (applyDiscountToAll && filteredInvoices.length > 1) {
+      if (discountMode === 'percentage') {
+        const pct = parseFloat(discountForm.percentage)
+        if (!pct || pct <= 0 || pct > 100) { toast.error('Enter a valid percentage'); return }
+      } else {
+        const amt = parseFloat(discountForm.amount)
+        if (!amt || amt <= 0) { toast.error('Enter a valid discount amount'); return }
+      }
+
+      try {
+        setIsApplyingDiscount(true)
+        const reason = discountForm.reason.trim()
+        let success = 0
+        const failures = []
+        for (const inv of filteredInvoices) {
+          try {
+            const perInvoiceAmount = discountMode === 'percentage'
+              ? Math.round((parseFloat(discountForm.percentage) / 100) * (inv.totalAmount || 0))
+              : Math.min(parseFloat(discountForm.amount), inv.totalAmount || 0)
+            if (perInvoiceAmount <= 0) continue
+
+            // Remove existing discount on this invoice (if any) so re-apply doesn't get rejected
+            if (inv.discountAmount > 0) {
+              await discountsService.removeDiscount(inv._id)
+            }
+            const payload = {
+              type: discountForm.type,
+              reason,
+              amount: perInvoiceAmount,
+            }
+            if (discountMode === 'percentage') {
+              payload.percentage = parseFloat(discountForm.percentage)
+            }
+            await discountsService.applyDiscount(inv._id, payload)
+            success++
+          } catch (err) {
+            failures.push(inv.invoiceNumber || inv._id)
+          }
+        }
+        if (success > 0) {
+          toast.success(`Discount applied to ${success} invoice${success > 1 ? 's' : ''}${failures.length ? ` (${failures.length} failed)` : ''}`)
+          // Refresh parent data so updated balances/discounts reflect everywhere
+          onSuccess()
+        } else {
+          toast.error('Failed to apply discount to any invoice')
+        }
+      } finally {
+        setIsApplyingDiscount(false)
+      }
+      return
+    }
+
     if (discountCalcAmount <= 0) { toast.error('Enter a valid discount amount'); return }
     if (discountCalcAmount > selectedInvoice.totalAmount) { toast.error('Discount exceeds total amount'); return }
 
@@ -840,8 +896,8 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                 </div>
               )}
 
-              {/* Inline discount toggle (also used for editing existing discount) */}
-              {selectedInvoice && (!selectedInvoice.discountAmount || isEditingDiscount) && (
+              {/* Inline discount toggle (also used for editing existing discount, or bulk apply across period) */}
+              {selectedInvoice && (!selectedInvoice.discountAmount || isEditingDiscount || filteredInvoices.length > 1) && (
                 <div className="border border-gray-100 dark:border-[#38383A] rounded-xl overflow-hidden">
                   <button
                     type="button"
@@ -857,6 +913,27 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
 
                   {showDiscount && (
                     <div className="px-4 pb-4 pt-1 space-y-3 border-t border-gray-100 dark:border-[#38383A] bg-blue-50/30 dark:bg-blue-950/10">
+                      {filteredInvoices.length > 1 && !isEditingDiscount && (
+                        <label className="flex items-start gap-2 px-3 py-2 bg-white dark:bg-[#1C1C1E] rounded-xl border border-blue-200 dark:border-blue-800/40 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={applyDiscountToAll}
+                            onChange={(e) => setApplyDiscountToAll(e.target.checked)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-900 dark:text-white">
+                              Apply to all {filteredInvoices.length} invoices in this period
+                            </p>
+                            <p className="text-[11px] text-gray-500 dark:text-[#8E8E93]">
+                              {discountMode === 'percentage'
+                                ? 'Same percentage applied per-invoice'
+                                : 'Same fixed amount applied per-invoice (capped to invoice total)'}
+                              . Existing discounts on those invoices will be overwritten.
+                            </p>
+                          </div>
+                        </label>
+                      )}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="label mb-1 block text-xs">Type *</label>
@@ -969,7 +1046,9 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                         >
                           {isApplyingDiscount
                             ? (isEditingDiscount ? 'Updating...' : 'Applying...')
-                            : (isEditingDiscount ? 'Update Discount' : 'Apply Discount')}
+                            : (applyDiscountToAll && filteredInvoices.length > 1
+                                ? `Apply to ${filteredInvoices.length} Invoices`
+                                : (isEditingDiscount ? 'Update Discount' : 'Apply Discount'))}
                         </button>
                       </div>
                     </div>
