@@ -173,16 +173,22 @@ const FeesFinance = () => {
 
   // Collection report query removed — ReportsTab now fetches its own data via getCollectionSummary
 
+  // When search/quarter filters are applied client-side, fetch the full result
+  // set (capped at server max) so filtered matches aren't hidden behind the
+  // server-side limit. Otherwise paginate normally via "Load more".
+  const hasClientSideFilters = !!(receiptFilters.search || receiptFilters.quarter)
+  const effectiveReceiptLimit = hasClientSideFilters ? 5000 : receiptLimit
+
   const { data: receiptsResp = { receipts: [], hasMore: false }, isLoading: receiptsLoading, isFetching: receiptsFetching } = useQuery({
-    queryKey: ['fees-receipts', receiptFilters.paymentMethod, receiptFilters.quarter, receiptFilters.startDate, receiptFilters.endDate, receiptFilters.search, receiptLimit],
+    queryKey: ['fees-receipts', receiptFilters.paymentMethod, receiptFilters.quarter, receiptFilters.startDate, receiptFilters.endDate, receiptFilters.search, effectiveReceiptLimit],
     queryFn: async () => {
-      const params = { limit: receiptLimit }
+      const params = { limit: effectiveReceiptLimit }
       if (receiptFilters.paymentMethod) params.paymentMethod = receiptFilters.paymentMethod
       if (receiptFilters.startDate) params.startDate = receiptFilters.startDate
       if (receiptFilters.endDate) params.endDate = receiptFilters.endDate
       const res = await paymentsService.list(params)
       let data = res.data || []
-      const hasMore = !!res.hasMore
+      let hasMore = !!res.hasMore
       if (receiptFilters.quarter) {
         const q = parseInt(receiptFilters.quarter, 10)
         data = data.filter(p => p.invoiceId?.billingPeriod?.quarter === q)
@@ -204,6 +210,9 @@ const FeesFinance = () => {
           { key: 'studentId.name', weight: 1 },
         ])
       }
+      // With client-side filters active we've already pulled the full set,
+      // so suppress the "Load more" affordance — there's nothing more to fetch.
+      if (hasClientSideFilters) hasMore = false
       return { receipts: data, hasMore }
     },
     enabled: !!activeSession && activeTab === 'receipts',
