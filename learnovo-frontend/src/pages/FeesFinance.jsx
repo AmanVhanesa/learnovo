@@ -280,6 +280,18 @@ const FeesFinance = () => {
     } catch { toast.error('Failed to load student data') }
   }
 
+  const refreshSelectedStudentData = async () => {
+    if (!selectedStudent?._id) return
+    try {
+      const res = await invoicesService.getStudentInvoices(selectedStudent._id)
+      setStudentInvoices((res.data || []).filter(inv => ['Pending', 'Partial', 'Overdue'].includes(inv.status)))
+      const paymentsRes = await paymentsService.list({ studentId: selectedStudent._id })
+      setStudentPayments(paymentsRes.data || [])
+      queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['all-invoices'] })
+    } catch { /* silent — modal stays open with prior data */ }
+  }
+
   // ── Receipt handlers ──
 
   const handleViewReceiptPdf = async (paymentId) => {
@@ -1491,7 +1503,7 @@ const ReceiptsTab = ({ receipts, loading, fetching, hasMore, onLoadMore, filters
         </div>
       )}
       {!loading && receipts.length > 0 && hasMore && (
-        <div className="px-5 py-4 border-t border-gray-100 dark:border-[#38383A] flex justify-center items-center gap-2">
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-[#38383A] flex justify-start items-center gap-2">
           <label className="text-xs text-gray-500 dark:text-[#8E8E93]">Load</label>
           <select
             onChange={(e) => { const n = parseInt(e.target.value, 10); if (n) onLoadMore(n); e.target.value = '' }}
