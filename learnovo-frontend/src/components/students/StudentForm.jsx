@@ -117,13 +117,15 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 if (response.data.success && response.data.data) {
                     const sessions = response.data.data
                     setAcademicYearOptions(sessions)
-                    // Auto-select the active year if not editing an existing student
-                    if (!student) {
+                    // Auto-select the active year for new students, or for existing
+                    // students whose stored academicYear is missing/empty (e.g. data
+                    // imported before this field was populated).
+                    const hasStoredYear = !!student?.academicYear
+                    if (!student || !hasStoredYear) {
                         const activeSession = sessions.find(s => s.isActive)
                         if (activeSession) {
                             setForm(prev => ({ ...prev, academicYear: activeSession.name }))
                         } else if (sessions.length > 0) {
-                            // Fall back to the most recent session
                             setForm(prev => ({ ...prev, academicYear: sessions[0].name }))
                         }
                     }

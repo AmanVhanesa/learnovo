@@ -2423,7 +2423,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
 // @access  Private
 router.put('/:id', protect, canAccessStudent, [
   body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters'),
-  body('email').optional().trim().isEmail().withMessage('Please provide a valid email address'),
+  body('email').optional({ checkFalsy: true }).trim().isEmail().withMessage('Please provide a valid email address'),
   body('phone').optional().custom((value) => {
     // Allow empty string or null
     if (!value || value.trim() === '') return true;
@@ -2476,9 +2476,11 @@ router.put('/:id', protect, canAccessStudent, [
     }
 
     // Check if roll number already exists in the same class (if being updated)
-    if (req.body.rollNumber && req.body.class) {
+    // Treat '0' and empty values as "no roll number" — skip duplicate check.
+    const rollNumberValue = req.body.rollNumber ? String(req.body.rollNumber).trim() : '';
+    if (rollNumberValue && rollNumberValue !== '0' && req.body.class) {
       const existingRollNumber = await User.findOne({
-        rollNumber: req.body.rollNumber?.trim(),
+        rollNumber: rollNumberValue,
         class: req.body.class?.trim(),
         section: req.body.section ? req.body.section.trim() : undefined,
         role: 'student',
