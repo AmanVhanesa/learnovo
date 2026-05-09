@@ -1,0 +1,3 @@
+date,receiptNo,admissionNumber,studentName,type,grossFees,paidAmount,reason,spisRemarks
+02-04-2026,25,6020,KANISHKA,Old,700,700,Old student with ≤₹1000 — possible misclassified registration fee,
+05-05-2026,872,5441,AMAN BHURIYA,Old,1000,1,Old student with ≤₹1000 — possible misclassified registration fee,

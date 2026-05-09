@@ -95,6 +95,7 @@ const FeesFinance = () => {
   const [editingInvoice, setEditingInvoice] = useState(null)
   const [paymentAction, setPaymentAction] = useState(null) // { payment, mode: 'edit' | 'reverse' }
   const [receiptFilters, setReceiptFilters] = useState({ search: '', paymentMethod: '', startDate: '', endDate: '' })
+  const [receiptLimit, setReceiptLimit] = useState(100)
   const [showFeeImportModal, setShowFeeImportModal] = useState(false)
   const [resolvingDispute, setResolvingDispute] = useState(null)
   const [resolveForm, setResolveForm] = useState({ action: 'APPROVE', note: '' })
@@ -1453,13 +1454,14 @@ const ReceiptsTab = ({ receipts, loading, filters, onFilterChange, onClearFilter
       {loading ? <LoadingSpinner /> : receipts.length === 0 ? <EmptyState icon={FileText} title="No receipts" description="Try adjusting filters" /> : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
-            <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Receipt No.', 'Student', 'Class', 'Amount', 'Method', 'Date', 'Actions'].map(h => <th key={h} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${h === 'Actions' ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Receipt No.', 'Student', 'Class', 'Period', 'Amount', 'Method', 'Date', 'Actions'].map(h => <th key={h} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${h === 'Actions' ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
             <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-100 dark:divide-[#38383A]">
               {receipts.map((p) => (
                 <tr key={p._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
                   <td className="px-5 py-3 whitespace-nowrap text-sm font-mono font-semibold text-primary-600 dark:text-primary-400">{p.receiptNumber}</td>
                   <td className="px-5 py-3 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{p.studentId?.name || p.studentId?.fullName || 'N/A'}</div><div className="text-xs text-gray-400 dark:text-[#636366]">{p.studentId?.admissionNumber || ''}</div></td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{p.studentId?.classId?.name || '-'}</td>
+                  <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{p.invoiceId?.billingPeriod?.quarter ? `Q${p.invoiceId.billingPeriod.quarter}${p.invoiceId.billingPeriod.year ? ` ${p.invoiceId.billingPeriod.year}` : ''}` : (p.invoiceId?.periodLabel || '-')}</td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(p.amount)}</td>
                   <td className="px-5 py-3 whitespace-nowrap"><span className="px-2 py-0.5 bg-gray-100 dark:bg-[#2C2C2E] text-gray-700 dark:text-[#8E8E93] text-xs rounded-md font-medium">{p.paymentMethod}</span></td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-[#8E8E93]">{new Date(p.paymentDate).toLocaleDateString('en-IN')}</td>

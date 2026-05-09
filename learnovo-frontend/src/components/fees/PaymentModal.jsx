@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { AlertCircle, History, Printer, Tag, ChevronDown, ChevronUp, IndianRupee, CreditCard, Banknote, Smartphone, Building2, FileCheck, Globe, Download } from 'lucide-react'
+import { AlertCircle, History, Printer, Tag, ChevronDown, ChevronUp, IndianRupee, CreditCard, Banknote, Smartphone, Building2, FileCheck, Globe, Download, CheckCircle2, Pencil, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { paymentsService, discountsService } from '../../services/feesService'
 import { formatCurrency } from '../../utils/formatCurrency'
@@ -40,6 +40,11 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
   const [discountMode, setDiscountMode] = useState('fixed')
   const [discountForm, setDiscountForm] = useState({ type: '', amount: '', percentage: '', reason: '' })
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false)
+  const [isEditingDiscount, setIsEditingDiscount] = useState(false)
+  const [isRemovingDiscount, setIsRemovingDiscount] = useState(false)
+
+  // Post-collection success view (popup-within-modal for receipt printing)
+  const [collectedResult, setCollectedResult] = useState(null) // { payments: [{_id, receiptNumber, amount}], totalAmount }
 
   // Extract unique periods/quarters from invoices for filtering (sorted chronologically)
   const periodOptions = useMemo(() => {
@@ -126,6 +131,11 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
 
     try {
       setIsApplyingDiscount(true)
+      // If editing, remove the existing discount first (backend rejects re-apply otherwise)
+      const previousDiscount = isEditingDiscount ? (selectedInvoice.discountAmount || 0) : 0
+      if (isEditingDiscount && previousDiscount > 0) {
+        await discountsService.removeDiscount(selectedInvoice._id)
+      }
       const payload = {
         type: discountForm.type,
         reason: discountForm.reason.trim(),
@@ -135,17 +145,52 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
         payload.percentage = parseFloat(discountForm.percentage)
       }
       await discountsService.applyDiscount(selectedInvoice._id, payload)
-      toast.success('Discount applied successfully')
-      const newBalance = Math.max(0, selectedInvoice.balanceAmount - discountCalcAmount)
-      setSelectedInvoice(inv => ({ ...inv, balanceAmount: newBalance, discountAmount: discountCalcAmount }))
+      toast.success(isEditingDiscount ? 'Discount updated' : 'Discount applied successfully')
+      // Re-derive balance: restore previous discount, then subtract new
+      const baseBalance = (selectedInvoice.balanceAmount || 0) + previousDiscount
+      const newBalance = Math.max(0, baseBalance - discountCalcAmount)
+      setSelectedInvoice(inv => ({ ...inv, balanceAmount: newBalance, discountAmount: discountCalcAmount, discountType: discountForm.type, discountReason: discountForm.reason.trim() }))
       setForm(f => ({ ...f, amount: newBalance }))
       setShowDiscount(false)
+      setIsEditingDiscount(false)
       setDiscountForm({ type: '', amount: '', percentage: '', reason: '' })
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to apply discount')
     } finally {
       setIsApplyingDiscount(false)
     }
+  }
+
+  const handleRemoveDiscount = async () => {
+    if (!selectedInvoice || !(selectedInvoice.discountAmount > 0)) return
+    if (!window.confirm('Remove the applied discount from this invoice?')) return
+    try {
+      setIsRemovingDiscount(true)
+      const previousDiscount = selectedInvoice.discountAmount || 0
+      await discountsService.removeDiscount(selectedInvoice._id)
+      toast.success('Discount removed')
+      const newBalance = (selectedInvoice.balanceAmount || 0) + previousDiscount
+      setSelectedInvoice(inv => ({ ...inv, balanceAmount: newBalance, discountAmount: 0, discountType: undefined, discountReason: undefined }))
+      setForm(f => ({ ...f, amount: newBalance }))
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to remove discount')
+    } finally {
+      setIsRemovingDiscount(false)
+    }
+  }
+
+  const handleEditDiscount = () => {
+    if (!selectedInvoice) return
+    const amt = selectedInvoice.discountAmount || 0
+    setDiscountForm({
+      type: selectedInvoice.discountType || '',
+      amount: String(amt),
+      percentage: '',
+      reason: selectedInvoice.discountReason || '',
+    })
+    setDiscountMode('fixed')
+    setIsEditingDiscount(true)
+    setShowDiscount(true)
   }
 
   // Initialize/refresh bulk selection state when entering multi-mode or when filtered invoices change
@@ -195,7 +240,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
 
     try {
       setIsSaving(true)
-      await paymentsService.collectBulk({
+      const res = await paymentsService.collectBulk({
         studentId: student._id,
         items: items.map(({ invoiceId, amount }) => ({ invoiceId, amount })),
         paymentMethod: form.paymentMethod,
@@ -205,7 +250,17 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
         depositorName: form.depositorName.trim(),
       })
       toast.success(`Collected payment for ${items.length} invoice(s)`)
-      onSuccess()
+      const collected = (res?.data?.payments || []).map(p => ({
+        _id: p._id,
+        receiptNumber: p.receiptNumber,
+        amount: p.amount,
+        invoiceNumber: p.invoiceNumber,
+      }))
+      if (collected.length > 0) {
+        setCollectedResult({ payments: collected, totalAmount: res?.data?.totalAmount || items.reduce((s, i) => s + i.amount, 0) })
+      } else {
+        onSuccess()
+      }
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to collect payment')
     } finally {

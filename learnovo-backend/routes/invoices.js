@@ -1905,16 +1905,22 @@ router.get('/payments', protect, authorize('admin', 'accountant'), async(req, re
       if (endDate) filter.paymentDate.$lte = new Date(endDate);
     }
 
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 5000);
+
     const payments = await Payment.find(filter)
       .populate({ path: 'studentId', select: 'name fullName admissionNumber studentId classId', populate: { path: 'classId', select: 'name' } })
-      .populate('invoiceId', 'invoiceNumber')
+      .populate('invoiceId', 'invoiceNumber periodLabel billingPeriod')
       .populate('collectedBy', 'name')
       .sort({ paymentDate: -1, createdAt: -1 })
-      .limit(100);
+      .limit(limit + 1);
+
+    const hasMore = payments.length > limit;
+    const data = hasMore ? payments.slice(0, limit) : payments;
 
     res.json({
       success: true,
-      data: payments
+      data,
+      hasMore
     });
   } catch (error) {
     logger.error('Get payments error', error);
