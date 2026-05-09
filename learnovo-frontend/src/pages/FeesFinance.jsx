@@ -409,7 +409,7 @@ const FeesFinance = () => {
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
         {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
         {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} activeSession={activeSession} onExport={handleExportDefaulters} dateFilter={defaultersDateFilter} onDateFilterChange={setDefaultersDateFilter} />}
-        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} fetching={receiptsFetching} hasMore={receiptsHasMore} onLoadMore={() => setReceiptLimit(l => l + 100)} filters={receiptFilters} onFilterChange={(f) => { setReceiptFilters(f); setReceiptLimit(100) }} onClearFilters={() => { setReceiptFilters({ search: '', paymentMethod: '', quarter: '', startDate: '', endDate: '' }); setReceiptLimit(100) }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
+        {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} fetching={receiptsFetching} hasMore={receiptsHasMore} onLoadMore={(n = 100) => setReceiptLimit(l => l + n)} filters={receiptFilters} onFilterChange={(f) => { setReceiptFilters(f); setReceiptLimit(100) }} onClearFilters={() => { setReceiptFilters({ search: '', paymentMethod: '', quarter: '', startDate: '', endDate: '' }); setReceiptLimit(100) }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
         {activeTab === 'refunds' && <RefundsTab />}
         {activeTab === 'disputes' && <DisputesTab data={disputesData} loading={disputesLoading} resolvingDispute={resolvingDispute} resolveForm={resolveForm} onSetResolvingDispute={setResolvingDispute} onSetResolveForm={setResolveForm} onResolve={handleResolveDispute} onRefresh={() => queryClient.invalidateQueries({ queryKey: ['fees-disputes'] })} />}
         {activeTab === 'reports' && <ReportsTab activeSession={activeSession} />}
@@ -1482,10 +1482,20 @@ const ReceiptsTab = ({ receipts, loading, fetching, hasMore, onLoadMore, filters
         </div>
       )}
       {!loading && receipts.length > 0 && hasMore && (
-        <div className="px-5 py-4 border-t border-gray-100 dark:border-[#38383A] flex justify-center">
-          <button onClick={onLoadMore} disabled={fetching} className="btn btn-outline btn-sm flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
-            {fetching ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading...</> : <><ChevronDown className="h-3.5 w-3.5" /> Load 100 more</>}
-          </button>
+        <div className="px-5 py-4 border-t border-gray-100 dark:border-[#38383A] flex justify-center items-center gap-2">
+          <label className="text-xs text-gray-500 dark:text-[#8E8E93]">Load</label>
+          <select
+            onChange={(e) => { const n = parseInt(e.target.value, 10); if (n) onLoadMore(n); e.target.value = '' }}
+            disabled={fetching}
+            className="input input-sm text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+            defaultValue=""
+          >
+            <option value="" disabled>Select…</option>
+            <option value="100">100 more</option>
+            <option value="200">200 more</option>
+            <option value="500">500 more</option>
+          </select>
+          {fetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" />}
         </div>
       )}
     </div>
