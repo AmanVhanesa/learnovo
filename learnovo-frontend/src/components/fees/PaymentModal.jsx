@@ -1191,13 +1191,28 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                     />
                   )}
                   {form.paymentMethod === 'Online' && (
-                    <input
-                      type="text"
-                      className="input text-sm"
-                      placeholder="Online Payment Reference / Order ID"
-                      value={form.transactionDetails.onlineRef || ''}
-                      onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, onlineRef: e.target.value } }))}
-                    />
+                    <div className="space-y-2">
+                      <select
+                        className="input text-sm"
+                        value={form.transactionDetails.onlineMode || ''}
+                        onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, onlineMode: e.target.value } }))}
+                      >
+                        <option value="">Select online mode…</option>
+                        <option value="UPI">UPI</option>
+                        <option value="NEFT">NEFT</option>
+                        <option value="IMPS">IMPS</option>
+                        <option value="RTGS">RTGS</option>
+                        <option value="Net Banking">Net Banking</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <input
+                        type="text"
+                        className="input text-sm"
+                        placeholder="Online Payment Reference / Order ID"
+                        value={form.transactionDetails.onlineRef || ''}
+                        onChange={e => setForm(prev => ({ ...prev, transactionDetails: { ...prev.transactionDetails, onlineRef: e.target.value } }))}
+                      />
+                    </div>
                   )}
                 </div>
               )}
