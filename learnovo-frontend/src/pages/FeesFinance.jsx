@@ -1487,7 +1487,7 @@ const ReceiptsTab = ({ receipts, loading, fetching, hasMore, onLoadMore, filters
           <select
             onChange={(e) => { const n = parseInt(e.target.value, 10); if (n) onLoadMore(n); e.target.value = '' }}
             disabled={fetching}
-            className="input input-sm text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+            className="input input-sm text-xs w-32 disabled:opacity-60 disabled:cursor-not-allowed"
             defaultValue=""
           >
             <option value="" disabled>Select…</option>
