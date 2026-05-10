@@ -1240,6 +1240,11 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
   const sortedDefaulters = [...filteredDefaulters].sort((a, b) => {
     const dir = sortAsc ? 1 : -1
     if (sortField === 'name') return dir * ((a.studentId?.fullName || a.studentId?.name || '').localeCompare(b.studentId?.fullName || b.studentId?.name || ''))
+    if (sortField === 'admissionNumber') {
+      const an = a.studentId?.admissionNumber || a.studentId?.studentId || ''
+      const bn = b.studentId?.admissionNumber || b.studentId?.studentId || ''
+      return dir * an.localeCompare(bn, undefined, { numeric: true, sensitivity: 'base' })
+    }
     if (sortField === 'totalBalance') return dir * ((a.liveBalance ?? a.totalBalance ?? 0) - (b.liveBalance ?? b.totalBalance ?? 0))
     if (sortField === 'overdueDays') return dir * ((a.overdueDays ?? 0) - (b.overdueDays ?? 0))
     if (sortField === 'dueDate') return dir * ((a.oldestDueDate ? new Date(a.oldestDueDate).getTime() : 0) - (b.oldestDueDate ? new Date(b.oldestDueDate).getTime() : 0))
@@ -1388,9 +1393,9 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
 
         {sortedDefaulters.length === 0 ? <EmptyState icon={Users} title={searchQuery ? 'No matching defaulters' : 'No defaulters'} description={searchQuery ? 'Try adjusting search' : 'All students are up to date'} /> : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[750px] divide-y divide-gray-200 dark:divide-[#38383A]">
+            <table className="w-full min-w-[850px] divide-y divide-gray-200 dark:divide-[#38383A]">
               <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>
-                {[{ l: 'Student', f: 'name' }, { l: 'Total Due', f: 'totalBalance' }, { l: 'Due Date', f: 'dueDate' }, { l: 'Overdue', f: 'overdueDays' }, { l: 'Invoices' }, { l: 'Contact' }, { l: 'Actions', r: true }].map(c => (
+                {[{ l: 'Adm. No.', f: 'admissionNumber' }, { l: 'Student', f: 'name' }, { l: 'Total Due', f: 'totalBalance' }, { l: 'Due Date', f: 'dueDate' }, { l: 'Overdue', f: 'overdueDays' }, { l: 'Invoices' }, { l: 'Contact' }, { l: 'Actions', r: true }].map(c => (
                   <th key={c.l} onClick={c.f ? () => handleSort(c.f) : undefined} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${c.r ? 'text-right' : 'text-left'} ${c.f ? 'cursor-pointer select-none hover:text-gray-700 dark:hover:text-white' : ''}`}>{c.l}{c.f && <SortIcon field={c.f} />}</th>
                 ))}
               </tr></thead>
@@ -1400,7 +1405,8 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
                     const bal = d.liveBalance ?? d.totalBalance ?? 0, ov = d.overdueDays ?? 0
                     return (
                       <tr key={d._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
-                        <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{d.studentId?.fullName || d.studentId?.name || 'Unknown'}</div><div className="text-xs text-gray-500 dark:text-[#8E8E93]">{d.studentId?.admissionNumber || '-'}{d.studentId?.sectionId?.name ? ` · ${d.studentId.sectionId.name}` : ''}</div></td>
+                        <td className="px-5 py-4 whitespace-nowrap text-sm font-mono text-gray-700 dark:text-gray-300">{d.studentId?.admissionNumber || d.studentId?.studentId || '-'}</td>
+                        <td className="px-5 py-4 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{d.studentId?.fullName || d.studentId?.name || 'Unknown'}</div><div className="text-xs text-gray-500 dark:text-[#8E8E93]">{d.studentId?.sectionId?.name || ''}</div></td>
                         <td className="px-5 py-4 whitespace-nowrap text-sm font-semibold text-red-600 dark:text-red-400">{formatCurrency(bal)}</td>
                         <td className="px-5 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDueDate(d.oldestDueDate)}</td>
                         <td className="px-5 py-4 whitespace-nowrap"><span className={`inline-flex px-2.5 py-0.5 text-xs font-semibold rounded-full ${ov > 60 ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400' : ov > 30 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400' : ov > 0 ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' : 'bg-gray-100 dark:bg-gray-800/30 text-gray-600 dark:text-gray-400'}`}>{ov > 0 ? `${ov} days` : 'Not yet due'}</span></td>
@@ -1414,7 +1420,7 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
                     return groupedSortedDefaulters.map(({ className, list, subtotal }) => (
                       <React.Fragment key={className}>
                         <tr className="bg-gray-50 dark:bg-[#2C2C2E]">
-                          <td colSpan={7} className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200">
+                          <td colSpan={8} className="px-5 py-2 text-xs font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200">
                             <span className="mr-3">{className}</span>
                             <span className="text-gray-500 dark:text-[#8E8E93] font-normal">{list.length} student{list.length === 1 ? '' : 's'} · Outstanding {formatCurrency(subtotal)}</span>
                           </td>
@@ -1451,10 +1457,34 @@ const DefaultersTab = ({ defaulters, loading, classes = [], activeSession, onExp
 
 const ReceiptsTab = ({ receipts, loading, fetching, hasMore, onLoadMore, filters, onFilterChange, onClearFilters, onPrintReceipt, onDownloadReceipt, onExport, onEditPayment, onReversePayment }) => {
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [sortField, setSortField] = useState('paymentDate')
+  const [sortAsc, setSortAsc] = useState(false)
   const handleExport = (fmt) => {
     setShowExportMenu(false)
     onExport(fmt)
   }
+  const sortedReceipts = useMemo(() => {
+    const dir = sortAsc ? 1 : -1
+    const arr = [...receipts]
+    arr.sort((a, b) => {
+      if (sortField === 'admissionNumber') {
+        const an = a.studentId?.admissionNumber || a.studentId?.studentId || ''
+        const bn = b.studentId?.admissionNumber || b.studentId?.studentId || ''
+        return dir * an.localeCompare(bn, undefined, { numeric: true, sensitivity: 'base' })
+      }
+      if (sortField === 'receiptNumber') {
+        return dir * String(a.receiptNumber || '').localeCompare(String(b.receiptNumber || ''), undefined, { numeric: true, sensitivity: 'base' })
+      }
+      if (sortField === 'amount') return dir * ((a.amount || 0) - (b.amount || 0))
+      // paymentDate (default)
+      const ad = a.paymentDate ? new Date(a.paymentDate).getTime() : 0
+      const bd = b.paymentDate ? new Date(b.paymentDate).getTime() : 0
+      return dir * (ad - bd)
+    })
+    return arr
+  }, [receipts, sortField, sortAsc])
+  const SortIcon = ({ field }) => <span className="inline-block ml-1 text-[10px] opacity-50">{sortField === field ? (sortAsc ? '▲' : '▼') : '⇅'}</span>
+  const handleSort = (f) => { if (sortField === f) setSortAsc(!sortAsc); else { setSortField(f); setSortAsc(f === 'admissionNumber' || f === 'receiptNumber') } }
   return (
   <div className="space-y-4">
     <div className="card p-3 sm:p-4">
@@ -1483,13 +1513,26 @@ const ReceiptsTab = ({ receipts, loading, fetching, hasMore, onLoadMore, filters
       <div className="px-5 py-4 border-b border-gray-100 dark:border-[#38383A] flex items-center justify-between"><h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2"><FileText className="h-4 w-4 text-primary-500" /> All Receipts {!loading && <span className="text-xs font-normal text-gray-400 dark:text-[#636366]">({receipts.length})</span>}</h3></div>
       {loading ? <LoadingSpinner /> : receipts.length === 0 ? <EmptyState icon={FileText} title="No receipts" description="Try adjusting filters" /> : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[600px] divide-y divide-gray-200 dark:divide-[#38383A]">
-            <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{['Receipt No.', 'Student', 'Class', 'Period', 'Amount', 'Method', 'Date', 'Actions'].map(h => <th key={h} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${h === 'Actions' ? 'text-right' : 'text-left'}`}>{h}</th>)}</tr></thead>
+          <table className="w-full min-w-[820px] divide-y divide-gray-200 dark:divide-[#38383A]">
+            <thead className="bg-gray-50 dark:bg-[#2C2C2E]"><tr>{[
+                { l: 'Receipt No.', f: 'receiptNumber' },
+                { l: 'Adm. No.', f: 'admissionNumber' },
+                { l: 'Student' },
+                { l: 'Class' },
+                { l: 'Period' },
+                { l: 'Amount', f: 'amount' },
+                { l: 'Method' },
+                { l: 'Date', f: 'paymentDate' },
+                { l: 'Actions', r: true }
+              ].map(c => (
+                <th key={c.l} onClick={c.f ? () => handleSort(c.f) : undefined} className={`px-5 py-3 text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide ${c.r ? 'text-right' : 'text-left'} ${c.f ? 'cursor-pointer select-none hover:text-gray-700 dark:hover:text-white' : ''}`}>{c.l}{c.f && <SortIcon field={c.f} />}</th>
+              ))}</tr></thead>
             <tbody className="bg-white dark:bg-[#1C1C1E] divide-y divide-gray-100 dark:divide-[#38383A]">
-              {receipts.map((p) => (
+              {sortedReceipts.map((p) => (
                 <tr key={p._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
                   <td className="px-5 py-3 whitespace-nowrap text-sm font-mono font-semibold text-primary-600 dark:text-primary-400">{p.receiptNumber}</td>
-                  <td className="px-5 py-3 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{p.studentId?.name || p.studentId?.fullName || 'N/A'}</div><div className="text-xs text-gray-400 dark:text-[#636366]">{p.studentId?.admissionNumber || ''}</div></td>
+                  <td className="px-5 py-3 whitespace-nowrap text-sm font-mono text-gray-700 dark:text-gray-300">{p.studentId?.admissionNumber || p.studentId?.studentId || '-'}</td>
+                  <td className="px-5 py-3 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{p.studentId?.name || p.studentId?.fullName || 'N/A'}</div></td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{p.studentId?.classId?.name || '-'}</td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{p.invoiceId?.billingPeriod?.quarter ? `Q${p.invoiceId.billingPeriod.quarter}${p.invoiceId.billingPeriod.year ? ` ${p.invoiceId.billingPeriod.year}` : ''}` : (p.invoiceId?.periodLabel || '-')}</td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(p.amount)}</td>
