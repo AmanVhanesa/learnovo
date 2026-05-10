@@ -20,7 +20,7 @@ const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Onli
  *     academicSessionId: { _id, name },
  *     liveBalance, totalBalance, unpaidInvoiceCount, oldestDueDate, invoiceIds[], overdueDays }
  */
-async function fetchDefaulters({ tenantId, academicSessionId, classId, sectionId, minBalance, dueDateRange, limit = 1000 }) {
+async function fetchDefaulters({ tenantId, academicSessionId, classId, sectionId, minBalance, dueDateRange, limit = 10000 }) {
   const tenantOid = new mongoose.Types.ObjectId(tenantId);
   const sessionOid = new mongoose.Types.ObjectId(academicSessionId);
 
