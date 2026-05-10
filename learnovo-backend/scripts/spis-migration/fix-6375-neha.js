@@ -183,33 +183,31 @@ function parseArgs() {
     }
   }
 
-  // ── 4. Update AnnualFeeAllocation totals ────────────────────────────
-  console.log('\nSTEP 3 — Update AnnualFeeAllocation totals');
+  // ── 4. Recalculate AnnualFeeAllocation from invoices (source of truth)
+  console.log('\nSTEP 3 — Recalculate AnnualFeeAllocation from invoices');
   const alloc = await AnnualFeeAllocation.findOne({
     tenantId, studentId: student._id
-  });
+  }).lean();
   if (!alloc) {
     console.error('✗ Allocation not found.');
     process.exit(1);
   }
+  console.log(`  before: paid=${alloc.totalPaid} discount=${alloc.totalDiscount} balance=${alloc.balance}`);
 
-  // The reversal lowered totalPaid by originalAmount (only on first run).
-  const paidDelta = reversedAlready ? 0 : -originalAmount;
-
-  const newTotalDiscount = roundToRupee(toNumber(alloc.totalDiscount) + totalDiscountDelta);
-  const newTotalPaid = roundToRupee(toNumber(alloc.totalPaid) + paidDelta);
-  const newBalance = roundToRupee(
-    toNumber(alloc.totalAnnualAmount) - newTotalPaid - newTotalDiscount - toNumber(alloc.totalWaived || 0)
-  );
-  console.log(`  totalPaid     ${alloc.totalPaid} → ${newTotalPaid} (Δ${paidDelta >= 0 ? '+' : ''}${paidDelta})`);
-  console.log(`  totalDiscount ${alloc.totalDiscount} → ${newTotalDiscount} (Δ+${totalDiscountDelta})`);
-  console.log(`  balance       ${alloc.balance} → ${newBalance}`);
-
-  if (execute && (paidDelta !== 0 || totalDiscountDelta !== 0)) {
-    await AnnualFeeAllocation.updateOne(
-      { _id: alloc._id },
-      { $set: { totalPaid: newTotalPaid, totalDiscount: newTotalDiscount, balance: newBalance } }
+  if (execute) {
+    await AnnualFeeAllocation.recalculateFromInvoices(alloc._id);
+    const after = await AnnualFeeAllocation.findById(alloc._id).lean();
+    console.log(`  after:  paid=${after.totalPaid} discount=${after.totalDiscount} balance=${after.balance}`);
+  } else {
+    // Project the post-execute values for the dry-run report.
+    const projectedPaid = 0;          // payment reversed → no remaining payments
+    const projectedDiscount = roundToRupee(
+      TUITION_CONCESSION_PER_QUARTER * 4 + ADMISSION_FEE_DISCOUNT_Q1
     );
+    const projectedBalance = roundToRupee(
+      toNumber(alloc.totalAnnualAmount) - projectedPaid - projectedDiscount
+    );
+    console.log(`  after (projected): paid=${projectedPaid} discount=${projectedDiscount} balance=${projectedBalance}`);
   }
 
   // ── 5. Recalculate StudentBalance ───────────────────────────────────
@@ -227,7 +225,6 @@ function parseArgs() {
   console.log(`  Receipt reversed:    ${reversedAlready ? 'already' : (execute ? 'YES' : 'would')}`);
   console.log(`  Tuition concession:  ₹${TUITION_CONCESSION_PER_QUARTER} × 4 = ₹${TUITION_CONCESSION_PER_QUARTER * 4}`);
   console.log(`  Admission discount:  ₹${ADMISSION_FEE_DISCOUNT_Q1} (Q1 only)`);
-  console.log(`  New annual balance:  ₹${newBalance}`);
 
   if (!execute) {
     console.log('\n  → Re-run with --execute to apply.');
