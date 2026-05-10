@@ -37,6 +37,10 @@ const mongoose = require('mongoose');
 
 const Tenant = require('../models/Tenant');
 const User = require('../models/User');
+// eslint-disable-next-line no-unused-vars
+const Class = require('../models/Class');
+// eslint-disable-next-line no-unused-vars
+const Section = require('../models/Section');
 const AcademicSession = require('../models/AcademicSession');
 const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
 const FeeInvoice = require('../models/FeeInvoice');
