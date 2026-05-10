@@ -2160,6 +2160,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       transportMode, driverId,
       // Student personal/medical fields from form
       dateOfBirth, gender, bloodGroup, religion, category,
+      motherTongue, aadhaarNumber,
       identificationMark, isOrphan, nationality,
       previousSchool, previousBoard, previousRollNumber, transferNotes,
       medicalConditions, allergies, doctorName, doctorPhone, notes
@@ -2362,6 +2363,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       driverId: finalDriverId,
       // Personal details
       dateOfBirth, gender, bloodGroup, religion, category,
+      motherTongue, aadhaarNumber,
       identificationMark, isOrphan, nationality,
       // Academic background
       previousSchool, previousBoard, previousRollNumber, transferNotes,

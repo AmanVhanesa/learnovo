@@ -65,6 +65,7 @@ const Students = () => {
   const [showForm, setShowForm] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
+  const [feeGenPrompt, setFeeGenPrompt] = useState(null) // { id, name } for newly created student
   const [editingStudent, setEditingStudent] = useState(null)
   const [studentToDeactivate, setStudentToDeactivate] = useState(null)
   const [selectedStudents, setSelectedStudents] = useState([])
@@ -206,6 +207,10 @@ const Students = () => {
             duration: 10000
           })
         }
+        const created = result.response?.data || {}
+        const newId = created.id || created._id
+        const newName = created.name || created.fullName
+        if (newId) setFeeGenPrompt({ id: newId, name: newName })
       }
       setShowForm(false)
     },
@@ -1272,6 +1277,41 @@ const Students = () => {
             toast.success(`Successfully imported ${result.success || result.created || 0} students`)
           }}
         />
+      )}
+
+      {/* Fee Generation Prompt (after creating a new student) */}
+      {feeGenPrompt && createPortal(
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-content max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Generate Fees?
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-[#8E8E93] mb-6">
+              {feeGenPrompt.name ? `${feeGenPrompt.name} has been added.` : 'Student added.'} Would you like to generate fees for this student now?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setFeeGenPrompt(null)}
+              >
+                Skip for now
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  const id = feeGenPrompt.id
+                  setFeeGenPrompt(null)
+                  navigate(`/app/fees?student=${id}`)
+                }}
+              >
+                Generate Fees
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Deactivate Student Modal */}

@@ -332,6 +332,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  motherTongue: {
+    type: String,
+    trim: true
+  },
+  aadhaarNumber: {
+    type: String,
+    trim: true
+  },
   penNumber: {
     type: String,
     trim: true

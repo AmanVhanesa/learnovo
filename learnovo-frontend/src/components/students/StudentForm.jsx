@@ -44,6 +44,8 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         gender: student?.gender || 'male',
         bloodGroup: student?.bloodGroup || '',
         religion: student?.religion || '',
+        motherTongue: student?.motherTongue || '',
+        aadhaarNumber: student?.aadhaarNumber || '',
         category: student?.category || '',
         identificationMark: student?.identificationMark || '',
         isOrphan: student?.isOrphan || false,
@@ -492,7 +494,15 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 </div>
 
                 {/* Form Content */}
-                <form onSubmit={handleSubmit} className="p-4 sm:p-6">
+                <form
+                    onSubmit={handleSubmit}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && e.target?.tagName !== 'TEXTAREA' && activeSection !== sections.length - 1) {
+                            e.preventDefault()
+                        }
+                    }}
+                    className="p-4 sm:p-6"
+                >
                     {/* Validation error summary */}
                     {(() => {
                         const visibleErrors = Object.values(formErrors).filter(msg => typeof msg === 'string' && msg.trim())
@@ -902,6 +912,29 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
+                                        <label className="label">Mother Tongue</label>
+                                        <input
+                                            className="input"
+                                            value={form.motherTongue}
+                                            onChange={(e) => updateField('motherTongue', e.target.value)}
+                                            placeholder="e.g., Hindi, Marathi, Tamil"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="label">Aadhaar Number</label>
+                                        <input
+                                            className="input"
+                                            value={form.aadhaarNumber}
+                                            onChange={(e) => updateField('aadhaarNumber', e.target.value.replace(/[^0-9]/g, '').slice(0, 12))}
+                                            placeholder="12-digit Aadhaar"
+                                            inputMode="numeric"
+                                            maxLength={12}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
                                         <label className="label">Identification Mark</label>
                                         <input
                                             className="input"
@@ -1243,14 +1276,16 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                             </button>
                             {activeSection < sections.length - 1 ? (
                                 <button
+                                    key="student-form-next-btn"
                                     type="button"
-                                    onClick={() => setActiveSection(activeSection + 1)}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveSection(activeSection + 1) }}
                                     className="btn btn-primary w-full sm:w-auto"
                                 >
                                     Next
                                 </button>
                             ) : (
                                 <button
+                                    key="student-form-submit-btn"
                                     type="submit"
                                     className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
                                     disabled={isLoading}
