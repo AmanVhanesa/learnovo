@@ -509,7 +509,7 @@ const AllInvoicesTab = ({
                             <button onClick={() => onEditInvoice(invoice)} className="btn-icon !p-1.5 !rounded-lg" title="Edit Invoice">
                               <Edit className="h-4 w-4" />
                             </button>
-                            {invoice.status === 'Pending' && (
+                            {(invoice.paidAmount || 0) === 0 && invoice.status !== 'Cancelled' && (
                               <button onClick={() => handleSingleDelete(invoice._id)} className="!p-1.5 !rounded-lg text-gray-400 dark:text-[#636366] hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Delete Invoice">
                                 <Trash2 className="h-4 w-4" />
                               </button>

@@ -601,8 +601,7 @@ router.delete('/bulk', protect, authorize('admin'), [
     const query = {
       tenantId: req.user.tenantId,
       academicSessionId,
-      status: 'Pending', // Only delete pending invoices
-      paidAmount: 0      // Double check no payments made
+      paidAmount: 0 // Only delete invoices with no payments (Pending + Overdue both qualify)
     };
 
     // If deleteAll is true, skip class filtering — delete all pending invoices for the session
@@ -648,7 +647,6 @@ router.delete('/bulk', protect, authorize('admin'), [
         const fallbackQuery = {
           tenantId: req.user.tenantId,
           academicSessionId,
-          status: 'Pending',
           paidAmount: 0,
           studentId: { $in: studentIds }
         };
@@ -656,20 +654,17 @@ router.delete('/bulk', protect, authorize('admin'), [
         logger.info('Bulk delete fallback query', { fallbackQuery });
         invoicesToDelete = await FeeInvoice.find(fallbackQuery);
 
-        // Soft delete: cancel invoices found via fallback
+        // Hard-delete invoices found via fallback
         if (invoicesToDelete.length > 0) {
           const invoiceIds = invoicesToDelete.map(inv => inv._id);
-          await FeeInvoice.updateMany(
-            { _id: { $in: invoiceIds } },
-            { $set: { status: 'Cancelled', balanceAmount: 0 } }
-          );
+          await FeeInvoice.deleteMany({ _id: { $in: invoiceIds } });
           // Mark as already handled so standard path is skipped
           query._id = { $in: [] };
         }
       }
     } else {
-      // Soft delete: cancel matching invoices
-      await FeeInvoice.updateMany(query, { $set: { status: 'Cancelled', balanceAmount: 0 } });
+      // Hard-delete matching invoices
+      await FeeInvoice.deleteMany(query);
     }
 
     const count = invoicesToDelete.length;
@@ -1045,11 +1040,8 @@ router.delete('/batch', protect, authorize('admin'), [
 
     const deletableIds = deletable.map(inv => inv._id);
 
-    // Soft delete: cancel invoices
-    await FeeInvoice.updateMany(
-      { _id: { $in: deletableIds } },
-      { $set: { status: 'Cancelled', balanceAmount: 0 } }
-    );
+    // Hard-delete unpaid invoices (matches single-delete behavior at DELETE /:id)
+    await FeeInvoice.deleteMany({ _id: { $in: deletableIds } });
 
     // Update student balances
     const distinctStudents = [...new Set(deletable.map(inv => `${inv.studentId}|${inv.academicSessionId}`))];
