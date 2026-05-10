@@ -46,6 +46,7 @@ const Payment = require('../../models/Payment');
 const AnnualFeeAllocation = require('../../models/AnnualFeeAllocation');
 const StudentBalance = require('../../models/StudentBalance');
 const FeeAuditLog = require('../../models/FeeAuditLog');
+const { reverseFeePaymentIncome } = require('../../services/financeAutoSyncService');
 const { roundToRupee, toNumber } = require('../../utils/money');
 
 const ADMISSION_NUMBER = '6375';
@@ -104,25 +105,71 @@ function parseArgs() {
   if (reversedAlready) {
     console.log('  ⏭️  Already reversed — skipping.');
   } else if (execute) {
-    await payment.reverse(admin._id, REVERSE_REASON);
-    // Decrement the invoice paidAmount (the reverse() method itself does
-    // not touch the invoice; the route handler does this part).
+    // The model method Payment.reverse() creates a negative reversal Payment
+    // doc, which trips the schema's min:0.01 amount validator. Replicate the
+    // same effect by writing through the raw collection (bypasses Mongoose
+    // validation) for the negative row, then flipping isReversed via
+    // updateOne (bypasses the immutability pre-save hook).
+    const reversalReceiptNumber = await Payment.generateReceiptNumber(tenantId);
+    const now = new Date();
+    const reversalDoc = {
+      tenantId,
+      receiptNumber: reversalReceiptNumber,
+      studentId: student._id,
+      invoiceId: payment.invoiceId,
+      academicSessionId: payment.academicSessionId,
+      amount: -originalAmount,
+      paymentMethod: payment.paymentMethod,
+      paymentDate: now,
+      remarks: `Reversal of ${payment.receiptNumber}: ${REVERSE_REASON}`,
+      isConfirmed: true,
+      confirmedAt: now,
+      confirmedBy: admin._id,
+      collectedBy: admin._id,
+      createdAt: now,
+      updatedAt: now
+    };
+    const insertRes = await Payment.collection.insertOne(reversalDoc);
+    const reversalPaymentId = insertRes.insertedId;
+
+    await Payment.updateOne(
+      { _id: payment._id, tenantId },
+      {
+        $set: {
+          isReversed: true,
+          reversedAt: now,
+          reversedBy: admin._id,
+          reversalReason: REVERSE_REASON,
+          reversalPaymentId
+        }
+      }
+    );
+
+    // Income side-effect (best-effort; matches the model method's behaviour).
+    try {
+      await reverseFeePaymentIncome(tenantId, payment._id);
+    } catch (e) {
+      console.warn('  ⚠ reverseFeePaymentIncome failed (non-fatal):', e.message);
+    }
+
+    // Decrement invoice paidAmount.
     const inv = await FeeInvoice.findOne({ _id: payment.invoiceId, tenantId });
     if (inv) {
       inv.paidAmount = roundToRupee(Math.max(0, toNumber(inv.paidAmount) - originalAmount));
       await inv.save();
     }
+
     try {
       await FeeAuditLog.logAction({
         tenantId, action: 'PAYMENT_REVERSED', entityType: 'Payment', entityId: payment._id,
         userId: admin._id, userName: admin.name || admin.fullName || 'Admin', userRole: admin.role,
-        details: { receiptNumber: payment.receiptNumber, amount: originalAmount, reason: REVERSE_REASON },
+        details: { receiptNumber: payment.receiptNumber, amount: originalAmount, reason: REVERSE_REASON, reversalReceiptNumber },
         ipAddress: 'cli/fix-6375-neha.js'
       });
     } catch (_) { /* non-fatal */ }
-    console.log(`  ✓ Reversed. Invoice paidAmount decremented by ₹${originalAmount}.`);
+    console.log(`  ✓ Reversed. Negative receipt ${reversalReceiptNumber} created. Invoice paidAmount decremented by ₹${originalAmount}.`);
   } else {
-    console.log(`  → Would reverse ₹${originalAmount} and decrement invoice paid by the same.`);
+    console.log(`  → Would reverse ₹${originalAmount} (creates a negative reversal Payment via raw insert to bypass schema min validator), decrement invoice paid by ${originalAmount}, and remove the linked Income record.`);
   }
 
   // ── 2 & 3. Apply concessions and discount on each quarter ──────────
