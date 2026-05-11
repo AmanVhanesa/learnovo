@@ -211,7 +211,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     const addGuardian = () => {
         setForm(prev => ({
             ...prev,
-            guardians: [...prev.guardians, { relation: 'Mother', name: '', phone: '', email: '', occupation: '', isPrimary: false }]
+            guardians: [...prev.guardians, { relation: 'Mother', name: '', phone: '', email: '', occupation: '', aadhaarNumber: '', isPrimary: false }]
         }))
     }
 
@@ -1150,13 +1150,26 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             </div>
                                         </div>
 
-                                        <div className="mt-4">
-                                            <label className="label">Occupation</label>
-                                            <input
-                                                className="input"
-                                                value={guardian.occupation}
-                                                onChange={(e) => updateGuardian(index, 'occupation', e.target.value)}
-                                            />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                            <div>
+                                                <label className="label">Occupation</label>
+                                                <input
+                                                    className="input"
+                                                    value={guardian.occupation}
+                                                    onChange={(e) => updateGuardian(index, 'occupation', e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="label">Aadhaar Number</label>
+                                                <input
+                                                    className="input"
+                                                    value={guardian.aadhaarNumber || ''}
+                                                    onChange={(e) => updateGuardian(index, 'aadhaarNumber', e.target.value.replace(/\D/g, '').slice(0, 12))}
+                                                    placeholder="12-digit Aadhaar number"
+                                                    inputMode="numeric"
+                                                    maxLength={12}
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
