@@ -119,8 +119,8 @@ async function processStudent(tenant, admissionNumber, admin, execute) {
       `paid ${inv.paidAmount}→${newPaid}, ` +
       `discount ${inv.discountAmount}→${newDiscount}, ` +
       `balance ${inv.balanceAmount}→${newBalance}, ` +
-      `${inv.status}→${status}` +
-      (noChange ? ' (no change)' : ''));
+      `${inv.status}→${status}${
+        noChange ? ' (no change)' : ''}`);
 
     if (execute && !noChange) {
       await FeeInvoice.updateOne(
@@ -136,9 +136,9 @@ async function processStudent(tenant, admissionNumber, admin, execute) {
     if (execute) {
       await AnnualFeeAllocation.recalculateFromInvoices(alloc._id);
       const after = await AnnualFeeAllocation.findById(alloc._id).lean();
-      console.log(`  Allocation: paid=${after.totalPaid} disc=${after.totalDiscount} waived=${after.totalWaived||0} balance=${after.balance}`);
+      console.log(`  Allocation: paid=${after.totalPaid} disc=${after.totalDiscount} waived=${after.totalWaived || 0} balance=${after.balance}`);
     } else {
-      console.log(`  Allocation (current): paid=${alloc.totalPaid} disc=${alloc.totalDiscount} waived=${alloc.totalWaived||0} balance=${alloc.balance}`);
+      console.log(`  Allocation (current): paid=${alloc.totalPaid} disc=${alloc.totalDiscount} waived=${alloc.totalWaived || 0} balance=${alloc.balance}`);
     }
   }
 
@@ -180,13 +180,17 @@ async function processStudent(tenant, admissionNumber, admin, execute) {
   console.log('✓ Connected to MongoDB');
 
   const tenant = await Tenant.findOne({ schoolCode: /spis/i }).lean();
-  if (!tenant) { console.error('SPIS tenant not found'); process.exit(1); }
+  if (!tenant) {
+    console.error('SPIS tenant not found'); process.exit(1);
+  }
   console.log(`✓ Tenant: ${tenant.schoolName} (${tenant.schoolCode})`);
 
   const admin = await User.findOne({
     tenantId: tenant._id, role: 'admin', isActive: true
   }).select('_id name fullName role').lean();
-  if (!admin) { console.error('No active admin user'); process.exit(1); }
+  if (!admin) {
+    console.error('No active admin user'); process.exit(1);
+  }
 
   if (!execute) {
     console.log('═══════════════════════════════════════');
