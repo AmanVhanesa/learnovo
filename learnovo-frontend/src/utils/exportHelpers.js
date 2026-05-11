@@ -92,7 +92,7 @@ export const exportReport = async (filename, { schoolName, reportTitle, headers,
   const headerRow = sheet.addRow(headers);
   headerRow.eachCell((cell) => {
     cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
   });
