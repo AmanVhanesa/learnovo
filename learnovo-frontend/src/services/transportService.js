@@ -74,6 +74,13 @@ export const exportDrivers = async (params = {}) => {
     return response.data;
 };
 
+export const getDriverStudents = async (driverId) => {
+    const response = await axios.get(`${API_URL}/drivers/${driverId}/students`, {
+        headers: getAuthHeader()
+    });
+    return response.data;
+};
+
 export const uploadDriverPhoto = async (driverId, file) => {
     const formData = new FormData();
     formData.append('photo', file);
@@ -313,6 +320,7 @@ export default {
     getExpiringLicenses,
     exportDrivers,
     uploadDriverPhoto,
+    getDriverStudents,
 
     // Vehicles
     getVehicles,

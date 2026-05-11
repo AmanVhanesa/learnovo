@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, Eye, Power, PowerOff, Loader2, CheckCircle } from 'lucide-react';
+import { UserCheck, Plus, Edit, Trash2, X, Search, Camera, Upload, Eye, Power, PowerOff, Loader2, CheckCircle, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import transportService from '../../services/transportService';
 import { formatDate } from '../../utils/formatDate';
@@ -12,6 +12,7 @@ const DriversTab = ({ onStatsUpdate }) => {
     const [showModal, setShowModal] = useState(false);
     const [editingDriver, setEditingDriver] = useState(null);
     const [viewingDriver, setViewingDriver] = useState(null);
+    const [studentsDriver, setStudentsDriver] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -205,6 +206,7 @@ const DriversTab = ({ onStatsUpdate }) => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Driver</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Contact</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">License</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Students</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wider">Actions</th>
                             </tr>
@@ -230,6 +232,20 @@ const DriversTab = ({ onStatsUpdate }) => {
                                         <div className="text-sm text-gray-500 dark:text-[#8E8E93]">
                                             Expires: {formatDate(driver.licenseExpiry)}
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <button
+                                            type="button"
+                                            onClick={() => setStudentsDriver(driver)}
+                                            disabled={!driver.studentCount}
+                                            title={driver.studentCount ? 'View assigned students' : 'No students assigned'}
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${driver.studentCount
+                                                ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-900/60 cursor-pointer'
+                                                : 'bg-gray-100 text-gray-500 dark:bg-[#2C2C2E] dark:text-[#8E8E93] cursor-default'}`}
+                                        >
+                                            <Users className="w-3.5 h-3.5" />
+                                            {driver.studentCount || 0}
+                                        </button>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${driver.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -290,7 +306,137 @@ const DriversTab = ({ onStatsUpdate }) => {
                     onClose={() => setViewingDriver(null)}
                 />
             )}
+
+            {/* Driver Students Modal */}
+            {studentsDriver && (
+                <DriverStudentsModal
+                    driver={studentsDriver}
+                    onClose={() => setStudentsDriver(null)}
+                />
+            )}
         </div>
+    );
+};
+
+// Modal showing all students assigned to a driver, grouped by route
+const DriverStudentsModal = ({ driver, onClose }) => {
+    const [loading, setLoading] = useState(true);
+    const [data, setData] = useState(null);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                setLoading(true);
+                const response = await transportService.getDriverStudents(driver._id);
+                if (!cancelled) setData(response.data);
+            } catch (err) {
+                if (!cancelled) setError(err.response?.data?.message || 'Failed to load students');
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [driver._id]);
+
+    return createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+            <div className="bg-white dark:bg-[#1C1C1E] rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white dark:bg-[#1C1C1E] border-b border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Assigned Students</h2>
+                        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">
+                            {driver.name} · {driver.driverId}
+                            {data && ` · ${data.totalStudents} student${data.totalStudents === 1 ? '' : 's'}`}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-[#8E8E93]">
+                        <X className="w-6 h-6" />
+                    </button>
+                </div>
+
+                <div className="p-6">
+                    {loading ? (
+                        <div className="text-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin text-primary-600 mx-auto" />
+                            <p className="mt-2 text-sm text-gray-600 dark:text-[#8E8E93]">Loading students...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="text-center py-12 text-red-600">{error}</div>
+                    ) : !data || data.totalStudents === 0 ? (
+                        <div className="text-center py-12">
+                            <Users className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                            <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
+                                No students are currently assigned to this driver's routes.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            {data.routes.map(group => (
+                                <div key={group.route._id}>
+                                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-200 dark:border-[#38383A]">
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                                                {group.route.routeName || group.route.routeId}
+                                            </h3>
+                                            {group.route.routeCode && (
+                                                <p className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                                                    {group.route.routeCode}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-semibold">
+                                            {group.count}
+                                        </span>
+                                    </div>
+                                    {group.students.length === 0 ? (
+                                        <p className="text-sm text-gray-500 dark:text-[#8E8E93] italic">No students on this route.</p>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full divide-y divide-gray-200 dark:divide-[#38383A]">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93]">Name</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93]">Admission No</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93]">Class</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93]">Stop</th>
+                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-[#8E8E93]">Type</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100 dark:divide-[#2C2C2E]">
+                                                    {group.students.map(s => (
+                                                        <tr key={s._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
+                                                            <td className="px-3 py-2 text-sm text-gray-900 dark:text-white">{s.name || '—'}</td>
+                                                            <td className="px-3 py-2 text-sm text-gray-600 dark:text-[#8E8E93]">{s.admissionNumber || '—'}</td>
+                                                            <td className="px-3 py-2 text-sm text-gray-600 dark:text-[#8E8E93]">
+                                                                {s.class || '—'}{s.section ? ` · ${s.section}` : ''}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-sm text-gray-600 dark:text-[#8E8E93]">{s.stop || '—'}</td>
+                                                            <td className="px-3 py-2 text-sm text-gray-600 dark:text-[#8E8E93]">{s.transportType || '—'}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="sticky bottom-0 bg-white dark:bg-[#1C1C1E] border-t border-gray-200 dark:border-[#38383A] px-6 py-4 flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body
     );
 };
 
