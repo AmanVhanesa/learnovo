@@ -396,6 +396,10 @@ const userSchema = new mongoose.Schema({
       type: String,
       trim: true
     },
+    aadhaarNumber: {
+      type: String,
+      trim: true
+    },
     isPrimary: {
       type: Boolean,
       default: false

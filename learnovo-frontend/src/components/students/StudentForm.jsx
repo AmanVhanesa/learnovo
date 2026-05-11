@@ -63,6 +63,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             phone: '',
             email: '',
             occupation: '',
+            aadhaarNumber: '',
             isPrimary: true
         }],
         address: student?.address || '',

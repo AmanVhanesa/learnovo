@@ -66,7 +66,10 @@ function parseArgs() {
   console.log('✓ Connected to MongoDB');
 
   const tenant = await Tenant.findOne({ schoolCode: /spis/i }).lean();
-  if (!tenant) { console.error('SPIS tenant not found'); process.exit(1); }
+  if (!tenant) {
+    console.error('SPIS tenant not found');
+    process.exit(1);
+  }
   const tenantId = tenant._id;
 
   const student = await User.findOne({
@@ -74,14 +77,20 @@ function parseArgs() {
     role: 'student',
     admissionNumber: ADMISSION_NUMBER
   }).select('_id name fullName admissionNumber').lean();
-  if (!student) { console.error(`Student ${ADMISSION_NUMBER} not found`); process.exit(1); }
+  if (!student) {
+    console.error(`Student ${ADMISSION_NUMBER} not found`);
+    process.exit(1);
+  }
   console.log(`✓ Student: ${student.name || student.fullName} (#${student.admissionNumber})`);
 
   // Use any active SPIS admin for confirmedBy / userId fields.
   const admin = await User.findOne({
     tenantId, role: 'admin', isActive: true
   }).select('_id name fullName role').lean();
-  if (!admin) { console.error('No active admin user found in SPIS'); process.exit(1); }
+  if (!admin) {
+    console.error('No active admin user found in SPIS');
+    process.exit(1);
+  }
 
   if (!execute) {
     console.log('═══════════════════════════════════════');
