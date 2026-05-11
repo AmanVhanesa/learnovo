@@ -146,7 +146,7 @@ const Reports = () => {
         'Student Name': a.studentName || '',
         Action: a.action || '',
       })))
-      exportReport(`activity_report_${todayStr}.xlsx`, {
+      await exportReport(`activity_report_${todayStr}.xlsx`, {
         schoolName: settings?.institution?.name,
         reportTitle: 'Activity Report',
 
@@ -224,7 +224,7 @@ const Reports = () => {
         Status: s.isActive ? 'Active' : 'Inactive',
       })))
       const activeCount = sorted.filter(s => s.isActive).length
-      exportReport(`enrollment_report_${todayStr}.xlsx`, {
+      await exportReport(`enrollment_report_${todayStr}.xlsx`, {
         schoolName: settings?.institution?.name,
         reportTitle: 'Student Enrollment Report',
         headers, rows, sheetName: 'Enrollment',

@@ -13,6 +13,7 @@
     "date-fns": "^2.30.0",
     "docx": "^9.6.1",
     "docxtemplater": "^3.68.3",
+    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.38.0",
     "html2canvas": "^1.4.1",

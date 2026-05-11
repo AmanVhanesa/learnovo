@@ -3350,7 +3350,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
     let fileExtension;
 
     if (format === 'xlsx' || format === 'excel') {
-      buffer = ImportExportService.exportToExcel(students, columns, 'Students');
+      buffer = await ImportExportService.exportToExcel(students, columns, 'Students');
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       fileExtension = 'xlsx';
     } else {

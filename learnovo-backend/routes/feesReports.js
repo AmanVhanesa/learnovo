@@ -483,7 +483,7 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
     let buffer, contentType, ext;
 
     if (fmt === 'excel') {
-      buffer = ImportExportService.exportToExcel(enriched, columns, 'Defaulters', headerInfo, footerRow);
+      buffer = await ImportExportService.exportToExcel(enriched, columns, 'Defaulters', headerInfo, footerRow);
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       ext = 'xlsx';
     } else {
@@ -1135,7 +1135,7 @@ router.get('/collection-report/export', protect, authorize('admin', 'accountant'
     let buffer, contentType, ext;
 
     if (fmt === 'excel') {
-      buffer = ImportExportService.exportToExcel(data, columns, 'Collection Report', headerInfo);
+      buffer = await ImportExportService.exportToExcel(data, columns, 'Collection Report', headerInfo);
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       ext = 'xlsx';
     } else {

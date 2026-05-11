@@ -171,7 +171,7 @@ const ExportColumnPicker = ({
             toast.loading(`Generating ${selectedFormat.toUpperCase()}…`, { id: toastId });
 
             if (selectedFormat === 'excel' || selectedFormat === 'xlsx') {
-                exportReport(`${safeBase}_${dateStr}.xlsx`, {
+                await exportReport(`${safeBase}_${dateStr}.xlsx`, {
                     schoolName: settings?.institution?.name,
                     reportTitle: title || 'Export',
                     headers, rows, sheetName,

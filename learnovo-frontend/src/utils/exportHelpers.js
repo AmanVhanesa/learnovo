@@ -31,9 +31,8 @@ export const exportData = (baseFilename, rows, format = 'csv') => {
 }
 
 /**
- * Export a branded report as Excel.
- * Header is one line: "School Name — Report Title" then "Generated: date".
- * Same simple format across all exports.
+ * Export a branded report as Excel with professional formatting.
+ * Includes borders, styled headers, alternating rows, and print-ready layout.
  *
  * @param {string} filename - e.g. "overview_report_2026-04-09.xlsx"
  * @param {object} options
@@ -44,56 +43,113 @@ export const exportData = (baseFilename, rows, format = 'csv') => {
  * @param {Array<{label: string, value: string|number}>} [options.summary] - Summary key-value pairs shown below data
  * @param {string} [options.sheetName] - Sheet tab name (default: "Report")
  */
-export const exportReport = (filename, { schoolName, reportTitle, headers, rows, summary, sheetName = 'Report' }) => {
-  const aoa = [];
+export const exportReport = async (filename, { schoolName, reportTitle, headers, rows, summary, sheetName = 'Report' }) => {
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'Learnovo';
+  workbook.created = new Date();
 
-  // Row 1: "School Name — Report Title" in one line
-  const title = [schoolName, reportTitle].filter(Boolean).join(' — ')
-  aoa.push([title || 'Report']);
+  const colCount = headers.length;
+  const sheet = workbook.addWorksheet(sheetName, {
+    pageSetup: {
+      paperSize: 9, // A4
+      orientation: colCount > 8 ? 'landscape' : 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
+    },
+    properties: { defaultRowHeight: 20 }
+  });
 
-  // Row 2: Generated timestamp
-  aoa.push([`Generated: ${new Date().toLocaleString('en-IN')}`]);
+  const thinBorder = { style: 'thin', color: { argb: 'FF000000' } };
+  let currentRow = 0;
 
-  // Blank row before data
-  aoa.push([]);
-
-  // Column headers + data rows
-  aoa.push(headers);
-  rows.forEach(r => aoa.push(r));
-
-  // Summary rows at the bottom
-  if (summary && summary.length > 0) {
-    aoa.push([]);
-    summary.forEach(s => aoa.push([s.label, s.value]));
+  // ── School name row ──
+  const title = [schoolName, reportTitle].filter(Boolean).join(' — ');
+  if (title) {
+    currentRow++;
+    const row = sheet.addRow([title]);
+    sheet.mergeCells(currentRow, 1, currentRow, colCount);
+    row.getCell(1).font = { bold: true, size: 14 };
+    row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+    row.height = 24;
   }
 
-  // Build workbook
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  // ── Generated date row ──
+  currentRow++;
+  const dateRow = sheet.addRow([`Generated: ${new Date().toLocaleString('en-IN')}`]);
+  sheet.mergeCells(currentRow, 1, currentRow, colCount);
+  dateRow.getCell(1).font = { size: 9, italic: true, color: { argb: 'FF777777' } };
+  dateRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
 
-  // Auto-fit column widths
-  const colCount = headers.length;
-  const colWidths = [];
+  // ── Blank separator row ──
+  currentRow++;
+  sheet.addRow([]);
+
+  // ── Column header row ──
+  currentRow++;
+  const headerRow = sheet.addRow(headers);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+  });
+  headerRow.height = 22;
+
+  // ── Data rows ──
+  rows.forEach((r, idx) => {
+    currentRow++;
+    const dataRow = sheet.addRow(r);
+    const isEven = idx % 2 === 0;
+
+    for (let c = 1; c <= colCount; c++) {
+      const cell = dataRow.getCell(c);
+      cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+      cell.font = { size: 10 };
+      cell.alignment = { vertical: 'middle', wrapText: true };
+      if (isEven) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+      }
+      if (!cell.value && cell.value !== 0) cell.value = '';
+    }
+  });
+
+  // ── Summary rows ──
+  if (summary && summary.length > 0) {
+    currentRow++;
+    sheet.addRow([]);
+    summary.forEach(s => {
+      currentRow++;
+      const sRow = sheet.addRow([s.label, s.value]);
+      sRow.getCell(1).font = { bold: true, size: 10 };
+      sRow.getCell(2).font = { size: 10 };
+    });
+  }
+
+  // ── Auto-fit column widths ──
   for (let c = 0; c < colCount; c++) {
     let maxLen = (headers[c] || '').length;
     rows.forEach(r => {
       const val = String(r[c] ?? '');
       if (val.length > maxLen) maxLen = val.length;
     });
-    colWidths.push({ wch: Math.min(40, Math.max(10, maxLen + 2)) });
-  }
-  ws['!cols'] = colWidths;
-
-  // Merge title row across all columns
-  if (colCount > 1) {
-    ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: colCount - 1 } },
-    ];
+    sheet.getColumn(c + 1).width = Math.min(40, Math.max(12, maxLen + 3));
   }
 
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  XLSX.writeFile(wb, filename);
+  // ── Page footer ──
+  sheet.headerFooter.oddFooter = '&CPage &P of &N';
+
+  // ── Generate and download ──
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /**

@@ -511,7 +511,7 @@ const Students = () => {
       if (selectedFormat === 'csv') {
         exportCSV(`students_export_${dateStr}.csv`, [json.headers, ...json.rows])
       } else {
-        exportReport(`students_export_${dateStr}.xlsx`, {
+        await exportReport(`students_export_${dateStr}.xlsx`, {
           schoolName: settings?.institution?.name,
           reportTitle: 'Student List',
           headers: json.headers, rows: json.rows, sheetName: 'Students',

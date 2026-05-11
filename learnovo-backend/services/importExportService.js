@@ -288,57 +288,143 @@ class ImportExportService {
   }
 
   /**
-     * Export data to Excel
+     * Export data to Excel (formatted with borders, styling, and print layout)
      * @param {Array} data - Array of objects to export
      * @param {Array} columns - Column definitions
      * @param {string} sheetName - Sheet name
      * @param {Object} headerInfo - Optional { schoolName, reportTitle, dateTime } for report header
-     * @returns {Buffer} Excel buffer
+     * @returns {Promise<Buffer>} Excel buffer
      */
-  static exportToExcel(data, columns, sheetName = 'Sheet1', headerInfo = null, footerRow = null) {
-    // Prepare data with headers
-    const headers = columns.map(col => col.header || col.key);
-    const rows = data.map(item => {
-      return columns.map(col => {
-        const value = this.getNestedValue(item, col.key);
-        return col.format ? col.format(value) : value;
-      });
+  static async exportToExcel(data, columns, sheetName = 'Sheet1', headerInfo = null, footerRow = null) {
+    const ExcelJS = require('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Learnovo';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet(sheetName, {
+      pageSetup: {
+        paperSize: 9, // A4
+        orientation: columns.length > 8 ? 'landscape' : 'portrait',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+        margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 }
+      },
+      properties: { defaultRowHeight: 20 }
     });
 
-    // Build header rows for school name, report title, date
-    const topRows = [];
+    const colCount = columns.length;
+    const headers = columns.map(col => col.header || col.key);
+
+    // ── Report header rows (school name, title, date) ──
+    let currentRow = 0;
     if (headerInfo) {
-      if (headerInfo.schoolName) topRows.push([headerInfo.schoolName]);
-      if (headerInfo.reportTitle) topRows.push([headerInfo.reportTitle]);
-      const dt = headerInfo.dateTime || `Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}`;
-      if (headerInfo.dateTime !== false) topRows.push([dt]);
-      topRows.push([]); // blank row
-    }
-
-    // Optional footer row appended after data
-    const footerRows = Array.isArray(footerRow) && footerRow.length ? [footerRow] : [];
-
-    // Create worksheet
-    const wsData = [...topRows, headers, ...rows, ...footerRows];
-    const worksheet = xlsx.utils.aoa_to_sheet(wsData);
-
-    // Style header info rows — merge across all columns
-    if (headerInfo && headers.length > 1) {
-      if (!worksheet['!merges']) worksheet['!merges'] = [];
-      for (let i = 0; i < topRows.length - 1; i++) { // -1 to skip blank row
-        worksheet['!merges'].push({ s: { r: i, c: 0 }, e: { r: i, c: headers.length - 1 } });
+      if (headerInfo.schoolName) {
+        currentRow++;
+        const row = sheet.addRow([headerInfo.schoolName]);
+        sheet.mergeCells(currentRow, 1, currentRow, colCount);
+        row.getCell(1).font = { bold: true, size: 14 };
+        row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.height = 24;
       }
+      if (headerInfo.reportTitle) {
+        currentRow++;
+        const row = sheet.addRow([headerInfo.reportTitle]);
+        sheet.mergeCells(currentRow, 1, currentRow, colCount);
+        row.getCell(1).font = { bold: true, size: 11, color: { argb: 'FF444444' } };
+        row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.height = 20;
+      }
+      if (headerInfo.dateTime !== false) {
+        currentRow++;
+        const dt = headerInfo.dateTime || `Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}`;
+        const row = sheet.addRow([dt]);
+        sheet.mergeCells(currentRow, 1, currentRow, colCount);
+        row.getCell(1).font = { size: 9, italic: true, color: { argb: 'FF777777' } };
+        row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+      // Blank separator row
+      currentRow++;
+      sheet.addRow([]);
     }
 
-    // Set column widths based on header lengths
-    worksheet['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 15) }));
+    // ── Column header row ──
+    currentRow++;
+    const headerRow = sheet.addRow(headers);
+    const headerRowNum = currentRow;
+    const thinBorder = { style: 'thin', color: { argb: 'FF000000' } };
 
-    // Create workbook
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, sheetName);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+    });
+    headerRow.height = 22;
+
+    // ── Data rows ──
+    const dataStartRow = currentRow + 1;
+    data.forEach((item, idx) => {
+      const values = columns.map(col => {
+        const value = this.getNestedValue(item, col.key);
+        return col.format ? col.format(value, item) : (value != null ? value : '');
+      });
+      currentRow++;
+      const row = sheet.addRow(values);
+
+      // Alternate row shading
+      const isEven = idx % 2 === 0;
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+        cell.font = { size: 10 };
+        cell.alignment = { vertical: 'middle', wrapText: true };
+        if (isEven) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+        }
+        // Fill empty cells so borders appear on all columns
+        if (!cell.value && cell.value !== 0) cell.value = '';
+      });
+
+      // Ensure all columns have borders even if row has fewer values
+      for (let c = 1; c <= colCount; c++) {
+        const cell = row.getCell(c);
+        if (!cell.border) {
+          cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+        }
+      }
+    });
+
+    // ── Footer row ──
+    if (Array.isArray(footerRow) && footerRow.length) {
+      currentRow++;
+      const fRow = sheet.addRow(footerRow);
+      fRow.eachCell((cell) => {
+        cell.font = { bold: true, size: 10 };
+        cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+        cell.alignment = { vertical: 'middle' };
+      });
+    }
+
+    // ── Auto-fit column widths based on content ──
+    sheet.columns.forEach((col, i) => {
+      let maxLen = headers[i] ? headers[i].length : 10;
+      // Check data values
+      data.forEach(item => {
+        const value = columns[i].format
+          ? columns[i].format(this.getNestedValue(item, columns[i].key), item)
+          : this.getNestedValue(item, columns[i].key);
+        const len = value != null ? String(value).length : 0;
+        if (len > maxLen) maxLen = len;
+      });
+      col.width = Math.min(Math.max(maxLen + 3, 12), 40);
+    });
+
+    // ── Print settings ──
+    sheet.headerFooter.oddFooter = '&CPage &P of &N';
+    sheet.getRow(headerRowNum).commit();
 
     // Generate buffer
-    return xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    return workbook.xlsx.writeBuffer();
   }
 
   /**
