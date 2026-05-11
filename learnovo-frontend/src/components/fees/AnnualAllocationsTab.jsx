@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Users, FileText, AlertCircle, CheckCircle, Calendar, ChevronDown,
-  ChevronUp, Settings, Play, Ban, Percent, Eye, RefreshCw
+  ChevronUp, Settings, Play, Ban, Percent, Eye, RefreshCw, Tag, X, Pencil
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { allocationsService } from '../../services/feesService'
@@ -27,6 +27,9 @@ const AnnualAllocationsTab = ({ activeSession }) => {
   const [expandedAllocation, setExpandedAllocation] = useState(null)
   const [changingPlan, setChangingPlan] = useState(null)
   const [newPlan, setNewPlan] = useState('')
+  const [applyingDiscount, setApplyingDiscount] = useState(null) // allocation _id being edited
+  const [discountMode, setDiscountMode] = useState('fixed') // 'fixed' | 'percentage'
+  const [discountForm, setDiscountForm] = useState({ value: '', reason: '' })
 
   // Fetch classes
   const { data: classes = [] } = useQuery({
@@ -108,6 +111,67 @@ const AnnualAllocationsTab = ({ activeSession }) => {
     },
     onError: (err) => toast.error(err.response?.data?.message || 'Failed to change plan'),
   })
+
+  // Apply / update / remove allocation-level discount (scholarship)
+  const applyDiscountMutation = useMutation({
+    mutationFn: ({ id, data }) => allocationsService.applyDiscount(id, data),
+    onSuccess: (res) => {
+      toast.success(res.message || 'Discount updated')
+      queryClient.invalidateQueries({ queryKey: ['allocations'] })
+      queryClient.invalidateQueries({ queryKey: ['alloc-dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      setApplyingDiscount(null)
+      setDiscountForm({ value: '', reason: '' })
+    },
+    onError: (err) => toast.error(err.response?.data?.message || 'Failed to update discount'),
+  })
+
+  const openDiscountForm = (alloc) => {
+    if (alloc.discountPercentage > 0) {
+      setDiscountMode('percentage')
+      setDiscountForm({ value: String(alloc.discountPercentage), reason: alloc.discountReason || '' })
+    } else if (alloc.discountFixed > 0) {
+      setDiscountMode('fixed')
+      setDiscountForm({ value: String(alloc.discountFixed), reason: alloc.discountReason || '' })
+    } else {
+      setDiscountMode('fixed')
+      setDiscountForm({ value: '', reason: '' })
+    }
+    setApplyingDiscount(alloc._id)
+  }
+
+  const handleApplyDiscount = (alloc) => {
+    const val = parseFloat(discountForm.value)
+    if (!val || val <= 0) { toast.error('Enter a valid discount value'); return }
+    if (discountMode === 'percentage' && val > 100) { toast.error('Percentage cannot exceed 100'); return }
+    if (discountMode === 'fixed' && val > (alloc.totalAnnualAmount || 0)) {
+      toast.error('Discount cannot exceed annual amount'); return
+    }
+    if (!discountForm.reason.trim()) { toast.error('Enter a reason'); return }
+    applyDiscountMutation.mutate({
+      id: alloc._id,
+      data: {
+        discountReason: discountForm.reason.trim(),
+        discountPercentage: discountMode === 'percentage' ? val : 0,
+        discountFixed: discountMode === 'fixed' ? val : 0,
+      },
+    })
+  }
+
+  const handleRemoveDiscount = (alloc) => {
+    if (!window.confirm('Remove the applied discount from this allocation? Future invoices will be regenerated at full amount.')) return
+    applyDiscountMutation.mutate({
+      id: alloc._id,
+      data: { discountPercentage: 0, discountFixed: 0, discountReason: 'Discount removed' },
+    })
+  }
+
+  const handleDiscountKeyDown = (alloc) => (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleApplyDiscount(alloc)
+    }
+  }
 
   const handleGenerate = () => {
     // Use new one-step flow: creates allocations AND invoices together
@@ -336,14 +400,44 @@ const AnnualAllocationsTab = ({ activeSession }) => {
                       </div>
                     </div>
 
-                    {/* Discount info */}
+                    {/* Discount info (with edit/remove when active) */}
                     {(alloc.totalDiscount > 0 || alloc.totalWaived > 0) && (
-                      <div className="text-sm">
-                        {alloc.totalDiscount > 0 && (
-                          <p className="text-green-600">Discount: -{formatCurrency(alloc.totalDiscount)} {alloc.discountReason && `(${alloc.discountReason})`}</p>
-                        )}
-                        {alloc.totalWaived > 0 && (
-                          <p className="text-blue-600">Waived: {formatCurrency(alloc.totalWaived)}</p>
+                      <div className="flex items-start gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
+                        <Tag className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          {alloc.totalDiscount > 0 && (
+                            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                              Discount: -{formatCurrency(alloc.totalDiscount)}
+                              {alloc.discountPercentage > 0 && <span className="ml-1 text-[11px] opacity-75">({alloc.discountPercentage}%)</span>}
+                              {alloc.discountReason && (
+                                <span className="block text-[11px] text-emerald-600/80 dark:text-emerald-400/70 truncate font-normal">
+                                  {alloc.discountReason}
+                                </span>
+                              )}
+                            </p>
+                          )}
+                          {alloc.totalWaived > 0 && (
+                            <p className="text-sm text-blue-600 dark:text-blue-400">Waived: {formatCurrency(alloc.totalWaived)}</p>
+                          )}
+                        </div>
+                        {alloc.status === 'active' && alloc.totalDiscount > 0 && applyingDiscount !== alloc._id && (
+                          <>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openDiscountForm(alloc) }}
+                              className="p-1.5 rounded-lg text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+                              title="Edit discount"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleRemoveDiscount(alloc) }}
+                              disabled={applyDiscountMutation.isPending}
+                              className="p-1.5 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                              title="Remove discount"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </>
                         )}
                       </div>
                     )}
@@ -357,6 +451,126 @@ const AnnualAllocationsTab = ({ activeSession }) => {
                         >
                           <Settings className="h-3 w-3" /> Change Plan
                         </button>
+                        {alloc.totalDiscount === 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openDiscountForm(alloc) }}
+                            className="text-xs px-3 py-1.5 rounded-lg bg-white dark:bg-[#1C1C1E] border border-blue-200 dark:border-blue-800/40 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-1 text-blue-700 dark:text-blue-400"
+                          >
+                            <Tag className="h-3 w-3" /> Apply Discount / Scholarship
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Apply / Edit Discount Inline Form */}
+                    {applyingDiscount === alloc._id && (
+                      <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-[#38383A]" onClick={(e) => e.stopPropagation()}>
+                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                          <Tag className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
+                          {alloc.totalDiscount > 0 ? 'Edit' : 'Apply'} Annual Discount / Scholarship
+                        </p>
+                        <p className="text-[11px] text-gray-500 dark:text-[#8E8E93]">
+                          Applied at the allocation level — distributed proportionally across all {alloc.paymentPlan} invoices. Existing invoices for this allocation will be adjusted.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block">Mode</label>
+                            <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-[#38383A]">
+                              <button
+                                type="button"
+                                onClick={() => setDiscountMode('fixed')}
+                                className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                                  discountMode === 'fixed'
+                                    ? 'bg-primary-600 text-white dark:bg-primary-500'
+                                    : 'bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]'
+                                }`}
+                              >
+                                Fixed ₹
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDiscountMode('percentage')}
+                                className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                                  discountMode === 'percentage'
+                                    ? 'bg-primary-600 text-white dark:bg-primary-500'
+                                    : 'bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]'
+                                }`}
+                              >
+                                Percent %
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500 mb-1 block">
+                              {discountMode === 'percentage' ? 'Percentage *' : 'Amount *'}
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              step="1"
+                              max={discountMode === 'percentage' ? 100 : alloc.totalAnnualAmount}
+                              className="input text-sm"
+                              placeholder={discountMode === 'percentage' ? 'e.g. 25' : 'e.g. 5000'}
+                              value={discountForm.value}
+                              onWheel={(e) => e.target.blur()}
+                              onKeyDown={handleDiscountKeyDown(alloc)}
+                              onChange={(e) => setDiscountForm(f => ({ ...f, value: e.target.value }))}
+                            />
+                            {discountMode === 'percentage' && discountForm.value > 0 && (
+                              <p className="text-[11px] text-primary-600 dark:text-primary-400 font-medium mt-1">
+                                = {formatCurrency(Math.round((parseFloat(discountForm.value) / 100) * (alloc.totalAnnualAmount || 0)))}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Reason *</label>
+                          <input
+                            type="text"
+                            className="input text-sm"
+                            placeholder="e.g. Merit scholarship, sibling discount"
+                            value={discountForm.reason}
+                            onKeyDown={handleDiscountKeyDown(alloc)}
+                            onChange={(e) => setDiscountForm(f => ({ ...f, reason: e.target.value }))}
+                          />
+                        </div>
+
+                        {/* Preview */}
+                        {(() => {
+                          const val = parseFloat(discountForm.value) || 0
+                          if (val <= 0) return null
+                          const discountAmount = discountMode === 'percentage'
+                            ? Math.round((val / 100) * (alloc.totalAnnualAmount || 0))
+                            : Math.min(val, alloc.totalAnnualAmount || 0)
+                          const newBalance = Math.max(0, (alloc.totalAnnualAmount || 0) - discountAmount - (alloc.totalPaid || 0))
+                          return (
+                            <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
+                              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">New annual balance</span>
+                              <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(newBalance)}</span>
+                            </div>
+                          )
+                        })()}
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleApplyDiscount(alloc)}
+                            disabled={applyDiscountMutation.isPending}
+                            className="btn btn-primary text-xs flex-1"
+                          >
+                            {applyDiscountMutation.isPending
+                              ? 'Saving...'
+                              : (alloc.totalDiscount > 0 ? 'Update Discount' : 'Apply Discount')}
+                          </button>
+                          <button
+                            onClick={() => { setApplyingDiscount(null); setDiscountForm({ value: '', reason: '' }) }}
+                            disabled={applyDiscountMutation.isPending}
+                            className="btn btn-outline text-xs"
+                          >
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     )}
 
