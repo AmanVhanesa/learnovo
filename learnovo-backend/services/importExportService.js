@@ -363,7 +363,6 @@ class ImportExportService {
     headerRow.height = 22;
 
     // ── Data rows ──
-    const dataStartRow = currentRow + 1;
     data.forEach((item, idx) => {
       const values = columns.map(col => {
         const value = this.getNestedValue(item, col.key);
@@ -374,7 +373,7 @@ class ImportExportService {
 
       // Alternate row shading
       const isEven = idx % 2 === 0;
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      row.eachCell({ includeEmpty: true }, (cell, _colNumber) => {
         cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
         cell.font = { size: 10 };
         cell.alignment = { vertical: 'middle', wrapText: true };
