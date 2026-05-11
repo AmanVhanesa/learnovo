@@ -37,6 +37,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
 
   // Inline discount state
   const [showDiscount, setShowDiscount] = useState(false)
+  const [showMultiDiscount, setShowMultiDiscount] = useState(false)
   const [discountMode, setDiscountMode] = useState('fixed')
   const [discountForm, setDiscountForm] = useState({ type: '', amount: '', percentage: '', reason: '' })
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false)
@@ -105,6 +106,15 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
     setDiscountForm({ type: '', amount: '', percentage: '', reason: '' })
     setApplyDiscountToAll(false)
   }, [selectedInvoice?._id])
+
+  // Reset discount UI when toggling between single / multi collect modes
+  useEffect(() => {
+    setShowDiscount(false)
+    setShowMultiDiscount(false)
+    setIsEditingDiscount(false)
+    setApplyDiscountToAll(false)
+    setDiscountForm({ type: '', amount: '', percentage: '', reason: '' })
+  }, [collectMode])
 
   const discountCalcAmount = useMemo(() => {
     if (discountMode === 'percentage') {
@@ -248,6 +258,85 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
     setIsEditingDiscount(true)
     setShowDiscount(true)
   }
+
+  // Prevent Enter inside discount fields from submitting the parent collect form.
+  // Trigger the appropriate apply-discount action instead.
+  const handleDiscountKeyDown = (apply) => (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      apply()
+    }
+  }
+
+  // Apply discount/waiver to all currently-checked invoices in multi mode
+  const handleApplyDiscountToSelected = async () => {
+    if (!discountForm.type) { toast.error('Select a discount type'); return }
+    if (!discountForm.reason.trim()) { toast.error('Provide a reason'); return }
+
+    const targets = filteredInvoices.filter(inv => bulkSelected[inv._id]?.checked)
+    if (targets.length === 0) { toast.error('Select at least one invoice to apply discount'); return }
+
+    if (discountMode === 'percentage') {
+      const pct = parseFloat(discountForm.percentage)
+      if (!pct || pct <= 0 || pct > 100) { toast.error('Enter a valid percentage'); return }
+    } else {
+      const amt = parseFloat(discountForm.amount)
+      if (!amt || amt <= 0) { toast.error('Enter a valid discount amount'); return }
+    }
+
+    try {
+      setIsApplyingDiscount(true)
+      const reason = discountForm.reason.trim()
+      let success = 0
+      const failures = []
+      for (const inv of targets) {
+        try {
+          const perInvoiceAmount = discountMode === 'percentage'
+            ? Math.round((parseFloat(discountForm.percentage) / 100) * (inv.totalAmount || 0))
+            : Math.min(parseFloat(discountForm.amount), inv.totalAmount || 0)
+          if (perInvoiceAmount <= 0) continue
+
+          if (inv.discountAmount > 0) {
+            await discountsService.removeDiscount(inv._id)
+          }
+          const payload = {
+            type: discountForm.type,
+            reason,
+            amount: perInvoiceAmount,
+          }
+          if (discountMode === 'percentage') {
+            payload.percentage = parseFloat(discountForm.percentage)
+          }
+          await discountsService.applyDiscount(inv._id, payload)
+          success++
+        } catch (err) {
+          failures.push(inv.invoiceNumber || inv._id)
+        }
+      }
+      if (success > 0) {
+        toast.success(`Discount applied to ${success} invoice${success > 1 ? 's' : ''}${failures.length ? ` (${failures.length} failed)` : ''}`)
+        setShowMultiDiscount(false)
+        setDiscountForm({ type: '', amount: '', percentage: '', reason: '' })
+        onSuccess()
+      } else {
+        toast.error('Failed to apply discount to any invoice')
+      }
+    } finally {
+      setIsApplyingDiscount(false)
+    }
+  }
+
+  const multiDiscountTotal = useMemo(() => {
+    const targets = filteredInvoices.filter(inv => bulkSelected[inv._id]?.checked)
+    return targets.reduce((sum, inv) => {
+      if (discountMode === 'percentage') {
+        const pct = parseFloat(discountForm.percentage || 0)
+        return sum + Math.round((pct / 100) * (inv.totalAmount || 0))
+      }
+      const amt = parseFloat(discountForm.amount || 0)
+      return sum + Math.min(amt, inv.totalAmount || 0)
+    }, 0)
+  }, [filteredInvoices, bulkSelected, discountMode, discountForm.amount, discountForm.percentage])
 
   // Initialize/refresh bulk selection state when entering multi-mode or when filtered invoices change
   useEffect(() => {
@@ -591,6 +680,141 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                   </div>
                 )}
               </div>
+
+              {/* Inline discount / waiver for selected invoices (multi mode) */}
+              {filteredInvoices.length > 0 && (
+                <div className="border border-gray-100 dark:border-[#38383A] rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowMultiDiscount(!showMultiDiscount)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                      Apply Discount / Waiver to Selected Invoices
+                      {bulkSelectedCount > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                          {bulkSelectedCount}
+                        </span>
+                      )}
+                    </span>
+                    {showMultiDiscount ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+
+                  {showMultiDiscount && (
+                    <div className="px-4 pb-4 pt-1 space-y-3 border-t border-gray-100 dark:border-[#38383A] bg-blue-50/30 dark:bg-blue-950/10">
+                      <p className="text-[11px] text-gray-500 dark:text-[#8E8E93]">
+                        {discountMode === 'percentage'
+                          ? 'Same percentage applied per selected invoice.'
+                          : 'Same fixed amount applied per selected invoice (capped to each invoice total).'}
+                        {' '}Existing discounts on these invoices will be overwritten.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="label mb-1 block text-xs">Type *</label>
+                          <select
+                            className="input text-xs"
+                            value={discountForm.type}
+                            onChange={e => setDiscountForm(f => ({ ...f, type: e.target.value }))}
+                          >
+                            <option value="">Select...</option>
+                            {DISCOUNT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label mb-1 block text-xs">Mode</label>
+                          <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-[#38383A]">
+                            <button
+                              type="button"
+                              onClick={() => setDiscountMode('fixed')}
+                              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                                discountMode === 'fixed'
+                                  ? 'bg-primary-600 text-white dark:bg-primary-500'
+                                  : 'bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]'
+                              }`}
+                            >
+                              Fixed ₹
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDiscountMode('percentage')}
+                              className={`flex-1 py-2 text-xs font-medium transition-colors ${
+                                discountMode === 'percentage'
+                                  ? 'bg-primary-600 text-white dark:bg-primary-500'
+                                  : 'bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]'
+                              }`}
+                            >
+                              Percent %
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {discountMode === 'fixed' ? (
+                        <div>
+                          <label className="label mb-1 block text-xs">Amount per Invoice *</label>
+                          <input
+                            type="number" min="1" step="1"
+                            className="input text-xs"
+                            placeholder="e.g. 500"
+                            value={discountForm.amount}
+                            onWheel={preventScrollChange}
+                            onKeyDown={handleDiscountKeyDown(handleApplyDiscountToSelected)}
+                            onChange={e => setDiscountForm(f => ({ ...f, amount: e.target.value }))}
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="label mb-1 block text-xs">Percentage *</label>
+                          <input
+                            type="number" min="1" max="100" step="1"
+                            className="input text-xs"
+                            placeholder="e.g. 10"
+                            value={discountForm.percentage}
+                            onWheel={preventScrollChange}
+                            onKeyDown={handleDiscountKeyDown(handleApplyDiscountToSelected)}
+                            onChange={e => setDiscountForm(f => ({ ...f, percentage: e.target.value }))}
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="label mb-1 block text-xs">Reason *</label>
+                        <input
+                          type="text"
+                          className="input text-xs"
+                          placeholder="e.g. Scholarship awarded"
+                          value={discountForm.reason}
+                          onKeyDown={handleDiscountKeyDown(handleApplyDiscountToSelected)}
+                          onChange={e => setDiscountForm(f => ({ ...f, reason: e.target.value }))}
+                        />
+                      </div>
+
+                      {bulkSelectedCount > 0 && multiDiscountTotal > 0 && (
+                        <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/30">
+                          <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                            Total discount across {bulkSelectedCount} invoice{bulkSelectedCount === 1 ? '' : 's'}
+                          </span>
+                          <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(multiDiscountTotal)}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleApplyDiscountToSelected}
+                        disabled={isApplyingDiscount || bulkSelectedCount === 0}
+                        className="btn btn-sm w-full bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50"
+                      >
+                        {isApplyingDiscount
+                          ? 'Applying...'
+                          : bulkSelectedCount === 0
+                            ? 'Select invoices to apply'
+                            : `Apply Discount to ${bulkSelectedCount} Invoice${bulkSelectedCount === 1 ? '' : 's'}`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Quarter / Period filter */}
               {periodOptions.length > 0 && (
@@ -1012,6 +1236,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                             placeholder="e.g. 500"
                             value={discountForm.amount}
                             onWheel={preventScrollChange}
+                            onKeyDown={handleDiscountKeyDown(handleApplyDiscount)}
                             onChange={e => setDiscountForm(f => ({ ...f, amount: e.target.value }))}
                           />
                         </div>
@@ -1024,6 +1249,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                             placeholder="e.g. 10"
                             value={discountForm.percentage}
                             onWheel={preventScrollChange}
+                            onKeyDown={handleDiscountKeyDown(handleApplyDiscount)}
                             onChange={e => setDiscountForm(f => ({ ...f, percentage: e.target.value }))}
                           />
                           {discountForm.percentage > 0 && (
@@ -1039,6 +1265,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                           className="input text-xs"
                           placeholder="e.g. Scholarship awarded"
                           value={discountForm.reason}
+                          onKeyDown={handleDiscountKeyDown(handleApplyDiscount)}
                           onChange={e => setDiscountForm(f => ({ ...f, reason: e.target.value }))}
                         />
                       </div>
