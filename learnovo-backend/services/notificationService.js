@@ -1,6 +1,7 @@
 const Notification = require('../models/Notification');
 const NotificationPreference = require('../models/NotificationPreference');
 const User = require('../models/User');
+const { applyDateRange } = require('../utils/dateRange');
 
 /**
  * Notification Service
@@ -229,11 +230,7 @@ async function getNotifications(userId, tenantId, options = {}) {
     query.category = category;
   }
 
-  if (startDate || endDate) {
-    query.createdAt = {};
-    if (startDate) query.createdAt.$gte = new Date(startDate);
-    if (endDate) query.createdAt.$lte = new Date(endDate);
-  }
+  applyDateRange(query, 'createdAt', startDate, endDate);
 
   const skip = (page - 1) * limit;
 

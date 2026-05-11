@@ -5,6 +5,7 @@ const { handleValidationErrors } = require('../middleware/validation');
 const Notification = require('../models/Notification');
 const NotificationPreference = require('../models/NotificationPreference');
 const Announcement = require('../models/Announcement');
+const { applyDateRange } = require('../utils/dateRange');
 
 /**
  * Get IDs of expired announcements for a tenant.
@@ -179,12 +180,7 @@ router.get('/', protect, [
       query.category = req.query.category;
     }
 
-    if (req.query.startDate && req.query.endDate) {
-      query.createdAt = {
-        $gte: new Date(req.query.startDate),
-        $lte: new Date(req.query.endDate)
-      };
-    }
+    applyDateRange(query, 'createdAt', req.query.startDate, req.query.endDate);
 
     // Exclude notifications for expired announcements
     addExpiredAnnouncementFilter(query, expiredIds);

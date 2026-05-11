@@ -6,6 +6,7 @@ const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const Income = require('../models/Income');
 const IncomeCategory = require('../models/IncomeCategory');
+const { applyDateRange } = require('../utils/dateRange');
 
 // All routes require auth + admin role
 router.use(protect, authorize('admin'));
@@ -42,11 +43,7 @@ router.get('/summary/category', async(req, res, next) => {
     const { startDate, endDate, academicSessionId } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
     if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
-    if (startDate || endDate) {
-      filter.incomeDate = {};
-      if (startDate) filter.incomeDate.$gte = new Date(startDate);
-      if (endDate) filter.incomeDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'incomeDate', startDate, endDate);
 
     const categoryData = await Income.aggregate([
       { $match: filter },
@@ -138,11 +135,7 @@ router.get('/export', async(req, res, next) => {
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
     if (academicSessionId) filter.academicSessionId = academicSessionId;
 
-    if (startDate || endDate) {
-      filter.incomeDate = {};
-      if (startDate) filter.incomeDate.$gte = new Date(startDate);
-      if (endDate) filter.incomeDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'incomeDate', startDate, endDate);
     if (category) filter.category = category;
     if (paymentMethod) filter.paymentMethod = paymentMethod;
 
@@ -206,11 +199,7 @@ router.get('/', [
       filter.referenceType = 'fee_payment';
       filter.isSystemGenerated = true;
     }
-    if (startDate || endDate) {
-      filter.incomeDate = {};
-      if (startDate) filter.incomeDate.$gte = new Date(startDate);
-      if (endDate) filter.incomeDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'incomeDate', startDate, endDate);
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },

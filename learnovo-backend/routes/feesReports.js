@@ -6,6 +6,7 @@ const Payment = require('../models/Payment');
 const { protect, authorize } = require('../middleware/auth');
 const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, sumMoney } = require('../utils/money');
+const { buildDateRange, applyDateRange } = require('../utils/dateRange');
 const ImportExportService = require('../services/importExportService');
 
 const PAYMENT_METHODS = ['Cash', 'UPI', 'Bank Transfer', 'Cheque', 'Card', 'Online'];
@@ -208,7 +209,7 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
 
     // Total Collected — Payment has no academicSessionId, so filter via invoice lookup
     const collectedPipeline = [
-      { $match: { tenantId, isConfirmed: true, isReversed: false, ...(startDate || endDate ? { paymentDate: { ...(startDate && { $gte: new Date(startDate) }), ...(endDate && { $lte: new Date(endDate) }) } } : {}) } }
+      { $match: { tenantId, isConfirmed: true, isReversed: false, ...(buildDateRange(startDate, endDate) ? { paymentDate: buildDateRange(startDate, endDate) } : {}) } }
     ];
     if (sessionObjectId) {
       collectedPipeline.push(
@@ -290,11 +291,7 @@ router.get('/dashboard', protect, authorize('admin', 'accountant'), async(req, r
       isReversed: false
     };
     if (sessionObjectId) methodFilter.academicSessionId = sessionObjectId;
-    if (startDate || endDate) {
-      methodFilter.paymentDate = {};
-      if (startDate) methodFilter.paymentDate.$gte = new Date(startDate);
-      if (endDate) methodFilter.paymentDate.$lte = new Date(endDate);
-    }
+    applyDateRange(methodFilter, 'paymentDate', startDate, endDate);
     const methodBreakdown = await Payment.aggregate([
       { $match: methodFilter },
       {
@@ -519,11 +516,7 @@ router.get('/collection-report', protect, authorize('admin', 'accountant'), asyn
 
     if (academicSessionId) filter.academicSessionId = academicSessionId;
 
-    if (startDate || endDate) {
-      filter.paymentDate = {};
-      if (startDate) filter.paymentDate.$gte = new Date(startDate);
-      if (endDate) filter.paymentDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'paymentDate', startDate, endDate);
 
     if (paymentMethod) filter.paymentMethod = paymentMethod;
 
@@ -1067,15 +1060,7 @@ router.get('/collection-report/export', protect, authorize('admin', 'accountant'
 
     if (paymentMethod) filter.paymentMethod = paymentMethod;
 
-    if (startDate || endDate) {
-      filter.paymentDate = {};
-      if (startDate) filter.paymentDate.$gte = new Date(startDate);
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        filter.paymentDate.$lte = end;
-      }
-    }
+    applyDateRange(filter, 'paymentDate', startDate, endDate);
 
     let payments = await Payment.find(filter)
       .populate('studentId', 'name fullName admissionNumber studentId classId')

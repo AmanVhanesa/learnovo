@@ -9,6 +9,7 @@ const AcademicSession = require('../models/AcademicSession');
 const Result = require('../models/Result');
 const { v4: uuidv4 } = require('uuid');
 const { logger } = require('../middleware/errorHandler');
+const { applyDateRange } = require('../utils/dateRange');
 
 // Default class sequence fallback when no hierarchy configured
 const DEFAULT_CLASS_SEQUENCE = [
@@ -1240,11 +1241,7 @@ async function getTransitionHistory({ tenantId, studentId, type, batchId, fromDa
   if (studentId) query.studentId = studentId;
   if (type) query.type = type;
   if (batchId) query.batchId = batchId;
-  if (fromDate || toDate) {
-    query.createdAt = {};
-    if (fromDate) query.createdAt.$gte = new Date(fromDate);
-    if (toDate) query.createdAt.$lte = new Date(toDate);
-  }
+  applyDateRange(query, 'createdAt', fromDate, toDate);
 
   const total = await TransitionLog.countDocuments(query);
   const logs = await TransitionLog.find(query)

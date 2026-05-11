@@ -15,6 +15,7 @@ const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { logger } = require('../middleware/errorHandler');
 const { toNumber, roundToRupee, sumMoney, validateAmount } = require('../utils/money');
+const { applyDateRange } = require('../utils/dateRange');
 
 const planGate = require('../middleware/planGate');
 const { syncFeePaymentToIncome } = require('../services/financeAutoSyncService');
@@ -739,11 +740,7 @@ router.get('/', protect, authorize('admin', 'accountant'), async(req, res) => {
     if (classId) baseFilter.classId = classId;
     if (academicSessionId) baseFilter.academicSessionId = academicSessionId;
 
-    if (startDate || endDate) {
-      baseFilter.issuedDate = {};
-      if (startDate) baseFilter.issuedDate.$gte = new Date(startDate);
-      if (endDate) baseFilter.issuedDate.$lte = new Date(endDate);
-    }
+    applyDateRange(baseFilter, 'issuedDate', startDate, endDate);
 
     // Query filter includes status for the actual data fetch
     const queryFilter = { ...baseFilter };
@@ -1891,11 +1888,7 @@ router.get('/payments', protect, authorize('admin', 'accountant'), async(req, re
     if (invoiceId) filter.invoiceId = invoiceId;
     if (paymentMethod) filter.paymentMethod = paymentMethod;
 
-    if (startDate || endDate) {
-      filter.paymentDate = {};
-      if (startDate) filter.paymentDate.$gte = new Date(startDate);
-      if (endDate) filter.paymentDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'paymentDate', startDate, endDate);
 
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 5000);
 

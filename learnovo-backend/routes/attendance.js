@@ -10,6 +10,7 @@ const Section = require('../models/Section');
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
+const { applyDateRange } = require('../utils/dateRange');
 
 // ─── Helper: check if date is a holiday ─────────────────────────────────────
 async function isHoliday(tenantId, date, appliesTo = 'all') {
@@ -912,9 +913,7 @@ router.get('/report', protect, async(req, res) => {
     const { startDate, endDate, classId, studentId } = req.query;
     const filter = { tenantId: req.user.tenantId };
 
-    if (startDate && endDate) {
-      filter.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
-    }
+    applyDateRange(filter, 'date', startDate, endDate);
     if (classId) filter.classId = classId;
 
     const attendanceRecords = await Attendance.find(filter)

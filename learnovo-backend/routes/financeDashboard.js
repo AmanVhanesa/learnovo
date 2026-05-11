@@ -6,6 +6,7 @@ const Income = require('../models/Income');
 const Expense = require('../models/Expense');
 const FeeInvoice = require('../models/FeeInvoice');
 const Payment = require('../models/Payment');
+const { applyDateRange } = require('../utils/dateRange');
 
 // All routes require auth + admin role
 router.use(protect, authorize('admin'));
@@ -199,11 +200,7 @@ router.get('/expense-breakdown', async(req, res, next) => {
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
     if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
 
-    if (startDate || endDate) {
-      filter.expenseDate = {};
-      if (startDate) filter.expenseDate.$gte = new Date(startDate);
-      if (endDate) filter.expenseDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'expenseDate', startDate, endDate);
 
     const breakdown = await Expense.aggregate([
       { $match: filter },
@@ -248,20 +245,14 @@ router.get('/report', async(req, res, next) => {
     const { startDate, endDate, format = 'json', academicSessionId } = req.query;
     const tenantId = req.user.tenantId;
 
-    const dateFilter = {};
-    if (startDate) dateFilter.$gte = new Date(startDate);
-    if (endDate) dateFilter.$lte = new Date(endDate);
-
     const incomeFilter = { tenantId, isDeleted: false };
     const expenseFilter = { tenantId, isDeleted: false };
     if (academicSessionId) {
       incomeFilter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
       expenseFilter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
     }
-    if (startDate || endDate) {
-      incomeFilter.incomeDate = dateFilter;
-      expenseFilter.expenseDate = dateFilter;
-    }
+    applyDateRange(incomeFilter, 'incomeDate', startDate, endDate);
+    applyDateRange(expenseFilter, 'expenseDate', startDate, endDate);
 
     const [incomes, expenses, incomeByCat, expenseByCat] = await Promise.all([
       Income.find(incomeFilter)
@@ -366,11 +357,7 @@ router.get('/income-breakdown', async(req, res, next) => {
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
     if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
 
-    if (startDate || endDate) {
-      filter.incomeDate = {};
-      if (startDate) filter.incomeDate.$gte = new Date(startDate);
-      if (endDate) filter.incomeDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'incomeDate', startDate, endDate);
 
     const breakdown = await Income.aggregate([
       { $match: filter },

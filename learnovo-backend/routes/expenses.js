@@ -7,6 +7,7 @@ const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const { logger } = require('../middleware/errorHandler');
 const { roundToRupee, sumMoney } = require('../utils/money');
+const { applyDateRange } = require('../utils/dateRange');
 const Expense = require('../models/Expense');
 const ExpenseCategory = require('../models/ExpenseCategory');
 const ExpenseBudget = require('../models/ExpenseBudget');
@@ -46,11 +47,7 @@ router.get('/summary/category', async(req, res, next) => {
     const { startDate, endDate, academicSessionId } = req.query;
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
     if (academicSessionId) filter.academicSessionId = new mongoose.Types.ObjectId(academicSessionId);
-    if (startDate || endDate) {
-      filter.expenseDate = {};
-      if (startDate) filter.expenseDate.$gte = new Date(startDate);
-      if (endDate) filter.expenseDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'expenseDate', startDate, endDate);
 
     const categoryData = await Expense.aggregate([
       { $match: filter },
@@ -158,11 +155,7 @@ router.get('/export', async(req, res, next) => {
     const filter = { tenantId: req.user.tenantId, isDeleted: false };
     if (academicSessionId) filter.academicSessionId = academicSessionId;
 
-    if (startDate || endDate) {
-      filter.expenseDate = {};
-      if (startDate) filter.expenseDate.$gte = new Date(startDate);
-      if (endDate) filter.expenseDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'expenseDate', startDate, endDate);
     if (category) filter.category = category;
     if (status) filter.status = status;
     if (paymentMethod) filter.paymentMethod = paymentMethod;
@@ -479,11 +472,7 @@ router.get('/', [
       filter.referenceType = 'payroll';
       filter.isSystemGenerated = true;
     }
-    if (startDate || endDate) {
-      filter.expenseDate = {};
-      if (startDate) filter.expenseDate.$gte = new Date(startDate);
-      if (endDate) filter.expenseDate.$lte = new Date(endDate);
-    }
+    applyDateRange(filter, 'expenseDate', startDate, endDate);
     if (search) {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },
