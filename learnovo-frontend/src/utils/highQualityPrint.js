@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf';
  * @param {string} [filename='document'] - PDF filename without extension
  * @param {Object} [options]
  * @param {number} [options.scale=3] - Canvas scale factor (3 ≈ 288 DPI)
- * @param {'a4'|'a5'|'letter'} [options.format='a5'] - Page format
+ * @param {'a4'|'a5'|'letter'} [options.format='a4'] - Page format
  * @param {'portrait'|'landscape'} [options.orientation='portrait']
  * @param {number} [options.margin=10] - Page margin in mm
  * @returns {Promise<void>}
@@ -18,7 +18,7 @@ import { jsPDF } from 'jspdf';
 export async function highQualityPrint(element, filename = 'document', options = {}) {
   const {
     scale = 3,
-    format = 'a5',
+    format = 'a4',
     orientation = 'portrait',
     margin = 10,
   } = options;
@@ -128,14 +128,16 @@ export async function highQualityPrint(element, filename = 'document', options =
 
 /**
  * Print an existing certificate by fetching its PDF from the backend
- * and downloading it so the user can open it in their system's native
- * PDF viewer (e.g. Preview on macOS) for the best print quality.
+ * and opening the browser's print dialog.
  *
  * This bypasses html2canvas entirely — the backend Puppeteer-rendered
  * PDF is the source of truth, so output is pixel-perfect.
  *
+ * Opens the PDF in a new window and triggers the system print dialog,
+ * allowing users to print directly without downloading first.
+ *
  * @param {string} certId - Certificate ID
- * @param {string} [filename='certificate.pdf'] - Download filename
+ * @param {string} [filename='certificate.pdf'] - Filename for print dialog
  * @returns {Promise<void>}
  */
 export async function printCertificatePdf(certId, filename = 'certificate.pdf') {
@@ -153,14 +155,25 @@ export async function printCertificatePdf(certId, filename = 'certificate.pdf') 
   const blob = await response.blob();
   const pdfUrl = URL.createObjectURL(blob);
 
-  // Download the PDF so the user can open it in their system's native
-  // PDF viewer which provides the highest quality print output.
-  const link = document.createElement('a');
-  link.href = pdfUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  // Open the PDF in a new window so the browser's native print dialog
+  // can be triggered. This allows users to print directly.
+  const printWindow = window.open(pdfUrl);
 
-  setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+  if (printWindow) {
+    // Wait a moment for the PDF to load, then trigger print dialog
+    printWindow.onload = () => {
+      printWindow.print();
+    };
+  } else {
+    // Fallback if popup is blocked: download instead
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // Clean up after 2 minutes (print typically finishes quickly)
+  setTimeout(() => URL.revokeObjectURL(pdfUrl), 120000);
 }
