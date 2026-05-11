@@ -5,7 +5,7 @@ import React from 'react';
  * Used by both CertificateGeneration and CertificateManager preview modals.
  *
  * Dimensions & fonts match the backend tc-minimal.html / bonafide-minimal.html templates
- * (559×794 px A5 page, Playfair Display headings, Helvetica Neue body).
+ * (595×842 px A4 page, Playfair Display headings, Helvetica Neue body).
  *
  * Props:
  *  - type: 'TC' | 'BONAFIDE'
@@ -56,8 +56,8 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
 
     return (
         <div style={{
-            width: 559,
-            height: 794,
+            width: 595,
+            height: 842,
             position: 'relative',
             overflow: 'hidden',
             background: '#f9fafb',
