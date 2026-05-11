@@ -19,7 +19,7 @@ const PAYMENT_METHODS = [
   { value: 'Online', label: 'Online', icon: Globe },
 ]
 
-const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDownloadReceipt, onClose, onSuccess }) => {
+const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDownloadReceipt, onDownloadConsolidatedReceipt, onClose, onSuccess }) => {
   const [activeTab, setActiveTab] = useState('collect')
   const [collectMode, setCollectMode] = useState('single') // 'single' | 'multi'
   const [selectedQuarter, setSelectedQuarter] = useState('all')
@@ -313,7 +313,12 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
         invoiceNumber: p.invoiceNumber,
       }))
       if (collected.length > 0) {
-        setCollectedResult({ payments: collected, totalAmount: res?.data?.totalAmount || items.reduce((s, i) => s + i.amount, 0) })
+        setCollectedResult({
+          payments: collected,
+          totalAmount: res?.data?.totalAmount || items.reduce((s, i) => s + i.amount, 0),
+          transactionGroupId: res?.data?.transactionGroupId || null,
+          groupReceiptNumber: res?.data?.groupReceiptNumber || null,
+        })
       } else {
         onSuccess()
       }
@@ -376,6 +381,7 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
 
   if (collectedResult) {
     const single = collectedResult.payments.length === 1
+    const hasGroup = !single && !!collectedResult.transactionGroupId
     return (
       <ModalWrapper title="Payment Collected" onClose={onSuccess}>
         <div className="p-6 sm:p-8 text-center">
@@ -387,7 +393,29 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
             {formatCurrency(collectedResult.totalAmount)} • {collectedResult.payments.length} receipt{single ? '' : 's'}
           </p>
 
+          {hasGroup && onDownloadConsolidatedReceipt && (
+            <div className="mb-4 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-center justify-between gap-3 text-left">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Consolidated Receipt</p>
+                {collectedResult.groupReceiptNumber && (
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-mono truncate">{collectedResult.groupReceiptNumber}</p>
+                )}
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300">One PDF covering all {collectedResult.payments.length} invoices</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onDownloadConsolidatedReceipt(collectedResult.transactionGroupId, collectedResult.groupReceiptNumber)}
+                className="btn btn-primary flex-shrink-0 flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" /> Download
+              </button>
+            </div>
+          )}
+
           <div className="space-y-2 mb-6 text-left">
+            {!single && (
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-[#8E8E93] mb-2">Individual Receipts</p>
+            )}
             {collectedResult.payments.map((p) => (
               <div key={p._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
                 <div className="min-w-0 flex-1">

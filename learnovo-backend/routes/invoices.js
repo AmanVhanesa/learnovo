@@ -1,5 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const { body } = require('express-validator');
 const FeeInvoice = require('../models/FeeInvoice');
 const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
@@ -1616,6 +1617,19 @@ router.post('/collect-bulk-payment', protect, authorize('admin', 'accountant'), 
     const collectedPayments = [];
     const updatedInvoices = [];
 
+    // When multiple invoices are settled in one transaction, stamp every
+    // resulting Payment row with a shared transactionGroupId + groupReceiptNumber
+    // so a single consolidated receipt PDF can be produced.
+    let transactionGroupId = null;
+    let groupReceiptNumber = null;
+    if (items.length > 1) {
+      transactionGroupId = crypto.randomUUID();
+      const year = new Date().getFullYear();
+      const Counter = require('../models/Counter');
+      const seq = await Counter.getNextSequence('group-receipt', String(year), tenantId);
+      groupReceiptNumber = `RCP-GRP-${year}-${String(seq).padStart(5, '0')}`;
+    }
+
     // Create a Payment per invoice (Payment.invoiceId is singular)
     for (const item of items) {
       const invoice = invoiceById.get(String(item.invoiceId));
@@ -1634,6 +1648,8 @@ router.post('/collect-bulk-payment', protect, authorize('admin', 'accountant'), 
         remarks,
         depositorName: depositorName ? String(depositorName).trim() : undefined,
         receiptNumber,
+        transactionGroupId,
+        groupReceiptNumber,
         isConfirmed: true,
         confirmedAt: new Date(),
         confirmedBy: req.user._id,
@@ -1664,7 +1680,13 @@ router.post('/collect-bulk-payment', protect, authorize('admin', 'accountant'), 
     res.json({
       success: true,
       message: `Collected ${roundToRupee(totalAmount)} across ${items.length} invoice(s)`,
-      data: { payments: collectedPayments, invoices: updatedInvoices, totalAmount }
+      data: {
+        payments: collectedPayments,
+        invoices: updatedInvoices,
+        totalAmount,
+        transactionGroupId,
+        groupReceiptNumber
+      }
     });
 
     // ── Side-effects (best-effort, response already sent) ──
@@ -2041,6 +2063,66 @@ router.get('/payments/:id/receipt/pdf', protect, async(req, res) => {
     console.error('Receipt PDF error:', error);
     if (!res.headersSent) {
       res.status(500).json({ success: false, message: 'Server error generating receipt PDF' });
+    }
+  }
+});
+
+// @desc    Download a consolidated PDF receipt covering every invoice settled
+//          in a single bulk-collection transaction.
+// @route   GET /api/invoices/payments/group/:groupId/receipt/pdf
+// @access  Private
+router.get('/payments/group/:groupId/receipt/pdf', protect, async(req, res) => {
+  try {
+    const { groupId } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const payments = await Payment.find({ tenantId, transactionGroupId: groupId })
+      .populate({
+        path: 'studentId',
+        select: 'name fullName admissionNumber studentId class section parentName classId',
+        populate: { path: 'classId', select: 'name' }
+      })
+      .populate('invoiceId')
+      .populate('collectedBy', 'name')
+      .sort({ createdAt: 1 });
+
+    if (!payments.length) {
+      return res.status(404).json({ success: false, message: 'Consolidated receipt not found' });
+    }
+
+    const tenant = await Tenant.findById(tenantId).select('schoolName schoolCode address phone email logo fullAddress website');
+    const settings = await Settings.getSettings(tenantId);
+    const schoolData = tenant ? tenant.toObject() : {};
+    if (settings && settings.institution) {
+      if (settings.institution.contact) {
+        if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
+        if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
+      }
+      if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
+      if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+      if (settings.institution.logo) schoolData.logo = settings.institution.logo;
+    }
+
+    const { generateConsolidatedReceiptPdf } = require('../services/receiptPdfService');
+    const pdfBuffer = await generateConsolidatedReceiptPdf(payments, schoolData);
+
+    const safeName = (payments[0].groupReceiptNumber || groupId).replace(/[^a-zA-Z0-9-_]/g, '_');
+    const filename = `Receipt-${safeName}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
+
+    // Archival to S3 in background
+    const { uploadBufferToS3, buildS3Key } = require('../utils/s3Upload');
+    const s3Key = buildS3Key('receipts', tenantId, filename);
+    uploadBufferToS3(pdfBuffer, s3Key, 'application/pdf')
+      .catch(err => console.error(`Background S3 upload failed for receipt ${filename}:`, err.message));
+
+  } catch (error) {
+    console.error('Consolidated receipt PDF error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Server error generating consolidated receipt PDF' });
     }
   }
 });

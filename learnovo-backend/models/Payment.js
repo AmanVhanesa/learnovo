@@ -155,6 +155,22 @@ const paymentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+
+  // Bulk-payment grouping: when admin settles multiple invoices in one
+  // transaction, every Payment created in that call shares the same
+  // transactionGroupId + groupReceiptNumber so a single consolidated
+  // receipt PDF can be produced.
+  transactionGroupId: {
+    type: String,
+    index: true,
+    sparse: true
+  },
+
+  groupReceiptNumber: {
+    type: String,
+    index: true,
+    sparse: true
   }
 }, {
   timestamps: true

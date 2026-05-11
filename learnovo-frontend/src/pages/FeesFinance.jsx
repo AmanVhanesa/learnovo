@@ -11,6 +11,7 @@ import {
   feesReportsService, invoicesService, paymentsService, feeStructuresService, refundsService, discountsService, allocationsService
 } from '../services/feesService'
 import { academicSessionsService, classesService } from '../services/academicsService'
+import { studentsService } from '../services/studentsService'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useSettings } from '../contexts/SettingsContext'
@@ -83,11 +84,15 @@ const FeesFinance = () => {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const studentIdFromUrl = searchParams.get('student')
-  const [activeTab, setActiveTab] = useState(studentIdFromUrl ? 'allInvoices' : 'dashboard')
+  const generateForStudentId = searchParams.get('generateForStudent')
+  const [activeTab, setActiveTab] = useState(
+    generateForStudentId ? 'invoices' : (studentIdFromUrl ? 'allInvoices' : 'dashboard')
+  )
 
   const [showFeeStructureModal, setShowFeeStructureModal] = useState(false)
   const [editingFeeStructure, setEditingFeeStructure] = useState(null)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [invoiceModalInitialStudent, setInvoiceModalInitialStudent] = useState(null)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState(null)
   const [studentInvoices, setStudentInvoices] = useState([])
@@ -127,6 +132,32 @@ const FeesFinance = () => {
     },
     enabled: !!activeSession && (activeTab === 'feeStructure' || activeTab === 'invoices' || activeTab === 'defaulters'),
   })
+
+  // Deep-link: ?generateForStudent={id} → fetch student and open IndividualInvoiceModal pre-filled
+  useEffect(() => {
+    if (!generateForStudentId || !activeSession) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await studentsService.get(generateForStudentId)
+        if (cancelled) return
+        const student = res?.data || res
+        if (student && student._id) {
+          setInvoiceModalInitialStudent(student)
+          setShowInvoiceModal(true)
+        }
+      } catch {
+        toast.error('Failed to load student for fee generation')
+      } finally {
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams)
+          next.delete('generateForStudent')
+          setSearchParams(next, { replace: true })
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [generateForStudentId, activeSession])
 
   const [defaultersDateFilter, setDefaultersDateFilter] = useState({ startDate: '', endDate: '' })
 
@@ -331,6 +362,31 @@ const FeesFinance = () => {
     }
   }
 
+  const handleDownloadConsolidatedReceipt = async (groupId, groupReceiptNumber) => {
+    const toastId = toast.loading('Generating consolidated PDF...')
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE}/invoices/payments/group/${groupId}/receipt/pdf`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!response.ok) throw new Error('Failed')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Receipt-${groupReceiptNumber || groupId}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+      toast.dismiss(toastId)
+      toast.success('Consolidated receipt downloaded!')
+    } catch {
+      toast.dismiss(toastId)
+      toast.error('Failed to download consolidated receipt')
+    }
+  }
+
   const handlePrintReceipt = async (paymentId) => {
     try {
       const toastId = toast.loading('Opening receipt...')
@@ -439,8 +495,8 @@ const FeesFinance = () => {
 
       {/* Modals */}
       {showFeeStructureModal && <FeeStructureModal feeStructure={editingFeeStructure} classes={classes} activeSession={activeSession} onClose={() => { setShowFeeStructureModal(false); setEditingFeeStructure(null) }} onSuccess={() => { setShowFeeStructureModal(false); setEditingFeeStructure(null); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }); toast.success(editingFeeStructure ? 'Updated' : 'Created') }} />}
-      {showInvoiceModal && <IndividualInvoiceModal feeStructures={feeStructures} activeSession={activeSession} onClose={() => setShowInvoiceModal(false)} onSuccess={() => { setShowInvoiceModal(false); toast.success('Invoice generated'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
-      {showPaymentModal && <PaymentModal student={selectedStudent} invoices={studentInvoices} payments={studentPayments} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onClose={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); setStudentPayments([]) }} onSuccess={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); toast.success('Payment collected') }} />}
+      {showInvoiceModal && <IndividualInvoiceModal feeStructures={feeStructures} activeSession={activeSession} initialStudent={invoiceModalInitialStudent} onClose={() => { setShowInvoiceModal(false); setInvoiceModalInitialStudent(null) }} onSuccess={() => { setShowInvoiceModal(false); setInvoiceModalInitialStudent(null); toast.success('Invoice generated'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
+      {showPaymentModal && <PaymentModal student={selectedStudent} invoices={studentInvoices} payments={studentPayments} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onDownloadConsolidatedReceipt={handleDownloadConsolidatedReceipt} onClose={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); setStudentPayments([]) }} onSuccess={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); toast.success('Payment collected') }} />}
       {editingInvoice && <EditInvoiceModal invoice={editingInvoice} onClose={() => setEditingInvoice(null)} onSuccess={() => { setEditingInvoice(null); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['all-invoices'] }); queryClient.invalidateQueries({ queryKey: ['fees-defaulters'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }) }} />}
       {paymentAction && <PaymentEditModal payment={paymentAction.payment} mode={paymentAction.mode} onClose={() => setPaymentAction(null)} onSuccess={() => { setPaymentAction(null); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['all-invoices'] }) }} />}
       {showFeeImportModal && <ImportModal isOpen={showFeeImportModal} onClose={() => setShowFeeImportModal(false)} module="fees" title="Import Fee Records" templateUrl="/fees/import/template" previewUrl="/fees/import/preview" executeUrl="/fees/import/execute" onSuccess={(result) => { setShowFeeImportModal(false); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fee-allocations'] }); toast.success(`Import complete: ${result?.allocationsCreated || result?.created || 0} records created`) }} />}
