@@ -124,6 +124,24 @@ export const studentsService = {
     return res.data
   },
 
+  // Document upload (Aadhaar, TC, Birth Certificate, Guardian Aadhaar)
+  uploadDocument: async (studentId, file, type, guardianIndex) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('type', type)
+    if (guardianIndex !== undefined && guardianIndex !== null && guardianIndex !== '') {
+      formData.append('guardianIndex', String(guardianIndex))
+    }
+    const res = await api.post(`/students/${studentId}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return res.data
+  },
+  deleteDocument: async (studentId, docId) => {
+    const res = await api.delete(`/students/${studentId}/documents/${docId}`)
+    return res.data
+  },
+
   // Detail Form — printable physical record for admin
   viewDetailForm: async (id) => {
     const res = await api.get(`/students/${id}/detail-form/html`, { responseType: 'text' })

@@ -186,14 +186,35 @@ const Students = () => {
     navigate(`/app/students/${student._id}`)
   }
 
+  const uploadPendingDocs = async (studentId, pendingDocs) => {
+    if (!studentId || !Array.isArray(pendingDocs) || pendingDocs.length === 0) return { uploaded: 0, failed: 0 }
+    let uploaded = 0
+    let failed = 0
+    for (const doc of pendingDocs) {
+      try {
+        await studentsService.uploadDocument(studentId, doc.file, doc.type, doc.guardianIndex)
+        uploaded += 1
+      } catch (err) {
+        failed += 1
+        // Surface a single error toast per failed upload so admins know to retry
+        toast.error(err?.response?.data?.message || `Failed to upload ${doc.file?.name || 'document'}`)
+      }
+    }
+    return { uploaded, failed }
+  }
+
   const saveMutation = useMutation({
-    mutationFn: async (formData) => {
+    mutationFn: async ({ formData, pendingDocs }) => {
       if (editingStudent) {
         await studentsService.update(editingStudent._id, formData)
-        return { isEdit: true }
+        const docResult = await uploadPendingDocs(editingStudent._id, pendingDocs)
+        return { isEdit: true, docResult }
       } else {
         const response = await studentsService.create(formData)
-        return { isEdit: false, response }
+        const created = response?.data || {}
+        const newId = created.id || created._id
+        const docResult = await uploadPendingDocs(newId, pendingDocs)
+        return { isEdit: false, response, docResult }
       }
     },
     onSuccess: (result) => {
@@ -212,6 +233,9 @@ const Students = () => {
         const newName = created.name || created.fullName
         if (newId) setFeeGenPrompt({ id: newId, name: newName })
       }
+      if (result.docResult?.uploaded > 0) {
+        toast.success(`Uploaded ${result.docResult.uploaded} document${result.docResult.uploaded === 1 ? '' : 's'}`)
+      }
       setShowForm(false)
     },
     onError: (error, variables) => {
@@ -226,7 +250,10 @@ const Students = () => {
         }).join('\n')
         const msg = `A student with similar details already exists:\n\n${lines}\n\nAdd this student anyway?`
         if (window.confirm(msg)) {
-          saveMutation.mutate({ ...variables, confirmDuplicate: true })
+          saveMutation.mutate({
+            ...variables,
+            formData: { ...(variables.formData || {}), confirmDuplicate: true }
+          })
         }
         return
       }
@@ -241,8 +268,8 @@ const Students = () => {
     },
   })
 
-  const handleSaveStudent = (formData) => {
-    saveMutation.mutate(formData)
+  const handleSaveStudent = (formData, pendingDocs = []) => {
+    saveMutation.mutate({ formData, pendingDocs })
   }
 
   const reactivateMutation = useMutation({
@@ -1303,7 +1330,7 @@ const Students = () => {
                 onClick={() => {
                   const id = feeGenPrompt.id
                   setFeeGenPrompt(null)
-                  navigate(`/app/fees?student=${id}`)
+                  navigate(`/app/fees-finance?generateForStudent=${id}`)
                 }}
               >
                 Generate Fees

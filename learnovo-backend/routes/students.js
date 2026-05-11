@@ -2155,7 +2155,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
     const {
       fullName, name, firstName, middleName, lastName, email, phone: _phone, password,
       classId, class: studentClass, section, academicYear, rollNumber, admissionDate, admissionClass,
-      guardians, address, avatar,
+      guardians, address, avatar, photo,
       penNumber, subDepartment, udiseCode,
       transportMode, driverId,
       // Student personal/medical fields from form
@@ -2353,7 +2353,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       rollNumber,
       admissionDate: admissionDate || new Date(),
       admissionClass: admissionClass || studentClass || undefined,
-      guardians, address, avatar,
+      guardians, address, avatar, photo,
       // Backfill legacy fatherOrHusbandName from guardians for backward compatibility
       fatherOrHusbandName: guardians?.find(g => g.relation === 'Father')?.name || undefined,
       penNumber: penNumber ? penNumber.trim() : undefined,
@@ -3864,6 +3864,101 @@ router.put('/:id/subject-preferences', protect, authorize('admin', 'principal'),
   } catch (error) {
     logger.error('Update subject preferences error', error, { requestId: req.requestId, route: req.route?.path, tenantId: req.user?.tenantId });
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @desc    Upload a document (Aadhaar, TC, Birth Certificate, Guardian Aadhaar) for a student
+// @route   POST /api/students/:id/documents
+// @access  Private (Admin)
+const ALLOWED_DOC_TYPES = ['student_aadhaar', 'tc', 'birth_certificate', 'guardian_aadhaar'];
+router.post('/:id/documents', protect, authorize('admin'), upload.single('file'), async(req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+    const { type, guardianIndex } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded', requestId: req.requestId });
+    }
+    if (!ALLOWED_DOC_TYPES.includes(type)) {
+      return res.status(400).json({ success: false, message: 'Invalid document type', requestId: req.requestId });
+    }
+    if (req.file.size > 5 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: 'File exceeds 5MB limit', requestId: req.requestId });
+    }
+
+    const student = await User.findOne({ _id: id, tenantId, role: 'student' });
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found', requestId: req.requestId });
+    }
+
+    const cloudinaryService = require('../services/cloudinaryService');
+    const uploaded = await cloudinaryService.uploadStudentDocument(req.file, tenantId, id, type);
+
+    const docEntry = {
+      type,
+      name: req.file.originalname,
+      url: uploaded.secure_url,
+      publicId: uploaded.public_id,
+      resourceType: uploaded.resource_type === 'raw' ? 'raw' : 'image',
+      format: uploaded.format,
+      bytes: uploaded.bytes,
+      uploadedAt: new Date(),
+      uploadedBy: req.user._id
+    };
+    if (type === 'guardian_aadhaar') {
+      const gi = parseInt(guardianIndex, 10);
+      if (!Number.isNaN(gi) && gi >= 0) docEntry.guardianIndex = gi;
+    }
+
+    student.documents = student.documents || [];
+    student.documents.push(docEntry);
+    await student.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Document uploaded successfully',
+      data: student.documents[student.documents.length - 1],
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('POST /students/:id/documents error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });
+    res.status(500).json({ success: false, message: 'Failed to upload document', requestId: req.requestId });
+  }
+});
+
+// @desc    Delete a student document
+// @route   DELETE /api/students/:id/documents/:docId
+// @access  Private (Admin)
+router.delete('/:id/documents/:docId', protect, authorize('admin'), async(req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id, docId } = req.params;
+
+    const student = await User.findOne({ _id: id, tenantId, role: 'student' });
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found', requestId: req.requestId });
+    }
+
+    const doc = (student.documents || []).find(d => d._id.toString() === docId);
+    if (!doc) {
+      return res.status(404).json({ success: false, message: 'Document not found', requestId: req.requestId });
+    }
+
+    const cloudinaryService = require('../services/cloudinaryService');
+    try {
+      await cloudinaryService.deleteFile(doc.publicId, doc.resourceType || 'image');
+    } catch (cloudErr) {
+      logger.warn('Cloudinary delete failed (continuing with DB removal)', { requestId: req.requestId, publicId: doc.publicId, error: cloudErr.message });
+    }
+
+    student.documents = student.documents.filter(d => d._id.toString() !== docId);
+    await student.save();
+
+    res.json({ success: true, message: 'Document deleted', requestId: req.requestId });
+  } catch (error) {
+    logger.error('DELETE /students/:id/documents/:docId error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });
+    res.status(500).json({ success: false, message: 'Failed to delete document', requestId: req.requestId });
   }
 });
 

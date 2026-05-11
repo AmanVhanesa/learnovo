@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2, Loader2, Search, UserCheck } from 'lucide-react'
+import { X, Upload, User, Heart, GraduationCap, Users, FileText, Camera, Trash2, Loader2, Search, UserCheck, FileBadge, FileCheck } from 'lucide-react'
 import api from '../../services/authService'
+import studentsService from '../../services/studentsService'
 import transportService from '../../services/transportService'
 import { dedupeClassesByName, sortClassObjects } from '../../utils/classOrder'
 import { SERVER_URL } from '../../constants/config'
@@ -195,7 +196,8 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         { id: 1, name: 'Personal Details', icon: Heart },
         { id: 2, name: 'Academic Background', icon: GraduationCap },
         { id: 3, name: 'Guardian Info', icon: Users },
-        { id: 4, name: 'Medical & Notes', icon: FileText }
+        { id: 4, name: 'Medical & Notes', icon: FileText },
+        { id: 5, name: 'Documents', icon: FileBadge }
     ]
 
     const updateField = (field, value) => {
@@ -407,12 +409,81 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         if (!submitData.middleName) delete submitData.middleName
         if (!submitData.lastName) delete submitData.lastName
 
-        onSave(submitData)
+        onSave(submitData, pendingDocs)
     }
 
     const [cropModal, setCropModal] = useState({ isOpen: false, imageSrc: null })
     const [photoError, setPhotoError] = useState(null)
     const [cameraOpen, setCameraOpen] = useState(false)
+
+    // Documents — existing (saved) plus pending (selected but not yet uploaded)
+    const [existingDocs, setExistingDocs] = useState(student?.documents || [])
+    const [pendingDocs, setPendingDocs] = useState([]) // [{ localId, file, type, guardianIndex }]
+    const [tcDocType, setTcDocType] = useState('tc') // 'tc' | 'birth_certificate'
+    const [docDeletingId, setDocDeletingId] = useState(null)
+    const [docError, setDocError] = useState(null)
+
+    const isValidDocFile = (file) => {
+        if (!file) return false
+        const okType = file.type.startsWith('image/') || file.type === 'application/pdf'
+        if (!okType) {
+            setDocError('Only images (JPG, PNG) and PDF are allowed.')
+            return false
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            setDocError('File exceeds 5MB. Please upload a smaller file.')
+            return false
+        }
+        setDocError(null)
+        return true
+    }
+
+    const addPendingDoc = (file, type, guardianIndex) => {
+        if (!isValidDocFile(file)) return
+        // Replace any existing pending of same type+guardian
+        setPendingDocs(prev => {
+            const filtered = prev.filter(d => !(d.type === type && d.guardianIndex === guardianIndex))
+            return [...filtered, { localId: `${Date.now()}-${Math.random()}`, file, type, guardianIndex }]
+        })
+    }
+
+    const removePendingDoc = (localId) => {
+        setPendingDocs(prev => prev.filter(d => d.localId !== localId))
+    }
+
+    const deleteExistingDoc = async (docId) => {
+        if (!student?._id) return
+        if (!window.confirm('Delete this document? This cannot be undone.')) return
+        try {
+            setDocDeletingId(docId)
+            await studentsService.deleteDocument(student._id, docId)
+            setExistingDocs(prev => prev.filter(d => d._id !== docId))
+        } catch (err) {
+            setDocError(err?.response?.data?.message || 'Failed to delete document')
+        } finally {
+            setDocDeletingId(null)
+        }
+    }
+
+    const findExistingDoc = (type, guardianIndex) => {
+        if (type === 'guardian_aadhaar') {
+            return existingDocs.find(d => d.type === 'guardian_aadhaar' && d.guardianIndex === guardianIndex)
+        }
+        if (type === 'tc_or_birth_certificate') {
+            return existingDocs.find(d => d.type === 'tc' || d.type === 'birth_certificate')
+        }
+        return existingDocs.find(d => d.type === type)
+    }
+
+    const findPendingDoc = (type, guardianIndex) => {
+        if (type === 'guardian_aadhaar') {
+            return pendingDocs.find(d => d.type === 'guardian_aadhaar' && d.guardianIndex === guardianIndex)
+        }
+        if (type === 'tc_or_birth_certificate') {
+            return pendingDocs.find(d => d.type === 'tc' || d.type === 'birth_certificate')
+        }
+        return pendingDocs.find(d => d.type === type)
+    }
 
     const handleCameraCapture = (dataUrl) => {
         setCameraOpen(false)
@@ -1265,6 +1336,92 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Section 5: Documents */}
+                        {activeSection === 5 && (
+                            <div className="space-y-6">
+                                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                                    <p className="text-xs text-blue-800 dark:text-blue-300">
+                                        Upload supporting documents (JPG, PNG, or PDF, max 5MB each).
+                                        {!student && ' Files will be uploaded after the student is saved.'}
+                                    </p>
+                                </div>
+
+                                {docError && (
+                                    <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                                        <p className="text-xs text-red-700 dark:text-red-300">{docError}</p>
+                                    </div>
+                                )}
+
+                                {/* Student Aadhaar */}
+                                <DocSlot
+                                    label="Student Aadhaar Card"
+                                    description="Upload the student's Aadhaar card (front and back combined, if possible)."
+                                    icon={FileCheck}
+                                    docType="student_aadhaar"
+                                    existing={findExistingDoc('student_aadhaar')}
+                                    pending={findPendingDoc('student_aadhaar')}
+                                    onPick={(file) => addPendingDoc(file, 'student_aadhaar')}
+                                    onRemovePending={removePendingDoc}
+                                    onDeleteExisting={deleteExistingDoc}
+                                    deletingId={docDeletingId}
+                                />
+
+                                {/* TC or Birth Certificate */}
+                                <div className="border border-gray-200 dark:border-[#38383A] rounded-lg p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <FileText className="h-4 w-4 text-gray-500 dark:text-[#8E8E93]" />
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white">TC / Birth Certificate</p>
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] mb-3">
+                                        Upload Transfer Certificate (for transferring students) or Birth Certificate (for fresh admissions).
+                                    </p>
+                                    <div className="mb-3">
+                                        <label className="label">Document Type</label>
+                                        <select
+                                            className="input"
+                                            value={tcDocType}
+                                            onChange={(e) => setTcDocType(e.target.value)}
+                                            disabled={!!findExistingDoc('tc_or_birth_certificate') || !!findPendingDoc('tc_or_birth_certificate')}
+                                        >
+                                            <option value="tc">Transfer Certificate (TC)</option>
+                                            <option value="birth_certificate">Birth Certificate</option>
+                                        </select>
+                                    </div>
+                                    <DocSlotBody
+                                        existing={findExistingDoc('tc_or_birth_certificate')}
+                                        pending={findPendingDoc('tc_or_birth_certificate')}
+                                        onPick={(file) => addPendingDoc(file, tcDocType)}
+                                        onRemovePending={removePendingDoc}
+                                        onDeleteExisting={deleteExistingDoc}
+                                        deletingId={docDeletingId}
+                                    />
+                                </div>
+
+                                {/* Per-guardian Aadhaar */}
+                                <div className="space-y-3">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white">Guardian Aadhaar Cards</p>
+                                    {(form.guardians || []).length === 0 && (
+                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93]">Add a guardian in the Guardian Info section to upload their Aadhaar.</p>
+                                    )}
+                                    {(form.guardians || []).map((guardian, gi) => (
+                                        <DocSlot
+                                            key={gi}
+                                            label={`${guardian.relation || 'Guardian'}${guardian.name ? ' — ' + guardian.name : ''} (Aadhaar)`}
+                                            description="Upload this guardian's Aadhaar card."
+                                            icon={FileCheck}
+                                            docType="guardian_aadhaar"
+                                            existing={findExistingDoc('guardian_aadhaar', gi)}
+                                            pending={findPendingDoc('guardian_aadhaar', gi)}
+                                            onPick={(file) => addPendingDoc(file, 'guardian_aadhaar', gi)}
+                                            onRemovePending={removePendingDoc}
+                                            onDeleteExisting={deleteExistingDoc}
+                                            deletingId={docDeletingId}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Footer Actions */}
@@ -1329,6 +1486,98 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             />
         </div>,
         document.body
+    )
+}
+
+// Reusable doc-slot UI for the Documents section
+const DocSlotBody = ({ existing, pending, onPick, onRemovePending, onDeleteExisting, deletingId }) => {
+    const handleChange = (e) => {
+        const file = e.target.files?.[0]
+        e.target.value = ''
+        if (file) onPick(file)
+    }
+
+    if (existing) {
+        return (
+            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <div className="flex items-center gap-2 min-w-0">
+                    <FileCheck className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                    <a
+                        href={existing.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-green-800 dark:text-green-300 truncate hover:underline"
+                    >
+                        {existing.name || 'View document'}
+                    </a>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onDeleteExisting(existing._id)}
+                    disabled={deletingId === existing._id}
+                    className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+                >
+                    {deletingId === existing._id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                    Remove
+                </button>
+            </div>
+        )
+    }
+
+    if (pending) {
+        return (
+            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                    <span className="text-xs text-amber-800 dark:text-amber-300 truncate">
+                        {pending.file.name} <span className="opacity-70">(uploads on save)</span>
+                    </span>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onRemovePending(pending.localId)}
+                    className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                >
+                    <Trash2 className="h-3 w-3" />
+                    Remove
+                </button>
+            </div>
+        )
+    }
+
+    return (
+        <label className="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-dashed border-gray-300 dark:border-[#38383A] cursor-pointer hover:border-primary-500 hover:bg-primary-50/30 dark:hover:bg-primary-900/10 transition-colors">
+            <Upload className="h-4 w-4 text-gray-500 dark:text-[#8E8E93]" />
+            <span className="text-xs text-gray-700 dark:text-[#C7C7CC]">Choose file (JPG, PNG, PDF — max 5MB)</span>
+            <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={handleChange}
+            />
+        </label>
+    )
+}
+
+const DocSlot = ({ label, description, icon: Icon, existing, pending, onPick, onRemovePending, onDeleteExisting, deletingId }) => {
+    return (
+        <div className="border border-gray-200 dark:border-[#38383A] rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-1">
+                {Icon && <Icon className="h-4 w-4 text-gray-500 dark:text-[#8E8E93]" />}
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{label}</p>
+            </div>
+            {description && (
+                <p className="text-xs text-gray-500 dark:text-[#8E8E93] mb-3">{description}</p>
+            )}
+            <DocSlotBody
+                existing={existing}
+                pending={pending}
+                onPick={onPick}
+                onRemovePending={onRemovePending}
+                onDeleteExisting={onDeleteExisting}
+                deletingId={deletingId}
+            />
+        </div>
     )
 }
 

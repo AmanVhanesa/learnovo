@@ -12,15 +12,16 @@ const fileFilter = (req, file, cb) => {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'image/jpeg',
     'image/png',
-    'image/gif'
+    'image/gif',
+    'application/pdf'
   ];
 
   if (allowedMimes.some(mime => file.mimetype.includes(mime)) ||
         file.originalname.endsWith('.csv') ||
-        file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
+        file.originalname.match(/\.(jpg|jpeg|png|gif|pdf)$/i)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only CSV, Excel, and Images are allowed.'), false);
+    cb(new Error('Invalid file type. Only CSV, Excel, Images, and PDF are allowed.'), false);
   }
 };
 

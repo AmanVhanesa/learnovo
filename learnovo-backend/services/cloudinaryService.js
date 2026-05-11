@@ -271,6 +271,24 @@ class CloudinaryService {
   }
 
   /**
+     * Upload student document (Aadhaar, TC, Birth Certificate, Guardian Aadhaar)
+     * Stored per-document-type folder under the student so deletions are scoped.
+     * @param {Object} file - Multer file object (image or PDF)
+     * @param {string} tenantId - Tenant ID
+     * @param {string} studentId - Student ID
+     * @param {string} docType - Document type slug (e.g. 'student_aadhaar', 'tc')
+     * @returns {Promise<Object>} - Upload result
+     */
+  async uploadStudentDocument(file, tenantId, studentId, docType) {
+    const safeType = String(docType || 'misc').replace(/[^a-z0-9_-]/gi, '_');
+    return this.uploadFromMulter(file, {
+      tenantId,
+      folder: 'students',
+      subPath: `${studentId}/documents/${safeType}`
+    });
+  }
+
+  /**
      * Upload certificate PDF
      * @param {Buffer} pdfBuffer - PDF buffer
      * @param {string} tenantId - Tenant ID

@@ -24,6 +24,85 @@ async function toBase64DataUri(url) {
   }
 }
 
+const DOC_TYPE_TITLES = {
+  student_aadhaar: 'Student Aadhaar Card',
+  tc: 'Transfer Certificate (TC)',
+  birth_certificate: 'Birth Certificate',
+  guardian_aadhaar: 'Guardian Aadhaar Card'
+};
+
+function getDocPageTitle(doc, student) {
+  const base = DOC_TYPE_TITLES[doc.type] || 'Document';
+  if (doc.type === 'guardian_aadhaar') {
+    const gi = typeof doc.guardianIndex === 'number' ? doc.guardianIndex : null;
+    const guardian = (gi != null && Array.isArray(student.guardians)) ? student.guardians[gi] : null;
+    if (guardian) {
+      const relation = guardian.relation || 'Guardian';
+      const name = guardian.name ? ` — ${guardian.name}` : '';
+      return `${base} (${relation}${name})`;
+    }
+  }
+  return base;
+}
+
+async function buildDocumentPagesHtml(student) {
+  const docs = Array.isArray(student.documents) ? student.documents : [];
+  if (docs.length === 0) return '';
+
+  const ordered = [...docs].sort((a, b) => {
+    const order = ['student_aadhaar', 'tc', 'birth_certificate', 'guardian_aadhaar'];
+    const ai = order.indexOf(a.type);
+    const bi = order.indexOf(b.type);
+    if (ai !== bi) return ai - bi;
+    if (a.type === 'guardian_aadhaar' && b.type === 'guardian_aadhaar') {
+      return (a.guardianIndex ?? 0) - (b.guardianIndex ?? 0);
+    }
+    return new Date(a.uploadedAt || 0) - new Date(b.uploadedAt || 0);
+  });
+
+  const pages = await Promise.all(ordered.map(async(doc) => {
+    const title = getDocPageTitle(doc, student);
+    const isPdf = (doc.resourceType === 'raw') || /\.pdf$/i.test(doc.url || '') || doc.format === 'pdf';
+
+    let bodyHtml;
+    if (isPdf) {
+      bodyHtml = `
+        <div class="doc-pdf-notice">
+          <div class="doc-pdf-icon">PDF</div>
+          <p class="doc-pdf-name">${esc(doc.name || 'Document')}</p>
+          <p class="doc-pdf-link">${esc(doc.url || '')}</p>
+          <p class="doc-pdf-hint">This document was uploaded as a PDF. Open the link above to view the original.</p>
+        </div>`;
+    } else {
+      const imgData = await toBase64DataUri(doc.url);
+      if (!imgData) {
+        bodyHtml = `
+          <div class="doc-pdf-notice">
+            <p class="doc-pdf-name">${esc(doc.name || 'Document')}</p>
+            <p class="doc-pdf-hint">Image could not be loaded for this PDF rendering.</p>
+            <p class="doc-pdf-link">${esc(doc.url || '')}</p>
+          </div>`;
+      } else {
+        bodyHtml = `<img class="doc-img" src="${imgData}" alt="${esc(title)}" />`;
+      }
+    }
+
+    const uploadedOn = doc.uploadedAt ? fmtDate(doc.uploadedAt) : '';
+
+    return `
+      <div class="doc-page">
+        <div class="doc-header">
+          <div class="doc-title">${esc(title)}</div>
+          ${uploadedOn ? `<div class="doc-meta">Uploaded: ${esc(uploadedOn)}</div>` : ''}
+        </div>
+        <div class="doc-body">${bodyHtml}</div>
+        <div class="doc-footer">Student: ${esc(buildStudentName(student))}${student.admissionNumber ? ` &middot; Adm# ${esc(student.admissionNumber)}` : ''}</div>
+      </div>`;
+  }));
+
+  return pages.join('\n');
+}
+
 const esc = (v) => {
   if (v === null || v === undefined || v === '') return '—';
   return String(v).replace(/[&<>"']/g, (c) => ({
@@ -237,6 +316,32 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
   .footer span { font-size: 8px; color: #111827; font-weight: 500; text-transform: uppercase; letter-spacing: 1.2px; }
   .footer .brand { font-weight: 700; color: #0f766e; }
   .footer .gen { display: block; margin-top: 2px; font-size: 7.5px; color: #111827; text-transform: none; letter-spacing: 0; font-style: italic; }
+
+  /* ─── Appended document pages (one per uploaded document) ─── */
+  .doc-page {
+    page-break-before: always;
+    width: 210mm; min-height: 297mm; box-sizing: border-box;
+    padding: 18mm 14mm; display: flex; flex-direction: column;
+    background: #ffffff;
+  }
+  .doc-header { border-bottom: 2px solid #0f766e; padding-bottom: 8px; margin-bottom: 14px; }
+  .doc-title { font-size: 16px; font-weight: 700; color: #0f766e; letter-spacing: 0.2px; }
+  .doc-meta { font-size: 10px; color: #6b7280; margin-top: 4px; }
+  .doc-body { flex: 1; display: flex; align-items: center; justify-content: center; }
+  .doc-img { max-width: 100%; max-height: 235mm; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 4px; }
+  .doc-pdf-notice {
+    width: 100%; max-width: 140mm; padding: 24px; text-align: center;
+    border: 2px dashed #cbd5e1; border-radius: 8px; background: #f8fafc;
+  }
+  .doc-pdf-icon {
+    display: inline-block; padding: 8px 18px; margin-bottom: 14px;
+    background: #dc2626; color: #ffffff; font-weight: 700; font-size: 12px;
+    border-radius: 4px; letter-spacing: 1px;
+  }
+  .doc-pdf-name { font-size: 13px; font-weight: 600; color: #111827; margin: 4px 0; word-break: break-all; }
+  .doc-pdf-link { font-size: 9px; color: #2563eb; margin: 8px 0; word-break: break-all; }
+  .doc-pdf-hint { font-size: 10px; color: #6b7280; margin-top: 12px; }
+  .doc-footer { text-align: center; font-size: 9px; color: #6b7280; padding-top: 8px; border-top: 1px solid #e5e7eb; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -389,7 +494,11 @@ async function generateStudentDetailFormPdf(student, schoolData) {
   const photoUrl = student.photo || student.avatar;
   const photoDataUri = await toBase64DataUri(photoUrl);
   const photoFallbackUrl = photoUrl && (photoUrl.startsWith('data:') || photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
-  const html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
+  let html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
+  const docPagesHtml = await buildDocumentPagesHtml(student);
+  if (docPagesHtml) {
+    html = html.replace('</body>', `${docPagesHtml}\n</body>`);
+  }
   const { getBrowser, releaseBrowser } = pdfService._internal;
   const browser = await getBrowser();
   const page = await browser.newPage();
@@ -416,6 +525,10 @@ async function generateStudentDetailFormHtml(student, schoolData) {
   const photoDataUri = await toBase64DataUri(photoUrl);
   const photoFallbackUrl = photoUrl && (photoUrl.startsWith('data:') || photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
   let html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
+  const docPagesHtml = await buildDocumentPagesHtml(student);
+  if (docPagesHtml) {
+    html = html.replace('</body>', `${docPagesHtml}\n</body>`);
+  }
 
   const studentName = buildStudentName(student);
   const toolbarHtml = `

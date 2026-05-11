@@ -488,6 +488,24 @@ const userSchema = new mongoose.Schema({
     trim: true
   },
 
+  // ── Student documents (Aadhaar, TC, Birth Certificate, etc.) ────
+  documents: [{
+    type: {
+      type: String,
+      enum: ['student_aadhaar', 'tc', 'birth_certificate', 'guardian_aadhaar'],
+      required: true
+    },
+    name: { type: String, trim: true },
+    url: { type: String, required: true },
+    publicId: { type: String, required: true },
+    resourceType: { type: String, enum: ['image', 'raw'], default: 'image' },
+    format: { type: String, trim: true },
+    bytes: { type: Number },
+    guardianIndex: { type: Number, min: 0 },
+    uploadedAt: { type: Date, default: Date.now },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  }],
+
   // ── Password reset fields ────────────────────────────────────────
   resetPasswordToken: {
     type: String,
