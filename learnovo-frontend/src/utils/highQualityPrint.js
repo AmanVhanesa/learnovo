@@ -128,14 +128,15 @@ export async function highQualityPrint(element, filename = 'document', options =
 
 /**
  * Print an existing certificate by fetching its PDF from the backend
- * and downloading it so the user can open it in their system's native
- * PDF viewer (e.g. Preview on macOS) for the best print quality.
+ * and opening the browser's native print preview dialog.
  *
  * This bypasses html2canvas entirely — the backend Puppeteer-rendered
  * PDF is the source of truth, so output is pixel-perfect.
  *
+ * Falls back to download if the popup is blocked.
+ *
  * @param {string} certId - Certificate ID
- * @param {string} [filename='certificate.pdf'] - Download filename
+ * @param {string} [filename='certificate.pdf'] - Fallback download filename
  * @returns {Promise<void>}
  */
 export async function printCertificatePdf(certId, filename = 'certificate.pdf') {
@@ -153,14 +154,27 @@ export async function printCertificatePdf(certId, filename = 'certificate.pdf') 
   const blob = await response.blob();
   const pdfUrl = URL.createObjectURL(blob);
 
-  // Download the PDF so the user can open it in their system's native
-  // PDF viewer which provides the highest quality print output.
-  const link = document.createElement('a');
-  link.href = pdfUrl;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const printWindow = window.open(pdfUrl, '_blank');
 
-  setTimeout(() => URL.revokeObjectURL(pdfUrl), 60000);
+  if (printWindow) {
+    printWindow.addEventListener('load', () => {
+      try {
+        printWindow.focus();
+        printWindow.print();
+      } catch {
+        // Some browsers block programmatic print on cross-origin/blob frames;
+        // user can still hit Cmd/Ctrl+P in the opened tab.
+      }
+    });
+  } else {
+    // Popup blocked — fall back to download
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  setTimeout(() => URL.revokeObjectURL(pdfUrl), 120000);
 }

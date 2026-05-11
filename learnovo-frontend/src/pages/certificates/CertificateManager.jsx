@@ -130,7 +130,7 @@ const CertificateManager = () => {
             const studentName = (cert.student?.fullName || cert.student?.name || 'certificate').replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_');
             const filename = `${cert.type}_${studentName}.pdf`;
             await printCertificatePdf(cert._id, filename);
-            toast.success('PDF downloaded — open it and print for best quality', { duration: 4000 });
+            toast.success('Opening print preview...', { duration: 3000 });
         } catch (error) {
             console.error('Print failed:', error);
             toast.error('Failed to prepare print. Please try again.');
