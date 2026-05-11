@@ -13,8 +13,8 @@ const PAYMENT_PLANS = [
   { value: 'annual', label: 'Annual (1 payment)', description: 'Single invoice for the entire year' },
 ]
 
-const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSuccess }) => {
-  const [selectedStudent, setSelectedStudent] = useState(null)
+const IndividualInvoiceModal = ({ feeStructures, activeSession, onClose, onSuccess, initialStudent = null }) => {
+  const [selectedStudent, setSelectedStudent] = useState(initialStudent)
   const [paymentPlan, setPaymentPlan] = useState('quarterly')
   const [thirdStudentConcession, setThirdStudentConcession] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
