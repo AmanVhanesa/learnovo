@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp, AlertTriangle, RefreshCw, Users, SlidersHorizontal, ChevronDown } from 'lucide-react'
+import { Plus, Search, Eye, Edit3, Power, PowerOff, Upload, Trash2, X, TrendingUp, AlertTriangle, RefreshCw, Users, SlidersHorizontal, ChevronDown, List } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { studentsService } from '../services/studentsService'
 import { useAuth } from '../contexts/AuthContext'
@@ -595,6 +595,15 @@ const Students = () => {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {(user?.role === 'admin' || user?.role === 'teacher') && (
+            <button
+              className="btn btn-outline text-gray-700 dark:text-[#8E8E93]"
+              onClick={() => navigate('/app/student-lists')}
+            >
+              <List className="h-4 w-4 mr-2" />
+              Student Lists
+            </button>
+          )}
           {user?.role === 'admin' && (
             <>
               <button

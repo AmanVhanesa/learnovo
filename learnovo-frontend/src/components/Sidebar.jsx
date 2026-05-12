@@ -25,7 +25,6 @@ import {
   Award,
   Wallet,
   BookCheck,
-  List,
   Megaphone,
   ReceiptText,
   CalendarClock,
@@ -67,7 +66,6 @@ const Sidebar = ({ isOpen, onClose }) => {
     // ── People ────────────────────────────────────────────────────
     const peopleItems = [
       { name: 'Students', href: '/app/students', icon: Users, roles: ['admin', 'teacher', 'parent'] },
-      { name: 'Student Lists', href: '/app/student-lists', icon: List, roles: ['admin', 'teacher'] },
       { name: 'Employees', href: '/app/employees', icon: UserPlus, roles: ['admin'] },
     ].filter(i => i.roles.includes(r))
 
