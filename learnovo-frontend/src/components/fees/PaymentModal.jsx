@@ -19,7 +19,7 @@ const PAYMENT_METHODS = [
   { value: 'Online', label: 'Online', icon: Globe },
 ]
 
-const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDownloadReceipt, onDownloadConsolidatedReceipt, onClose, onSuccess }) => {
+const PaymentModal = ({ student, invoices, payments = [], allocation = null, onPrintReceipt, onDownloadReceipt, onDownloadConsolidatedReceipt, onClose, onSuccess }) => {
   const [activeTab, setActiveTab] = useState('collect')
   const [collectMode, setCollectMode] = useState('single') // 'single' | 'multi'
   const [selectedQuarter, setSelectedQuarter] = useState('all')
@@ -133,6 +133,20 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
     if (!selectedInvoice || !selectedInvoice.totalAmount) return 0
     return Math.min(100, Math.round(((selectedInvoice.paidAmount || 0) / selectedInvoice.totalAmount) * 100))
   }, [selectedInvoice])
+
+  // Student-level totals: prefer the annual allocation; fall back to the sum of pending invoices.
+  const studentTotals = useMemo(() => {
+    if (allocation) {
+      return {
+        totalFees: allocation.totalAnnualAmount || 0,
+        pendingBalance: allocation.balance || 0,
+        source: 'allocation',
+      }
+    }
+    const totalFees = invoices.reduce((s, inv) => s + (inv.totalAmount || 0), 0)
+    const pendingBalance = invoices.reduce((s, inv) => s + (inv.balanceAmount || 0), 0)
+    return { totalFees, pendingBalance, source: 'invoices' }
+  }, [allocation, invoices])
 
   const handleApplyDiscount = async () => {
     if (!selectedInvoice) return
@@ -598,6 +612,18 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                 </div>
               </div>
 
+              {/* Student-level fee summary */}
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30">
+                  <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">{studentTotals.source === 'allocation' ? 'Total Annual Fees' : 'Total Fees'}</p>
+                  <p className="text-sm font-bold text-blue-700 dark:text-blue-400 mt-0.5">{formatCurrency(studentTotals.totalFees)}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+                  <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">Total Pending Balance</p>
+                  <p className="text-sm font-bold text-amber-700 dark:text-amber-400 mt-0.5">{formatCurrency(studentTotals.pendingBalance)}</p>
+                </div>
+              </div>
+
               {/* Mode toggle */}
               <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-[#38383A]">
                 <button type="button" onClick={() => setCollectMode('single')} className="flex-1 py-2 text-xs font-medium bg-white dark:bg-[#1C1C1E] text-gray-500 dark:text-[#8E8E93]">
@@ -1003,6 +1029,18 @@ const PaymentModal = ({ student, invoices, payments = [], onPrintReceipt, onDown
                   <p className="text-xs text-gray-500 dark:text-[#636366]">
                     ID: {student.studentId || student.admissionNumber} &middot; Class: {student.classId?.name || student.class || 'N/A'}
                   </p>
+                </div>
+              </div>
+
+              {/* Student-level fee summary */}
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30">
+                  <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">{studentTotals.source === 'allocation' ? 'Total Annual Fees' : 'Total Fees'}</p>
+                  <p className="text-sm font-bold text-blue-700 dark:text-blue-400 mt-0.5">{formatCurrency(studentTotals.totalFees)}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30">
+                  <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">Total Pending Balance</p>
+                  <p className="text-sm font-bold text-amber-700 dark:text-amber-400 mt-0.5">{formatCurrency(studentTotals.pendingBalance)}</p>
                 </div>
               </div>
 

@@ -97,6 +97,7 @@ const FeesFinance = () => {
   const [selectedStudent, setSelectedStudent] = useState(null)
   const [studentInvoices, setStudentInvoices] = useState([])
   const [studentPayments, setStudentPayments] = useState([])
+  const [studentAllocation, setStudentAllocation] = useState(null)
   const [editingInvoice, setEditingInvoice] = useState(null)
   const [paymentAction, setPaymentAction] = useState(null) // { payment, mode: 'edit' | 'reverse' }
   const [receiptFilters, setReceiptFilters] = useState({ search: '', paymentMethod: '', quarter: '', startDate: '', endDate: '' })
@@ -307,6 +308,11 @@ const FeesFinance = () => {
       setStudentInvoices((res.data || []).filter(inv => ['Pending', 'Partial', 'Overdue'].includes(inv.status)))
       const paymentsRes = await paymentsService.list({ studentId: student._id })
       setStudentPayments(paymentsRes.data || [])
+      try {
+        const allocRes = await allocationsService.list({ studentId: student._id, academicSessionId: activeSession?._id })
+        const allocs = allocRes.data || []
+        setStudentAllocation(allocs[0] || null)
+      } catch { setStudentAllocation(null) }
       setShowPaymentModal(true)
     } catch { toast.error('Failed to load student data') }
   }
@@ -318,6 +324,11 @@ const FeesFinance = () => {
       setStudentInvoices((res.data || []).filter(inv => ['Pending', 'Partial', 'Overdue'].includes(inv.status)))
       const paymentsRes = await paymentsService.list({ studentId: selectedStudent._id })
       setStudentPayments(paymentsRes.data || [])
+      try {
+        const allocRes = await allocationsService.list({ studentId: selectedStudent._id, academicSessionId: activeSession?._id })
+        const allocs = allocRes.data || []
+        setStudentAllocation(allocs[0] || null)
+      } catch { /* keep prior allocation on error */ }
       queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })
       queryClient.invalidateQueries({ queryKey: ['all-invoices'] })
     } catch { /* silent — modal stays open with prior data */ }
@@ -496,7 +507,7 @@ const FeesFinance = () => {
       {/* Modals */}
       {showFeeStructureModal && <FeeStructureModal feeStructure={editingFeeStructure} classes={classes} activeSession={activeSession} onClose={() => { setShowFeeStructureModal(false); setEditingFeeStructure(null) }} onSuccess={() => { setShowFeeStructureModal(false); setEditingFeeStructure(null); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }); toast.success(editingFeeStructure ? 'Updated' : 'Created') }} />}
       {showInvoiceModal && <IndividualInvoiceModal feeStructures={feeStructures} activeSession={activeSession} initialStudent={invoiceModalInitialStudent} onClose={() => { setShowInvoiceModal(false); setInvoiceModalInitialStudent(null) }} onSuccess={() => { setShowInvoiceModal(false); setInvoiceModalInitialStudent(null); toast.success('Invoice generated'); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }) }} />}
-      {showPaymentModal && <PaymentModal student={selectedStudent} invoices={studentInvoices} payments={studentPayments} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onDownloadConsolidatedReceipt={handleDownloadConsolidatedReceipt} onClose={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); setStudentPayments([]) }} onSuccess={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); toast.success('Payment collected') }} />}
+      {showPaymentModal && <PaymentModal student={selectedStudent} invoices={studentInvoices} payments={studentPayments} allocation={studentAllocation} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onDownloadConsolidatedReceipt={handleDownloadConsolidatedReceipt} onClose={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); setStudentPayments([]); setStudentAllocation(null) }} onSuccess={() => { setShowPaymentModal(false); setSelectedStudent(null); setStudentInvoices([]); setStudentAllocation(null); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); toast.success('Payment collected') }} />}
       {editingInvoice && <EditInvoiceModal invoice={editingInvoice} onClose={() => setEditingInvoice(null)} onSuccess={() => { setEditingInvoice(null); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['all-invoices'] }); queryClient.invalidateQueries({ queryKey: ['fees-defaulters'] }); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }) }} />}
       {paymentAction && <PaymentEditModal payment={paymentAction.payment} mode={paymentAction.mode} onClose={() => setPaymentAction(null)} onSuccess={() => { setPaymentAction(null); queryClient.invalidateQueries({ queryKey: ['fees-receipts'] }); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['all-invoices'] }) }} />}
       {showFeeImportModal && <ImportModal isOpen={showFeeImportModal} onClose={() => setShowFeeImportModal(false)} module="fees" title="Import Fee Records" templateUrl="/fees/import/template" previewUrl="/fees/import/preview" executeUrl="/fees/import/execute" onSuccess={(result) => { setShowFeeImportModal(false); queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] }); queryClient.invalidateQueries({ queryKey: ['fee-allocations'] }); toast.success(`Import complete: ${result?.allocationsCreated || result?.created || 0} records created`) }} />}
