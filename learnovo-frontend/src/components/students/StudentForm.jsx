@@ -8,12 +8,15 @@ import { dedupeClassesByName, sortClassObjects } from '../../utils/classOrder'
 import { SERVER_URL } from '../../constants/config'
 import ImageCropModal from '../ImageCropModal'
 import CameraCaptureModal from '../CameraCaptureModal'
+import { useSettings } from '../../contexts/SettingsContext'
 
 const currentYear = new Date().getFullYear()
 const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
 const FALLBACK_ACADEMIC_YEAR = defaultAcademicYear
 
 const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
+    const { settings } = useSettings()
+    const schoolUdiseCode = settings?.institution?.udiseCode || ''
     const [activeSection, setActiveSection] = useState(0)
     const [form, setForm] = useState({
         // Basic Info
@@ -1478,6 +1481,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 title="Crop Student Photo"
                 minWidth={400}
                 minHeight={400}
+                outputFormat="image/jpeg"
             />
             <CameraCaptureModal
                 isOpen={cameraOpen}

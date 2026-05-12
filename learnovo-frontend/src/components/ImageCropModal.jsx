@@ -4,41 +4,76 @@ import Cropper from 'react-easy-crop'
 import { X, ZoomIn, ZoomOut, AlertTriangle, Loader } from 'lucide-react'
 
 /**
- * Extracts the cropped area from a source image using canvas.
- * Returns a PNG blob at full resolution (no scaling).
+ * Draws the cropped region of `image` onto a canvas, optionally scaled.
  */
-function getCroppedBlob(imageSrc, pixelCrop) {
+function drawCropToCanvas(image, pixelCrop, scale = 1) {
+  const width = Math.max(1, Math.round(pixelCrop.width * scale))
+  const height = Math.max(1, Math.round(pixelCrop.height * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    width,
+    height
+  )
+  return canvas
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Canvas crop failed'))),
+      type,
+      quality
+    )
+  })
+}
+
+function loadImage(src) {
   return new Promise((resolve, reject) => {
     const image = new window.Image()
     image.crossOrigin = 'anonymous'
-    image.onload = () => {
-      const canvas = document.createElement('canvas')
-      canvas.width = pixelCrop.width
-      canvas.height = pixelCrop.height
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(
-        image,
-        pixelCrop.x,
-        pixelCrop.y,
-        pixelCrop.width,
-        pixelCrop.height,
-        0,
-        0,
-        pixelCrop.width,
-        pixelCrop.height
-      )
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return reject(new Error('Canvas crop failed'))
-          resolve(blob)
-        },
-        'image/png',
-        1
-      )
-    }
+    image.onload = () => resolve(image)
     image.onerror = () => reject(new Error('Failed to load image'))
-    image.src = imageSrc
+    image.src = src
   })
+}
+
+/**
+ * Extracts the cropped area as a blob, automatically compressing JPEG output
+ * (and downscaling as a last resort) to stay within `maxBytes`.
+ * PNG is returned as-is at full resolution.
+ */
+async function getCroppedBlob(imageSrc, pixelCrop, outputFormat, maxBytes) {
+  const image = await loadImage(imageSrc)
+
+  if (outputFormat === 'image/jpeg') {
+    const qualitySteps = [0.92, 0.85, 0.75, 0.65, 0.55]
+    const scaleSteps = [1, 0.85, 0.7, 0.55]
+    for (const scale of scaleSteps) {
+      const canvas = drawCropToCanvas(image, pixelCrop, scale)
+      for (const q of qualitySteps) {
+        const blob = await canvasToBlob(canvas, 'image/jpeg', q)
+        if (blob.size <= maxBytes) return blob
+      }
+    }
+    // Couldn't get under the cap; return the smallest attempt.
+    const canvas = drawCropToCanvas(image, pixelCrop, 0.55)
+    return canvasToBlob(canvas, 'image/jpeg', 0.55)
+  }
+
+  const canvas = drawCropToCanvas(image, pixelCrop, 1)
+  return canvasToBlob(canvas, 'image/png', 1)
 }
 
 const ImageCropModal = ({
@@ -50,6 +85,8 @@ const ImageCropModal = ({
   title = 'Crop Image',
   minWidth = 400,
   minHeight,
+  outputFormat = 'image/png',
+  maxFileSize = 3 * 1024 * 1024,
 }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -57,7 +94,9 @@ const ImageCropModal = ({
   const [isProcessing, setIsProcessing] = useState(false)
   const [sizeWarning, setSizeWarning] = useState(null)
 
-  const effectiveMinHeight = minHeight || Math.round(minWidth / aspectRatio)
+  // When aspectRatio is null/undefined/0, react-easy-crop allows free-form crop.
+  const isFreeAspect = !aspectRatio
+  const effectiveMinHeight = minHeight || (isFreeAspect ? minWidth : Math.round(minWidth / aspectRatio))
 
   const onCropAreaChange = useCallback(
     (_croppedArea, croppedAreaPixels) => {
@@ -80,9 +119,10 @@ const ImageCropModal = ({
     if (!croppedAreaPixels) return
     setIsProcessing(true)
     try {
-      const blob = await getCroppedBlob(imageSrc, croppedAreaPixels)
-      if (blob.size > 2 * 1024 * 1024) {
-        setSizeWarning('Cropped image exceeds 2MB. Try zooming in less or using a smaller source image.')
+      const blob = await getCroppedBlob(imageSrc, croppedAreaPixels, outputFormat, maxFileSize)
+      if (blob.size > maxFileSize) {
+        const mb = (maxFileSize / (1024 * 1024)).toFixed(0)
+        setSizeWarning(`Cropped image still exceeds ${mb}MB after compression. Try a smaller source image.`)
         setIsProcessing(false)
         return
       }
@@ -137,7 +177,7 @@ const ImageCropModal = ({
             image={imageSrc}
             crop={crop}
             zoom={zoom}
-            aspect={aspectRatio}
+            aspect={isFreeAspect ? undefined : aspectRatio}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={onCropAreaChange}
