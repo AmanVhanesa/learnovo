@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Save, Tag, Plus, Trash2 } from 'lucide-react';
+import { Save, Tag, Plus, Trash2, Settings as SettingsIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import libraryService from '../../services/libraryService';
 
@@ -43,13 +43,16 @@ const LibrarySettings = () => {
   );
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-4 sm:space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Library Settings</h1>
-        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">Fine rules, issue limits, and reservation config</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+          <SettingsIcon className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+          Library Settings
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">Fine rules, issue limits, and reservation config</p>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-5 shadow-sm space-y-4">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-5 shadow-glass space-y-4">
         <h2 className="font-semibold text-gray-900 dark:text-white">General</h2>
         <Field label="Library Name" k="libraryName" type="text" />
         <h2 className="font-semibold text-gray-900 dark:text-white pt-2">Issue Rules</h2>
@@ -86,7 +89,7 @@ const LibrarySettings = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-5 shadow-sm">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-5 shadow-glass">
         <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-3">
           <Tag className="h-4 w-4" /> Categories
         </h2>

@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, BookOpen, Copy } from 'lucide-react';
 import toast from 'react-hot-toast';
-import libraryService from '../../services/libraryService';
-import BookFormModal from '../../components/library/BookFormModal';
+import libraryService from '../../../services/libraryService';
+import BookFormModal from '../BookFormModal';
 
-const Books = () => {
+const BooksTab = () => {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
@@ -38,18 +38,15 @@ const Books = () => {
   const pagination = data?.pagination || {};
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Books</h1>
-          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">Catalog and copies</p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Books Catalog</h2>
         <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn btn-primary gap-2">
           <Plus className="h-4 w-4" /> Add Book
         </button>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-4 shadow-sm">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-4 shadow-glass">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -68,7 +65,7 @@ const Books = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass overflow-hidden">
         {isLoading ? (
           <div className="p-12 text-center text-gray-500">Loading...</div>
         ) : books.length === 0 ? (
@@ -94,7 +91,7 @@ const Books = () => {
                 {books.map(b => (
                   <tr key={b._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
                     <td className="px-4 py-3">
-                      <Link to={`/app/library/books/${b._id}`} className="font-medium text-gray-900 dark:text-white hover:text-emerald-600">
+                      <Link to={`/app/library/books/${b._id}`} className="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400">
                         {b.title}
                       </Link>
                       {b.isbn && <p className="text-xs text-gray-400">ISBN: {b.isbn}</p>}
@@ -107,7 +104,7 @@ const Books = () => {
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 text-xs rounded-md font-semibold ${
                         b.availableCopies > 0
-                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
+                          ? 'bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400'
                           : 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400'
                       }`}>
                         {b.availableCopies}
@@ -116,7 +113,7 @@ const Books = () => {
                     <td className="px-4 py-3 text-center text-gray-700 dark:text-[#E5E5EA]">{b.totalCopies}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex items-center gap-1">
-                        <Link to={`/app/library/books/${b._id}`} className="p-1.5 text-gray-400 hover:text-emerald-600" title="Copies">
+                        <Link to={`/app/library/books/${b._id}`} className="p-1.5 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400" title="Copies">
                           <Copy className="h-4 w-4" />
                         </Link>
                         <button onClick={() => { setEditing(b); setShowModal(true); }} className="p-1.5 text-gray-400 hover:text-blue-600" title="Edit">
@@ -152,4 +149,4 @@ const Books = () => {
   );
 };
 
-export default Books;
+export default BooksTab;

@@ -54,58 +54,81 @@ const MyLibrary = () => {
 
   const totalFines = fines.reduce((sum, f) => sum + (f.amount || 0), 0);
 
+  const statCards = [
+    {
+      label: 'Currently Issued',
+      value: `${member?.currentBooksIssued || 0} / ${member?.maxBooksAllowed || 0}`,
+      icon: BookOpen,
+      color: 'bg-primary-500'
+    },
+    {
+      label: 'Total Issued',
+      value: member?.totalBooksIssued || 0,
+      icon: Bookmark,
+      color: 'bg-blue-500'
+    },
+    {
+      label: 'Pending Fines',
+      value: `₹${totalFines}`,
+      icon: IndianRupee,
+      color: totalFines > 0 ? 'bg-amber-500' : 'bg-gray-400'
+    }
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-          <Library className="h-6 w-6 text-emerald-600" /> My Library
+          <Library className="h-6 w-6 text-primary-600 dark:text-primary-400" />
+          My Library
         </h1>
-        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">
+        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
           {member?.membershipNumber ? `Member #${member.membershipNumber}` : 'Welcome'}
         </p>
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-24 rounded-2xl bg-gray-100 dark:bg-[#1C1C1E] animate-pulse" />)}
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-3 sm:gap-4">
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-4 shadow-sm">
-            <BookOpen className="h-5 w-5 text-emerald-600 mb-2" />
-            <p className="text-xs text-gray-500 uppercase">Currently Issued</p>
-            <p className="text-2xl font-bold mt-1">{member?.currentBooksIssued || 0} <span className="text-xs text-gray-400">/ {member?.maxBooksAllowed || 0}</span></p>
-          </div>
-          <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-4 shadow-sm">
-            <Bookmark className="h-5 w-5 text-blue-600 mb-2" />
-            <p className="text-xs text-gray-500 uppercase">Total Issued</p>
-            <p className="text-2xl font-bold mt-1">{member?.totalBooksIssued || 0}</p>
-          </div>
-          <div className={`rounded-2xl border p-4 shadow-sm ${totalFines > 0 ? 'bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30' : 'bg-white dark:bg-[#1C1C1E] border-gray-100 dark:border-[#38383A]'}`}>
-            <IndianRupee className={`h-5 w-5 mb-2 ${totalFines > 0 ? 'text-amber-600' : 'text-gray-400'}`} />
-            <p className="text-xs text-gray-500 uppercase">Pending Fines</p>
-            <p className="text-2xl font-bold mt-1">₹{totalFines}</p>
-          </div>
-        </div>
-      )}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+        {statCards.map((stat) => {
+          const Icon = stat.icon;
+          return (
+            <div key={stat.label} className="bg-white dark:bg-white/[0.08] dark:border dark:border-white/[0.15] dark:shadow-[0_4px_24px_rgba(0,0,0,0.10)] rounded-2xl shadow-glass p-4 sm:p-5">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm text-gray-500 dark:text-[#8E8E93]">{stat.label}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mt-2">
+                    {isLoading ? '...' : stat.value}
+                  </p>
+                </div>
+                <div className={`${stat.color} p-3 rounded-xl flex-shrink-0`}>
+                  <Icon className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-sm overflow-hidden">
-        <div className="px-4 pt-3 border-b border-gray-100 dark:border-[#38383A] flex gap-1 overflow-x-auto">
-          {[
-            { k: 'current', l: 'Current' },
-            { k: 'history', l: 'History' },
-            { k: 'reservations', l: 'Reservations' },
-            { k: 'fines', l: 'Fines' },
-            { k: 'browse', l: 'Browse' }
-          ].map(t => (
-            <button key={t.k} onClick={() => setTab(t.k)}
-                    className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                      tab === t.k ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}>{t.l}</button>
-          ))}
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-glass overflow-hidden">
+        <div className="border-b border-gray-200 dark:border-[#38383A]">
+          <nav className="flex space-x-6 sm:space-x-8 px-4 sm:px-6 overflow-x-auto whitespace-nowrap">
+            {[
+              { k: 'current', l: 'Current' },
+              { k: 'history', l: 'History' },
+              { k: 'reservations', l: 'Reservations' },
+              { k: 'fines', l: 'Fines' },
+              { k: 'browse', l: 'Browse' }
+            ].map(t => (
+              <button key={t.k} onClick={() => setTab(t.k)}
+                      className={`py-4 px-1 text-sm font-medium border-b-2 transition-colors ${
+                        tab === t.k
+                          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                          : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300'
+                      }`}>{t.l}</button>
+            ))}
+          </nav>
         </div>
 
-        <div className="p-4">
+        <div className="p-4 sm:p-6">
           {tab === 'current' && (
             active.length === 0 ? (
               <div className="py-12 text-center text-sm text-gray-500">No books currently issued</div>
@@ -204,7 +227,7 @@ const MyLibrary = () => {
                       <div className="min-w-0">
                         <p className="font-medium truncate">{b.title}</p>
                         <p className="text-xs text-gray-500 truncate">by {b.author}</p>
-                        <p className={`text-xs mt-1 ${b.availableCopies > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        <p className={`text-xs mt-1 ${b.availableCopies > 0 ? 'text-primary-600 dark:text-primary-400' : 'text-red-600'}`}>
                           {b.availableCopies > 0 ? `${b.availableCopies} available` : 'Not available'}
                         </p>
                       </div>

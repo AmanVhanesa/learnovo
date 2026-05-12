@@ -69,12 +69,12 @@ const IssueBookModal = ({ open, onClose }) => {
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-[#E5E5EA] mb-1">Book</label>
             {selectedBook ? (
-              <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-500/10 p-3 rounded-lg">
+              <div className="flex items-center justify-between bg-primary-50 dark:bg-primary-500/10 p-3 rounded-lg">
                 <div>
                   <p className="font-medium text-sm">{selectedBook.title}</p>
                   <p className="text-xs text-gray-500">by {selectedBook.author} · {selectedBook.availableCopies} available</p>
                 </div>
-                <button onClick={() => setSelectedBook(null)} className="text-emerald-700 text-xs font-medium">Change</button>
+                <button onClick={() => setSelectedBook(null)} className="text-primary-700 dark:text-primary-400 text-xs font-medium">Change</button>
               </div>
             ) : (
               <>

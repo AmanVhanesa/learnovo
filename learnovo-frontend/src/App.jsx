@@ -84,15 +84,9 @@ const Attendance = lazy(() => import('./pages/Attendance'))
 const StudentAttendanceView = lazy(() => import('./pages/attendance/StudentAttendanceView'))
 const Assignments = lazy(() => import('./pages/Assignments'))
 const Homework = lazy(() => import('./pages/Homework'))
-const LibraryDashboard = lazy(() => import('./pages/library/LibraryDashboard'))
-const LibraryBooks = lazy(() => import('./pages/library/Books'))
+const Library = lazy(() => import('./pages/library/Library'))
 const LibraryBookDetail = lazy(() => import('./pages/library/BookDetail'))
-const LibraryIssues = lazy(() => import('./pages/library/Issues'))
-const LibraryMembers = lazy(() => import('./pages/library/Members'))
-const LibraryFines = lazy(() => import('./pages/library/Fines'))
 const LibrarySettingsPage = lazy(() => import('./pages/library/LibrarySettings'))
-const LibraryReservations = lazy(() => import('./pages/library/Reservations'))
-const LibraryReports = lazy(() => import('./pages/library/LibraryReports'))
 const MyLibrary = lazy(() => import('./pages/library/MyLibrary'))
 const Admissions = lazy(() => import('./pages/Admissions'))
 const Activities = lazy(() => import('./pages/Activities'))
@@ -363,12 +357,7 @@ function App() {
                       {/* Library Module */}
                       <Route path="library" element={
                         <ProtectedRoute allowedRoles={['admin', 'librarian', 'principal', 'vice_principal']}>
-                          <LibraryDashboard />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="library/books" element={
-                        <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                          <LibraryBooks />
+                          <Library />
                         </ProtectedRoute>
                       } />
                       <Route path="library/books/:id" element={
@@ -376,34 +365,9 @@ function App() {
                           <LibraryBookDetail />
                         </ProtectedRoute>
                       } />
-                      <Route path="library/issues" element={
-                        <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                          <LibraryIssues />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="library/members" element={
-                        <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                          <LibraryMembers />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="library/fines" element={
-                        <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                          <LibraryFines />
-                        </ProtectedRoute>
-                      } />
                       <Route path="library/settings" element={
                         <ProtectedRoute allowedRoles={['admin', 'librarian']}>
                           <LibrarySettingsPage />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="library/reservations" element={
-                        <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                          <LibraryReservations />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="library/reports" element={
-                        <ProtectedRoute allowedRoles={['admin', 'librarian']}>
-                          <LibraryReports />
                         </ProtectedRoute>
                       } />
                       <Route path="library/my" element={

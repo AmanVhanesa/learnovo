@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { IndianRupee, Check, X as XIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
-import libraryService from '../../services/libraryService';
-import { formatDateShort } from '../../utils/formatDate';
+import libraryService from '../../../services/libraryService';
+import { formatDateShort } from '../../../utils/formatDate';
 
-const Fines = () => {
+const FinesTab = () => {
   const qc = useQueryClient();
   const [tab, setTab] = useState('pending');
   const [page, setPage] = useState(1);
@@ -45,18 +45,18 @@ const Fines = () => {
   const pagination = data?.pagination || {};
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Library Fines</h1>
-        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">Paid fines auto-sync to Income</p>
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Library Fines</h2>
+        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-0.5">Paid fines auto-sync to Income</p>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass overflow-hidden">
         <div className="px-4 pt-3 border-b border-gray-100 dark:border-[#38383A] flex gap-1">
           {['pending', 'paid', 'waived'].map(t => (
             <button key={t} onClick={() => { setTab(t); setPage(1); }}
                     className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-                      tab === t ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                      tab === t ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}>{t}</button>
           ))}
         </div>
@@ -122,7 +122,7 @@ const Fines = () => {
       {payingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl shadow-xl max-w-sm w-full p-5">
-            <h2 className="font-semibold flex items-center gap-2 mb-4"><IndianRupee className="h-5 w-5 text-emerald-600" /> Collect Fine</h2>
+            <h2 className="font-semibold flex items-center gap-2 mb-4"><IndianRupee className="h-5 w-5 text-primary-600 dark:text-primary-400" /> Collect Fine</h2>
             <label className="block text-xs font-medium mb-1">Payment Method</label>
             <select className="input w-full" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
               <option>Cash</option><option>Bank Transfer</option><option>UPI</option><option>Cheque</option><option>Card</option>
@@ -152,4 +152,4 @@ const Fines = () => {
   );
 };
 
-export default Fines;
+export default FinesTab;

@@ -1,10 +1,10 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, AlertTriangle, Package, BarChart3 } from 'lucide-react';
-import libraryService from '../../services/libraryService';
-import { formatDateShort } from '../../utils/formatDate';
+import { TrendingUp, AlertTriangle, Package } from 'lucide-react';
+import libraryService from '../../../services/libraryService';
+import { formatDateShort } from '../../../utils/formatDate';
 
-const LibraryReports = () => {
+const ReportsTab = () => {
   const { data: most } = useQuery({ queryKey: ['lib-most'], queryFn: () => libraryService.mostIssued(15) });
   const { data: defaulters } = useQuery({ queryKey: ['lib-def'], queryFn: () => libraryService.defaulters() });
   const { data: inv } = useQuery({ queryKey: ['lib-inv'], queryFn: () => libraryService.inventoryValue() });
@@ -16,24 +16,22 @@ const LibraryReports = () => {
   const totalCopies = invList.reduce((s, i) => s + (i.count || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-          <BarChart3 className="h-6 w-6 text-emerald-600" /> Library Reports
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">Insights, defaulters, inventory valuation</p>
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Reports</h2>
+        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-0.5">Insights, defaulters, inventory valuation</p>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-5 shadow-sm">
-        <h2 className="font-semibold flex items-center gap-2 mb-4"><Package className="h-4 w-4 text-emerald-600" /> Inventory Valuation</h2>
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-5 shadow-glass">
+        <h3 className="font-semibold flex items-center gap-2 mb-4"><Package className="h-4 w-4 text-primary-600 dark:text-primary-400" /> Inventory Valuation</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div className="p-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-lg">
             <p className="text-xs text-gray-500 uppercase">Total Copies</p>
             <p className="text-xl font-bold mt-1">{totalCopies}</p>
           </div>
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg">
+          <div className="p-3 bg-primary-50 dark:bg-primary-500/10 rounded-lg">
             <p className="text-xs text-gray-500 uppercase">Total Value</p>
-            <p className="text-xl font-bold mt-1 text-emerald-700 dark:text-emerald-400">₹{totalValue.toLocaleString('en-IN')}</p>
+            <p className="text-xl font-bold mt-1 text-primary-700 dark:text-primary-400">₹{totalValue.toLocaleString('en-IN')}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -49,10 +47,10 @@ const LibraryReports = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-sm overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 dark:border-[#38383A]">
-            <h2 className="font-semibold flex items-center gap-2"><TrendingUp className="h-4 w-4 text-blue-600" /> Most Issued Books</h2>
+            <h3 className="font-semibold flex items-center gap-2"><TrendingUp className="h-4 w-4 text-blue-600" /> Most Issued Books</h3>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-[#38383A]">
             {mostList.length === 0 ? (
@@ -69,9 +67,9 @@ const LibraryReports = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 dark:border-[#38383A]">
-            <h2 className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" /> Defaulters ({defList.length})</h2>
+            <h3 className="font-semibold flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" /> Defaulters ({defList.length})</h3>
           </div>
           <div className="divide-y divide-gray-100 dark:divide-[#38383A] max-h-96 overflow-y-auto">
             {defList.length === 0 ? (
@@ -90,4 +88,4 @@ const LibraryReports = () => {
   );
 };
 
-export default LibraryReports;
+export default ReportsTab;

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Edit, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
-import libraryService from '../../services/libraryService';
+import libraryService from '../../../services/libraryService';
 
-const Members = () => {
+const MembersTab = () => {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -25,13 +25,13 @@ const Members = () => {
   const pagination = data?.pagination || {};
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Library Members</h1>
-        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">Auto-enrolled when first issued a book</p>
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Library Members</h2>
+        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-0.5">Auto-enrolled when first issued a book</p>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-4 shadow-sm">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] p-4 shadow-glass">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input className="input w-full pl-9" placeholder="Search by name, email or admission #..."
@@ -39,7 +39,7 @@ const Members = () => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass overflow-hidden">
         {isLoading ? (
           <div className="p-12 text-center text-gray-500">Loading...</div>
         ) : items.length === 0 ? (
@@ -74,7 +74,7 @@ const Members = () => {
                     <td className="px-4 py-3 text-center">{m.maxBooksAllowed}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 text-xs rounded-md font-semibold ${
-                        m.status === 'active' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' :
+                        m.status === 'active' ? 'bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400' :
                         'bg-gray-100 text-gray-600 dark:bg-gray-500/10 dark:text-gray-400'
                       }`}>{m.status}</span>
                     </td>
@@ -134,4 +134,4 @@ const Members = () => {
   );
 };
 
-export default Members;
+export default MembersTab;

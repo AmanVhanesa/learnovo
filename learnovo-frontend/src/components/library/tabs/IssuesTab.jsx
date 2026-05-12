@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, RefreshCw, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
-import libraryService from '../../services/libraryService';
-import { formatDateShort } from '../../utils/formatDate';
-import IssueBookModal from '../../components/library/IssueBookModal';
+import libraryService from '../../../services/libraryService';
+import { formatDateShort } from '../../../utils/formatDate';
+import IssueBookModal from '../IssueBookModal';
 
 const STATUS_TABS = [
   { key: '', label: 'All' },
@@ -14,7 +14,7 @@ const STATUS_TABS = [
   { key: 'lost', label: 'Lost' }
 ];
 
-const Issues = () => {
+const IssuesTab = () => {
   const qc = useQueryClient();
   const [status, setStatus] = useState('issued');
   const [page, setPage] = useState(1);
@@ -46,18 +46,15 @@ const Issues = () => {
   const pagination = data?.pagination || {};
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Issue & Return</h1>
-          <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">Manage book transactions</p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Issue & Return</h2>
         <button onClick={() => setShowIssue(true)} className="btn btn-primary gap-2">
           <Plus className="h-4 w-4" /> Issue Book
         </button>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass overflow-hidden">
         <div className="px-4 pt-3 border-b border-gray-100 dark:border-[#38383A] overflow-x-auto">
           <div className="flex gap-1">
             {STATUS_TABS.map(t => (
@@ -65,7 +62,7 @@ const Issues = () => {
                       onClick={() => { setStatus(t.key); setPage(1); }}
                       className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
                         status === t.key
-                          ? 'border-emerald-600 text-emerald-600'
+                          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                           : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-[#8E8E93]'
                       }`}>
                 {t.label}
@@ -109,7 +106,7 @@ const Issues = () => {
                       <td className={`px-4 py-3 ${overdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>{formatDateShort(i.dueDate)}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 text-xs rounded-md font-semibold ${
-                          i.status === 'returned' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' :
+                          i.status === 'returned' ? 'bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400' :
                           i.status === 'overdue' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' :
                           i.status === 'lost' ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400' :
                           'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
@@ -156,4 +153,4 @@ const Issues = () => {
   );
 };
 
-export default Issues;
+export default IssuesTab;

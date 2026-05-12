@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import libraryService from '../../services/libraryService';
-import { formatDateShort } from '../../utils/formatDate';
+import libraryService from '../../../services/libraryService';
+import { formatDateShort } from '../../../utils/formatDate';
 
-const Reservations = () => {
+const ReservationsTab = () => {
   const qc = useQueryClient();
   const [tab, setTab] = useState('active');
 
@@ -23,20 +23,18 @@ const Reservations = () => {
   const items = data?.data || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-          <Bookmark className="h-6 w-6 text-emerald-600" /> Reservations
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-0.5">Manage book reservation queue</p>
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Reservations</h2>
+        <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-0.5">Manage book reservation queue</p>
       </div>
 
-      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-[#38383A] shadow-glass overflow-hidden">
         <div className="px-4 pt-3 border-b border-gray-100 dark:border-[#38383A] flex gap-1">
           {['active', 'fulfilled', 'cancelled', 'expired'].map(t => (
             <button key={t} onClick={() => setTab(t)}
                     className={`px-3 py-2 text-sm font-medium border-b-2 capitalize transition-colors ${
-                      tab === t ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                      tab === t ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}>{t}</button>
           ))}
         </div>
@@ -82,4 +80,4 @@ const Reservations = () => {
   );
 };
 
-export default Reservations;
+export default ReservationsTab;
