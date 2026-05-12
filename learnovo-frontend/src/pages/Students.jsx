@@ -107,6 +107,10 @@ const Students = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(100)
 
+  // Sort state — null means use backend default (name asc)
+  const [sortField, setSortField] = useState(null)
+  const [sortAsc, setSortAsc] = useState(true)
+
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const searchTimerRef = useRef(null)
@@ -120,9 +124,9 @@ const Students = () => {
   }, [searchQuery])
 
   useEffect(() => {
-    setCurrentPage(1) // reset to page 1 on filter change
-    setSelectedStudents([]) // clear selection on filter change
-  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, studentTypeFilter])
+    setCurrentPage(1) // reset to page 1 on filter/sort change
+    setSelectedStudents([]) // clear selection on filter/sort change
+  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, studentTypeFilter, sortField, sortAsc])
 
   // Reset section filter when class changes (available sections depend on class)
   useEffect(() => {
@@ -144,7 +148,7 @@ const Students = () => {
 
   // Fetch students with React Query
   const { data: studentsResponse, isLoading, error: studentsError, refetch: refetchStudents } = useQuery({
-    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, studentTypeFilter, currentPage, perPage],
+    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, studentTypeFilter, currentPage, perPage, sortField, sortAsc],
     queryFn: async () => {
       const filters = {
         search: debouncedSearch,
@@ -155,7 +159,8 @@ const Students = () => {
         driver: driverFilter,
         studentType: studentTypeFilter,
         page: currentPage,
-        limit: perPage
+        limit: perPage,
+        ...(sortField ? { sortBy: sortField, sortOrder: sortAsc ? 'asc' : 'desc' } : {})
       }
       const response = await studentsService.list(filters)
       return response
@@ -1092,7 +1097,19 @@ const Students = () => {
                     />
                   </th>
                 )}
-                <th>Admission No.</th>
+                <th
+                  onClick={() => {
+                    if (sortField === 'admissionNumber') setSortAsc(prev => !prev)
+                    else { setSortField('admissionNumber'); setSortAsc(true) }
+                  }}
+                  className="cursor-pointer select-none hover:text-teal-600"
+                  title="Sort by admission number"
+                >
+                  Admission No.
+                  <span className="inline-block ml-1 text-[10px] opacity-50">
+                    {sortField === 'admissionNumber' ? (sortAsc ? '▲' : '▼') : '⇅'}
+                  </span>
+                </th>
                 <th>Photo</th>
                 <th>Name</th>
                 <th>Roll No.</th>

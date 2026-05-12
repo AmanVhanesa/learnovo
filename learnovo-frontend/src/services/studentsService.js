@@ -2,7 +2,7 @@ import api from './authService'
 
 export const studentsService = {
   list: async (filters = {}) => {
-    const { page = 1, limit = 20, search = '', class: classFilter, classId, section, academicYear, status, driver, studentType, lightweight } = filters
+    const { page = 1, limit = 20, search = '', class: classFilter, classId, section, academicYear, status, driver, studentType, lightweight, sortBy, sortOrder } = filters
     const params = new URLSearchParams()
 
     // Only add non-empty params to avoid validation errors
@@ -17,6 +17,8 @@ export const studentsService = {
     if (driver && driver.trim()) params.append('driver', driver.trim())
     if (studentType && studentType.trim()) params.append('studentType', studentType.trim())
     if (lightweight) params.append('lightweight', 'true')
+    if (sortBy && sortBy.trim()) params.append('sortBy', sortBy.trim())
+    if (sortOrder && sortOrder.trim()) params.append('sortOrder', sortOrder.trim())
 
     const url = `/students${params.toString() ? `?${params.toString()}` : ''}`
 

@@ -268,7 +268,15 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       ? '_id name firstName lastName fullName admissionNumber rollNumber class section classId sectionId academicYear isActive gender photo'
       : '-password';
 
-    const defaultSort = { name: 1, admissionNumber: 1 };
+    // Sorting: accept sortBy/sortOrder from query, whitelist allowed fields.
+    // Falls back to legacy default ({ name: 1, admissionNumber: 1 }) when no
+    // sortBy is provided so existing callers are unaffected.
+    const allowedSortFields = ['admissionNumber', 'name', 'rollNumber', 'createdAt'];
+    const requestedSortBy = allowedSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
+    const sortDir = req.query.sortOrder === 'desc' ? -1 : 1;
+    const defaultSort = requestedSortBy
+      ? { [requestedSortBy]: sortDir, _id: 1 }
+      : { name: 1, admissionNumber: 1 };
 
     // Run count and find in parallel for speed
     const [students, total] = await Promise.all([
