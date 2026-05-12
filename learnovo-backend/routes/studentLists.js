@@ -107,7 +107,7 @@ router.get('/:id', protect, async(req, res) => {
     if (req.user.role === 'teacher') filter.createdBy = req.user._id;
 
     const list = await StudentList.findOne(filter)
-      .populate('students', 'admissionNumber name fullName class section phone rollNumber email');
+      .populate('students', 'admissionNumber name fullName class section phone rollNumber email guardians address fatherOrHusbandName gender dateOfBirth bloodGroup');
 
     if (!list) {
       return res.status(404).json({ success: false, message: 'Student list not found' });
@@ -218,7 +218,7 @@ router.delete('/:id', protect, async(req, res) => {
 // Helper to get list with students
 const getExportData = async(listId, tenantId) => {
   const list = await StudentList.findOne({ _id: listId, tenantId })
-    .populate('students', 'admissionNumber name fullName class section phone');
+    .populate('students', 'admissionNumber name fullName class section phone rollNumber email guardians address fatherOrHusbandName gender dateOfBirth bloodGroup');
   if (!list) throw new Error('List not found');
   return list;
 };

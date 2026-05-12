@@ -17,7 +17,7 @@ const CreateStudentListModal = ({ isOpen, onClose, onSuccess }) => {
             const current = prev.trim();
             if (current) {
                 // Check if number already exists to avoid duplicates
-                const existingNumbers = current.split(/[\\n\\s,]+/).map(n => n.trim());
+                const existingNumbers = current.split(/[\s,]+/).map(n => n.trim());
                 if (existingNumbers.includes(admissionNumber)) {
                     toast.success('Student already added to the list');
                     return current;
@@ -31,7 +31,7 @@ const CreateStudentListModal = ({ isOpen, onClose, onSuccess }) => {
 
     // Compute live count of numbers
     const admissionNumbers = numbersText
-        .split(/[\\n\\s,]+/)
+        .split(/[\s,]+/)
         .map(n => n.trim())
         .filter(n => n.length > 0);
 

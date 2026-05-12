@@ -14,7 +14,7 @@ const AddMoreStudentsModal = ({ isOpen, onClose, onSuccess, listId }) => {
         setNumbersText((prev) => {
             const current = prev.trim();
             if (current) {
-                const existingNumbers = current.split(/[\\n\\s,]+/).map(n => n.trim());
+                const existingNumbers = current.split(/[\s,]+/).map(n => n.trim());
                 if (existingNumbers.includes(admissionNumber)) {
                     toast.success('Student already queued for addition');
                     return current;
@@ -28,7 +28,7 @@ const AddMoreStudentsModal = ({ isOpen, onClose, onSuccess, listId }) => {
 
     // Compute live count of numbers
     const admissionNumbers = numbersText
-        .split(/[\\n\\s,]+/)
+        .split(/[\s,]+/)
         .map(n => n.trim())
         .filter(n => n.length > 0);
 
