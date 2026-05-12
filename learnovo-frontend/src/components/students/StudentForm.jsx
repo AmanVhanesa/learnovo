@@ -425,6 +425,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     const [tcDocType, setTcDocType] = useState('tc') // 'tc' | 'birth_certificate'
     const [docDeletingId, setDocDeletingId] = useState(null)
     const [docError, setDocError] = useState(null)
+    const [docCropModal, setDocCropModal] = useState({ isOpen: false, imageSrc: null, type: null, guardianIndex: undefined, fileName: '' })
 
     const isValidDocFile = (file) => {
         if (!file) return false
@@ -452,6 +453,36 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
     const removePendingDoc = (localId) => {
         setPendingDocs(prev => prev.filter(d => d.localId !== localId))
+    }
+
+    // For document slots: images go through the crop modal first; PDFs are added as-is.
+    const handleDocFilePick = (file, type, guardianIndex) => {
+        if (!isValidDocFile(file)) return
+        if (file.type === 'application/pdf') {
+            addPendingDoc(file, type, guardianIndex)
+            return
+        }
+        const reader = new FileReader()
+        reader.onloadend = () => {
+            setDocCropModal({
+                isOpen: true,
+                imageSrc: reader.result,
+                type,
+                guardianIndex,
+                fileName: file.name || 'document.png',
+            })
+        }
+        reader.onerror = () => setDocError('Failed to read the selected file.')
+        reader.readAsDataURL(file)
+    }
+
+    const closeDocCropModal = () => setDocCropModal({ isOpen: false, imageSrc: null, type: null, guardianIndex: undefined, fileName: '' })
+
+    const handleDocCropComplete = async (blob) => {
+        const baseName = (docCropModal.fileName || 'document').replace(/\.[^.]+$/, '')
+        const ext = blob.type === 'image/jpeg' ? 'jpg' : 'png'
+        const croppedFile = new File([blob], `${baseName}-cropped.${ext}`, { type: blob.type || 'image/jpeg' })
+        addPendingDoc(croppedFile, docCropModal.type, docCropModal.guardianIndex)
     }
 
     const deleteExistingDoc = async (docId) => {
@@ -902,7 +933,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             <label className="label">UDISE Code (School)</label>
                                             <input
                                                 className="input bg-gray-50 dark:bg-[#2C2C2E]"
-                                                value={student?.udiseCode || 'Inherited'}
+                                                value={student?.udiseCode || schoolUdiseCode || 'Not set in school settings'}
                                                 readOnly
                                             />
                                         </div>
@@ -1364,7 +1395,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     docType="student_aadhaar"
                                     existing={findExistingDoc('student_aadhaar')}
                                     pending={findPendingDoc('student_aadhaar')}
-                                    onPick={(file) => addPendingDoc(file, 'student_aadhaar')}
+                                    onPick={(file) => handleDocFilePick(file, 'student_aadhaar')}
                                     onRemovePending={removePendingDoc}
                                     onDeleteExisting={deleteExistingDoc}
                                     deletingId={docDeletingId}
@@ -1394,7 +1425,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     <DocSlotBody
                                         existing={findExistingDoc('tc_or_birth_certificate')}
                                         pending={findPendingDoc('tc_or_birth_certificate')}
-                                        onPick={(file) => addPendingDoc(file, tcDocType)}
+                                        onPick={(file) => handleDocFilePick(file, tcDocType)}
                                         onRemovePending={removePendingDoc}
                                         onDeleteExisting={deleteExistingDoc}
                                         deletingId={docDeletingId}
@@ -1416,7 +1447,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             docType="guardian_aadhaar"
                                             existing={findExistingDoc('guardian_aadhaar', gi)}
                                             pending={findPendingDoc('guardian_aadhaar', gi)}
-                                            onPick={(file) => addPendingDoc(file, 'guardian_aadhaar', gi)}
+                                            onPick={(file) => handleDocFilePick(file, 'guardian_aadhaar', gi)}
                                             onRemovePending={removePendingDoc}
                                             onDeleteExisting={deleteExistingDoc}
                                             deletingId={docDeletingId}
@@ -1482,6 +1513,18 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 minWidth={400}
                 minHeight={400}
                 outputFormat="image/jpeg"
+            />
+            <ImageCropModal
+                isOpen={docCropModal.isOpen}
+                onClose={closeDocCropModal}
+                onCropComplete={handleDocCropComplete}
+                imageSrc={docCropModal.imageSrc}
+                aspectRatio={null}
+                title="Crop Document"
+                minWidth={600}
+                minHeight={400}
+                outputFormat="image/jpeg"
+                maxFileSize={5 * 1024 * 1024}
             />
             <CameraCaptureModal
                 isOpen={cameraOpen}

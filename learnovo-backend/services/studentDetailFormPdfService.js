@@ -393,7 +393,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
       ${row('Religion', student.religion)}
       ${row('Category', student.category)}
       ${row('PEN Number', student.penNumber)}
-      ${row('UDISE Code', student.udiseCode)}
+      ${row('UDISE Code', student.udiseCode || udiseCode)}
       ${row('National ID', student.nationalId)}
       ${row('Identification Mark', student.identificationMark)}
       ${row('Is Orphan', yesNo(student.isOrphan))}
