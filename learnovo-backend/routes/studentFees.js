@@ -17,6 +17,7 @@ const {
   settleSuccessfulAttempt,
   runPostSettlementSideEffects
 } = require('../services/paymentSettlementService');
+const { mapOnlineMode } = require('../utils/onlineModeMap');
 
 // Payment gateway — resolved per tenant via factory
 const { getGateway } = require('../services/payment/GatewayFactory');
@@ -194,12 +195,14 @@ router.get('/history', protect, authorize('student', 'parent'), async(req, res) 
                 // reconciliation tick. settleSuccessfulAttempt is
                 // idempotent via (paymentAttemptId, invoiceId), so a
                 // simultaneous reconciliation run will no-op.
+                const onlineMode = mapOnlineMode(result?.rawPaymentMode);
                 const session = await mongoose.startSession();
                 session.startTransaction();
                 let settleResult;
                 try {
                   settleResult = await settleSuccessfulAttempt(attempt, session, {
                     paymentMode: 'ONLINE',
+                    onlineMode,
                     paymentDate: new Date(),
                     transactionRefId: attempt.gatewayRefId || null,
                     initiatedBy: 'student',
@@ -218,6 +221,7 @@ router.get('/history', protect, authorize('student', 'parent'), async(req, res) 
                   await runPostSettlementSideEffects(attempt, settleResult.invoices, {
                     receipts: settleResult.receipts,
                     paymentMode: 'Online',
+                    onlineMode,
                     paymentDate: new Date(),
                     transactionRefId: attempt.gatewayRefId || null
                   });
@@ -319,12 +323,14 @@ router.post('/reconcile/:attemptId', protect, authorize('student', 'parent'), as
     }
 
     if (gwResult?.status === 'SUCCESS') {
+      const onlineMode = mapOnlineMode(gwResult?.rawPaymentMode);
       const session = await mongoose.startSession();
       session.startTransaction();
       let settleResult;
       try {
         settleResult = await settleSuccessfulAttempt(attempt, session, {
           paymentMode: 'ONLINE',
+          onlineMode,
           paymentDate: new Date(),
           transactionRefId: attempt.gatewayRefId || null,
           initiatedBy: 'student',
@@ -343,6 +349,7 @@ router.post('/reconcile/:attemptId', protect, authorize('student', 'parent'), as
         await runPostSettlementSideEffects(attempt, settleResult.invoices, {
           receipts: settleResult.receipts,
           paymentMode: 'Online',
+          onlineMode,
           paymentDate: new Date(),
           transactionRefId: attempt.gatewayRefId || null
         });
@@ -674,12 +681,14 @@ router.post('/attempts/:attemptId/abandon', protect, authorize('student', 'paren
             // the combined transaction. Settle inline here so cancel-
             // and-retry self-heals when the student returns from a
             // closed gateway window.
+            const onlineMode = mapOnlineMode(result?.rawPaymentMode);
             const session = await mongoose.startSession();
             session.startTransaction();
             let settleResult;
             try {
               settleResult = await settleSuccessfulAttempt(attempt, session, {
                 paymentMode: 'ONLINE',
+                onlineMode,
                 paymentDate: new Date(),
                 transactionRefId: attempt.gatewayRefId || null,
                 initiatedBy: 'student',
@@ -702,6 +711,7 @@ router.post('/attempts/:attemptId/abandon', protect, authorize('student', 'paren
               await runPostSettlementSideEffects(attempt, settleResult.invoices, {
                 receipts: settleResult.receipts,
                 paymentMode: 'Online',
+                onlineMode,
                 paymentDate: new Date(),
                 transactionRefId: attempt.gatewayRefId || null
               });

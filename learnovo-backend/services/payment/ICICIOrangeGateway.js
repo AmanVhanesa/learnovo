@@ -294,8 +294,16 @@ class ICICIOrangeGateway extends PaymentGateway {
       throw new Error('ICICI status response failed secureHash verification');
     }
 
+    // ICICI's STATUS response carries the payment mode under a few
+    // alternative keys depending on the product variant. Expose it as a
+    // top-level rawPaymentMode so callers (recovery paths in
+    // studentFees.js) don't need to know the field names.
+    const rawPaymentMode = body.paymentMode || body.payMode || body.paymentMethod
+      || body.paymentChannel || body.txnMode || body.payment_method || body.payment_mode || null;
+
     return {
       status: this._normaliseStatus(body.txnStatus || body.responseCode),
+      rawPaymentMode,
       raw: body
     };
   }

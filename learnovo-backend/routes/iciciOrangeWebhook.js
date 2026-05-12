@@ -54,6 +54,7 @@ const {
   runPostSettlementSideEffects
 } = require('../services/paymentSettlementService');
 const { toNumber, moneyEquals } = require('../utils/money');
+const { mapOnlineMode } = require('../utils/onlineModeMap');
 
 const router = express.Router();
 
@@ -452,6 +453,13 @@ async function applyReturnSuccess(attempt, parsed) {
   const session = await mongoose.startSession();
   session.startTransaction();
 
+  // Map the gateway-reported payment mode (UPI/NEFT/Net Banking/etc.) onto
+  // our Payment.transactionDetails.onlineMode enum so the admin Fee
+  // Collection grid shows the actual sub-mode instead of a blank field.
+  // Falls back to undefined when the bank's payload doesn't carry the
+  // hint — the Payment is still created, just without the sub-mode.
+  const onlineMode = mapOnlineMode(parsed.rawPaymentMode);
+
   let result;
   try {
     const paymentDate = new Date();
@@ -459,9 +467,11 @@ async function applyReturnSuccess(attempt, parsed) {
       gatewayResponseExtras: {
         bankRef: parsed.bankRef || null,
         rawStatus: parsed.rawStatus,
+        rawPaymentMode: parsed.rawPaymentMode || null,
         source: 'returnURL'
       },
       paymentMode: 'ONLINE',
+      onlineMode,
       paymentDate,
       transactionRefId: parsed.bankRef || attempt.gatewayRefId || null,
       initiatedBy: 'student',
@@ -482,6 +492,7 @@ async function applyReturnSuccess(attempt, parsed) {
       await runPostSettlementSideEffects(attempt, result.invoices, {
         receipts: result.receipts,
         paymentMode: 'Online',
+        onlineMode,
         paymentDate: new Date(),
         transactionRefId: parsed.bankRef || attempt.gatewayRefId || null
       });
@@ -604,7 +615,7 @@ async function handlePgDirectReturn(req, tenantCode, tenant) {
   // ONLY when its secureHash verifies. Otherwise fall back to a signed
   // server-to-server STATUS call — this is the bank's recommended way
   // to confirm an ambiguous returnURL post.
-  let outcome = null;          // { normalisedStatus, rawStatus, bankRef, amount, source }
+  let outcome = null;          // { normalisedStatus, rawStatus, bankRef, amount, rawPaymentMode, source }
   const bodyVerified = gateway.verifyReturnPayload(payload);
   if (bodyVerified.valid) {
     outcome = {
@@ -612,6 +623,7 @@ async function handlePgDirectReturn(req, tenantCode, tenant) {
       rawStatus: bodyVerified.rawStatus,
       bankRef: bodyVerified.bankRef,
       amount: bodyVerified.amount,
+      rawPaymentMode: bodyVerified.rawPaymentMode || null,
       source: 'returnURL'
     };
   } else {
@@ -624,11 +636,19 @@ async function handlePgDirectReturn(req, tenantCode, tenant) {
     });
     try {
       const status = await gateway.checkStatus(merchantRef);
+      // Pull the bank's reported payment mode off the STATUS response.
+      // ICICI's field name is non-canonical across product variants
+      // (paymentMode / payMode / paymentMethod / paymentChannel /
+      // txnMode), so probe the same set the inbound callback parser does.
+      const raw = status.raw || {};
+      const rawPaymentMode = raw.paymentMode || raw.payMode || raw.paymentMethod
+        || raw.paymentChannel || raw.txnMode || raw.payment_method || raw.payment_mode || null;
       outcome = {
         normalisedStatus: status.status,
-        rawStatus: status.raw?.txnStatus || status.raw?.responseCode,
-        bankRef: status.raw?.txnID || status.raw?.txnAuthID || null,
-        amount: status.raw?.amount !== undefined ? Number(status.raw.amount) : null,
+        rawStatus: raw.txnStatus || raw.responseCode,
+        bankRef: raw.txnID || raw.txnAuthID || null,
+        amount: raw.amount !== undefined ? Number(raw.amount) : null,
+        rawPaymentMode,
         source: 'statusCheck'
       };
     } catch (statusErr) {
