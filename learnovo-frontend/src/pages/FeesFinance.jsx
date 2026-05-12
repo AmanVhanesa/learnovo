@@ -305,7 +305,7 @@ const FeesFinance = () => {
     setSelectedStudent(student)
     try {
       const res = await invoicesService.getStudentInvoices(student._id)
-      setStudentInvoices((res.data || []).filter(inv => ['Pending', 'Partial', 'Overdue'].includes(inv.status)))
+      setStudentInvoices(res.data || [])
       const paymentsRes = await paymentsService.list({ studentId: student._id })
       setStudentPayments(paymentsRes.data || [])
       try {
@@ -321,7 +321,7 @@ const FeesFinance = () => {
     if (!selectedStudent?._id) return
     try {
       const res = await invoicesService.getStudentInvoices(selectedStudent._id)
-      setStudentInvoices((res.data || []).filter(inv => ['Pending', 'Partial', 'Overdue'].includes(inv.status)))
+      setStudentInvoices(res.data || [])
       const paymentsRes = await paymentsService.list({ studentId: selectedStudent._id })
       setStudentPayments(paymentsRes.data || [])
       try {

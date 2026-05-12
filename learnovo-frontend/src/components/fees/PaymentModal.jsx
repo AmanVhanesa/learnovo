@@ -24,6 +24,15 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
   const [collectMode, setCollectMode] = useState('single') // 'single' | 'multi'
   const [selectedQuarter, setSelectedQuarter] = useState('all')
   const [selectedInvoice, setSelectedInvoice] = useState(null)
+  // Local working copy of invoices so discount/payment mutations recalculate
+  // student-level totals live without waiting for the parent to refetch.
+  const [invoicesState, setInvoicesState] = useState(invoices)
+  useEffect(() => { setInvoicesState(invoices) }, [invoices])
+  // The collect-payment UI only deals with invoices that still have a balance.
+  const pendingInvoices = useMemo(
+    () => invoicesState.filter(inv => ['Pending', 'Partial', 'Overdue'].includes(inv.status)),
+    [invoicesState]
+  )
   const [bulkSelected, setBulkSelected] = useState({}) // { [invoiceId]: { checked, amount } }
   const [form, setForm] = useState({
     amount: '',
@@ -48,11 +57,11 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
   // Post-collection success view (popup-within-modal for receipt printing)
   const [collectedResult, setCollectedResult] = useState(null) // { payments: [{_id, receiptNumber, amount}], totalAmount }
 
-  // Extract unique periods/quarters from invoices for filtering (sorted chronologically)
+  // Extract unique periods/quarters from pending invoices for filtering (sorted chronologically)
   const periodOptions = useMemo(() => {
     const periods = []
     const seen = new Set()
-    invoices.forEach(inv => {
+    pendingInvoices.forEach(inv => {
       const label = inv.periodLabel || inv.billingPeriod?.displayText || ''
       if (label && !seen.has(label)) {
         seen.add(label)
@@ -65,29 +74,29 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
     })
     periods.sort((a, b) => a.sortKey - b.sortKey)
     return periods.map(({ sortKey, ...rest }) => rest) // eslint-disable-line no-unused-vars
-  }, [invoices])
+  }, [pendingInvoices])
 
-  // Filter invoices by selected period, sorted chronologically (Q1 → Q4)
+  // Filter pending invoices by selected period, sorted chronologically (Q1 → Q4)
   const filteredInvoices = useMemo(() => {
     const list = selectedQuarter === 'all'
-      ? invoices
-      : invoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === selectedQuarter)
+      ? pendingInvoices
+      : pendingInvoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === selectedQuarter)
     return [...list].sort((a, b) => {
       const ka = new Date(a.periodStart || a.billingPeriod?.startDate || a.dueDate || 0).getTime() || 0
       const kb = new Date(b.periodStart || b.billingPeriod?.startDate || b.dueDate || 0).getTime() || 0
       return ka - kb
     })
-  }, [invoices, selectedQuarter])
+  }, [pendingInvoices, selectedQuarter])
 
   useEffect(() => {
-    if (invoices.length === 0 && payments.length > 0) {
+    if (pendingInvoices.length === 0 && payments.length > 0) {
       setActiveTab('history')
-    } else if (invoices.length > 0) {
+    } else if (pendingInvoices.length > 0) {
       setActiveTab('collect')
-      setSelectedInvoice(invoices[0])
-      setForm(f => ({ ...f, amount: invoices[0].balanceAmount || '' }))
+      setSelectedInvoice(pendingInvoices[0])
+      setForm(f => ({ ...f, amount: pendingInvoices[0].balanceAmount || '' }))
     }
-  }, [invoices, payments])
+  }, [pendingInvoices, payments])
 
   // When quarter filter changes, auto-select first filtered invoice
   useEffect(() => {
@@ -134,19 +143,22 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
     return Math.min(100, Math.round(((selectedInvoice.paidAmount || 0) / selectedInvoice.totalAmount) * 100))
   }, [selectedInvoice])
 
-  // Student-level totals: prefer the annual allocation; fall back to the sum of pending invoices.
+  // Student-level totals: prefer the annual allocation; fall back to summing every
+  // invoice (paid + pending) so the "Total Fees" card reflects the full annual amount,
+  // not just what's still due. Pending balance is recomputed from the live working set
+  // so discount/payment mutations update the card without waiting for a refetch.
   const studentTotals = useMemo(() => {
+    const livePendingBalance = invoicesState.reduce((s, inv) => s + (inv.balanceAmount || 0), 0)
     if (allocation) {
       return {
         totalFees: allocation.totalAnnualAmount || 0,
-        pendingBalance: allocation.balance || 0,
+        pendingBalance: livePendingBalance,
         source: 'allocation',
       }
     }
-    const totalFees = invoices.reduce((s, inv) => s + (inv.totalAmount || 0), 0)
-    const pendingBalance = invoices.reduce((s, inv) => s + (inv.balanceAmount || 0), 0)
-    return { totalFees, pendingBalance, source: 'invoices' }
-  }, [allocation, invoices])
+    const totalFees = invoicesState.reduce((s, inv) => s + (inv.totalAmount || 0), 0)
+    return { totalFees, pendingBalance: livePendingBalance, source: 'invoices' }
+  }, [allocation, invoicesState])
 
   const handleApplyDiscount = async () => {
     if (!selectedInvoice) return
@@ -229,7 +241,10 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
       // Re-derive balance: restore previous discount, then subtract new
       const baseBalance = (selectedInvoice.balanceAmount || 0) + previousDiscount
       const newBalance = Math.max(0, baseBalance - discountCalcAmount)
-      setSelectedInvoice(inv => ({ ...inv, balanceAmount: newBalance, discountAmount: discountCalcAmount, discountType: discountForm.type, discountReason: discountForm.reason.trim() }))
+      const invoiceId = selectedInvoice._id
+      const patch = { balanceAmount: newBalance, discountAmount: discountCalcAmount, discountType: discountForm.type, discountReason: discountForm.reason.trim() }
+      setSelectedInvoice(inv => ({ ...inv, ...patch }))
+      setInvoicesState(list => list.map(inv => inv._id === invoiceId ? { ...inv, ...patch } : inv))
       setForm(f => ({ ...f, amount: newBalance }))
       setShowDiscount(false)
       setIsEditingDiscount(false)
@@ -250,7 +265,10 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
       await discountsService.removeDiscount(selectedInvoice._id)
       toast.success('Discount removed')
       const newBalance = (selectedInvoice.balanceAmount || 0) + previousDiscount
-      setSelectedInvoice(inv => ({ ...inv, balanceAmount: newBalance, discountAmount: 0, discountType: undefined, discountReason: undefined }))
+      const invoiceId = selectedInvoice._id
+      const patch = { balanceAmount: newBalance, discountAmount: 0, discountType: undefined, discountReason: undefined }
+      setSelectedInvoice(inv => ({ ...inv, ...patch }))
+      setInvoicesState(list => list.map(inv => inv._id === invoiceId ? { ...inv, ...patch } : inv))
       setForm(f => ({ ...f, amount: newBalance }))
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to remove discount')
@@ -587,7 +605,7 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
       {/* Collect Tab */}
       {activeTab === 'collect' && (
         <div className="p-4 sm:p-6">
-          {invoices.length === 0 ? (
+          {pendingInvoices.length === 0 ? (
             <div className="text-center py-10">
               <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="h-7 w-7 text-emerald-500 dark:text-emerald-400" />
@@ -857,11 +875,11 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
                             : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93]'
                         }`}
                       >
-                        All ({invoices.length})
+                        All ({pendingInvoices.length})
                       </button>
                     )}
                     {periodOptions.map((period) => {
-                      const count = invoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === period.value).length
+                      const count = pendingInvoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === period.value).length
                       return (
                         <button
                           key={period.value}
@@ -1045,7 +1063,7 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
               </div>
 
               {/* Mode toggle */}
-              {invoices.length > 1 && (
+              {pendingInvoices.length > 1 && (
                 <div className="flex rounded-xl overflow-hidden border border-gray-200 dark:border-[#38383A]">
                   <button type="button" className="flex-1 py-2 text-xs font-medium bg-primary-600 text-white dark:bg-primary-500">
                     Single Invoice
@@ -1071,11 +1089,11 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
                             : 'border-gray-200 dark:border-[#38383A] text-gray-600 dark:text-[#8E8E93] hover:border-gray-300 dark:hover:border-[#636366]'
                         }`}
                       >
-                        All ({invoices.length})
+                        All ({pendingInvoices.length})
                       </button>
                     )}
                     {periodOptions.map((period) => {
-                      const count = invoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === period.value).length
+                      const count = pendingInvoices.filter(inv => (inv.periodLabel || inv.billingPeriod?.displayText || '') === period.value).length
                       return (
                         <button
                           key={period.value}
