@@ -1517,6 +1517,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 onCropComplete={handleDocCropComplete}
                 imageSrc={docCropModal.imageSrc}
                 aspectRatio={null}
+                allowAspectChange
                 title="Crop Document"
                 minWidth={600}
                 minHeight={400}

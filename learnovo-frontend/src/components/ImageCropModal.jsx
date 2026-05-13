@@ -1,7 +1,16 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import Cropper from 'react-easy-crop'
 import { X, ZoomIn, ZoomOut, AlertTriangle, Loader } from 'lucide-react'
+
+const DEFAULT_ASPECT_PRESETS = [
+  { key: 'freestyle', label: 'Freestyle', value: null },
+  { key: 'custom', label: 'Custom', value: null },
+  { key: 'square', label: 'Square 1:1', value: 1 },
+  { key: 'portrait', label: 'Portrait 3:4', value: 3 / 4 },
+  { key: 'landscape', label: 'Landscape 4:3', value: 4 / 3 },
+  { key: 'a4', label: 'A4', value: 1 / 1.414 },
+]
 
 /**
  * Draws the cropped region of `image` onto a canvas, optionally scaled.
@@ -87,6 +96,8 @@ const ImageCropModal = ({
   minHeight,
   outputFormat = 'image/png',
   maxFileSize = 3 * 1024 * 1024,
+  allowAspectChange,
+  aspectPresets = DEFAULT_ASPECT_PRESETS,
 }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -94,9 +105,37 @@ const ImageCropModal = ({
   const [isProcessing, setIsProcessing] = useState(false)
   const [sizeWarning, setSizeWarning] = useState(null)
 
-  // When aspectRatio is null/undefined/0, react-easy-crop allows free-form crop.
-  const isFreeAspect = !aspectRatio
-  const effectiveMinHeight = minHeight || (isFreeAspect ? minWidth : Math.round(minWidth / aspectRatio))
+  // Show preset selector by default when the consumer passes a null aspectRatio,
+  // unless they explicitly opt out via allowAspectChange={false}.
+  const showAspectPresets = allowAspectChange ?? aspectRatio === null
+
+  const initialPresetKey = useMemo(() => {
+    if (aspectRatio === null || aspectRatio === undefined) return 'freestyle'
+    const match = aspectPresets.find((p) => p.value === aspectRatio)
+    return match ? match.key : 'freestyle'
+  }, [aspectRatio, aspectPresets])
+
+  const [activePresetKey, setActivePresetKey] = useState(initialPresetKey)
+  const [customW, setCustomW] = useState('')
+  const [customH, setCustomH] = useState('')
+  const activePreset = aspectPresets.find((p) => p.key === activePresetKey) || aspectPresets[0]
+
+  const customAspect = useMemo(() => {
+    const w = parseFloat(customW)
+    const h = parseFloat(customH)
+    if (!w || !h || w <= 0 || h <= 0) return null
+    return w / h
+  }, [customW, customH])
+
+  const isCustomPreset = activePresetKey === 'custom'
+  const effectiveAspect = showAspectPresets
+    ? isCustomPreset
+      ? customAspect
+      : activePreset.value
+    : aspectRatio
+
+  const isFreeAspect = !effectiveAspect
+  const effectiveMinHeight = minHeight || (isFreeAspect ? minWidth : Math.round(minWidth / effectiveAspect))
 
   const onCropAreaChange = useCallback(
     (_croppedArea, croppedAreaPixels) => {
@@ -177,7 +216,7 @@ const ImageCropModal = ({
             image={imageSrc}
             crop={crop}
             zoom={zoom}
-            aspect={isFreeAspect ? undefined : aspectRatio}
+            aspect={isFreeAspect ? undefined : effectiveAspect}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={onCropAreaChange}
@@ -188,6 +227,83 @@ const ImageCropModal = ({
 
         {/* Controls */}
         <div className="px-4 sm:px-6 py-4 border-t border-gray-100 dark:border-[#2C2C2E] flex-shrink-0 space-y-3">
+          {/* Aspect ratio presets */}
+          {showAspectPresets && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] mr-1">
+                  Aspect:
+                </span>
+                {aspectPresets.map((preset) => {
+                  const isActive = preset.key === activePresetKey
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      onClick={() => setActivePresetKey(preset.key)}
+                      className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                        isActive
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-white dark:bg-[#1C1C1E] text-gray-700 dark:text-gray-300 border-gray-200 dark:border-[#2C2C2E] hover:border-teal-500'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {isCustomPreset && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] mr-1">
+                    Custom ratio:
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={customW}
+                    onChange={(e) => setCustomW(e.target.value)}
+                    placeholder="W"
+                    aria-label="Custom width ratio"
+                    className="w-16 px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-[#2C2C2E] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white focus:border-teal-500 focus:outline-none"
+                  />
+                  <span className="text-xs text-gray-400">:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={customH}
+                    onChange={(e) => setCustomH(e.target.value)}
+                    placeholder="H"
+                    aria-label="Custom height ratio"
+                    className="w-16 px-2 py-1 text-xs rounded-md border border-gray-200 dark:border-[#2C2C2E] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white focus:border-teal-500 focus:outline-none"
+                  />
+                  {customAspect && (
+                    <span className="text-xs text-gray-500 dark:text-[#8E8E93]">
+                      = {customAspect.toFixed(2)}
+                    </span>
+                  )}
+                  {!customAspect && (
+                    <span className="text-xs text-gray-400">
+                      (blank = free / full frame)
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomW('')
+                      setCustomH('')
+                    }}
+                    className="ml-1 text-xs text-teal-600 hover:underline"
+                  >
+                    Reset
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Zoom slider */}
           <div className="flex items-center gap-3">
             <ZoomOut className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -204,7 +320,13 @@ const ImageCropModal = ({
           </div>
 
           <p className="text-xs text-gray-500 dark:text-[#8E8E93] text-center">
-            Drag to reposition. Use slider to zoom.
+            {showAspectPresets
+              ? activePresetKey === 'freestyle'
+                ? 'Freestyle: zoom and pan the image — the crop fills the visible frame.'
+                : activePresetKey === 'custom'
+                ? 'Custom: type a width:height ratio, then drag to reposition and zoom.'
+                : 'Drag to reposition and zoom to frame the crop.'
+              : 'Drag to reposition. Use slider to zoom.'}
           </p>
 
           {/* Warning */}
