@@ -107,9 +107,9 @@ const Students = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [perPage, setPerPage] = useState(100)
 
-  // Sort state — null means use backend default (name asc)
-  const [sortField, setSortField] = useState(null)
-  const [sortAsc, setSortAsc] = useState(true)
+  // Sort state — default to newest student first (most recently added)
+  const [sortField, setSortField] = useState('createdAt')
+  const [sortAsc, setSortAsc] = useState(false)
 
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('')
