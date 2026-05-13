@@ -329,9 +329,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 if (!primaryGuardian.name?.trim()) {
                     errors.guardianName = 'Primary guardian name is required'
                 }
-                if (!primaryGuardian.phone?.trim()) {
-                    errors.guardianPhone = 'Primary guardian phone is required'
-                } else {
+                if (primaryGuardian.phone?.trim()) {
                     const gPhone = primaryGuardian.phone.replace(/[\s\-\+]/g, '')
                     if (!/^\d{10,12}$/.test(gPhone)) {
                         errors.guardianPhone = 'Enter a valid guardian phone number'
@@ -1226,12 +1224,11 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                                             <div>
-                                                <label className="label">Phone *</label>
+                                                <label className="label">Phone</label>
                                                 <input
                                                     className={`input ${(formErrors.guardianPhone && guardian.isPrimary) || formErrors[`guardianPhone${index}`] ? 'border-red-500' : ''}`}
                                                     value={guardian.phone}
                                                     onChange={(e) => updateGuardian(index, 'phone', e.target.value)}
-                                                    required={guardian.isPrimary}
                                                 />
                                                 {formErrors.guardianPhone && guardian.isPrimary && (
                                                     <p className="text-xs text-red-500 mt-1">{formErrors.guardianPhone}</p>
