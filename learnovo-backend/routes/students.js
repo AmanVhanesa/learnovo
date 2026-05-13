@@ -2115,6 +2115,9 @@ router.get('/:id/detail-form/html', protect, authorize('admin', 'principal', 'vi
     const { generateStudentDetailFormHtml } = require('../services/studentDetailFormPdfService');
     const html = await generateStudentDetailFormHtml(student, schoolData);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.send(html);
   } catch (error) {
     logger.error('Student detail form HTML error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });
@@ -2142,6 +2145,9 @@ router.get('/:id/detail-form/pdf', protect, authorize('admin', 'principal', 'vic
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.end(pdfBuffer);
   } catch (error) {
     logger.error('Student detail form PDF error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });

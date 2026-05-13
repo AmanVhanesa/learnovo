@@ -146,11 +146,17 @@ export const studentsService = {
 
   // Detail Form — printable physical record for admin
   viewDetailForm: async (id) => {
-    const res = await api.get(`/students/${id}/detail-form/html`, { responseType: 'text' })
+    const res = await api.get(`/students/${id}/detail-form/html`, {
+      responseType: 'text',
+      params: { _t: Date.now() },
+    })
     return res.data
   },
   downloadDetailForm: async (id) => {
-    const res = await api.get(`/students/${id}/detail-form/pdf`, { responseType: 'blob' })
+    const res = await api.get(`/students/${id}/detail-form/pdf`, {
+      responseType: 'blob',
+      params: { _t: Date.now() },
+    })
     return res.data
   }
 }
