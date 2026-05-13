@@ -215,24 +215,25 @@ const ImageCropModal = ({
         </div>
 
         {/* Crop Area */}
-        <div className="relative flex-1 min-h-[300px] sm:min-h-[400px] bg-gray-900 flex items-center justify-center overflow-auto p-2">
-          <ReactCrop
-            crop={crop}
-            onChange={(c) => setCrop(c)}
-            onComplete={(c) => setCompletedCrop(c)}
-            aspect={effectiveAspect || undefined}
-            keepSelection
-            className="max-h-full"
-          >
-            <img
-              ref={imgRef}
-              src={imageSrc}
-              alt="Crop preview"
-              onLoad={onImageLoad}
-              className="max-h-[60vh] max-w-full object-contain select-none"
-              draggable={false}
-            />
-          </ReactCrop>
+        <div className="relative flex-1 min-h-0 bg-gray-900 overflow-auto p-2">
+          <div className="min-h-full flex items-center justify-center">
+            <ReactCrop
+              crop={crop}
+              onChange={(c) => setCrop(c)}
+              onComplete={(c) => setCompletedCrop(c)}
+              aspect={effectiveAspect || undefined}
+              keepSelection
+            >
+              <img
+                ref={imgRef}
+                src={imageSrc}
+                alt="Crop preview"
+                onLoad={onImageLoad}
+                className="max-w-full block select-none"
+                draggable={false}
+              />
+            </ReactCrop>
+          </div>
         </div>
 
         {/* Controls */}
