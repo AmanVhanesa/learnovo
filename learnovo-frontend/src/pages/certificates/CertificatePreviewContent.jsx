@@ -282,15 +282,25 @@ const CertificatePreviewContent = ({ type, data, certificateNumber, showPreviewW
                                     To Whom It May Concern
                                 </div>
 
-                                {/* Declaration paragraph */}
+                                {/* Declaration paragraph — wording switches for inactive (former) students */}
                                 <p style={{ fontSize: 11, lineHeight: 1.9, color: '#374151', fontWeight: 500, textAlign: 'justify' }}>
                                     This is to certify that {hl(d.studentName)},
                                     Son/Daughter of Shri {hl(d.fatherName)}
                                     {' '}and Smt. {hl(d.motherName)},
-                                    is a bonafide student of this institution. He/She is currently studying in
-                                    Class {hl(`${d.class} (${d.section})`)}
-                                    {' '}for the Academic Session {hl(d.academicYear)}.
-                                    His/Her date of birth as per our school records is {hl(d.dob)}.
+                                    {d.isActive === false ? (
+                                        <>
+                                            {' '}was a bonafide student of this institution and studied here from the Academic Session {hl(d.fromSession || d.academicYear)}
+                                            {' '}to {hl(d.toSession || d.academicYear)}.
+                                            {' '}The last class attended was Class {hl(`${d.class} (${d.section})`)}.
+                                        </>
+                                    ) : (
+                                        <>
+                                            {' '}is a bonafide student of this institution. He/She is currently studying in
+                                            Class {hl(`${d.class} (${d.section})`)}
+                                            {' '}for the Academic Session {hl(d.academicYear)}.
+                                        </>
+                                    )}
+                                    {' '}His/Her date of birth as per our school records is {hl(d.dob)}.
                                 </p>
 
                                 {/* Details grid */}

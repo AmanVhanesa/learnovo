@@ -10,6 +10,7 @@ const AnnualFeeAllocation = require('../models/AnnualFeeAllocation');
 const Counter = require('../models/Counter');
 const ClassSubject = require('../models/ClassSubject');
 const AcademicSession = require('../models/AcademicSession');
+const StudentClassHistory = require('../models/StudentClassHistory');
 const pdfService = require('../services/pdfService');
 const { format } = require('date-fns');
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, ImageRun } = require('docx');
@@ -62,6 +63,39 @@ const stripHonorific = (name) => {
   if (!name || typeof name !== 'string') return name;
   // Remove common honorifics: Mr., Mrs., Ms., Dr., Prof., Miss
   return name.replace(/^(Mr\.|Mrs\.|Ms\.|Dr\.|Prof\.|Miss)\s+/i, '').trim();
+};
+
+// For a deactivated student, derive the from/to academic sessions for the bonafide certificate.
+// fromSession: earliest StudentClassHistory entry → admission session via AcademicSession date range → current academicYear
+// toSession:   student.academicYear (frozen at deactivation) → active session name
+const resolveStudyTenure = async(student, tenantId) => {
+  const fallback = student.academicYear || '';
+  let toSession = fallback;
+  let fromSession = fallback;
+
+  try {
+    const earliestHistory = await StudentClassHistory.findOne({ tenantId, studentId: student._id })
+      .sort({ createdAt: 1 });
+    if (earliestHistory?.academicYear) {
+      fromSession = earliestHistory.academicYear;
+    } else if (student.admissionDate) {
+      const matchingSession = await AcademicSession.findOne({
+        tenantId,
+        startDate: { $lte: student.admissionDate },
+        endDate: { $gte: student.admissionDate }
+      });
+      if (matchingSession?.name) fromSession = matchingSession.name;
+    }
+  } catch (err) {
+    console.error('Error resolving study tenure:', err.message);
+  }
+
+  if (!toSession) {
+    const activeSession = await AcademicSession.findOne({ tenantId, isActive: true });
+    if (activeSession?.name) toSession = activeSession.name;
+  }
+
+  return { fromSession: fromSession || toSession, toSession: toSession || fromSession };
 };
 
 exports.getTemplates = async(req, res) => {
@@ -241,6 +275,13 @@ exports.previewCertificate = async(req, res) => {
     const rawMotherName = mother?.name || '-';
     const motherName = stripHonorific(rawMotherName);
 
+    // For inactive students on a Bonafide certificate, resolve the from/to session tenure
+    const isActive = student.isActive !== false;
+    let bonafideTenure = null;
+    if (type === 'BONAFIDE' && !isActive) {
+      bonafideTenure = await resolveStudyTenure(student, tenantId);
+    }
+
     const data = {
       studentName: student.fullName,
       fatherName: fatherName,
@@ -249,6 +290,9 @@ exports.previewCertificate = async(req, res) => {
       class: student.class || '-',
       section: student.section || '-',
       academicYear: student.academicYear || settings.academic.currentYear,
+      isActive,
+      fromSession: bonafideTenure?.fromSession || '',
+      toSession: bonafideTenure?.toSession || '',
       dob: dob,
       dobWords: dobWords, // TODO: Implement converter
       nationality: 'Indian', // Default or from model
@@ -351,6 +395,19 @@ exports.generateCertificate = async(req, res) => {
       schoolPhone: settings.institution.contact?.phone || '',
       schoolEmail: settings.institution.contact?.email || ''
     };
+
+    // Re-derive active status server-side so the frontend can't flip an inactive
+    // student to active in the bonafide wording. Honor user-edited from/to sessions
+    // if provided, falling back to the auto-resolved tenure.
+    finalData.isActive = student.isActive !== false;
+    if (type === 'BONAFIDE' && !finalData.isActive) {
+      const tenure = await resolveStudyTenure(student, tenantId);
+      finalData.fromSession = (specificData?.fromSession || '').trim() || tenure.fromSession;
+      finalData.toSession = (specificData?.toSession || '').trim() || tenure.toSession;
+    } else {
+      delete finalData.fromSession;
+      delete finalData.toSession;
+    }
 
     // 3.1 Apply ephemeral overrides (TC only) — these do NOT update the student record
     if (type === 'TC') {
@@ -891,22 +948,41 @@ function buildBonafideDocument(data, cert, logoBuffer, signatureBuffer) {
   sections.push(buildMetaRow('Certificate No', cert.certificateNumber || '', 'Date of Issue', data.issueDate || ''));
   // To whom
   sections.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 60 }, children: [textRun('TO WHOM IT MAY CONCERN', { size: 24, bold: true, color: '0A5C56', font: 'Georgia' })] }));
-  // Declaration
-  sections.push(new Paragraph({ spacing: { after: 120 }, children: [
+  // Declaration — wording differs for inactive (former) students
+  const classSection = `${data.class || ''} (${data.section || ''})`;
+  const declarationChildren = [
     textRun('This is to certify that ', { size: 22, color: '374151' }),
     textRun(data.studentName || '', { size: 22, bold: true, color: DARK }),
     textRun(', Son/Daughter of Shri ', { size: 22, color: '374151' }),
     textRun(data.fatherName || '', { size: 22, bold: true, color: DARK }),
     textRun(' and Smt. ', { size: 22, color: '374151' }),
-    textRun(data.motherName || '', { size: 22, bold: true, color: DARK }),
-    textRun(', is a bonafide student of this institution. He/She is currently studying in Class ', { size: 22, color: '374151' }),
-    textRun(`${data.class || ''} (${data.section || ''})`, { size: 22, bold: true, color: DARK }),
-    textRun(' for the Academic Session ', { size: 22, color: '374151' }),
-    textRun(data.academicYear || '', { size: 22, bold: true, color: DARK }),
-    textRun('. His/Her date of birth as per our school records is ', { size: 22, color: '374151' }),
+    textRun(data.motherName || '', { size: 22, bold: true, color: DARK })
+  ];
+  if (data.isActive === false) {
+    declarationChildren.push(
+      textRun(', was a bonafide student of this institution and studied here from the Academic Session ', { size: 22, color: '374151' }),
+      textRun(data.fromSession || data.academicYear || '', { size: 22, bold: true, color: DARK }),
+      textRun(' to ', { size: 22, color: '374151' }),
+      textRun(data.toSession || data.academicYear || '', { size: 22, bold: true, color: DARK }),
+      textRun('. The last class attended was Class ', { size: 22, color: '374151' }),
+      textRun(classSection, { size: 22, bold: true, color: DARK }),
+      textRun('.', { size: 22, color: '374151' })
+    );
+  } else {
+    declarationChildren.push(
+      textRun(', is a bonafide student of this institution. He/She is currently studying in Class ', { size: 22, color: '374151' }),
+      textRun(classSection, { size: 22, bold: true, color: DARK }),
+      textRun(' for the Academic Session ', { size: 22, color: '374151' }),
+      textRun(data.academicYear || '', { size: 22, bold: true, color: DARK }),
+      textRun('.', { size: 22, color: '374151' })
+    );
+  }
+  declarationChildren.push(
+    textRun(' His/Her date of birth as per our school records is ', { size: 22, color: '374151' }),
     textRun(data.dob || '', { size: 22, bold: true, color: DARK }),
     textRun('.', { size: 22, color: '374151' })
-  ] }));
+  );
+  sections.push(new Paragraph({ spacing: { after: 120 }, children: declarationChildren }));
   // Details grid
   const detailRows = [
     ['Student Name', data.studentName || '', 'Admission Number', data.admissionNumber || ''],

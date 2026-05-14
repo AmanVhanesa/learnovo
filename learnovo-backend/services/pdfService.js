@@ -251,6 +251,46 @@ async function injectLogo(html, logoPath) {
 }
 
 /**
+ * Build the Bonafide declaration paragraph HTML.
+ * - Active student: standard "currently studying in" wording.
+ * - Inactive student: "was a student" wording with from/to academic sessions.
+ * Values are HTML-escaped inline because this function bypasses fillTemplate.
+ */
+function buildBonafideDeclarationHtml(data) {
+  const esc = (v) => String(v || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const studentName = esc(data.studentName);
+  const fatherName = esc(data.fatherName);
+  const motherName = esc(data.motherName);
+  const classText = esc(`${data.class || ''} (${data.section || ''})`);
+  const academicYear = esc(data.academicYear);
+  const dob = esc(data.dob);
+  const fromSession = esc(data.fromSession || data.academicYear);
+  const toSession = esc(data.toSession || data.academicYear);
+
+  const tenureSentence = data.isActive === false
+    ? `was a bonafide student of this institution and studied here from the Academic Session <span class="hl">${fromSession}</span> to <span class="hl">${toSession}</span>. The last class attended was Class <span class="hl">${classText}</span>.`
+    : `is a bonafide student of this institution. He/She is currently studying in Class <span class="hl">${classText}</span> for the Academic Session <span class="hl">${academicYear}</span>.`;
+
+  return `<p class="declaration-text">
+      This is to certify that <span class="hl">${studentName}</span>,
+      Son/Daughter of Shri <span class="hl">${fatherName}</span>
+      and Smt. <span class="hl">${motherName}</span>,
+      ${tenureSentence}
+      His/Her date of birth as per our school records is
+      <span class="hl">${dob}</span>.
+    </p>`;
+}
+
+function injectBonafideDeclaration(html, data) {
+  return html.replace('<!-- DECLARATION_PLACEHOLDER -->', buildBonafideDeclarationHtml(data));
+}
+
+/**
  * Inject principal signature into the template HTML
  * Replaces <!-- PRINCIPAL_SIGNATURE_PLACEHOLDER --> with an <img> or empty string
  */
@@ -733,6 +773,12 @@ const pdfService = {
     // 2. Inject images (logo + principal signature) as base64
     html = await injectLogo(html, data.schoolLogo);
     html = await injectPrincipalSignature(html, data.principalSignature);
+
+    // 2a. Bonafide declaration paragraph is built server-side because its wording
+    // changes between active and inactive students (and contains HTML)
+    if (template.type === 'BONAFIDE') {
+      html = injectBonafideDeclaration(html, data);
+    }
 
     // 3. Fill all {{placeholder}} values
     const placeholders = buildPlaceholderMap(data);

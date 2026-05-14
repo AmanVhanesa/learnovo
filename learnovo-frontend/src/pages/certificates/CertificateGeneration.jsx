@@ -610,9 +610,21 @@ const CertificateGeneration = () => {
                         {certType === 'BONAFIDE' && (
                             <div className="bg-gray-50 dark:bg-[#2C2C2E] p-6 rounded-xl border border-gray-100 dark:border-[#38383A]">
                                 <h3 className="text-sm font-semibold text-gray-700 dark:text-[#8E8E93] border-b border-gray-200 dark:border-[#38383A] pb-3 mb-5">Certificate Details</h3>
+                                {previewData.isActive === false && (
+                                    <div className="flex items-start gap-3 p-3 mb-5 bg-amber-50 dark:bg-amber-900/10 text-amber-800 dark:text-amber-400 rounded-lg text-xs border border-amber-200 dark:border-amber-800">
+                                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                        <p>This student is deactivated. The certificate will state that they <strong>studied here from the From Session to the To Session</strong> below. Adjust the sessions if needed.</p>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
                                     <EditableField label="Purpose" field="purpose" placeholder="e.g. For school admission" value={previewData.purpose} modified={isModified('purpose')} onChange={handleFieldChange} />
                                     <EditableField label="Date of Issue" field="issueDate" value={previewData.issueDate} modified={isModified('issueDate')} onChange={handleFieldChange} />
+                                    {previewData.isActive === false && (
+                                        <>
+                                            <EditableField label="From Session" field="fromSession" placeholder="e.g. 2022-2023" value={previewData.fromSession} modified={isModified('fromSession')} onChange={handleFieldChange} />
+                                            <EditableField label="To Session" field="toSession" placeholder="e.g. 2024-2025" value={previewData.toSession} modified={isModified('toSession')} onChange={handleFieldChange} />
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         )}
