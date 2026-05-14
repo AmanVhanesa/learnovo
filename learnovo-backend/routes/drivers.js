@@ -4,6 +4,7 @@ const { body, query } = require('express-validator');
 const Driver = require('../models/Driver');
 const Route = require('../models/Route');
 const StudentTransportAssignment = require('../models/StudentTransportAssignment');
+const User = require('../models/User');
 
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
@@ -132,9 +133,36 @@ router.get('/', protect, authorize('admin'), [
       driver.licenseExpired = driverDoc.isLicenseExpired();
     });
 
-    // Aggregate active student counts per driver via Route → StudentTransportAssignment
+    // Aggregate unique student counts per driver from two sources:
+    // 1. Direct assignment via User.driverId (set in the student form)
+    // 2. Route-based assignment via Route.assignedDriver → StudentTransportAssignment
     if (drivers.length > 0) {
+      const tenantObjectId = new mongoose.Types.ObjectId(req.user.tenantId);
       const driverIds = drivers.map(d => d._id);
+      const driverStudentSet = new Map();
+      const addStudent = (driverId, studentId) => {
+        const key = driverId.toString();
+        if (!driverStudentSet.has(key)) driverStudentSet.set(key, new Set());
+        driverStudentSet.get(key).add(studentId.toString());
+      };
+
+      // 1. Direct assignment on User
+      const directGroups = await User.aggregate([
+        {
+          $match: {
+            tenantId: tenantObjectId,
+            role: 'student',
+            isActive: true,
+            driverId: { $in: driverIds }
+          }
+        },
+        { $group: { _id: '$driverId', students: { $addToSet: '$_id' } } }
+      ]);
+      directGroups.forEach(g => {
+        g.students.forEach(sid => addStudent(g._id, sid));
+      });
+
+      // 2. Route-based assignment
       const routes = await Route.find({
         tenantId: req.user.tenantId,
         assignedDriver: { $in: driverIds },
@@ -142,29 +170,28 @@ router.get('/', protect, authorize('admin'), [
       }).select('_id assignedDriver').lean();
 
       const routeIds = routes.map(r => r._id);
-      const counts = routeIds.length > 0
-        ? await StudentTransportAssignment.aggregate([
+      const routeToDriver = new Map(routes.map(r => [r._id.toString(), r.assignedDriver.toString()]));
+
+      if (routeIds.length > 0) {
+        const routeGroups = await StudentTransportAssignment.aggregate([
           {
             $match: {
-              tenantId: new mongoose.Types.ObjectId(req.user.tenantId),
+              tenantId: tenantObjectId,
               route: { $in: routeIds },
               isActive: true
             }
           },
-          { $group: { _id: '$route', count: { $sum: 1 } } }
-        ])
-        : [];
-
-      const routeCount = new Map(counts.map(c => [c._id.toString(), c.count]));
-      const driverCount = new Map();
-      routes.forEach(r => {
-        const did = r.assignedDriver.toString();
-        const cnt = routeCount.get(r._id.toString()) || 0;
-        driverCount.set(did, (driverCount.get(did) || 0) + cnt);
-      });
+          { $group: { _id: '$route', students: { $addToSet: '$student' } } }
+        ]);
+        routeGroups.forEach(g => {
+          const did = routeToDriver.get(g._id.toString());
+          if (!did) return;
+          g.students.forEach(sid => addStudent(did, sid));
+        });
+      }
 
       drivers.forEach(d => {
-        d.studentCount = driverCount.get(d._id.toString()) || 0;
+        d.studentCount = driverStudentSet.get(d._id.toString())?.size || 0;
       });
     }
 
@@ -200,6 +227,51 @@ router.get('/:id/students', protect, authorize('admin'), async(req, res) => {
       return res.status(404).json({ success: false, message: 'Driver not found' });
     }
 
+    const mapStudent = (s, extra = {}) => {
+      const fullName = s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
+      return {
+        _id: s._id,
+        name: fullName,
+        admissionNumber: s.admissionNumber,
+        class: s.class,
+        section: s.section,
+        phone: s.phone,
+        photo: s.photo || s.avatar,
+        ...extra
+      };
+    };
+
+    const groups = [];
+    const seenStudentIds = new Set();
+
+    // 1. Directly-assigned students (User.driverId)
+    const directStudents = await User.find({
+      tenantId,
+      role: 'student',
+      isActive: true,
+      driverId: driver._id
+    })
+      .select('firstName lastName name admissionNumber class section phone photo avatar transportMode')
+      .lean();
+
+    if (directStudents.length > 0) {
+      const mapped = directStudents.map(s => {
+        seenStudentIds.add(s._id.toString());
+        return mapStudent(s, {
+          source: 'direct',
+          transportMode: s.transportMode || 'School Transport'
+        });
+      }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      groups.push({
+        route: null,
+        label: 'Directly Assigned',
+        students: mapped,
+        count: mapped.length
+      });
+    }
+
+    // 2. Route-based assignments
     const routes = await Route.find({
       tenantId,
       assignedDriver: driver._id,
@@ -218,46 +290,43 @@ router.get('/:id/students', protect, authorize('admin'), async(req, res) => {
         .lean()
       : [];
 
-    const routesWithStudents = routes.map(route => {
+    routes.forEach(route => {
       const students = assignments
         .filter(a => a.student && a.route && a.route._id.toString() === route._id.toString())
+        .filter(a => !seenStudentIds.has(a.student._id.toString()))
         .map(a => {
-          const s = a.student;
-          const fullName = s.name || `${s.firstName || ''} ${s.lastName || ''}`.trim();
-          return {
-            _id: s._id,
-            name: fullName,
-            admissionNumber: s.admissionNumber,
-            class: s.class,
-            section: s.section,
-            phone: s.phone,
-            photo: s.photo || s.avatar,
+          seenStudentIds.add(a.student._id.toString());
+          return mapStudent(a.student, {
+            source: 'route',
             stop: a.stop,
             transportType: a.transportType,
             academicYear: a.academicYear
-          };
+          });
         })
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-      return {
-        route: {
-          _id: route._id,
-          routeId: route.routeId,
-          routeName: route.routeName,
-          routeCode: route.routeCode
-        },
-        students,
-        count: students.length
-      };
+      if (students.length > 0) {
+        groups.push({
+          route: {
+            _id: route._id,
+            routeId: route.routeId,
+            routeName: route.routeName,
+            routeCode: route.routeCode
+          },
+          label: route.routeName || route.routeId,
+          students,
+          count: students.length
+        });
+      }
     });
 
-    const totalStudents = routesWithStudents.reduce((sum, r) => sum + r.count, 0);
+    const totalStudents = groups.reduce((sum, g) => sum + g.count, 0);
 
     res.json({
       success: true,
       data: {
         driver: { _id: driver._id, driverId: driver.driverId, name: driver.name },
-        routes: routesWithStudents,
+        routes: groups,
         totalStudents
       }
     });
