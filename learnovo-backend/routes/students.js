@@ -186,6 +186,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     // Add class filter from query — match by class string OR classId
     // Students may store class as name or grade, so we match both ways.
     // Always look up the Class document to match by all identifiers (classId, name, grade).
+    let resolvedClassDoc = null;
     if (req.query.classId || req.query.class) {
       let classDoc;
       try {
@@ -199,6 +200,7 @@ router.get('/', protect, authorize('admin', 'teacher'), [
           }).select('_id name grade').lean();
         }
       } catch (_) { /* ignore */ }
+      resolvedClassDoc = classDoc || null;
 
       if (classDoc) {
         if (!filter.$and) filter.$and = [];
@@ -221,9 +223,25 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       }
     }
 
-    // Add section filter — exact match (sections are stored uppercase)
+    // Add section filter — match the legacy `section` string OR `sectionId`.
+    // Some students only have `sectionId` populated (no `section` string, or it's
+    // out of sync), so we mirror the Academics page count by OR-ing both.
+    // Scope the Section lookup to the resolved class when available to avoid
+    // matching same-named sections in other classes.
     if (req.query.section) {
-      filter.section = req.query.section.trim().toUpperCase();
+      const sectionName = req.query.section.trim().toUpperCase();
+      const sectionLookup = { tenantId: req.user.tenantId, name: sectionName };
+      if (resolvedClassDoc) sectionLookup.classId = resolvedClassDoc._id;
+      let sectionIds = [];
+      try {
+        const matchedSections = await Section.find(sectionLookup).select('_id').lean();
+        sectionIds = matchedSections.map(s => s._id);
+      } catch (_) { /* ignore */ }
+
+      if (!filter.$and) filter.$and = [];
+      const sectionOr = [{ section: sectionName }];
+      if (sectionIds.length > 0) sectionOr.push({ sectionId: { $in: sectionIds } });
+      filter.$and.push({ $or: sectionOr });
     }
 
     // Add academic year filter
