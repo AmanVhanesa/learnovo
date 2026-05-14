@@ -31,18 +31,53 @@ const DOC_TYPE_TITLES = {
   guardian_aadhaar: 'Guardian Aadhaar Card'
 };
 
-function getDocPageTitle(doc, student) {
-  const base = DOC_TYPE_TITLES[doc.type] || 'Document';
-  if (doc.type === 'guardian_aadhaar') {
-    const gi = typeof doc.guardianIndex === 'number' ? doc.guardianIndex : null;
-    const guardian = (gi != null && Array.isArray(student.guardians)) ? student.guardians[gi] : null;
-    if (guardian) {
-      const relation = guardian.relation || 'Guardian';
-      const name = guardian.name ? ` — ${guardian.name}` : '';
-      return `${base} (${relation}${name})`;
-    }
+async function renderDocBodyFull(doc) {
+  const isPdf = (doc.resourceType === 'raw') || /\.pdf$/i.test(doc.url || '') || doc.format === 'pdf';
+  if (isPdf) {
+    return `
+      <div class="doc-pdf-notice">
+        <div class="doc-pdf-icon">PDF</div>
+        <p class="doc-pdf-name">${esc(doc.name || 'Document')}</p>
+        <p class="doc-pdf-link">${esc(doc.url || '')}</p>
+        <p class="doc-pdf-hint">This document was uploaded as a PDF. Open the link above to view the original.</p>
+      </div>`;
   }
-  return base;
+  const imgData = await toBase64DataUri(doc.url);
+  if (!imgData) {
+    return `
+      <div class="doc-pdf-notice">
+        <p class="doc-pdf-name">${esc(doc.name || 'Document')}</p>
+        <p class="doc-pdf-hint">Image could not be loaded for this PDF rendering.</p>
+        <p class="doc-pdf-link">${esc(doc.url || '')}</p>
+      </div>`;
+  }
+  return `<img class="doc-img" src="${imgData}" alt="" />`;
+}
+
+async function renderDocBodyHalf(doc) {
+  const isPdf = (doc.resourceType === 'raw') || /\.pdf$/i.test(doc.url || '') || doc.format === 'pdf';
+  if (isPdf) {
+    return `
+      <div class="doc-pdf-notice doc-pdf-notice-half">
+        <div class="doc-pdf-icon">PDF</div>
+        <p class="doc-pdf-name">${esc(doc.name || 'Document')}</p>
+        <p class="doc-pdf-link">${esc(doc.url || '')}</p>
+      </div>`;
+  }
+  const imgData = await toBase64DataUri(doc.url);
+  if (!imgData) {
+    return `<div class="doc-pdf-notice doc-pdf-notice-half"><p class="doc-pdf-name">${esc(doc.name || 'Document')}</p></div>`;
+  }
+  return `<img class="doc-img-half" src="${imgData}" alt="" />`;
+}
+
+function getGuardianLabel(doc, student) {
+  const gi = typeof doc.guardianIndex === 'number' ? doc.guardianIndex : null;
+  const guardian = (gi != null && Array.isArray(student.guardians)) ? student.guardians[gi] : null;
+  if (!guardian) return 'Guardian';
+  const relation = guardian.relation || 'Guardian';
+  const name = guardian.name ? ` — ${guardian.name}` : '';
+  return `${relation}${name}`;
 }
 
 async function buildDocumentPagesHtml(student) {
@@ -60,45 +95,50 @@ async function buildDocumentPagesHtml(student) {
     return new Date(a.uploadedAt || 0) - new Date(b.uploadedAt || 0);
   });
 
-  const pages = await Promise.all(ordered.map(async(doc) => {
-    const title = getDocPageTitle(doc, student);
-    const isPdf = (doc.resourceType === 'raw') || /\.pdf$/i.test(doc.url || '') || doc.format === 'pdf';
+  const guardianDocs = ordered.filter(d => d.type === 'guardian_aadhaar');
+  const otherDocs = ordered.filter(d => d.type !== 'guardian_aadhaar');
 
-    let bodyHtml;
-    if (isPdf) {
-      bodyHtml = `
-        <div class="doc-pdf-notice">
-          <div class="doc-pdf-icon">PDF</div>
-          <p class="doc-pdf-name">${esc(doc.name || 'Document')}</p>
-          <p class="doc-pdf-link">${esc(doc.url || '')}</p>
-          <p class="doc-pdf-hint">This document was uploaded as a PDF. Open the link above to view the original.</p>
-        </div>`;
-    } else {
-      const imgData = await toBase64DataUri(doc.url);
-      if (!imgData) {
-        bodyHtml = `
-          <div class="doc-pdf-notice">
-            <p class="doc-pdf-name">${esc(doc.name || 'Document')}</p>
-            <p class="doc-pdf-hint">Image could not be loaded for this PDF rendering.</p>
-            <p class="doc-pdf-link">${esc(doc.url || '')}</p>
-          </div>`;
-      } else {
-        bodyHtml = `<img class="doc-img" src="${imgData}" alt="${esc(title)}" />`;
-      }
-    }
+  const studentLine = `Student: ${esc(buildStudentName(student))}${student.admissionNumber ? ` &middot; Adm# ${esc(student.admissionNumber)}` : ''}`;
 
+  const pages = [];
+
+  for (const doc of otherDocs) {
+    const title = DOC_TYPE_TITLES[doc.type] || 'Document';
+    const body = await renderDocBodyFull(doc);
     const uploadedOn = doc.uploadedAt ? fmtDate(doc.uploadedAt) : '';
-
-    return `
+    pages.push(`
       <div class="doc-page">
         <div class="doc-header">
           <div class="doc-title">${esc(title)}</div>
           ${uploadedOn ? `<div class="doc-meta">Uploaded: ${esc(uploadedOn)}</div>` : ''}
         </div>
-        <div class="doc-body">${bodyHtml}</div>
-        <div class="doc-footer">Student: ${esc(buildStudentName(student))}${student.admissionNumber ? ` &middot; Adm# ${esc(student.admissionNumber)}` : ''}</div>
-      </div>`;
-  }));
+        <div class="doc-body">${body}</div>
+        <div class="doc-footer">${studentLine}</div>
+      </div>`);
+  }
+
+  // Group guardian Aadhaar cards two-per-page so father + mother fit on a single page.
+  for (let i = 0; i < guardianDocs.length; i += 2) {
+    const pair = guardianDocs.slice(i, i + 2);
+    const items = await Promise.all(pair.map(async(doc) => {
+      const label = getGuardianLabel(doc, student);
+      const body = await renderDocBodyHalf(doc);
+      return `
+        <div class="doc-multi-item">
+          <div class="doc-multi-subtitle">${esc(label)} — Aadhaar Card</div>
+          <div class="doc-multi-img-wrap">${body}</div>
+        </div>`;
+    }));
+
+    pages.push(`
+      <div class="doc-page">
+        <div class="doc-header">
+          <div class="doc-title">Guardian Aadhaar Card${pair.length > 1 ? 's' : ''}</div>
+        </div>
+        <div class="doc-body doc-multi-body">${items.join('')}</div>
+        <div class="doc-footer">${studentLine}</div>
+      </div>`);
+  }
 
   return pages.join('\n');
 }
@@ -124,6 +164,12 @@ function buildStudentName(student) {
     || student.name
     || [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' ')
     || '—';
+}
+
+function getMotherName(student) {
+  if (!Array.isArray(student.guardians)) return '';
+  const mother = student.guardians.find(g => (g.relation || '').toLowerCase() === 'mother');
+  return mother?.name || '';
 }
 
 function row(label, value) {
@@ -154,12 +200,14 @@ function buildGuardiansHtml(guardians = []) {
         ${row('Phone', g.phone)}
         ${row('Email', g.email)}
         ${row('Occupation', g.occupation)}
+        ${row('Aadhaar Number', g.aadhaarNumber)}
       </div>
     </div>`).join('');
 }
 
 function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl) {
   const studentName = buildStudentName(student);
+  const motherName = getMotherName(student);
   const className = student.classId?.name || student.class || '—';
   const sectionName = student.section || '—';
   const subDeptName = student.subDepartment?.name || '—';
@@ -193,7 +241,8 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
   }
   .page {
     width: 794px; height: 1123px;
-    padding: 16px 20px;
+    /* Side padding leaves a safe hole-punch margin on both edges */
+    padding: 16px 50px;
     background: #fff;
     position: relative;
     overflow: hidden;
@@ -287,21 +336,24 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
 
   .empty { font-size: 10px; color: #4b5563; font-style: italic; }
 
-  /* Digital notice (replaces signatures) */
-  .digital-notice {
-    margin-top: 18px; padding: 12px 16px;
-    background: #edf9f7; border: 1px solid #d1ede9; border-radius: 8px;
-    display: flex; align-items: center; gap: 14px;
+  /* Signatures */
+  .signatures {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 28px;
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
-  .digital-icon {
-    width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%;
-    background: #0a5c56; color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 700;
+  .sig-box { display: flex; flex-direction: column; align-items: stretch; text-align: center; }
+  .sig-line {
+    width: 100%; border-top: 1.2px solid #111827;
+    margin-top: 44px; margin-bottom: 6px;
   }
-  .digital-text { display: flex; flex-direction: column; gap: 2px; }
-  .digital-text b { font-size: 11px; font-weight: 700; color: #0a5c56; text-transform: uppercase; letter-spacing: 0.8px; }
-  .digital-text span { font-size: 9px; color: #111827; font-style: italic; }
+  .sig-label {
+    font-size: 9px; font-weight: 700; color: #111827;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
 
   /* Declaration */
   .declaration {
@@ -342,6 +394,32 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
   .doc-pdf-link { font-size: 9px; color: #2563eb; margin: 8px 0; word-break: break-all; }
   .doc-pdf-hint { font-size: 10px; color: #6b7280; margin-top: 12px; }
   .doc-footer { text-align: center; font-size: 9px; color: #6b7280; padding-top: 8px; border-top: 1px solid #e5e7eb; margin-top: 8px; }
+
+  /* Multi-document page (groups father + mother Aadhaar onto one page) */
+  .doc-body.doc-multi-body {
+    flex-direction: column; align-items: stretch; justify-content: stretch;
+    gap: 14px;
+  }
+  .doc-multi-item {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+  }
+  .doc-multi-subtitle {
+    font-size: 11px; font-weight: 700; color: #0a5c56;
+    padding-left: 8px; border-left: 3px solid #0a5c56;
+    margin-bottom: 6px;
+  }
+  .doc-multi-img-wrap {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    min-height: 0;
+  }
+  .doc-img-half {
+    max-width: 100%; max-height: 110mm;
+    object-fit: contain; border: 1px solid #e5e7eb; border-radius: 4px;
+  }
+  .doc-pdf-notice-half { max-width: 110mm; padding: 14px; }
+  .doc-pdf-notice-half .doc-pdf-icon { margin-bottom: 8px; padding: 6px 14px; font-size: 11px; }
+  .doc-pdf-notice-half .doc-pdf-name { font-size: 11px; }
+  .doc-pdf-notice-half .doc-pdf-link { font-size: 8px; }
 </style>
 </head>
 <body>
@@ -390,6 +468,9 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
     <div class="grid-2">
       ${row('Full Name', studentName)}
       ${row('Father\'s Name', student.fatherOrHusbandName)}
+      ${row('Mother\'s Name', motherName)}
+      ${row('Aadhaar Number', student.aadhaarNumber)}
+      ${row('Mother Tongue', student.motherTongue)}
       ${row('Religion', student.religion)}
       ${row('Category', student.category)}
       ${row('PEN Number', student.penNumber)}
@@ -471,11 +552,18 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
     as per school policy.
   </div>
 
-  <div class="digital-notice">
-    <span class="digital-icon">&#10003;</span>
-    <div class="digital-text">
-      <b>Digitally Generated Document</b>
-      <span>This is a system-generated student detail form. No physical signature is required.</span>
+  <div class="signatures">
+    <div class="sig-box">
+      <div class="sig-line"></div>
+      <div class="sig-label">Class Teacher</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line"></div>
+      <div class="sig-label">Parent / Guardian</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line"></div>
+      <div class="sig-label">Principal</div>
     </div>
   </div>
 
