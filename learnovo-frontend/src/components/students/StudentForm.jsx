@@ -7,7 +7,6 @@ import transportService from '../../services/transportService'
 import { dedupeClassesByName, sortClassObjects } from '../../utils/classOrder'
 import { SERVER_URL } from '../../constants/config'
 import ImageCropModal from '../ImageCropModal'
-import CameraCaptureModal from '../CameraCaptureModal'
 import { useSettings } from '../../contexts/SettingsContext'
 
 const currentYear = new Date().getFullYear()
@@ -415,7 +414,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 
     const [cropModal, setCropModal] = useState({ isOpen: false, imageSrc: null })
     const [photoError, setPhotoError] = useState(null)
-    const [cameraOpen, setCameraOpen] = useState(false)
 
     // Documents — existing (saved) plus pending (selected but not yet uploaded)
     const [existingDocs, setExistingDocs] = useState(student?.documents || [])
@@ -515,13 +513,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             return pendingDocs.find(d => d.type === 'tc' || d.type === 'birth_certificate')
         }
         return pendingDocs.find(d => d.type === type)
-    }
-
-    const handleCameraCapture = (dataUrl) => {
-        setCameraOpen(false)
-        if (!dataUrl) return
-        setPhotoError(null)
-        setCropModal({ isOpen: true, imageSrc: dataUrl })
     }
 
     const handlePhotoUpload = async (e) => {
@@ -657,14 +648,17 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                     onChange={handlePhotoUpload}
                                                 />
                                             </label>
-                                            <button
-                                                type="button"
-                                                onClick={() => setCameraOpen(true)}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-700 text-white text-xs font-medium cursor-pointer hover:bg-gray-800 active:scale-95 transition-all"
-                                            >
+                                            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-700 text-white text-xs font-medium cursor-pointer hover:bg-gray-800 active:scale-95 transition-all">
                                                 <Camera className="h-3.5 w-3.5" />
                                                 Camera
-                                            </button>
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    capture="environment"
+                                                    className="hidden"
+                                                    onChange={handlePhotoUpload}
+                                                />
+                                            </label>
                                         </div>
                                         {photoError && (
                                             <p className="text-xs text-red-500 mt-2">{photoError}</p>
@@ -1523,11 +1517,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 minHeight={400}
                 outputFormat="image/jpeg"
                 maxFileSize={5 * 1024 * 1024}
-            />
-            <CameraCaptureModal
-                isOpen={cameraOpen}
-                onCancel={() => setCameraOpen(false)}
-                onCapture={handleCameraCapture}
             />
         </div>,
         document.body
