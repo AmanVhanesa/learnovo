@@ -180,7 +180,6 @@ const HomeworkSubmissionForm = ({ homework, onClose, onSuccess }) => {
                                     type="file"
                                     multiple
                                     accept="image/*,.pdf,.doc,.docx"
-                                    capture="environment"
                                     onChange={handleFileChange}
                                     className="hidden"
                                 />
