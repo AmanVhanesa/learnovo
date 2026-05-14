@@ -98,6 +98,7 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
               || student.fatherOrHusbandName
               || student.guardianName
               || ''
+            const relPrefix = (student.gender || '').toLowerCase().startsWith('f') ? 'D/o' : 'S/o'
             return (
             <button
               key={student._id}
@@ -120,7 +121,7 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] truncate">
                   {student.admissionNumber || student.studentId || 'N/A'} &middot; {student.classId?.name || student.class || 'N/A'}
                   {fatherName && (
-                    <span> &middot; S/o {fatherName}</span>
+                    <span> &middot; {relPrefix} {fatherName}</span>
                   )}
                   {(() => {
                     const match = getMatchedField(student, searchTerm.trim())
