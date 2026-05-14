@@ -883,6 +883,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
           Number(p.amount || 0)
         ]);
         row.height = 18;
+        const isCash = (p.paymentMethod || '').toLowerCase() === 'cash';
         row.eachCell((cell, colNumber) => {
           cell.border = { top: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' }, bottom: { style: 'hair' } };
           if (colNumber === colCount) {
@@ -891,9 +892,16 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
           } else cell.alignment = { horizontal: 'left', vertical: 'middle' };
         });
-        if (idx % 2 === 1) row.eachCell(c => {
-          c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F8F8' } };
-        });
+        if (isCash) {
+          row.eachCell(c => {
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF59D' } };
+            c.font = { ...(c.font || {}), bold: true };
+          });
+        } else if (idx % 2 === 1) {
+          row.eachCell(c => {
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F8F8' } };
+          });
+        }
       });
 
       // Grand total at end of list
