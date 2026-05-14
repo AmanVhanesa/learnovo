@@ -276,7 +276,10 @@ router.get('/', protect, authorize('admin', 'teacher'), [
         { admissionNumber: { $regex: searchTerm, $options: 'i' } },
         { rollNumber: { $regex: searchTerm, $options: 'i' } },
         { studentId: { $regex: searchTerm, $options: 'i' } },
-        { phone: { $regex: searchTerm, $options: 'i' } }
+        { phone: { $regex: searchTerm, $options: 'i' } },
+        { fatherOrHusbandName: { $regex: searchTerm, $options: 'i' } },
+        { guardianName: { $regex: searchTerm, $options: 'i' } },
+        { 'guardians.name': { $regex: searchTerm, $options: 'i' } }
       ];
     }
 
