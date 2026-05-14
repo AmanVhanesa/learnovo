@@ -16,6 +16,7 @@ import GeneratePayrollModal from '../components/payroll/GeneratePayrollModal';
 import AdvanceSalaryModal from '../components/payroll/AdvanceSalaryModal';
 import PayrollDetailsModal from '../components/payroll/PayrollDetailsModal';
 import EditPayrollModal from '../components/payroll/EditPayrollModal';
+import MarkAsPaidModal from '../components/payroll/MarkAsPaidModal';
 import AcademicSessionSelector from '../components/AcademicSessionSelector';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -45,6 +46,7 @@ const Payroll = () => {
     const [showCustomExportModal, setShowCustomExportModal] = useState(false);
     const [showIciciModal, setShowIciciModal] = useState(false);
     const [iciciLoading, setIciciLoading] = useState(false);
+    const [markAsPaidTarget, setMarkAsPaidTarget] = useState(null); // { type: 'single' | 'bulk', ids: [...] }
     const [iciciForm, setIciciForm] = useState({
         debitAccountNo: '',
         paymentMode: 'NEFT',
@@ -135,9 +137,10 @@ const Payroll = () => {
     });
 
     const markAsPaidMutation = useMutation({
-        mutationFn: (id) => payrollService.markAsPaid(id),
+        mutationFn: ({ id, paymentDetails }) => payrollService.markAsPaid(id, paymentDetails),
         onSuccess: () => {
             toast.success('Payroll marked as paid');
+            setMarkAsPaidTarget(null);
             queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
             queryClient.invalidateQueries({ queryKey: ['payroll-summary'] });
         },
@@ -145,9 +148,10 @@ const Payroll = () => {
     });
 
     const bulkMarkAsPaidMutation = useMutation({
-        mutationFn: (ids) => payrollService.bulkMarkAsPaid(ids),
-        onSuccess: (_, ids) => {
+        mutationFn: ({ ids, paymentDetails }) => payrollService.bulkMarkAsPaid(ids, paymentDetails),
+        onSuccess: (_, { ids }) => {
             toast.success(`${ids.length} payroll record${ids.length > 1 ? 's' : ''} marked as paid`);
+            setMarkAsPaidTarget(null);
             queryClient.invalidateQueries({ queryKey: ['payroll-records'] });
             queryClient.invalidateQueries({ queryKey: ['payroll-summary'] });
         },
@@ -179,9 +183,7 @@ const Payroll = () => {
     };
 
     const handleMarkAsPaid = (id) => {
-        if (window.confirm('Mark this payroll as paid?')) {
-            markAsPaidMutation.mutate(id);
-        }
+        setMarkAsPaidTarget({ type: 'single', ids: [id] });
     };
 
     const handleBulkMarkAsPaid = () => {
@@ -192,8 +194,15 @@ const Payroll = () => {
             toast.error('No pending payroll records to mark as paid');
             return;
         }
-        if (window.confirm(`Mark all ${pendingIds.length} pending payroll record${pendingIds.length > 1 ? 's' : ''} as paid?`)) {
-            bulkMarkAsPaidMutation.mutate(pendingIds);
+        setMarkAsPaidTarget({ type: 'bulk', ids: pendingIds });
+    };
+
+    const handleConfirmMarkAsPaid = (paymentDetails) => {
+        if (!markAsPaidTarget) return;
+        if (markAsPaidTarget.type === 'single') {
+            markAsPaidMutation.mutate({ id: markAsPaidTarget.ids[0], paymentDetails });
+        } else {
+            bulkMarkAsPaidMutation.mutate({ ids: markAsPaidTarget.ids, paymentDetails });
         }
     };
 
@@ -959,6 +968,13 @@ const Payroll = () => {
             <AdvanceSalaryModal isOpen={showAdvanceModal} onClose={() => { setShowAdvanceModal(false); setSelectedAdvance(null); }} onSuccess={handleAdvanceSuccess} mode={advanceModalMode} advanceData={selectedAdvance} />
             <PayrollDetailsModal isOpen={showDetailsModal} onClose={() => { setShowDetailsModal(false); setSelectedPayrollId(null); }} payrollId={selectedPayrollId} />
             <EditPayrollModal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setSelectedPayroll(null); }} payrollData={selectedPayroll} onSuccess={handleEditSuccess} />
+            <MarkAsPaidModal
+                isOpen={!!markAsPaidTarget}
+                onClose={() => setMarkAsPaidTarget(null)}
+                onConfirm={handleConfirmMarkAsPaid}
+                recordCount={markAsPaidTarget?.ids?.length || 1}
+                loading={markAsPaidMutation.isPending || bulkMarkAsPaidMutation.isPending}
+            />
 
             {/* Custom export column-picker modal (controlled) */}
             <ExportColumnPicker

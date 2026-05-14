@@ -163,11 +163,13 @@ const payrollService = {
     /**
      * Mark a payroll record as paid
      */
-    markAsPaid: async (id) => {
+    markAsPaid: async (id, { paymentMethod, paymentDate, paymentReference } = {}) => {
         try {
             const response = await api.put(`/payroll/${id}`, {
                 paymentStatus: 'paid',
-                paymentDate: new Date().toISOString()
+                paymentDate: paymentDate || new Date().toISOString(),
+                ...(paymentMethod ? { paymentMethod } : {}),
+                ...(paymentReference ? { paymentReference } : {})
             });
             return response.data;
         } catch (error) {
@@ -178,11 +180,13 @@ const payrollService = {
     /**
      * Bulk mark payroll records as paid
      */
-    bulkMarkAsPaid: async (ids) => {
+    bulkMarkAsPaid: async (ids, { paymentMethod, paymentDate, paymentReference } = {}) => {
         try {
             const response = await api.post('/payroll/bulk-mark-paid', {
                 ids,
-                paymentDate: new Date().toISOString()
+                paymentDate: paymentDate || new Date().toISOString(),
+                ...(paymentMethod ? { paymentMethod } : {}),
+                ...(paymentReference ? { paymentReference } : {})
             }, { timeout: 120000 });
             return response.data;
         } catch (error) {
