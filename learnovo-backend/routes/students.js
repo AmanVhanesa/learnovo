@@ -1663,20 +1663,55 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
   try {
     const tenantId = req.user.tenantId;
 
-    // Build section query — optionally filter by selected class
+    // Build section query — optionally filter by selected class.
+    // Match the class by name OR grade since the dropdown value may be either.
     const sectionQuery = { tenantId };
     if (req.query.class) {
-      const classDoc = await Class.findOne({ tenantId, name: req.query.class });
+      const classDoc = await Class.findOne({
+        tenantId,
+        $or: [{ name: req.query.class }, { grade: req.query.class }]
+      });
       if (classDoc) sectionQuery.classId = classDoc._id;
     }
 
-    // Fetch filter options from actual tenant-created data
-    const [classes, sections, academicYears, drivers] = await Promise.all([
-      User.distinct('class', { role: 'student', tenantId }),
+    // Class list source of truth = Class collection, scoped to classes that
+    // actually have students. We fall back to free-text User.class values
+    // only for students whose classId is missing (legacy/unimported rows).
+    const [classDocs, orphanClassStrings, sections, academicYears, drivers] = await Promise.all([
+      (async() => {
+        const idsWithStudents = await User.distinct('classId', {
+          role: 'student',
+          tenantId,
+          classId: { $ne: null }
+        });
+        if (!idsWithStudents.length) return [];
+        return Class.find({ tenantId, _id: { $in: idsWithStudents } })
+          .select('name grade')
+          .lean();
+      })(),
+      User.distinct('class', {
+        role: 'student',
+        tenantId,
+        $or: [{ classId: null }, { classId: { $exists: false } }]
+      }),
       Section.distinct('name', sectionQuery),
       User.distinct('academicYear', { role: 'student', tenantId }),
       Driver.find({ tenantId, isActive: true }).select('_id name').sort({ name: 1 })
     ]);
+
+    // Dedupe case-insensitively. Class-collection values win over orphan strings.
+    const canonicalByKey = new Map();
+    const keyOf = (s) => (s || '').toString().trim().toLowerCase();
+    for (const c of classDocs) {
+      const display = c.grade || c.name;
+      if (!display) continue;
+      canonicalByKey.set(keyOf(display), display);
+    }
+    for (const s of orphanClassStrings) {
+      const k = keyOf(s);
+      if (!k || canonicalByKey.has(k)) continue;
+      canonicalByKey.set(k, s);
+    }
 
     // Sort classes in educational hierarchy order (Nursery → LKG → UKG → 1 → 2 → ...)
     const prePrimaryOrder = { 'pre-nursery': 0, 'nursery': 1, 'lkg': 2, 'ukg': 3, 'jr. kg': 2, 'sr. kg': 3, 'playgroup': 0 };
@@ -1694,7 +1729,7 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
     res.json({
       success: true,
       data: {
-        classes: classes.filter(Boolean).sort((a, b) => getClassOrder(a) - getClassOrder(b)),
+        classes: [...canonicalByKey.values()].sort((a, b) => getClassOrder(a) - getClassOrder(b)),
         sections: sections.filter(Boolean).sort(sortAlphaNum),
         academicYears: academicYears.filter(Boolean).sort().reverse(), // Newest first
         genders: ['Male', 'Female', 'Other'],
