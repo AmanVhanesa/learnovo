@@ -93,7 +93,12 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
               {searchResults.length} student{searchResults.length !== 1 ? 's' : ''} found
             </span>
           </div>
-          {searchResults.map((student) => (
+          {searchResults.map((student) => {
+            const fatherName = student.guardians?.find(g => g.relation === 'Father')?.name
+              || student.fatherOrHusbandName
+              || student.guardianName
+              || ''
+            return (
             <button
               key={student._id}
               onClick={() => handleSelect(student)}
@@ -114,6 +119,9 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
                 </p>
                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] truncate">
                   {student.admissionNumber || student.studentId || 'N/A'} &middot; {student.classId?.name || student.class || 'N/A'}
+                  {fatherName && (
+                    <span> &middot; S/o {fatherName}</span>
+                  )}
                   {(() => {
                     const match = getMatchedField(student, searchTerm.trim())
                     return match && match.label !== 'Name' && match.value !== String(student.admissionNumber)
@@ -123,7 +131,8 @@ const StudentSearch = ({ onSelectStudent, placeholder = 'Search by name, admissi
                 </p>
               </div>
             </button>
-          ))}
+            )
+          })}
         </div>
       )}
 
