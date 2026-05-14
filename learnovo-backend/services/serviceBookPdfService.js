@@ -258,7 +258,8 @@ async function generateServiceBook(employeeId, tenantId) {
     fetchImageBuffer(employee.photo)
   ]);
 
-  const doc = new PDFDocument({ size: 'A4', margin: 32 });
+  // Wider left/right margins leave a safe hole-punch margin on both edges
+  const doc = new PDFDocument({ size: 'A4', margins: { top: 32, bottom: 32, left: 40, right: 40 } });
   const chunks = [];
   doc.on('data', c => chunks.push(c));
   const done = new Promise((resolve, reject) => {
