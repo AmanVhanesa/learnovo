@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DollarSign, TrendingUp, AlertCircle, AlertTriangle, Calendar,
   Users, FileText, Search, X, Plus, Receipt, Settings, History,
-  Edit, Trash2, Eye, Printer, RotateCcw, Check, Ban, List,
+  Edit, Trash2, Eye, EyeOff, Printer, RotateCcw, Check, Ban, List,
   ArrowUpRight, ArrowDownRight, Download, ChevronDown, ChevronUp,
   Copy, Upload, Loader2
 } from 'lucide-react'
@@ -105,6 +105,16 @@ const FeesFinance = () => {
   const [showFeeImportModal, setShowFeeImportModal] = useState(false)
   const [resolvingDispute, setResolvingDispute] = useState(null)
   const [resolveForm, setResolveForm] = useState({ action: 'APPROVE', note: '' })
+  const [amountsHidden, setAmountsHidden] = useState(() => {
+    try { return localStorage.getItem('feesAmountsHidden') === 'true' } catch { return false }
+  })
+  const toggleAmountsHidden = () => {
+    setAmountsHidden(prev => {
+      const next = !prev
+      try { localStorage.setItem('feesAmountsHidden', String(next)) } catch { /* ignore */ }
+      return next
+    })
+  }
 
   // ── Queries ──
 
@@ -490,12 +500,12 @@ const FeesFinance = () => {
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'dashboard' && dashboardData && <DashboardTab data={dashboardData} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onEditInvoice={setEditingInvoice} onDeleteInvoice={handleDeleteInvoice} onNavigate={setActiveTab} />}
+        {activeTab === 'dashboard' && dashboardData && <DashboardTab data={dashboardData} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onEditInvoice={setEditingInvoice} onDeleteInvoice={handleDeleteInvoice} onNavigate={setActiveTab} amountsHidden={amountsHidden} onToggleAmounts={toggleAmountsHidden} />}
         {activeTab === 'allocations' && <AnnualAllocationsTab activeSession={activeSession} />}
         {activeTab === 'allInvoices' && <AllInvoicesTab activeSession={activeSession} initialStudentId={studentIdFromUrl} onEditInvoice={setEditingInvoice} onCollectPayment={async (inv) => { if (inv.studentId) { const s = typeof inv.studentId === 'object' ? inv.studentId : { _id: inv.studentId }; await handleSelectStudent(s) } }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onDeleteInvoice={handleDeleteInvoice} />}
         {activeTab === 'feeStructure' && <FeeStructureTab feeStructures={feeStructures} classes={classes} onCreateNew={() => { setEditingFeeStructure(null); setShowFeeStructureModal(true) }} onEdit={(s) => { setEditingFeeStructure(s); setShowFeeStructureModal(true) }} onDelete={async (id) => { if (window.confirm('Delete this fee structure?')) { try { await feeStructuresService.delete(id); toast.success('Deleted'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } } }} onDuplicate={async (s) => { try { await feeStructuresService.create({ classId: typeof s.classId === 'object' ? s.classId._id : s.classId, sectionId: s.sectionId ? (typeof s.sectionId === 'object' ? s.sectionId._id : s.sectionId) : null, academicSessionId: activeSession._id, feeHeads: s.feeHeads.map(h => ({ name: h.name, amount: h.amount, frequency: h.frequency, isCompulsory: h.isCompulsory, dueDay: h.dueDay })), isActive: true }); toast.success('Duplicated'); queryClient.invalidateQueries({ queryKey: ['fee-structures'] }) } catch { toast.error('Failed') } }} />}
         {activeTab === 'invoices' && <InvoicesTab classes={classes} feeStructures={feeStructures} activeSession={activeSession} onShowIndividual={() => setShowInvoiceModal(true)} />}
-        {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} />}
+        {activeTab === 'collect' && <CollectPaymentTab dashboardData={dashboardData} selectedStudent={selectedStudent} onSelectStudent={handleSelectStudent} amountsHidden={amountsHidden} onToggleAmounts={toggleAmountsHidden} />}
         {activeTab === 'defaulters' && <DefaultersTab defaulters={defaulters} loading={defaultersLoading} classes={classes} activeSession={activeSession} onExport={handleExportDefaulters} dateFilter={defaultersDateFilter} onDateFilterChange={setDefaultersDateFilter} />}
         {activeTab === 'receipts' && <ReceiptsTab receipts={allReceipts} loading={receiptsLoading} fetching={receiptsFetching} hasMore={receiptsHasMore} onLoadMore={(n = 100) => setReceiptLimit(l => l + n)} filters={receiptFilters} onFilterChange={(f) => { setReceiptFilters(f); setReceiptLimit(100) }} onClearFilters={() => { setReceiptFilters({ search: '', paymentMethod: '', quarter: '', startDate: '', endDate: '' }); setReceiptLimit(100) }} onPrintReceipt={handlePrintReceipt} onDownloadReceipt={handleDownloadReceiptPdf} onExport={handleExportReceipts} onEditPayment={(p) => setPaymentAction({ payment: p, mode: 'edit' })} onReversePayment={(p) => setPaymentAction({ payment: p, mode: 'reverse' })} />}
         {activeTab === 'refunds' && <RefundsTab />}
@@ -602,7 +612,7 @@ const ImportFeesTab = ({ onImport }) => (
   </div>
 )
 
-const DashboardTab = ({ data, onPrintReceipt, onDownloadReceipt, onEditInvoice, onDeleteInvoice, onNavigate }) => {
+const DashboardTab = ({ data, onPrintReceipt, onDownloadReceipt, onEditInvoice, onDeleteInvoice, onNavigate, amountsHidden, onToggleAmounts }) => {
   const summary = data.summary || {}
   // totalPending from backend already includes Overdue balances (status IN [Pending, Partial, Overdue]);
   // do not add totalOverdue again or it will double-count.
@@ -621,6 +631,18 @@ const DashboardTab = ({ data, onPrintReceipt, onDownloadReceipt, onEditInvoice, 
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={onToggleAmounts}
+          aria-label={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+          title={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#38383A] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
+        >
+          {amountsHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+          <span>{amountsHidden ? 'Show amounts' : 'Hide amounts'}</span>
+        </button>
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: 'Total Collected', value: summary.totalCollected, icon: TrendingUp, bg: 'bg-green-100 dark:bg-green-900/30', ic: 'text-green-600 dark:text-green-400', vc: 'text-green-600 dark:text-green-400', trend: collectionRate > 0 ? `${collectionRate}% rate` : null, up: true },
@@ -632,7 +654,7 @@ const DashboardTab = ({ data, onPrintReceipt, onDownloadReceipt, onEditInvoice, 
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">{c.label}</p>
-                <p className={`text-lg sm:text-2xl font-bold mt-1.5 ${c.vc}`}>{formatCurrency(c.value)}</p>
+                <p className={`text-lg sm:text-2xl font-bold mt-1.5 ${c.vc} ${amountsHidden ? 'tracking-widest' : ''}`}>{amountsHidden ? '••••••' : formatCurrency(c.value)}</p>
                 {c.trend && <div className={`flex items-center gap-1 mt-1.5 text-xs font-medium ${c.up ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{c.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}{c.trend}</div>}
               </div>
               <div className={`p-2.5 ${c.bg} rounded-xl flex-shrink-0`}><c.icon className={`h-5 w-5 ${c.ic}`} /></div>
@@ -997,7 +1019,7 @@ const InvoicesTab = ({ classes, feeStructures, activeSession, onShowIndividual }
 
 // ── Collect Payment Tab ──
 
-const CollectPaymentTab = ({ dashboardData, selectedStudent, onSelectStudent }) => (
+const CollectPaymentTab = ({ dashboardData, selectedStudent, onSelectStudent, amountsHidden, onToggleAmounts }) => (
   <div className="space-y-6">
     <div className="bg-gradient-to-r from-primary-50 to-primary-100 dark:from-[#1a3a35] dark:to-[#162e2a] border border-primary-200 dark:border-[#2a5a52] rounded-xl p-5 sm:p-6">
       <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -1015,20 +1037,34 @@ const CollectPaymentTab = ({ dashboardData, selectedStudent, onSelectStudent }) 
     </div>
 
     {dashboardData && (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[
-          { label: 'Pending Dues', value: dashboardData.summary?.totalPending, color: 'amber', icon: AlertCircle },
-          { label: 'Overdue Amount', value: dashboardData.summary?.totalOverdue, color: 'red', icon: AlertTriangle },
-          { label: 'This Month', value: dashboardData.summary?.thisMonthCollection, color: 'green', icon: TrendingUp },
-        ].map((c) => (
-          <div key={c.label} className="card p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <div><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">{c.label}</p><p className={`text-xl font-bold text-${c.color}-600 dark:text-${c.color}-400 mt-1`}>{formatCurrency(c.value)}</p></div>
-              <div className={`p-2.5 bg-${c.color}-100 dark:bg-${c.color}-500/15 rounded-xl`}><c.icon className={`h-5 w-5 text-${c.color}-600 dark:text-${c.color}-400`} /></div>
+      <>
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onToggleAmounts}
+            aria-label={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+            title={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#38383A] hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors"
+          >
+            {amountsHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            <span>{amountsHidden ? 'Show amounts' : 'Hide amounts'}</span>
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { label: 'Pending Dues', value: dashboardData.summary?.totalPending, color: 'amber', icon: AlertCircle },
+            { label: 'Overdue Amount', value: dashboardData.summary?.totalOverdue, color: 'red', icon: AlertTriangle },
+            { label: 'This Month', value: dashboardData.summary?.thisMonthCollection, color: 'green', icon: TrendingUp },
+          ].map((c) => (
+            <div key={c.label} className="card p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div><p className="text-[10px] font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">{c.label}</p><p className={`text-xl font-bold text-${c.color}-600 dark:text-${c.color}-400 mt-1 ${amountsHidden ? 'tracking-widest' : ''}`}>{amountsHidden ? '••••••' : formatCurrency(c.value)}</p></div>
+                <div className={`p-2.5 bg-${c.color}-100 dark:bg-${c.color}-500/15 rounded-xl`}><c.icon className={`h-5 w-5 text-${c.color}-600 dark:text-${c.color}-400`} /></div>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </>
     )}
 
     <div className="card p-4 sm:p-6">
