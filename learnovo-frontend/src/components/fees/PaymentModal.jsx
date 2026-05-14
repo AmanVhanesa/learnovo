@@ -91,11 +91,24 @@ const PaymentModal = ({ student, invoices, payments = [], allocation = null, onP
   useEffect(() => {
     if (pendingInvoices.length === 0 && payments.length > 0) {
       setActiveTab('history')
-    } else if (pendingInvoices.length > 0) {
-      setActiveTab('collect')
-      setSelectedInvoice(pendingInvoices[0])
-      setForm(f => ({ ...f, amount: pendingInvoices[0].balanceAmount || '' }))
+      return
     }
+    if (pendingInvoices.length === 0) return
+    setActiveTab('collect')
+    // Preserve the user's current selection (refreshed with the latest patched
+    // data) when the list changes — e.g. after applying a discount, the
+    // patched invoice is still the one being viewed, not pendingInvoices[0].
+    setSelectedInvoice(prev => {
+      if (prev) {
+        const latest = pendingInvoices.find(inv => inv._id === prev._id)
+        if (latest) return latest
+      }
+      return pendingInvoices[0]
+    })
+    setForm(f => {
+      if (f.amount !== '' && f.amount !== null && f.amount !== undefined) return f
+      return { ...f, amount: pendingInvoices[0].balanceAmount || '' }
+    })
   }, [pendingInvoices, payments])
 
   // When quarter filter changes, auto-select first filtered invoice
