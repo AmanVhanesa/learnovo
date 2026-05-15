@@ -144,6 +144,14 @@ export const studentsService = {
     return res.data
   },
 
+  // Reuse a sibling's guardian Aadhaar without re-uploading the file
+  linkDocument: async (studentId, { type, guardianIndex, sourceStudentId, sourceDocId }) => {
+    const res = await api.post(`/students/${studentId}/documents/link`, {
+      type, guardianIndex, sourceStudentId, sourceDocId
+    })
+    return res.data
+  },
+
   // Detail Form — printable physical record for admin
   viewDetailForm: async (id) => {
     const res = await api.get(`/students/${id}/detail-form/html`, {

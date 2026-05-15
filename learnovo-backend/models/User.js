@@ -503,7 +503,12 @@ const userSchema = new mongoose.Schema({
     bytes: { type: Number },
     guardianIndex: { type: Number, min: 0 },
     uploadedAt: { type: Date, default: Date.now },
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    // When a guardian_aadhaar is linked from a sibling instead of re-uploaded,
+    // these track the source so we can avoid duplicate Cloudinary storage and
+    // skip Cloudinary deletion while any sibling still references the asset.
+    linkedFromStudentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    linkedFromDocId: { type: mongoose.Schema.Types.ObjectId }
   }],
 
   // ── Password reset fields ────────────────────────────────────────

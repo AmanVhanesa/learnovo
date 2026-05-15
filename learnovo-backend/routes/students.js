@@ -52,7 +52,7 @@ router.get('/guardian-search', protect, authorize('admin'), [
         { fullName: regex }
       ]
     })
-      .select('name fullName guardians address admissionNumber class section')
+      .select('name fullName guardians address admissionNumber class section documents')
       .sort({ name: 1 })
       .limit(10)
       .lean();
@@ -65,6 +65,17 @@ router.get('/guardian-search', protect, authorize('admin'), [
       const key = primaryGuardian?.phone || s._id.toString();
       if (!seen.has(key)) {
         seen.add(key);
+        // Surface guardian Aadhaar docs so a new sibling can reuse them
+        // without re-uploading. Indices align with `guardians` above.
+        const guardianDocuments = (s.documents || [])
+          .filter(d => d.type === 'guardian_aadhaar' && typeof d.guardianIndex === 'number')
+          .map(d => ({
+            docId: d._id,
+            guardianIndex: d.guardianIndex,
+            name: d.name,
+            url: d.url,
+            format: d.format
+          }));
         results.push({
           studentId: s._id,
           studentName: s.fullName || s.name,
@@ -72,7 +83,8 @@ router.get('/guardian-search', protect, authorize('admin'), [
           class: s.class,
           section: s.section,
           guardians: s.guardians || [],
-          address: s.address || ''
+          address: s.address || '',
+          guardianDocuments
         });
       }
     }
@@ -3997,6 +4009,76 @@ router.post('/:id/documents', protect, authorize('admin'), upload.single('file')
   }
 });
 
+// @desc    Link a guardian Aadhaar document from a sibling instead of re-uploading.
+//          Both students will reference the same Cloudinary asset.
+// @route   POST /api/students/:id/documents/link
+// @access  Private (Admin)
+router.post('/:id/documents/link', protect, authorize('admin'), async(req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+    const { id } = req.params;
+    const { type, guardianIndex, sourceStudentId, sourceDocId } = req.body || {};
+
+    if (type !== 'guardian_aadhaar') {
+      return res.status(400).json({ success: false, message: 'Only guardian_aadhaar documents can be linked', requestId: req.requestId });
+    }
+    const gi = parseInt(guardianIndex, 10);
+    if (Number.isNaN(gi) || gi < 0) {
+      return res.status(400).json({ success: false, message: 'Invalid guardianIndex', requestId: req.requestId });
+    }
+    if (!sourceStudentId || !sourceDocId) {
+      return res.status(400).json({ success: false, message: 'sourceStudentId and sourceDocId are required', requestId: req.requestId });
+    }
+
+    const student = await User.findOne({ _id: id, tenantId, role: 'student' });
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found', requestId: req.requestId });
+    }
+
+    const source = await User.findOne({ _id: sourceStudentId, tenantId, role: 'student' }).select('documents');
+    if (!source) {
+      return res.status(404).json({ success: false, message: 'Source student not found', requestId: req.requestId });
+    }
+    const sourceDoc = (source.documents || []).find(d => d._id.toString() === sourceDocId);
+    if (!sourceDoc || sourceDoc.type !== 'guardian_aadhaar') {
+      return res.status(404).json({ success: false, message: 'Source document not found', requestId: req.requestId });
+    }
+
+    // Don't double-link the same guardian slot
+    const exists = (student.documents || []).some(d => d.type === 'guardian_aadhaar' && d.guardianIndex === gi);
+    if (exists) {
+      return res.status(409).json({ success: false, message: 'This guardian already has an Aadhaar document', requestId: req.requestId });
+    }
+
+    student.documents = student.documents || [];
+    student.documents.push({
+      type: 'guardian_aadhaar',
+      name: sourceDoc.name,
+      url: sourceDoc.url,
+      publicId: sourceDoc.publicId,
+      resourceType: sourceDoc.resourceType || 'image',
+      format: sourceDoc.format,
+      bytes: sourceDoc.bytes,
+      guardianIndex: gi,
+      uploadedBy: req.user._id,
+      uploadedAt: new Date(),
+      linkedFromStudentId: source._id,
+      linkedFromDocId: sourceDoc._id
+    });
+    await student.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Document linked from sibling',
+      data: student.documents[student.documents.length - 1],
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('POST /students/:id/documents/link error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });
+    res.status(500).json({ success: false, message: 'Failed to link document', requestId: req.requestId });
+  }
+});
+
 // @desc    Delete a student document
 // @route   DELETE /api/students/:id/documents/:docId
 // @access  Private (Admin)
@@ -4015,11 +4097,22 @@ router.delete('/:id/documents/:docId', protect, authorize('admin'), async(req, r
       return res.status(404).json({ success: false, message: 'Document not found', requestId: req.requestId });
     }
 
-    const cloudinaryService = require('../services/cloudinaryService');
-    try {
-      await cloudinaryService.deleteFile(doc.publicId, doc.resourceType || 'image');
-    } catch (cloudErr) {
-      logger.warn('Cloudinary delete failed (continuing with DB removal)', { requestId: req.requestId, publicId: doc.publicId, error: cloudErr.message });
+    // If any sibling still references the same Cloudinary asset, keep the
+    // file on Cloudinary and only remove this student's reference.
+    const sharedRef = await User.findOne({
+      tenantId,
+      _id: { $ne: student._id },
+      role: 'student',
+      'documents.publicId': doc.publicId
+    }).select('_id').lean();
+
+    if (!sharedRef) {
+      const cloudinaryService = require('../services/cloudinaryService');
+      try {
+        await cloudinaryService.deleteFile(doc.publicId, doc.resourceType || 'image');
+      } catch (cloudErr) {
+        logger.warn('Cloudinary delete failed (continuing with DB removal)', { requestId: req.requestId, publicId: doc.publicId, error: cloudErr.message });
+      }
     }
 
     student.documents = student.documents.filter(d => d._id.toString() !== docId);

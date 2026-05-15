@@ -208,18 +208,41 @@ const Students = () => {
     return { uploaded, failed }
   }
 
+  const linkSiblingDocs = async (studentId, linkedDocs) => {
+    if (!studentId || !Array.isArray(linkedDocs) || linkedDocs.length === 0) return { uploaded: 0, failed: 0 }
+    let uploaded = 0
+    let failed = 0
+    for (const doc of linkedDocs) {
+      try {
+        await studentsService.linkDocument(studentId, {
+          type: doc.type,
+          guardianIndex: doc.guardianIndex,
+          sourceStudentId: doc.sourceStudentId,
+          sourceDocId: doc.sourceDocId
+        })
+        uploaded += 1
+      } catch (err) {
+        failed += 1
+        toast.error(err?.response?.data?.message || 'Failed to link sibling document')
+      }
+    }
+    return { uploaded, failed }
+  }
+
   const saveMutation = useMutation({
-    mutationFn: async ({ formData, pendingDocs }) => {
+    mutationFn: async ({ formData, pendingDocs, linkedDocs }) => {
       if (editingStudent) {
         await studentsService.update(editingStudent._id, formData)
-        const docResult = await uploadPendingDocs(editingStudent._id, pendingDocs)
-        return { isEdit: true, docResult }
+        const uploadResult = await uploadPendingDocs(editingStudent._id, pendingDocs)
+        const linkResult = await linkSiblingDocs(editingStudent._id, linkedDocs)
+        return { isEdit: true, docResult: { uploaded: uploadResult.uploaded + linkResult.uploaded, failed: uploadResult.failed + linkResult.failed } }
       } else {
         const response = await studentsService.create(formData)
         const created = response?.data || {}
         const newId = created.id || created._id
-        const docResult = await uploadPendingDocs(newId, pendingDocs)
-        return { isEdit: false, response, docResult }
+        const uploadResult = await uploadPendingDocs(newId, pendingDocs)
+        const linkResult = await linkSiblingDocs(newId, linkedDocs)
+        return { isEdit: false, response, docResult: { uploaded: uploadResult.uploaded + linkResult.uploaded, failed: uploadResult.failed + linkResult.failed } }
       }
     },
     onSuccess: (result) => {
@@ -273,8 +296,8 @@ const Students = () => {
     },
   })
 
-  const handleSaveStudent = (formData, pendingDocs = []) => {
-    saveMutation.mutate({ formData, pendingDocs })
+  const handleSaveStudent = (formData, pendingDocs = [], linkedDocs = []) => {
+    saveMutation.mutate({ formData, pendingDocs, linkedDocs })
   }
 
   const reactivateMutation = useMutation({

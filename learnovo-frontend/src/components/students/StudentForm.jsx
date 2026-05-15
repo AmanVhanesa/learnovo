@@ -265,6 +265,32 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                 : prev.guardians,
             address: result.address || prev.address
         }))
+        // Carry over the sibling's guardian Aadhaar docs as "linked" — these
+        // won't be re-uploaded; the backend will share the Cloudinary asset.
+        // Skip any guardianIndex the user has already populated with a file.
+        if (Array.isArray(result.guardianDocuments) && result.guardianDocuments.length > 0) {
+            setLinkedDocs(prev => {
+                const next = [...prev]
+                for (const d of result.guardianDocuments) {
+                    if (typeof d.guardianIndex !== 'number') continue
+                    const taken = pendingDocs.some(p => p.type === 'guardian_aadhaar' && p.guardianIndex === d.guardianIndex)
+                        || existingDocs.some(e => e.type === 'guardian_aadhaar' && e.guardianIndex === d.guardianIndex)
+                        || next.some(l => l.type === 'guardian_aadhaar' && l.guardianIndex === d.guardianIndex)
+                    if (taken) continue
+                    next.push({
+                        localId: `link-${Date.now()}-${d.guardianIndex}`,
+                        type: 'guardian_aadhaar',
+                        guardianIndex: d.guardianIndex,
+                        sourceStudentId: result.studentId,
+                        sourceDocId: d.docId,
+                        sourceStudentName: result.studentName,
+                        name: d.name,
+                        url: d.url
+                    })
+                }
+                return next
+            })
+        }
         setGuardianSearch('')
         setShowGuardianDropdown(false)
         setGuardianResults([])
@@ -409,15 +435,17 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         if (!submitData.middleName) delete submitData.middleName
         if (!submitData.lastName) delete submitData.lastName
 
-        onSave(submitData, pendingDocs)
+        onSave(submitData, pendingDocs, linkedDocs)
     }
 
     const [cropModal, setCropModal] = useState({ isOpen: false, imageSrc: null })
     const [photoError, setPhotoError] = useState(null)
 
     // Documents — existing (saved) plus pending (selected but not yet uploaded)
+    // plus linkedDocs (sibling guardian Aadhaars to share, not re-upload).
     const [existingDocs, setExistingDocs] = useState(student?.documents || [])
     const [pendingDocs, setPendingDocs] = useState([]) // [{ localId, file, type, guardianIndex }]
+    const [linkedDocs, setLinkedDocs] = useState([]) // [{ localId, type, guardianIndex, sourceStudentId, sourceDocId, sourceStudentName, name, url }]
     const [tcDocType, setTcDocType] = useState('tc') // 'tc' | 'birth_certificate'
     const [docDeletingId, setDocDeletingId] = useState(null)
     const [docError, setDocError] = useState(null)
@@ -445,10 +473,16 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             const filtered = prev.filter(d => !(d.type === type && d.guardianIndex === guardianIndex))
             return [...filtered, { localId: `${Date.now()}-${Math.random()}`, file, type, guardianIndex }]
         })
+        // Picking a fresh file overrides any sibling link for this slot
+        setLinkedDocs(prev => prev.filter(d => !(d.type === type && d.guardianIndex === guardianIndex)))
     }
 
     const removePendingDoc = (localId) => {
         setPendingDocs(prev => prev.filter(d => d.localId !== localId))
+    }
+
+    const removeLinkedDoc = (localId) => {
+        setLinkedDocs(prev => prev.filter(d => d.localId !== localId))
     }
 
     // For document slots: images go through the crop modal first; PDFs are added as-is.
@@ -513,6 +547,11 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             return pendingDocs.find(d => d.type === 'tc' || d.type === 'birth_certificate')
         }
         return pendingDocs.find(d => d.type === type)
+    }
+
+    const findLinkedDoc = (type, guardianIndex) => {
+        if (type !== 'guardian_aadhaar') return undefined
+        return linkedDocs.find(d => d.type === 'guardian_aadhaar' && d.guardianIndex === guardianIndex)
     }
 
     const handlePhotoUpload = async (e) => {
@@ -1438,8 +1477,10 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                             docType="guardian_aadhaar"
                                             existing={findExistingDoc('guardian_aadhaar', gi)}
                                             pending={findPendingDoc('guardian_aadhaar', gi)}
+                                            linked={findLinkedDoc('guardian_aadhaar', gi)}
                                             onPick={(file) => handleDocFilePick(file, 'guardian_aadhaar', gi)}
                                             onRemovePending={removePendingDoc}
+                                            onRemoveLinked={removeLinkedDoc}
                                             onDeleteExisting={deleteExistingDoc}
                                             deletingId={docDeletingId}
                                         />
@@ -1524,11 +1565,42 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
 }
 
 // Reusable doc-slot UI for the Documents section
-const DocSlotBody = ({ existing, pending, onPick, onRemovePending, onDeleteExisting, deletingId }) => {
+const DocSlotBody = ({ existing, pending, linked, onPick, onRemovePending, onRemoveLinked, onDeleteExisting, deletingId }) => {
     const handleChange = (e) => {
         const file = e.target.files?.[0]
         e.target.value = ''
         if (file) onPick(file)
+    }
+
+    if (linked) {
+        return (
+            <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800">
+                <div className="flex items-center gap-2 min-w-0">
+                    <FileCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                    <div className="min-w-0">
+                        <a
+                            href={linked.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-xs text-indigo-800 dark:text-indigo-300 truncate hover:underline"
+                        >
+                            {linked.name || 'View document'}
+                        </a>
+                        <span className="block text-[10px] text-indigo-700/80 dark:text-indigo-400/80 truncate">
+                            Linked from sibling {linked.sourceStudentName ? `— ${linked.sourceStudentName}` : ''} (saves on submit)
+                        </span>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onRemoveLinked && onRemoveLinked(linked.localId)}
+                    className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                >
+                    <Trash2 className="h-3 w-3" />
+                    Unlink
+                </button>
+            </div>
+        )
     }
 
     if (existing) {
@@ -1593,7 +1665,7 @@ const DocSlotBody = ({ existing, pending, onPick, onRemovePending, onDeleteExist
     )
 }
 
-const DocSlot = ({ label, description, icon: Icon, existing, pending, onPick, onRemovePending, onDeleteExisting, deletingId }) => {
+const DocSlot = ({ label, description, icon: Icon, existing, pending, linked, onPick, onRemovePending, onRemoveLinked, onDeleteExisting, deletingId }) => {
     return (
         <div className="border border-gray-200 dark:border-[#38383A] rounded-lg p-4">
             <div className="flex items-center gap-2 mb-1">
@@ -1606,8 +1678,10 @@ const DocSlot = ({ label, description, icon: Icon, existing, pending, onPick, on
             <DocSlotBody
                 existing={existing}
                 pending={pending}
+                linked={linked}
                 onPick={onPick}
                 onRemovePending={onRemovePending}
+                onRemoveLinked={onRemoveLinked}
                 onDeleteExisting={onDeleteExisting}
                 deletingId={deletingId}
             />
