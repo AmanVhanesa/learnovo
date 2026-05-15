@@ -57,6 +57,27 @@ const feeInvoiceSchema = new mongoose.Schema({
     index: true
   },
 
+  // Invoice source — distinguishes regular fee invoices from activity-program invoices.
+  // 'fee' is the default and matches all historical rows.
+  invoiceType: {
+    type: String,
+    enum: ['fee', 'activity'],
+    default: 'fee',
+    index: true
+  },
+
+  // For invoiceType='activity', this points at the ActivityEnrollment that drove it.
+  sourceId: {
+    type: mongoose.Schema.Types.ObjectId,
+    index: true
+  },
+
+  // Display label for the source (e.g. activity program name) — denormalized for listings.
+  sourceLabel: {
+    type: String,
+    trim: true
+  },
+
   // Invoice Items / Line Items (Locked at generation)
   items: [{
     feeHeadName: {
@@ -255,22 +276,39 @@ feeInvoiceSchema.index({ tenantId: 1, invoiceNumber: 1 }, { unique: true });
 feeInvoiceSchema.index({ tenantId: 1, studentId: 1, status: 1 });
 feeInvoiceSchema.index({ tenantId: 1, academicSessionId: 1, status: 1 });
 feeInvoiceSchema.index({ tenantId: 1, dueDate: 1, status: 1 });
-// Prevent duplicate active invoices for same student + billing period + academic session
+// Prevent duplicate active invoices for same student + billing period + academic session.
+// Scoped to invoiceType + sourceId so an activity invoice can coexist with the regular
+// fee invoice for the same month, and two different activity invoices can too.
 feeInvoiceSchema.index(
-  { tenantId: 1, studentId: 1, academicSessionId: 1, 'billingPeriod.displayText': 1 },
+  {
+    tenantId: 1,
+    studentId: 1,
+    academicSessionId: 1,
+    invoiceType: 1,
+    sourceId: 1,
+    'billingPeriod.displayText': 1
+  },
   {
     unique: true,
     partialFilterExpression: { status: { $ne: 'Cancelled' } },
-    name: 'unique_active_invoice_per_student_period'
+    name: 'unique_active_invoice_per_student_period_v2'
   }
 );
-// NEW: Period-based unique constraint (for new invoice generation flow)
+// NEW: Period-based unique constraint (for new invoice generation flow), also scoped to source.
 feeInvoiceSchema.index(
-  { tenantId: 1, studentId: 1, academicSessionId: 1, periodStart: 1, periodEnd: 1 },
+  {
+    tenantId: 1,
+    studentId: 1,
+    academicSessionId: 1,
+    invoiceType: 1,
+    sourceId: 1,
+    periodStart: 1,
+    periodEnd: 1
+  },
   {
     unique: true,
     partialFilterExpression: { status: { $ne: 'Cancelled' }, periodStart: { $exists: true } },
-    name: 'unique_active_invoice_per_student_period_dates',
+    name: 'unique_active_invoice_per_student_period_dates_v2',
     sparse: true
   }
 );

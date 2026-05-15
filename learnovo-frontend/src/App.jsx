@@ -90,6 +90,8 @@ const LibrarySettingsPage = lazy(() => import('./pages/library/LibrarySettings')
 const MyLibrary = lazy(() => import('./pages/library/MyLibrary'))
 const Admissions = lazy(() => import('./pages/Admissions'))
 const Activities = lazy(() => import('./pages/Activities'))
+const ActivityPrograms = lazy(() => import('./pages/ActivityPrograms'))
+const ActivityProgramDetail = lazy(() => import('./pages/ActivityProgramDetail'))
 const Announcements = lazy(() => import('./pages/Announcements'))
 const Circulars = lazy(() => import('./pages/Circulars'))
 const Notifications = lazy(() => import('./pages/Notifications'))
@@ -384,6 +386,18 @@ function App() {
                       <Route path="activities" element={
                         <ProtectedRoute allowedRoles={['admin', 'teacher']}>
                           <Activities />
+                        </ProtectedRoute>
+                      } />
+
+                      {/* Activity Programs (extracurricular: dance, music, karate, etc.) */}
+                      <Route path="activity-programs" element={
+                        <ProtectedRoute allowedRoles={['admin', 'accountant']}>
+                          <ActivityPrograms />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="activity-programs/:id" element={
+                        <ProtectedRoute allowedRoles={['admin', 'accountant']}>
+                          <ActivityProgramDetail />
                         </ProtectedRoute>
                       } />
                       <Route path="reports" element={

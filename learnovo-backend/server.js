@@ -335,6 +335,12 @@ app.use('/api/drivers', require('./routes/drivers'));
 app.use('/api/vehicles', require('./routes/vehicles'));
 app.use('/api/transport/routes', require('./routes/transportRoutes'));
 app.use('/api/student-transport', require('./routes/studentTransport'));
+
+// Activity Programs (extracurricular: dance, music, karate, etc.)
+app.use('/api/activity-programs', require('./routes/activityPrograms'));
+app.use('/api/activity-enrollments', require('./routes/activityEnrollments'));
+app.use('/api/activity-invoices', require('./routes/activityInvoices'));
+
 app.use('/api/payroll', require('./routes/payroll'));
 app.use('/api/advance-salary', require('./routes/advanceSalary'));
 app.use('/api/homework', require('./routes/homework'));

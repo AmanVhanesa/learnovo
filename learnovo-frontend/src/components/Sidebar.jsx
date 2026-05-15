@@ -32,7 +32,8 @@ import {
   CircleDollarSign,
   PieChart,
   Merge,
-  Library
+  Library,
+  Music
 } from 'lucide-react'
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -115,6 +116,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
     // ── Operations ────────────────────────────────────────────────
     const opsItems = [
+      { name: 'Activities', href: '/app/activity-programs', icon: Music, roles: ['admin', 'accountant'] },
       { name: 'Transport', href: '/app/transport', icon: Bus, roles: ['admin'] },
       { name: 'Certificates', href: '/app/certificates', icon: Award, roles: ['admin', 'teacher'] },
       { name: 'Communication', href: '/app/communication', icon: Bell, roles: ['admin', 'teacher'] },
