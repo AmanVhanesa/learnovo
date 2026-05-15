@@ -1225,6 +1225,29 @@ router.get('/receipts', protect, authorize('student', 'parent'), async(req, res)
       .sort({ paymentDate: -1 })
       .lean();
 
+    // Build a lookup of bulk-payment grouping (transactionGroupId + groupReceiptNumber)
+    // keyed by paymentAttemptId+invoiceId so we can surface "Download Combined Receipt"
+    // for receipts that were part of a multi-invoice bulk transaction.
+    const groupLookup = new Map();
+    for (const p of payments) {
+      if (!p.transactionGroupId) continue;
+      const attemptId = p.paymentAttemptId
+        ? String(p.paymentAttemptId)
+        : (p.transactionDetails?.transactionId || '');
+      const invoiceId = String(p.invoiceId?._id || p.invoiceId || '');
+      groupLookup.set(`${attemptId}::${invoiceId}`, {
+        transactionGroupId: String(p.transactionGroupId),
+        groupReceiptNumber: p.groupReceiptNumber || null
+      });
+    }
+
+    const enrichedReceipts = receipts.map(r => {
+      const attemptId = String(r.paymentAttemptId?._id || r.paymentAttemptId || '');
+      const invoiceId = String(r.invoiceId?._id || r.invoiceId || '');
+      const group = groupLookup.get(`${attemptId}::${invoiceId}`);
+      return group ? { ...r, ...group } : r;
+    });
+
     const orphanReceipts = [];
     for (const p of payments) {
       // Prefer the top-level paymentAttemptId (set by the new gateway flow).
@@ -1260,6 +1283,8 @@ router.get('/receipts', protect, authorize('student', 'parent'), async(req, res)
         transactionRefId: gatewayTxnId,
         initiatedBy: 'admin',
         issuedAt: p.confirmedAt || p.paymentDate || p.createdAt,
+        transactionGroupId: p.transactionGroupId ? String(p.transactionGroupId) : null,
+        groupReceiptNumber: p.groupReceiptNumber || null,
         paymentAttemptId: attemptId
           ? {
             _id: attemptId,
@@ -1275,7 +1300,7 @@ router.get('/receipts', protect, authorize('student', 'parent'), async(req, res)
       });
     }
 
-    const combined = [...receipts, ...orphanReceipts]
+    const combined = [...enrichedReceipts, ...orphanReceipts]
       .sort((a, b) => new Date(b.issuedAt || 0) - new Date(a.issuedAt || 0));
 
     res.json({ success: true, data: combined });
@@ -1324,6 +1349,67 @@ router.get('/receipt/:id', protect, authorize('student', 'parent'), async(req, r
     res.json({ success: true, data: receipt });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/**
+ * @desc    Re-download the consolidated PDF for a multi-invoice (bulk) payment.
+ *          Scoped to the requesting student — only payments owned by that
+ *          student can be exposed via this route, even though the underlying
+ *          transactionGroupId is tenant-wide.
+ * @route   GET /api/student-fees/receipt/group/:groupId/pdf
+ * @access  Private (Student, Parent)
+ */
+router.get('/receipt/group/:groupId/pdf', protect, authorize('student', 'parent'), async(req, res) => {
+  try {
+    const { studentId, error } = resolveStudentId(req);
+    if (error) return res.status(400).json({ success: false, message: error });
+
+    const { groupId } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const payments = await Payment.find({ tenantId, studentId, transactionGroupId: groupId })
+      .populate({
+        path: 'studentId',
+        select: 'name fullName admissionNumber studentId class section parentName classId',
+        populate: { path: 'classId', select: 'name' }
+      })
+      .populate('invoiceId')
+      .populate('collectedBy', 'name')
+      .sort({ createdAt: 1 });
+
+    if (!payments.length) {
+      return res.status(404).json({ success: false, message: 'Consolidated receipt not found' });
+    }
+
+    const Settings = require('../models/Settings');
+    const tenant = await Tenant.findById(tenantId).select('schoolName schoolCode address phone email logo fullAddress website');
+    const settings = await Settings.getSettings(tenantId);
+    const schoolData = tenant ? tenant.toObject() : {};
+    if (settings && settings.institution) {
+      if (settings.institution.contact) {
+        if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
+        if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
+      }
+      if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
+      if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
+      if (settings.institution.logo) schoolData.logo = settings.institution.logo;
+    }
+
+    const { generateConsolidatedReceiptPdf } = require('../services/receiptPdfService');
+    const pdfBuffer = await generateConsolidatedReceiptPdf(payments, schoolData);
+
+    const safeName = (payments[0].groupReceiptNumber || groupId).replace(/[^a-zA-Z0-9-_]/g, '_');
+    const filename = `Receipt-${safeName}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.end(pdfBuffer);
+  } catch (error) {
+    console.error('Student consolidated receipt PDF error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Server error generating consolidated receipt PDF' });
+    }
   }
 });
 

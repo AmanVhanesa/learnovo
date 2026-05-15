@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee, Filter, ChevronDown, ArrowUpDown, RotateCcw, SlidersHorizontal, Eye } from 'lucide-react';
+import { CreditCard, History, AlertTriangle, FileText, CheckCircle, Clock, X, ExternalLink, Download, Lock, ShieldCheck, Upload, IndianRupee, Filter, ChevronDown, ArrowUpDown, RotateCcw, SlidersHorizontal, Eye, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { studentFeesService } from '../../services/studentFeesService';
 import { formatCurrency } from '../../utils/formatCurrency';
@@ -529,6 +529,32 @@ const StudentFeesDashboard = () => {
         } catch {
             toast.dismiss(toastId);
             toast.error('Receipt unavailable');
+        }
+    }
+
+    const handleDownloadConsolidatedReceipt = async (groupId, groupReceiptNumber) => {
+        const toastId = toast.loading('Generating combined PDF...', { id: 'receipt-dl-combined' });
+        try {
+            const token = localStorage.getItem('token');
+            const params = isParent && selectedChildId ? `?childId=${selectedChildId}` : '';
+            const response = await fetch(`${SERVER_URL}/api/student-fees/receipt/group/${groupId}/pdf${params}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!response.ok) throw new Error('Failed');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Receipt-${groupReceiptNumber || groupId}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+            toast.dismiss(toastId);
+            toast.success('Combined receipt downloaded');
+        } catch {
+            toast.dismiss(toastId);
+            toast.error('Combined receipt unavailable');
         }
     }
 
@@ -1121,6 +1147,16 @@ const StudentFeesDashboard = () => {
                                                     <Download className="h-3.5 w-3.5" />
                                                     PDF
                                                 </button>
+                                                {receipt.transactionGroupId && (
+                                                    <button
+                                                        onClick={() => handleDownloadConsolidatedReceipt(receipt.transactionGroupId, receipt.groupReceiptNumber)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 rounded-lg transition-colors"
+                                                        title="Download a single PDF covering all invoices paid in this transaction"
+                                                    >
+                                                        <Layers className="h-3.5 w-3.5" />
+                                                        Combined
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
