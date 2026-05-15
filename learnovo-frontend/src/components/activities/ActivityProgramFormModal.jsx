@@ -49,10 +49,19 @@ const ActivityProgramFormModal = ({ program, onClose, onSaved }) => {
   const { data: instructors = [] } = useQuery({
     queryKey: ['activity-instructors'],
     queryFn: async () => {
-      const res = await api.get('/employees?status=active&limit=200')
-      return (res.data?.data || []).filter(u =>
-        ['teacher', 'admin', 'principal', 'vice_principal'].includes(u.role)
+      // Fetch teacher-class roles only. Backend caps limit at 100.
+      const roles = ['teacher', 'principal', 'vice_principal', 'admin']
+      const results = await Promise.all(
+        roles.map(role =>
+          api.get('/employees', { params: { role, status: 'active', limit: 100 } })
+            .then(r => r.data?.data || [])
+            .catch(() => [])
+        )
       )
+      const merged = results.flat()
+      const byId = new Map()
+      for (const u of merged) byId.set(String(u._id), u)
+      return Array.from(byId.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     },
     staleTime: 60 * 1000
   })
