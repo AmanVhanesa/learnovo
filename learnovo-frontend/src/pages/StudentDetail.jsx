@@ -628,6 +628,14 @@ const StudentDetail = () => {
                                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Email</p>
                                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{guardian.email || 'N/A'}</p>
                                                 </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Occupation</p>
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{guardian.occupation || 'N/A'}</p>
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Aadhaar Number</p>
+                                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{guardian.aadhaarNumber || 'N/A'}</p>
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
