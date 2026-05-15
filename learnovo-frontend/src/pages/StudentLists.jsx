@@ -9,6 +9,7 @@ import CreateStudentListModal from '../components/students/CreateStudentListModa
 import AddMoreStudentsModal from '../components/students/AddMoreStudentsModal';
 import ExportColumnPicker from '../components/ExportColumnPicker';
 import { formatDate } from '../utils/formatDate';
+import { formatClassDisplay } from '../utils/classOrder';
 
 const StudentLists = () => {
     const queryClient = useQueryClient();
@@ -76,7 +77,7 @@ const StudentLists = () => {
         { key: 'sno', label: 'S.No', group: 'Basic', getValue: (_s, i) => (i ?? 0) + 1 },
         { key: 'admissionNumber', label: 'Admission No', group: 'Basic', getValue: s => s.admissionNumber || '-' },
         { key: 'name', label: 'Student Name', group: 'Basic', getValue: s => s.fullName || s.name || '-' },
-        { key: 'class', label: 'Class', group: 'Basic', getValue: s => s.class || '-' },
+        { key: 'class', label: 'Class', group: 'Basic', getValue: s => s.class ? formatClassDisplay(s.class) : '-' },
         { key: 'section', label: 'Section', group: 'Basic', getValue: s => s.section || '-' },
         { key: 'rollNumber', label: 'Roll No', group: 'Basic', getValue: s => s.rollNumber || '-' },
         { key: 'phone', label: 'Phone', group: 'Contact', getValue: s => s.phone || '-' },
@@ -273,7 +274,7 @@ const StudentLists = () => {
                                                             </div>
                                                         </td>
                                                         <td className="text-sm text-gray-900 dark:text-white">
-                                                            {student.class || '-'} {student.section && `- ${student.section}`}
+                                                            {student.class ? formatClassDisplay(student.class) : '-'} {student.section && `- ${student.section}`}
                                                         </td>
                                                         <td className="text-sm text-gray-900 dark:text-white">
                                                             {student.phone || '-'}

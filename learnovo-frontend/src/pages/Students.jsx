@@ -15,7 +15,7 @@ import { useSettings } from '../contexts/SettingsContext'
 import { SERVER_URL } from '../constants/config'
 import { formatDate } from '../utils/formatDate'
 import { getMatchedField } from '../utils/searchRelevance'
-import { sortClasses } from '../utils/classOrder'
+import { sortClasses, formatClassDisplay } from '../utils/classOrder'
 
 const StudentPhotoCell = ({ student }) => {
   const [imgFailed, setImgFailed] = React.useState(false)
@@ -742,7 +742,7 @@ const Students = () => {
               <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}
                 className="appearance-none w-full h-10 pl-3 pr-8 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer">
                 <option value="">Class</option>
-                {filterOptions.classes.map(cls => (<option key={cls} value={cls}>{cls}</option>))}
+                {filterOptions.classes.map(cls => (<option key={cls} value={cls}>{formatClassDisplay(cls)}</option>))}
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                 <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
@@ -813,7 +813,7 @@ const Students = () => {
             >
               <option value="">Class</option>
               {filterOptions.classes.map(cls => (
-                <option key={cls} value={cls}>{cls}</option>
+                <option key={cls} value={cls}>{formatClassDisplay(cls)}</option>
               ))}
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
@@ -933,7 +933,7 @@ const Students = () => {
                     {!classFilter && !sectionFilter && !yearFilter && !driverFilter && !searchQuery && (
                       <span className="text-xs text-gray-400 italic">None — will export all {statusFilter === 'inactive' ? 'inactive' : 'active'} students</span>
                     )}
-                    {classFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Class: {classFilter}</span>}
+                    {classFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Class: {formatClassDisplay(classFilter)}</span>}
                     {sectionFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Section: {sectionFilter}</span>}
                     {yearFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Year: {yearFilter}</span>}
                     {statusFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Status: {statusFilter}</span>}
@@ -1032,7 +1032,7 @@ const Students = () => {
               <span className="text-xs text-gray-500 dark:text-[#8E8E93]">Active filters:</span>
               {classFilter && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
-                  Class: {classFilter}
+                  Class: {formatClassDisplay(classFilter)}
                   <button
                     onClick={() => setClassFilter('')}
                     className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
@@ -1206,7 +1206,7 @@ const Students = () => {
                       </div>
                     </td>
                     <td className="text-sm text-gray-900 dark:text-white">{student.rollNumber || '-'}</td>
-                    <td className="text-sm text-gray-900 dark:text-white">{student.class || '-'}</td>
+                    <td className="text-sm text-gray-900 dark:text-white">{student.class ? formatClassDisplay(student.class) : '-'}</td>
                     <td className="text-sm text-gray-900 dark:text-white">{student.section || '-'}</td>
                     <td>
                       <span

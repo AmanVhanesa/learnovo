@@ -32,6 +32,29 @@ export function getClassOrder(className) {
 }
 
 /**
+ * Format a class name for display. Numeric classes get an ordinal suffix
+ * (1 → 1st, 2 → 2nd, 3 → 3rd, 11 → 11th). Pre-primary names (Nursery,
+ * LKG, UKG, …) and other non-numeric values are returned unchanged.
+ */
+export function formatClassDisplay(className) {
+  if (className === null || className === undefined) return ''
+  const str = className.toString().trim()
+  if (!str) return ''
+
+  const cleaned = str.replace(/^(class|grade|std|standard)\s*/i, '').trim()
+  const num = parseInt(cleaned, 10)
+  if (!isNaN(num) && String(num) === cleaned) {
+    const v = num % 100
+    const suffix = (v >= 11 && v <= 13)
+      ? 'th'
+      : (['th', 'st', 'nd', 'rd'][num % 10] || 'th')
+    return `${num}${suffix}`
+  }
+
+  return str
+}
+
+/**
  * Sort an array of class names in educational hierarchy order.
  */
 export function sortClasses(classes) {
