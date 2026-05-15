@@ -23,6 +23,86 @@ const AcademicSession = require('../models/AcademicSession');
 
 const router = express.Router();
 
+// ── Student import template: shared field list + sample rows ─────────────
+// Used by both the CSV and Excel template endpoints so the two stay in sync.
+const STUDENT_IMPORT_FIELDS = [
+  // Identity
+  'fullName', 'firstName', 'middleName', 'lastName',
+  // Admission / academic
+  'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear',
+  'admissionDate', 'admissionClass', 'admissionSection', 'studentType',
+  // Personal
+  'dateOfBirth', 'gender', 'bloodGroup', 'category', 'religion',
+  'motherTongue', 'nationality',
+  // IDs
+  'aadhaarNumber', 'penNumber', 'udiseCode', 'identificationMark', 'isOrphan',
+  // Contact
+  'email', 'phone', 'address',
+  // Father
+  'fatherName', 'fatherPhone', 'fatherEmail', 'fatherOccupation', 'fatherAadhaar',
+  // Mother
+  'motherName', 'motherPhone', 'motherEmail', 'motherOccupation', 'motherAadhaar',
+  // Other guardian (used when neither father nor mother is the primary contact)
+  'guardianRelation', 'guardianName', 'guardianPhone', 'guardianEmail',
+  'guardianOccupation', 'guardianAadhaar',
+  // Previous school
+  'previousSchool', 'previousBoard', 'previousRollNumber', 'transferNotes',
+  // Medical
+  'medicalConditions', 'allergies', 'doctorName', 'doctorPhone',
+  // Org / transport
+  'subDepartment', 'driverName',
+  // Lifecycle status
+  'isActive', 'deactivatedAt', 'removalDate', 'removalReason', 'removalNotes'
+];
+
+const STUDENT_IMPORT_SAMPLES = [
+  {
+    fullName: 'John David Doe', firstName: '', middleName: '', lastName: '',
+    admissionNumber: 'ADM001', rollNumber: '1', class: '10', section: 'A',
+    academicYear: '2024-2025', admissionDate: '2024-04-01', admissionClass: '10',
+    admissionSection: 'A', studentType: 'new',
+    dateOfBirth: '2010-05-15', gender: 'male', bloodGroup: 'A+',
+    category: 'General', religion: 'Hindu', motherTongue: 'Hindi', nationality: 'Indian',
+    aadhaarNumber: '123456789012', penNumber: '12345678901', udiseCode: '12345678901',
+    identificationMark: 'Mole on left cheek', isOrphan: 'false',
+    email: 'john.doe@example.com', phone: '1234567890', address: '123 Main St',
+    fatherName: 'Father Name', fatherPhone: '9876543210', fatherEmail: 'father@example.com',
+    fatherOccupation: 'Engineer', fatherAadhaar: '111122223333',
+    motherName: 'Mother Name', motherPhone: '9876543211', motherEmail: 'mother@example.com',
+    motherOccupation: 'Teacher', motherAadhaar: '444455556666',
+    guardianRelation: '', guardianName: '', guardianPhone: '', guardianEmail: '',
+    guardianOccupation: '', guardianAadhaar: '',
+    previousSchool: '', previousBoard: '', previousRollNumber: '', transferNotes: '',
+    medicalConditions: '', allergies: '', doctorName: '', doctorPhone: '',
+    subDepartment: '27 LG SEC', driverName: 'Raju Singh',
+    isActive: 'active', deactivatedAt: '', removalDate: '',
+    removalReason: '', removalNotes: ''
+  },
+  {
+    fullName: 'Jane Smith', firstName: '', middleName: '', lastName: '',
+    admissionNumber: 'ADM002', rollNumber: '2', class: '9', section: 'B',
+    academicYear: '2024-2025', admissionDate: '2023-04-01', admissionClass: '8',
+    admissionSection: 'A', studentType: 'old',
+    dateOfBirth: '2009-08-20', gender: 'female', bloodGroup: 'B+',
+    category: 'OBC', religion: '', motherTongue: '', nationality: 'Indian',
+    aadhaarNumber: '', penNumber: '', udiseCode: '',
+    identificationMark: '', isOrphan: 'false',
+    email: 'jane@example.com', phone: '9876543210', address: '456 Oak Ave',
+    fatherName: '', fatherPhone: '', fatherEmail: '', fatherOccupation: '', fatherAadhaar: '',
+    motherName: '', motherPhone: '', motherEmail: '', motherOccupation: '', motherAadhaar: '',
+    guardianRelation: 'Uncle', guardianName: 'Uncle Name', guardianPhone: '9876543213',
+    guardianEmail: 'uncle@example.com', guardianOccupation: 'Businessman',
+    guardianAadhaar: '777788889999',
+    previousSchool: 'ABC Public School', previousBoard: 'CBSE',
+    previousRollNumber: '15', transferNotes: 'Transferred mid-year',
+    medicalConditions: 'Asthma', allergies: 'Peanuts',
+    doctorName: 'Dr. Sharma', doctorPhone: '9876500000',
+    subDepartment: '', driverName: '',
+    isActive: 'inactive', deactivatedAt: '2025-03-15', removalDate: '2025-03-15',
+    removalReason: 'Transferred', removalNotes: 'Moved to another city'
+  }
+];
+
 // @desc    Search guardian info from existing students (for sibling quick-fill)
 // @route   GET /api/students/guardian-search
 // @access  Private (Admin)
@@ -369,26 +449,18 @@ router.get('/', protect, authorize('admin', 'teacher'), [
 // @access  Private (Admin) — Basic+ plan required
 router.get('/import/template', protect, authorize('admin'), planGate.requireActiveSubscription, planGate.checkCsvImport, (req, res) => {
   try {
-    const fields = [
-      'fullName', 'email', 'phone', 'dateOfBirth', 'gender',
-      'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear', 'admissionDate', 'admissionClass',
-      'bloodGroup', 'category', 'religion',
-      'fatherName', 'fatherPhone', 'fatherEmail',
-      'motherName', 'motherPhone', 'motherEmail',
-      'guardianName', 'guardianPhone',
-      'address',
-      'penNumber', 'subDepartment', 'driverName',
-      'isActive', 'deactivatedAt', 'removalDate', 'removalReason', 'removalNotes',
-      'studentType',
-      // Optional: firstName, middleName, lastName for backward compatibility
-      'firstName', 'middleName', 'lastName'
-    ];
+    const fields = STUDENT_IMPORT_FIELDS;
+    const [sampleActive, sampleInactive] = STUDENT_IMPORT_SAMPLES;
 
-    // Create header row
-    const csvContent = `${fields.join(',')  }\n` +
-      // Add sample rows — one active, one inactive
-      'John David Doe,john.doe@example.com,1234567890,2010-05-15,male,ADM001,1,10,A,2024-2025,2024-04-01,10,A+,General,Hindu,Father Name,9876543210,father@example.com,Mother Name,9876543211,mother@example.com,,,123 Main St,12345678901,27 LG SEC,Raju Singh,active,,,,,new,,,' + '\n' +
-      'Jane Smith,jane@example.com,9876543210,2009-08-20,female,ADM002,2,9,B,2024-2025,2023-04-01,8,B+,General,,Father Name,9876543212,,Mother Name,9876543213,,,456 Oak Ave,,,inactive,2025-03-15,2025-03-15,Transferred,Moved to another city,old,,,';
+    const toCsvCell = (v) => {
+      if (v === undefined || v === null) return '';
+      const s = String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const toCsvRow = (sample) => fields.map(f => toCsvCell(sample[f])).join(',');
+
+    const csvContent =
+      `${fields.join(',')}\n${toCsvRow(sampleActive)}\n${toCsvRow(sampleInactive)}`;
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=students_import_template.csv');
@@ -406,101 +478,12 @@ router.get('/import/template/excel', protect, authorize('admin'), (req, res) => 
   try {
     const XLSX = require('xlsx');
 
-    const fields = [
-      'fullName', 'email', 'phone', 'dateOfBirth', 'gender',
-      'admissionNumber', 'rollNumber', 'class', 'section', 'academicYear', 'admissionDate', 'admissionClass',
-      'bloodGroup', 'category', 'religion',
-      'fatherName', 'fatherPhone', 'fatherEmail',
-      'motherName', 'motherPhone', 'motherEmail',
-      'guardianName', 'guardianPhone',
-      'address',
-      'penNumber', 'subDepartment', 'driverName',
-      'isActive', 'deactivatedAt', 'removalDate', 'removalReason', 'removalNotes',
-      'studentType',
-      'firstName', 'middleName', 'lastName'
-    ];
+    const fields = STUDENT_IMPORT_FIELDS;
+    const [sampleActive, sampleInactive] = STUDENT_IMPORT_SAMPLES;
 
-    // Sample data rows — one active, one inactive
-    const sampleActive = {
-      'fullName': 'John David Doe',
-      'email': 'john.doe@example.com',
-      'phone': '1234567890',
-      'dateOfBirth': '2010-05-15',
-      'gender': 'male',
-      'admissionNumber': 'ADM001',
-      'rollNumber': '1',
-      'class': '10',
-      'section': 'A',
-      'academicYear': '2024-2025',
-      'admissionDate': '2024-04-01',
-      'admissionClass': '10',
-      'bloodGroup': 'A+',
-      'category': 'General',
-      'religion': 'Hindu',
-      'fatherName': 'Father Name',
-      'fatherPhone': '9876543210',
-      'fatherEmail': 'father@example.com',
-      'motherName': 'Mother Name',
-      'motherPhone': '9876543211',
-      'motherEmail': 'mother@example.com',
-      'guardianName': '',
-      'guardianPhone': '',
-      'address': '123 Main St',
-      'penNumber': '12345678901',
-      'subDepartment': '27 LG SEC',
-      'driverName': 'Raju Singh',
-      'isActive': 'active',
-      'deactivatedAt': '',
-      'removalDate': '',
-      'removalReason': '',
-      'removalNotes': '',
-      'studentType': 'new',
-      'firstName': '',
-      'middleName': '',
-      'lastName': ''
-    };
-
-    const sampleInactive = {
-      'fullName': 'Jane Smith',
-      'email': 'jane@example.com',
-      'phone': '9876543210',
-      'dateOfBirth': '2009-08-20',
-      'gender': 'female',
-      'admissionNumber': 'ADM002',
-      'rollNumber': '2',
-      'class': '9',
-      'section': 'B',
-      'academicYear': '2024-2025',
-      'admissionDate': '2023-04-01',
-      'admissionClass': '8',
-      'bloodGroup': 'B+',
-      'category': 'General',
-      'religion': '',
-      'fatherName': 'Father Name',
-      'fatherPhone': '9876543212',
-      'fatherEmail': '',
-      'motherName': 'Mother Name',
-      'motherPhone': '9876543213',
-      'motherEmail': '',
-      'guardianName': '',
-      'guardianPhone': '',
-      'address': '456 Oak Ave',
-      'penNumber': '',
-      'subDepartment': '',
-      'driverName': '',
-      'isActive': 'inactive',
-      'deactivatedAt': '2025-03-15',
-      'removalDate': '2025-03-15',
-      'removalReason': 'Transferred',
-      'removalNotes': 'Moved to another city',
-      'studentType': 'old',
-      'firstName': '',
-      'middleName': '',
-      'lastName': ''
-    };
-
-    // Create worksheet with headers and sample data
-    const wsData = [fields, Object.values(sampleActive), Object.values(sampleInactive)];
+    // Project samples in field order — don't rely on object insertion order
+    const rowFor = (sample) => fields.map(f => sample[f] ?? '');
+    const wsData = [fields, rowFor(sampleActive), rowFor(sampleInactive)];
     const worksheet = XLSX.utils.aoa_to_sheet(wsData);
 
     // Set column widths for better readability
@@ -597,16 +580,40 @@ router.post('/import/preview', protect, authorize('admin'), planGate.requireActi
         'fatherphone': 'fatherPhone',
         'father_email': 'fatherEmail',
         'fatheremail': 'fatherEmail',
+        'father_occupation': 'fatherOccupation',
+        'fatheroccupation': 'fatherOccupation',
+        'father_aadhaar': 'fatherAadhaar',
+        'fatheraadhaar': 'fatherAadhaar',
+        'father_aadhar': 'fatherAadhaar',
+        'fatheraadhar': 'fatherAadhaar',
         'mother_name': 'motherName',
         'mothername': 'motherName',
         'mother_phone': 'motherPhone',
         'motherphone': 'motherPhone',
         'mother_email': 'motherEmail',
         'motheremail': 'motherEmail',
+        'mother_occupation': 'motherOccupation',
+        'motheroccupation': 'motherOccupation',
+        'mother_aadhaar': 'motherAadhaar',
+        'motheraadhaar': 'motherAadhaar',
+        'mother_aadhar': 'motherAadhaar',
+        'motheraadhar': 'motherAadhaar',
+        'guardian_relation': 'guardianRelation',
+        'guardianrelation': 'guardianRelation',
+        'relation': 'guardianRelation',
         'guardian_name': 'guardianName',
         'guardianname': 'guardianName',
         'guardian_phone': 'guardianPhone',
         'guardianphone': 'guardianPhone',
+        'guardian_email': 'guardianEmail',
+        'guardianemail': 'guardianEmail',
+        'guardian_occupation': 'guardianOccupation',
+        'guardianoccupation': 'guardianOccupation',
+        'occupation': 'guardianOccupation',
+        'guardian_aadhaar': 'guardianAadhaar',
+        'guardianaadhaar': 'guardianAadhaar',
+        'guardian_aadhar': 'guardianAadhaar',
+        'guardianaadhar': 'guardianAadhaar',
         // Other fields
         'blood_group': 'bloodGroup',
         'bloodgroup': 'bloodGroup',
@@ -614,6 +621,45 @@ router.post('/import/preview', protect, authorize('admin'), planGate.requireActi
         'subdepartment': 'subDepartment',
         'pen_number': 'penNumber',
         'pennumber': 'penNumber',
+        // Student personal IDs / demographics
+        'aadhaar': 'aadhaarNumber',
+        'aadhar': 'aadhaarNumber',
+        'aadhaar_number': 'aadhaarNumber',
+        'aadhar_number': 'aadhaarNumber',
+        'aadhaarnumber': 'aadhaarNumber',
+        'aadharnumber': 'aadhaarNumber',
+        'aadhaar_no': 'aadhaarNumber',
+        'aadhar_no': 'aadhaarNumber',
+        'mother_tongue': 'motherTongue',
+        'mothertongue': 'motherTongue',
+        'nationality': 'nationality',
+        'religion': 'religion',
+        'category': 'category',
+        'identification_mark': 'identificationMark',
+        'identificationmark': 'identificationMark',
+        'is_orphan': 'isOrphan',
+        'isorphan': 'isOrphan',
+        'orphan': 'isOrphan',
+        // Previous school
+        'previous_school': 'previousSchool',
+        'previousschool': 'previousSchool',
+        'prev_school': 'previousSchool',
+        'previous_board': 'previousBoard',
+        'previousboard': 'previousBoard',
+        'prev_board': 'previousBoard',
+        'previous_roll_number': 'previousRollNumber',
+        'previousrollnumber': 'previousRollNumber',
+        'prev_roll_number': 'previousRollNumber',
+        'transfer_notes': 'transferNotes',
+        'transfernotes': 'transferNotes',
+        // Medical
+        'medical_conditions': 'medicalConditions',
+        'medicalconditions': 'medicalConditions',
+        'allergies': 'allergies',
+        'doctor_name': 'doctorName',
+        'doctorname': 'doctorName',
+        'doctor_phone': 'doctorPhone',
+        'doctorphone': 'doctorPhone',
         'driver': 'driverName',
         'driver_name': 'driverName',
         'drivername': 'driverName',
@@ -1193,6 +1239,8 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
             name: addHonorific(row.fatherName, 'Mr.'),
             phone: row.fatherPhone,
             email: row.fatherEmail,
+            occupation: row.fatherOccupation,
+            aadhaarNumber: row.fatherAadhaar,
             isPrimary: true
           });
         }
@@ -1202,12 +1250,23 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
             relation: 'Mother',
             name: addHonorific(row.motherName, 'Mrs.'),
             phone: row.motherPhone,
-            email: row.motherEmail
+            email: row.motherEmail,
+            occupation: row.motherOccupation,
+            aadhaarNumber: row.motherAadhaar
           });
         }
 
-        if (guardians.length === 0 && row.guardianName) {
-          guardians.push({ relation: 'Guardian', name: row.guardianName, phone: row.guardianPhone, isPrimary: true });
+        if (row.guardianName) {
+          guardians.push({
+            relation: (row.guardianRelation && row.guardianRelation.trim()) || 'Guardian',
+            name: row.guardianName,
+            phone: row.guardianPhone,
+            email: row.guardianEmail,
+            occupation: row.guardianOccupation,
+            aadhaarNumber: row.guardianAadhaar,
+            // Promote to primary only when no parent was provided
+            isPrimary: !row.fatherName && !row.motherName
+          });
         }
 
         // Handle Sub Department (use pre-fetched cache — no per-row DB call)
@@ -1420,8 +1479,54 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
         if (row.religion && row.religion.trim()) {
           studentData.religion = row.religion.trim();
         }
+        if (row.motherTongue && row.motherTongue.trim()) {
+          studentData.motherTongue = row.motherTongue.trim();
+        }
+        if (row.nationality && row.nationality.trim()) {
+          studentData.nationality = row.nationality.trim();
+        }
+        if (row.aadhaarNumber && row.aadhaarNumber.toString().trim()) {
+          studentData.aadhaarNumber = row.aadhaarNumber.toString().trim();
+        }
         if (row.penNumber && row.penNumber.toString().trim()) {
           studentData.penNumber = row.penNumber.toString().trim();
+        }
+        if (row.udiseCode && row.udiseCode.toString().trim()) {
+          studentData.udiseCode = row.udiseCode.toString().trim();
+        }
+        if (row.identificationMark && row.identificationMark.trim()) {
+          studentData.identificationMark = row.identificationMark.trim();
+        }
+        if (row.isOrphan !== undefined && row.isOrphan !== null && row.isOrphan !== '') {
+          const v = row.isOrphan.toString().trim().toLowerCase();
+          studentData.isOrphan = ['true', 'yes', '1', 'y'].includes(v);
+        }
+        if (row.admissionSection && row.admissionSection.trim()) {
+          studentData.admissionSection = row.admissionSection.trim().toUpperCase();
+        }
+        if (row.previousSchool && row.previousSchool.trim()) {
+          studentData.previousSchool = row.previousSchool.trim();
+        }
+        if (row.previousBoard && row.previousBoard.trim()) {
+          studentData.previousBoard = row.previousBoard.trim();
+        }
+        if (row.previousRollNumber && row.previousRollNumber.toString().trim()) {
+          studentData.previousRollNumber = row.previousRollNumber.toString().trim();
+        }
+        if (row.transferNotes && row.transferNotes.trim()) {
+          studentData.transferNotes = row.transferNotes.trim();
+        }
+        if (row.medicalConditions && row.medicalConditions.trim()) {
+          studentData.medicalConditions = row.medicalConditions.trim();
+        }
+        if (row.allergies && row.allergies.trim()) {
+          studentData.allergies = row.allergies.trim();
+        }
+        if (row.doctorName && row.doctorName.trim()) {
+          studentData.doctorName = row.doctorName.trim();
+        }
+        if (row.doctorPhone && row.doctorPhone.trim()) {
+          studentData.doctorPhone = row.doctorPhone.trim();
         }
         if (subDepartmentId) {
           studentData.subDepartment = subDepartmentId;
@@ -1718,7 +1823,9 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
     const canonicalByKey = new Map();
     const keyOf = (s) => (s || '').toString().trim().toLowerCase();
     for (const c of classDocs) {
-      const display = c.grade || c.name;
+      // Prefer Class.name (the human-readable form, e.g. "1ST", "NURSERY")
+      // over Class.grade (the numeric form, e.g. "1") for display.
+      const display = c.name || c.grade;
       if (!display) continue;
       canonicalByKey.set(keyOf(display), display);
     }
