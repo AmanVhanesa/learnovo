@@ -289,6 +289,8 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
   .title-badge h1 { font-size: 12px; font-weight: 700; color: #0a5c56; letter-spacing: 4px; text-transform: uppercase; line-height: 1; }
   .title-meta { font-size: 9px; color: #111827; margin-top: 6px; }
   .title-meta b { color: #111827; font-weight: 700; }
+  .adm-pill { display: inline-block; background: #fff3bf; border: 1px solid #f1c40f; color: #7a5d00; font-size: 12px; font-weight: 700; letter-spacing: 0.6px; padding: 3px 10px; border-radius: 999px; margin: 6px 0 4px; }
+  .adm-pill b { color: #5a4500; font-size: 13px; letter-spacing: 1px; }
 
   /* Identity strip — photo + key facts */
   .identity {
@@ -442,7 +444,8 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
 
   <div class="title-sec">
     <div class="title-badge"><h1>Student Detail Form</h1></div>
-    <div class="title-meta">Admission No: <b>${esc(student.admissionNumber)}</b> &nbsp;&middot;&nbsp; Status: <b>${student.isActive ? 'Active' : 'Inactive'}</b> &nbsp;&middot;&nbsp; Page 1 of 2</div>
+    <div class="adm-pill">Admission No: <b>${esc(student.admissionNumber)}</b></div>
+    <div class="title-meta">Status: <b>${student.isActive ? 'Active' : 'Inactive'}</b> &nbsp;&middot;&nbsp; Page 1 of 2</div>
   </div>
 
   <div class="identity">
