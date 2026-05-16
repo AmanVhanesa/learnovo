@@ -1,7 +1,8 @@
 import React from 'react'
 import { Calendar, BookOpen, Users, Star, Lock } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { academicSessionsService, classesService, subjectsService, teacherAssignmentsService } from '../../services/academicsService'
+import { academicSessionsService, subjectsService, teacherAssignmentsService } from '../../services/academicsService'
+import { teachersService } from '../../services/teachersService'
 import { useAuth } from '../../contexts/AuthContext'
 
 const formatDate = (dateString) => {
@@ -44,10 +45,10 @@ const TeacherAcademics = () => {
   const sessions = sessionsData?.sessions || []
   const activeSession = sessionsData?.activeSession || null
 
-  const { data: classes = [] } = useQuery({
-    queryKey: ['teacher-academic-classes'],
+  const { data: myClasses = [] } = useQuery({
+    queryKey: ['teacher-my-classes'],
     queryFn: async () => {
-      const res = await classesService.list()
+      const res = await teachersService.myClasses()
       return (res.data || []).sort((a, b) => (gradeOrder[a.grade] ?? 99) - (gradeOrder[b.grade] ?? 99))
     },
   })
@@ -75,57 +76,67 @@ const TeacherAcademics = () => {
   const userId = user?._id?.toString()
   const idOf = (v) => (v && typeof v === 'object' ? v._id : v)?.toString()
 
-  // A teacher is linked to a class via any of:
-  //  1. TeacherSubjectAssignment (modern subject assignment)
-  //  2. Class.classTeacher (class teacher)
-  //  3. Section.sectionTeacher on any section of the class
-  //  4. Legacy Class.subjects[].teacher
-  const myClassIds = new Set()
-  const mySectionIds = new Set()
-  const classesWhereAllSectionsMine = new Set() // class teacher OR class-level subject assignment
-
+  // myClasses comes from /api/teachers/my-classes — already authoritative
+  // (same logic the dashboard uses). Determine "my sections" per class: if
+  // the teacher is class teacher of that class, all sections are theirs;
+  // otherwise restrict to sections where they're the section teacher or
+  // have a section-scoped subject assignment.
+  const mySectionIdsByClass = new Map() // cid → Set<sectionId> | 'all'
   myAssignments.forEach(a => {
     const cid = idOf(a.classId)
     const sid = idOf(a.sectionId)
-    if (cid) myClassIds.add(cid)
-    if (sid) mySectionIds.add(sid)
-    else if (cid) classesWhereAllSectionsMine.add(cid) // assignment with no sectionId = all sections
+    if (!cid) return
+    const existing = mySectionIdsByClass.get(cid)
+    if (!sid) {
+      mySectionIdsByClass.set(cid, 'all')
+    } else if (existing !== 'all') {
+      const set = existing instanceof Set ? existing : new Set()
+      set.add(sid)
+      mySectionIdsByClass.set(cid, set)
+    }
   })
 
-  classes.forEach(cls => {
+  myClasses.forEach(cls => {
     const cid = idOf(cls._id)
-    if (idOf(cls.classTeacher) === userId) {
-      myClassIds.add(cid)
-      classesWhereAllSectionsMine.add(cid)
+    const isClassTeacher = idOf(cls.classTeacher) === userId
+    const hasSubjectTeacher = (cls.subjects || []).some(s => idOf(s.teacher) === userId)
+    if (userId && (isClassTeacher || hasSubjectTeacher)) {
+      mySectionIdsByClass.set(cid, 'all')
     }
-    ;(cls.subjects || []).forEach(s => {
-      if (idOf(s.teacher) === userId) {
-        myClassIds.add(cid)
-        classesWhereAllSectionsMine.add(cid)
-      }
-    })
     ;(cls.sections || []).forEach(sec => {
-      if (idOf(sec.sectionTeacher) === userId) {
-        myClassIds.add(cid)
-        mySectionIds.add(idOf(sec._id))
+      if (userId && idOf(sec.sectionTeacher) === userId) {
+        const existing = mySectionIdsByClass.get(cid)
+        if (existing !== 'all') {
+          const set = existing instanceof Set ? existing : new Set()
+          set.add(idOf(sec._id))
+          mySectionIdsByClass.set(cid, set)
+        }
       }
     })
   })
+
+  const isSectionMine = (cid, sec) => {
+    const entry = mySectionIdsByClass.get(cid)
+    if (entry === 'all') return true
+    if (entry instanceof Set) return entry.has(idOf(sec._id))
+    // No specific section info — fall back to showing all sections of this class.
+    return true
+  }
 
   const mySubjectIds = new Set(
     myAssignments.map(a => idOf(a.subjectId)).filter(Boolean)
   )
-  classes.forEach(cls => {
+  myClasses.forEach(cls => {
     ;(cls.subjects || []).forEach(s => {
-      if (idOf(s.teacher) === userId) {
-        const subjId = idOf(s.subject)
+      if (userId && idOf(s.teacher) === userId) {
+        const subjId = idOf(s.subject) || idOf(s)
         if (subjId) mySubjectIds.add(subjId)
+      } else if (s && !s.teacher && s._id) {
+        // my-classes endpoint returns flattened subjects (no teacher field) — these are subjects assigned to the teacher's class
+        mySubjectIds.add(idOf(s._id))
       }
     })
   })
-
-  const isSectionMine = (cid, sec) =>
-    classesWhereAllSectionsMine.has(cid) || mySectionIds.has(idOf(sec._id))
 
   if (loadingSessions) {
     return (
@@ -181,7 +192,7 @@ const TeacherAcademics = () => {
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="card p-4 sm:p-5 text-center">
           <Users className="h-6 w-6 text-primary-500 mx-auto mb-2" />
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{myClassIds.size}</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{myClasses.length}</p>
           <p className="text-sm text-gray-500 dark:text-[#8E8E93]">My Classes</p>
         </div>
         <div className="card p-4 sm:p-5 text-center">
@@ -240,8 +251,6 @@ const TeacherAcademics = () => {
         </div>
         <div className="p-4 sm:p-6">
           {(() => {
-            const myClasses = classes.filter(cls => myClassIds.has(idOf(cls._id)))
-
             if (myClasses.length === 0) {
               return (
                 <div className="text-center py-8">

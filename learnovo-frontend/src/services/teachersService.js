@@ -20,6 +20,10 @@ export const teachersService = {
   remove: async (id) => {
     const res = await api.delete(`/teachers/${id}`)
     return res.data
+  },
+  myClasses: async () => {
+    const res = await api.get('/teachers/my-classes')
+    return res.data
   }
 }
 

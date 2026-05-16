@@ -277,12 +277,28 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
       .populate('sectionTeacher', 'name fullName email')
       .sort({ name: 1 });
 
-    // Group sections by classId
+    // Per-section student counts (match by sectionId OR legacy string section + class)
+    const sectionStudentCounts = await User.aggregate([
+      { $match: {
+        tenantId, role: 'student', isActive: true,
+        sectionId: { $in: sections.map(s => s._id) }
+      } },
+      { $group: { _id: '$sectionId', count: { $sum: 1 } } }
+    ]);
+    const studentCountBySection = {};
+    sectionStudentCounts.forEach(sc => {
+      if (sc._id) studentCountBySection[sc._id.toString()] = sc.count;
+    });
+
+    // Group sections by classId, attaching studentCount
     const sectionsByClass = {};
     sections.forEach(sec => {
       const cid = sec.classId.toString();
       if (!sectionsByClass[cid]) sectionsByClass[cid] = [];
-      sectionsByClass[cid].push(sec);
+      sectionsByClass[cid].push({
+        ...sec.toObject(),
+        studentCount: studentCountBySection[sec._id.toString()] || 0
+      });
     });
 
     // Get subjects from ClassSubject collection (admin-configured class-subject mappings)
