@@ -424,9 +424,9 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
             });
         }
 
-        // Backend expects 'name' not 'fullName'
+        // Backend expects 'name' not 'fullName'. Store student name in uppercase.
         if (submitData.fullName) {
-            submitData.name = submitData.fullName
+            submitData.name = submitData.fullName.trim().toUpperCase()
             delete submitData.fullName
         }
 
