@@ -72,8 +72,60 @@ const TeacherAcademics = () => {
     enabled: !!user?._id,
   })
 
-  const myClassIds = new Set(myAssignments.map(a => a.classId?._id || a.classId))
-  const mySubjectIds = new Set(myAssignments.map(a => a.subjectId?._id || a.subjectId))
+  const userId = user?._id?.toString()
+  const idOf = (v) => (v && typeof v === 'object' ? v._id : v)?.toString()
+
+  // A teacher is linked to a class via any of:
+  //  1. TeacherSubjectAssignment (modern subject assignment)
+  //  2. Class.classTeacher (class teacher)
+  //  3. Section.sectionTeacher on any section of the class
+  //  4. Legacy Class.subjects[].teacher
+  const myClassIds = new Set()
+  const mySectionIds = new Set()
+  const classesWhereAllSectionsMine = new Set() // class teacher OR class-level subject assignment
+
+  myAssignments.forEach(a => {
+    const cid = idOf(a.classId)
+    const sid = idOf(a.sectionId)
+    if (cid) myClassIds.add(cid)
+    if (sid) mySectionIds.add(sid)
+    else if (cid) classesWhereAllSectionsMine.add(cid) // assignment with no sectionId = all sections
+  })
+
+  classes.forEach(cls => {
+    const cid = idOf(cls._id)
+    if (idOf(cls.classTeacher) === userId) {
+      myClassIds.add(cid)
+      classesWhereAllSectionsMine.add(cid)
+    }
+    ;(cls.subjects || []).forEach(s => {
+      if (idOf(s.teacher) === userId) {
+        myClassIds.add(cid)
+        classesWhereAllSectionsMine.add(cid)
+      }
+    })
+    ;(cls.sections || []).forEach(sec => {
+      if (idOf(sec.sectionTeacher) === userId) {
+        myClassIds.add(cid)
+        mySectionIds.add(idOf(sec._id))
+      }
+    })
+  })
+
+  const mySubjectIds = new Set(
+    myAssignments.map(a => idOf(a.subjectId)).filter(Boolean)
+  )
+  classes.forEach(cls => {
+    ;(cls.subjects || []).forEach(s => {
+      if (idOf(s.teacher) === userId) {
+        const subjId = idOf(s.subject)
+        if (subjId) mySubjectIds.add(subjId)
+      }
+    })
+  })
+
+  const isSectionMine = (cid, sec) =>
+    classesWhereAllSectionsMine.has(cid) || mySectionIds.has(idOf(sec._id))
 
   if (loadingSessions) {
     return (
@@ -180,20 +232,26 @@ const TeacherAcademics = () => {
         </div>
       )}
 
-      {/* All Classes (read-only, teacher's highlighted) */}
+      {/* My Classes (filtered to teacher's assignments only) */}
       <div className="card">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-[#38383A]">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">School Classes</h2>
-          <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-0.5">Your assigned classes are highlighted</p>
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">My Classes</h2>
+          <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-0.5">Classes and sections assigned to you</p>
         </div>
         <div className="p-4 sm:p-6">
-          {classes.length === 0 ? (
-            <div className="text-center py-8">
-              <BookOpen className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-              <p className="text-sm text-gray-500 dark:text-[#8E8E93]">No classes found</p>
-            </div>
-          ) : (() => {
-            const grouped = classes.reduce((acc, cls) => {
+          {(() => {
+            const myClasses = classes.filter(cls => myClassIds.has(idOf(cls._id)))
+
+            if (myClasses.length === 0) {
+              return (
+                <div className="text-center py-8">
+                  <BookOpen className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-[#8E8E93]">You have not been assigned to any classes yet</p>
+                </div>
+              )
+            }
+
+            const grouped = myClasses.reduce((acc, cls) => {
               const g = cls.grade || 'Unknown'
               if (!acc[g]) acc[g] = []
               acc[g].push(cls)
@@ -205,40 +263,36 @@ const TeacherAcademics = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sortedGrades.map(grade => {
                   const gradeClasses = grouped[grade]
-                  const allSections = gradeClasses.flatMap(cls => cls.sections || [])
-                  const totalStudents = gradeClasses.reduce((sum, cls) => sum + (cls.studentCount || 0), 0)
-                  const isMyClass = gradeClasses.some(cls => myClassIds.has(cls._id))
+                  const mySectionsInGrade = gradeClasses.flatMap(cls => {
+                    const cid = idOf(cls._id)
+                    return (cls.sections || []).filter(sec => isSectionMine(cid, sec))
+                  })
+                  const totalStudents = mySectionsInGrade.reduce((sum, sec) => sum + (sec.studentCount || 0), 0)
 
                   return (
                     <div
                       key={grade}
-                      className={`border rounded-2xl p-4 transition-all ${
-                        isMyClass
-                          ? 'border-primary-300 dark:border-[#2a5a52] bg-primary-50/50 dark:bg-[#1a3a35]/50 ring-1 ring-primary-200 dark:ring-[#2a5a52]'
-                          : 'border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E]'
-                      }`}
+                      className="border rounded-2xl p-4 border-primary-300 dark:border-[#2a5a52] bg-primary-50/50 dark:bg-[#1a3a35]/50 ring-1 ring-primary-200 dark:ring-[#2a5a52]"
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white">{formatGrade(grade)}</h3>
-                            {isMyClass && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-primary-100 text-primary-700 dark:bg-[rgba(62,196,177,0.12)] dark:text-[#3EC4B1]">
-                                MY CLASS
-                              </span>
-                            )}
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-primary-100 text-primary-700 dark:bg-[rgba(62,196,177,0.12)] dark:text-[#3EC4B1]">
+                              MY CLASS
+                            </span>
                           </div>
                           <p className="text-xs text-gray-500 dark:text-[#8E8E93]">{gradeClasses[0]?.academicYear || ''}</p>
                         </div>
                       </div>
                       <div className="flex gap-4 text-sm mb-3">
                         <span className="text-gray-500 dark:text-[#8E8E93]"><strong className="text-gray-800 dark:text-white">{totalStudents}</strong> Students</span>
-                        <span className="text-gray-500 dark:text-[#8E8E93]"><strong className="text-gray-800 dark:text-white">{allSections.length}</strong> Sections</span>
+                        <span className="text-gray-500 dark:text-[#8E8E93]"><strong className="text-gray-800 dark:text-white">{mySectionsInGrade.length}</strong> Sections</span>
                       </div>
-                      {allSections.length > 0 && (
+                      {mySectionsInGrade.length > 0 && (
                         <div className="space-y-1.5">
                           <p className="text-xs font-semibold text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide">Sections</p>
-                          {allSections.map(section => (
+                          {mySectionsInGrade.map(section => (
                             <div key={section._id} className="flex items-center justify-between bg-gray-50 dark:bg-[#2C2C2E] rounded px-2.5 py-1.5">
                               <div>
                                 <span className="text-sm font-medium text-gray-800 dark:text-white uppercase">{section.name}</span>
