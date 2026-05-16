@@ -284,13 +284,13 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
   .aff-line b { font-weight: 700; color: #111827; }
 
   /* Title */
-  .title-sec { text-align: center; padding: 8px 0 4px; }
+  .title-sec { text-align: center; padding: 8px 0 4px; position: relative; }
   .title-badge { display: inline-block; background: #edf9f7; border-radius: 8px; padding: 6px 24px; }
   .title-badge h1 { font-size: 12px; font-weight: 700; color: #0a5c56; letter-spacing: 4px; text-transform: uppercase; line-height: 1; }
   .title-meta { font-size: 9px; color: #111827; margin-top: 6px; }
   .title-meta b { color: #111827; font-weight: 700; }
-  .adm-pill { display: inline-block; background: #fff3bf; border: 1px solid #f1c40f; color: #7a5d00; font-size: 12px; font-weight: 700; letter-spacing: 0.6px; padding: 3px 10px; border-radius: 999px; margin: 6px 0 4px; }
-  .adm-pill b { color: #5a4500; font-size: 13px; letter-spacing: 1px; }
+  .adm-pill { position: absolute; right: 0; top: 50%; transform: translateY(-50%); background: #fff3bf; border: 1px solid #f1c40f; color: #7a5d00; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; padding: 3px 10px; border-radius: 999px; }
+  .adm-pill b { color: #5a4500; font-size: 11px; letter-spacing: 0.8px; }
 
   /* Identity strip — photo + key facts */
   .identity {
