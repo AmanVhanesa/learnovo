@@ -20,11 +20,12 @@ const formatDate = (dateString) => {
 // Helper function to sort classes by grade order
 const sortClassesByGrade = (classes) => {
     const gradeOrder = {
-        'Nursery': 0,
-        'LKG': 1,
-        'UKG': 2,
-        '1': 3, '2': 4, '3': 5, '4': 6, '5': 7, '6': 8,
-        '7': 9, '8': 10, '9': 11, '10': 12, '11': 13, '12': 14
+        'Playway': 0,
+        'Nursery': 1,
+        'LKG': 2,
+        'UKG': 3,
+        '1': 4, '2': 5, '3': 6, '4': 7, '5': 8, '6': 9,
+        '7': 10, '8': 11, '9': 12, '10': 13, '11': 14, '12': 15
     };
 
     return [...classes].sort((a, b) => {
@@ -383,7 +384,7 @@ const AcademicsManagement = () => {
                             </div>
                         ) : (() => {
                             // Group classes by grade
-                            const gradeOrder = { 'Nursery': 0, 'LKG': 1, 'UKG': 2, '1': 3, '2': 4, '3': 5, '4': 6, '5': 7, '6': 8, '7': 9, '8': 10, '9': 11, '10': 12, '11': 13, '12': 14 };
+                            const gradeOrder = { 'Playway': 0, 'Nursery': 1, 'LKG': 2, 'UKG': 3, '1': 4, '2': 5, '3': 6, '4': 7, '5': 8, '6': 9, '7': 10, '8': 11, '9': 12, '10': 13, '11': 14, '12': 15 };
                             const grouped = classes.reduce((acc, cls) => {
                                 const g = cls.grade || 'Unknown';
                                 if (!acc[g]) acc[g] = [];
@@ -1040,12 +1041,13 @@ const ClassFormModal = ({ classData, teachers, sessions = [], activeSession, onC
                                 value={form.grade}
                                 onChange={(e) => {
                                     const grade = e.target.value
-                                    const autoName = ['Nursery', 'LKG', 'UKG'].includes(grade) ? grade : grade ? `Class ${grade}` : ''
+                                    const autoName = ['Playway', 'Nursery', 'LKG', 'UKG'].includes(grade) ? grade : grade ? `Class ${grade}` : ''
                                     setForm({ ...form, grade, name: classData ? form.name : autoName })
                                 }}
                                 required
                             >
                                 <option value="">Select Grade</option>
+                                <option value="Playway">Playway</option>
                                 <option value="Nursery">Nursery</option>
                                 <option value="LKG">LKG</option>
                                 <option value="UKG">UKG</option>
