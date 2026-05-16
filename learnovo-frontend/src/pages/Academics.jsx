@@ -499,9 +499,20 @@ const AcademicsManagement = () => {
                             const subjectById = {}
                             subjects.forEach(s => { subjectById[s._id] = s })
 
+                            // Only consider ClassSubject records whose class still exists
+                            // in the current tenant's class list. Orphan records (deleted
+                            // class, mismatched session) used to falsely mark every subject
+                            // as "assigned", which collapsed the Unassigned Subjects list
+                            // and produced an empty page even when subjects existed.
+                            const validClassIds = new Set(classes.map(c => c._id.toString()))
+                            const validClassSubjects = classSubjects.filter(cs => {
+                                const clsId = cs.classId?._id?.toString()
+                                return clsId && validClassIds.has(clsId)
+                            })
+
                             // Build class → subjects mapping using full subject data
                             const classSubjectMap = {}
-                            classSubjects.forEach(cs => {
+                            validClassSubjects.forEach(cs => {
                                 const clsId = cs.classId?._id
                                 const clsName = cs.classId?.name
                                 const subjId = cs.subjectId?._id
@@ -514,8 +525,8 @@ const AcademicsManagement = () => {
                             const classesWithSubjects = classes
                                 .filter(cls => classSubjectMap[cls._id])
                                 .map(cls => ({ ...cls, assignedSubjects: classSubjectMap[cls._id].subjects }))
-                            // Subjects not assigned to any class
-                            const assignedSubjectIds = new Set(classSubjects.map(cs => cs.subjectId?._id).filter(Boolean))
+                            // Subjects not assigned to any (valid) class
+                            const assignedSubjectIds = new Set(validClassSubjects.map(cs => cs.subjectId?._id).filter(Boolean))
                             const unassignedSubjects = subjects.filter(s => !assignedSubjectIds.has(s._id))
 
                             return (
@@ -590,7 +601,7 @@ const AcademicsManagement = () => {
 
                                     {/* Unassigned subjects */}
                                     {unassignedSubjects.length > 0 && (
-                                        <details className="group border border-dashed border-gray-300 dark:border-[#48484A] rounded-2xl overflow-hidden">
+                                        <details className="group border border-dashed border-gray-300 dark:border-[#48484A] rounded-2xl overflow-hidden" open={classesWithSubjects.length === 0}>
                                             <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none bg-gray-50/50 dark:bg-[#1C1C1E] hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors">
                                                 <div className="flex items-center gap-3">
                                                     <div className="h-9 w-9 rounded-xl bg-gray-100 dark:bg-[#38383A] flex items-center justify-center">
