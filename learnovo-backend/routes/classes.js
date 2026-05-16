@@ -34,6 +34,7 @@ router.get('/', protect, async(req, res) => {
           User.countDocuments({
             tenantId: req.user.tenantId,
             role: 'student',
+            isActive: true,
             $or: [
               { classId: classItem._id },
               { class: classItem.name },
@@ -51,6 +52,7 @@ router.get('/', protect, async(req, res) => {
             const sectionStudentCount = await User.countDocuments({
               tenantId: req.user.tenantId,
               role: 'student',
+              isActive: true,
               $or: [
                 { sectionId: section._id },
                 { section: section.name, classId: classItem._id },
@@ -433,8 +435,10 @@ router.get('/:id/sections', protect, async(req, res) => {
     const sectionsWithCounts = await Promise.all(
       sections.map(async(section) => {
         const studentCount = await User.countDocuments({
+          tenantId: req.user.tenantId,
           sectionId: section._id,
-          role: 'student'
+          role: 'student',
+          isActive: true
         });
         return {
           ...section.toObject(),
