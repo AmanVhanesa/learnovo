@@ -234,7 +234,14 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
       .populate('subjectId', 'name subjectCode')
       .populate('sectionId', 'name');
 
-    // Collect class IDs from TeacherSubjectAssignment that weren't found in Strategy 1
+    // Strategy 3: Find classes where the teacher is a section teacher of any section
+    const teacherSections = await Section.find({
+      tenantId,
+      sectionTeacher: teacherId,
+      isActive: true
+    }).select('classId').lean();
+
+    // Collect class IDs from all strategies that weren't found in Strategy 1
     const classIdsFromModel = new Set(classesFromModel.map(c => c._id.toString()));
     const extraClassIds = new Set();
     teacherAssignments.forEach(a => {
@@ -242,8 +249,13 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
         extraClassIds.add(a.classId._id.toString());
       }
     });
+    teacherSections.forEach(s => {
+      if (s.classId && !classIdsFromModel.has(s.classId.toString())) {
+        extraClassIds.add(s.classId.toString());
+      }
+    });
 
-    // Fetch any additional classes from TeacherSubjectAssignment
+    // Fetch any additional classes from Strategy 2 / Strategy 3
     let extraClasses = [];
     if (extraClassIds.size > 0) {
       extraClasses = await Class.find({
@@ -260,9 +272,16 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
 
     let allClasses = [...classesFromModel, ...extraClasses];
 
-    // Fallback: if no assignments found via any strategy, return all tenant classes
-    // This ensures teachers can still use the system when explicit assignments haven't been set up
-    if (allClasses.length === 0 && teacherAssignments.length === 0) {
+    // Backward-compat fallback: if no assignments found via any strategy and
+    // the caller hasn't opted into strict mode, return all tenant classes so
+    // existing flows (attendance) still work for unassigned teachers. The
+    // academics page passes ?strict=true to suppress this — showing all
+    // classes there hides the fact that the teacher isn't actually assigned.
+    if (
+      allClasses.length === 0 &&
+      teacherAssignments.length === 0 &&
+      req.query.strict !== 'true'
+    ) {
       allClasses = await Class.find({ tenantId, isActive: true })
         .populate('classTeacher', 'name email')
         .populate('subjects.subject', 'name subjectCode')

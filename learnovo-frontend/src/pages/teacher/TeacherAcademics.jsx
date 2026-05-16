@@ -48,7 +48,7 @@ const TeacherAcademics = () => {
   const { data: myClasses = [] } = useQuery({
     queryKey: ['teacher-my-classes'],
     queryFn: async () => {
-      const res = await teachersService.myClasses()
+      const res = await teachersService.myClasses({ strict: true })
       return (res.data || []).sort((a, b) => (gradeOrder[a.grade] ?? 99) - (gradeOrder[b.grade] ?? 99))
     },
   })

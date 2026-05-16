@@ -21,8 +21,8 @@ export const teachersService = {
     const res = await api.delete(`/teachers/${id}`)
     return res.data
   },
-  myClasses: async () => {
-    const res = await api.get('/teachers/my-classes')
+  myClasses: async ({ strict = false } = {}) => {
+    const res = await api.get(`/teachers/my-classes${strict ? '?strict=true' : ''}`)
     return res.data
   }
 }
