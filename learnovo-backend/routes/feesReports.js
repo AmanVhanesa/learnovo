@@ -424,7 +424,8 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
       limit: 5000
     });
 
-    const enriched = defaulters.map((d) => ({
+    const enriched = defaulters.map((d, idx) => ({
+      serialNumber: idx + 1,
       admissionNumber: d.studentId?.admissionNumber || d.studentId?.studentId || '-',
       studentName: d.studentId?.fullName || d.studentId?.name || 'N/A',
       className: d.studentId?.classId?.name || '-',
@@ -438,6 +439,7 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
     }));
 
     const columns = [
+      { key: 'serialNumber', header: 'S. No.' },
       { key: 'admissionNumber', header: 'Admission No.' },
       { key: 'studentName', header: 'Student Name' },
       { key: 'className', header: 'Class' },
@@ -465,10 +467,11 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
     const today = new Date().toISOString().split('T')[0];
     const headerInfo = await ImportExportService.getExportHeaderInfo(tenantId, 'Fee Defaulters Report');
 
-    // Totals row aligned to columns: Admission No. | Student Name | Class | Section | Phone | Email | Total Pending | Unpaid Invoices | Oldest Due Date | Overdue Days
+    // Totals row aligned to columns: S. No. | Admission No. | Student Name | Class | Section | Phone | Email | Total Pending | Unpaid Invoices | Oldest Due Date | Overdue Days
     const totalPending = roundToRupee(enriched.reduce((s, r) => s + (Number(r.totalBalance) || 0), 0));
     const totalInvoices = enriched.reduce((s, r) => s + (Number(r.unpaidInvoiceCount) || 0), 0);
     const footerRow = [
+      '',
       'TOTAL',
       `${enriched.length} student${enriched.length === 1 ? '' : 's'}`,
       '', '', '', '',
@@ -480,7 +483,7 @@ router.get('/defaulters/export', protect, authorize('admin', 'accountant'), asyn
     let buffer, contentType, ext;
 
     if (fmt === 'excel') {
-      buffer = await ImportExportService.exportToExcel(enriched, columns, 'Defaulters', headerInfo, footerRow);
+      buffer = await ImportExportService.exportToExcel(enriched, columns, 'Defaulters', headerInfo, footerRow, { headerFillColor: 'FF2E7D32' });
       contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       ext = 'xlsx';
     } else {

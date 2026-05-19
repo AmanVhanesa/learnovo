@@ -293,9 +293,11 @@ class ImportExportService {
      * @param {Array} columns - Column definitions
      * @param {string} sheetName - Sheet name
      * @param {Object} headerInfo - Optional { schoolName, reportTitle, dateTime } for report header
+     * @param {Array|null} footerRow - Optional totals row appended at the bottom
+     * @param {Object} options - Optional { headerFillColor } (ARGB hex like 'FF2E7D32')
      * @returns {Promise<Buffer>} Excel buffer
      */
-  static async exportToExcel(data, columns, sheetName = 'Sheet1', headerInfo = null, footerRow = null) {
+  static async exportToExcel(data, columns, sheetName = 'Sheet1', headerInfo = null, footerRow = null, options = {}) {
     const ExcelJS = require('exceljs');
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Learnovo';
@@ -323,9 +325,9 @@ class ImportExportService {
         currentRow++;
         const row = sheet.addRow([headerInfo.schoolName]);
         sheet.mergeCells(currentRow, 1, currentRow, colCount);
-        row.getCell(1).font = { bold: true, size: 14 };
+        row.getCell(1).font = { bold: true, size: 13 };
         row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-        row.height = 24;
+        row.height = 20;
       }
       if (headerInfo.reportTitle) {
         currentRow++;
@@ -333,7 +335,7 @@ class ImportExportService {
         sheet.mergeCells(currentRow, 1, currentRow, colCount);
         row.getCell(1).font = { bold: true, size: 11, color: { argb: 'FF444444' } };
         row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
-        row.height = 20;
+        row.height = 16;
       }
       if (headerInfo.dateTime !== false) {
         currentRow++;
@@ -342,10 +344,8 @@ class ImportExportService {
         sheet.mergeCells(currentRow, 1, currentRow, colCount);
         row.getCell(1).font = { size: 9, italic: true, color: { argb: 'FF777777' } };
         row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.height = 14;
       }
-      // Blank separator row
-      currentRow++;
-      sheet.addRow([]);
     }
 
     // ── Column header row ──
@@ -354,9 +354,10 @@ class ImportExportService {
     const headerRowNum = currentRow;
     const thinBorder = { style: 'thin', color: { argb: 'FF000000' } };
 
+    const headerFillColor = options.headerFillColor || 'FF1F3A5F';
     headerRow.eachCell((cell) => {
       cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F3A5F' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerFillColor } };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
     });
