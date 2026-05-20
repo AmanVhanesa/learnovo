@@ -191,6 +191,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       maritalStatus, nationality, employmentType, appointmentOrderNo,
       probationEndDate, reportingTo, specialization, previousEmployer,
       previousDesignation, certifications, qualifications,
+      educationalQualifications,
       postings, promotions, trainings, awards, serviceRemarks
     } = req.body;
 
@@ -314,6 +315,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       previousEmployer,
       previousDesignation,
       certifications: Array.isArray(certifications) ? certifications : undefined,
+      educationalQualifications: Array.isArray(educationalQualifications) ? educationalQualifications : undefined,
       postings: Array.isArray(postings) ? postings : undefined,
       promotions: Array.isArray(promotions) ? promotions : undefined,
       trainings: Array.isArray(trainings) ? trainings : undefined,

@@ -392,6 +392,18 @@ async function generateServiceBook(employeeId, tenantId) {
     Y = doc.y + 4;
   }
 
+  // Educational Qualifications (structured table)
+  if (Array.isArray(employee.educationalQualifications) && employee.educationalQualifications.length) {
+    Y = sectionTitle(doc, L, R, Y, 'Educational Qualifications');
+    const w = R - L;
+    Y = drawTable(doc, L, R, Y,
+      ['Examination / Degree', 'Board / University', 'Year', 'Division', '% / CGPA'],
+      employee.educationalQualifications.map(q => [val(q.degree), val(q.boardOrUniversity), val(q.yearOfPassing), val(q.division), val(q.percentage)]),
+      [w * 0.24, w * 0.32, w * 0.12, w * 0.16, w * 0.16]
+    );
+    Y += 4;
+  }
+
   if (hasPage2Content) {
     // Page 1 footer
     const p1FooterY = doc.page.height - doc.page.margins.bottom - 12;

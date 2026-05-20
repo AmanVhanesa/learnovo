@@ -71,6 +71,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         previousDesignation: employee?.previousDesignation || '',
         subjects: employee?.subjects || [],
         certifications: employee?.certifications || [],
+        educationalQualifications: employee?.educationalQualifications || [],
 
         // Service Record
         postings: employee?.postings || [],
@@ -235,6 +236,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
         if (!payload.probationEndDate) delete payload.probationEndDate
         if (payload.subjects?.length === 0) delete payload.subjects
         if (payload.certifications?.length === 0) delete payload.certifications
+        if (payload.educationalQualifications?.length === 0) delete payload.educationalQualifications
         if (payload.salary === '') delete payload.salary
         if (payload.leaveDeductionPerDay === '') delete payload.leaveDeductionPerDay
         onSave(payload, _pendingPhotoFile)
@@ -534,6 +536,29 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         <label className="label">Previous Designation</label>
                                         <input className="input" value={form.previousDesignation} onChange={(e) => updateField('previousDesignation', e.target.value)} />
                                     </div>
+                                </div>
+
+                                {/* Educational Qualifications (repeatable) */}
+                                <div className="border border-gray-200 dark:border-[#38383A] rounded-lg p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Educational Qualifications</h4>
+                                        <button type="button" onClick={() => addRow('educationalQualifications', { degree: '', boardOrUniversity: '', yearOfPassing: '', division: '', percentage: '' })} className="btn btn-ghost px-3 inline-flex items-center gap-1 text-xs">
+                                            <Plus className="h-3 w-3" /> Add
+                                        </button>
+                                    </div>
+                                    {form.educationalQualifications.length === 0 && <p className="text-xs text-gray-500 dark:text-[#8E8E93]">No qualifications recorded.</p>}
+                                    {form.educationalQualifications.map((row, i) => (
+                                        <div key={i} className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-2">
+                                            <input className="input" value={row.degree} onChange={(e) => updateRow('educationalQualifications', i, 'degree', e.target.value)} placeholder="Examination / Degree" />
+                                            <input className="input" value={row.boardOrUniversity} onChange={(e) => updateRow('educationalQualifications', i, 'boardOrUniversity', e.target.value)} placeholder="Board / University" />
+                                            <input className="input" value={row.yearOfPassing} onChange={(e) => updateRow('educationalQualifications', i, 'yearOfPassing', e.target.value)} placeholder="Year of Passing" />
+                                            <input className="input" value={row.division} onChange={(e) => updateRow('educationalQualifications', i, 'division', e.target.value)} placeholder="Division" />
+                                            <div className="flex gap-1">
+                                                <input className="input flex-1" value={row.percentage} onChange={(e) => updateRow('educationalQualifications', i, 'percentage', e.target.value)} placeholder="% / CGPA" />
+                                                <button type="button" onClick={() => removeRow('educationalQualifications', i)} className="text-red-500 hover:text-red-700 p-2"><Trash2 className="h-4 w-4" /></button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
 
                                 {form.role === 'teacher' && (

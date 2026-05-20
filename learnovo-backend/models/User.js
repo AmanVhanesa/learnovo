@@ -206,6 +206,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   }],
+  educationalQualifications: [{
+    degree: { type: String, trim: true },
+    boardOrUniversity: { type: String, trim: true },
+    yearOfPassing: { type: String, trim: true },
+    division: { type: String, trim: true },
+    percentage: { type: String, trim: true }
+  }],
   postings: [{
     fromDate: { type: Date },
     toDate: { type: Date },
