@@ -383,12 +383,12 @@ async function generateServiceBook(employeeId, tenantId) {
 
   if (employee.qualifications) {
     doc.fontSize(7).font('Helvetica').fillColor(C.label).text('DETAILED QUALIFICATIONS', L, Y, { width: R - L, characterSpacing: 0.5 });
-    doc.fontSize(8.5).font('Helvetica').fillColor(C.text).text(employee.qualifications, L, Y + 9, { width: R - L });
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(C.text).text(employee.qualifications, L, Y + 9, { width: R - L });
     Y = doc.y + 4;
   }
   if (Array.isArray(employee.certifications) && employee.certifications.length) {
     doc.fontSize(7).font('Helvetica').fillColor(C.label).text('CERTIFICATIONS', L, Y, { width: R - L, characterSpacing: 0.5 });
-    doc.fontSize(8.5).font('Helvetica').fillColor(C.text).text(employee.certifications.join(' · '), L, Y + 9, { width: R - L });
+    doc.fontSize(9).font('Helvetica-Bold').fillColor(C.text).text(employee.certifications.join(' · '), L, Y + 9, { width: R - L });
     Y = doc.y + 4;
   }
 
