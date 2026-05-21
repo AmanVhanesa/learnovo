@@ -126,6 +126,16 @@ export const studentsService = {
     return res.data
   },
 
+  // Profile photo upload — multipart, returns Cloudinary URL
+  uploadPhoto: async (studentId, file) => {
+    const formData = new FormData()
+    formData.append('photo', file)
+    const res = await api.post(`/students/${studentId}/upload-photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return res.data
+  },
+
   // Document upload (Aadhaar, TC, Birth Certificate, Guardian Aadhaar)
   uploadDocument: async (studentId, file, type, guardianIndex) => {
     const formData = new FormData()

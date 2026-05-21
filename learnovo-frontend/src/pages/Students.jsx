@@ -229,10 +229,20 @@ const Students = () => {
     return { uploaded, failed }
   }
 
+  const uploadPendingPhoto = async (studentId, pendingPhoto) => {
+    if (!studentId || !pendingPhoto) return
+    try {
+      await studentsService.uploadPhoto(studentId, pendingPhoto)
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to upload student photo')
+    }
+  }
+
   const saveMutation = useMutation({
-    mutationFn: async ({ formData, pendingDocs, linkedDocs }) => {
+    mutationFn: async ({ formData, pendingDocs, linkedDocs, pendingPhoto }) => {
       if (editingStudent) {
         await studentsService.update(editingStudent._id, formData)
+        await uploadPendingPhoto(editingStudent._id, pendingPhoto)
         const uploadResult = await uploadPendingDocs(editingStudent._id, pendingDocs)
         const linkResult = await linkSiblingDocs(editingStudent._id, linkedDocs)
         return { isEdit: true, docResult: { uploaded: uploadResult.uploaded + linkResult.uploaded, failed: uploadResult.failed + linkResult.failed } }
@@ -240,6 +250,7 @@ const Students = () => {
         const response = await studentsService.create(formData)
         const created = response?.data || {}
         const newId = created.id || created._id
+        await uploadPendingPhoto(newId, pendingPhoto)
         const uploadResult = await uploadPendingDocs(newId, pendingDocs)
         const linkResult = await linkSiblingDocs(newId, linkedDocs)
         return { isEdit: false, response, docResult: { uploaded: uploadResult.uploaded + linkResult.uploaded, failed: uploadResult.failed + linkResult.failed } }
@@ -296,8 +307,8 @@ const Students = () => {
     },
   })
 
-  const handleSaveStudent = (formData, pendingDocs = [], linkedDocs = []) => {
-    saveMutation.mutate({ formData, pendingDocs, linkedDocs })
+  const handleSaveStudent = (formData, pendingDocs = [], linkedDocs = [], pendingPhoto = null) => {
+    saveMutation.mutate({ formData, pendingDocs, linkedDocs, pendingPhoto })
   }
 
   const reactivateMutation = useMutation({

@@ -435,11 +435,20 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         if (!submitData.middleName) delete submitData.middleName
         if (!submitData.lastName) delete submitData.lastName
 
-        onSave(submitData, pendingDocs, linkedDocs)
+        // Never send a local-only preview URL (blob:) or a legacy base64 (data:) to the backend.
+        // Photos are uploaded separately via /students/:id/upload-photo.
+        if (typeof submitData.photo === 'string' &&
+            (submitData.photo.startsWith('blob:') || submitData.photo.startsWith('data:'))) {
+            delete submitData.photo
+        }
+
+        onSave(submitData, pendingDocs, linkedDocs, pendingPhoto)
     }
 
     const [cropModal, setCropModal] = useState({ isOpen: false, imageSrc: null })
     const [photoError, setPhotoError] = useState(null)
+    const [pendingPhoto, setPendingPhoto] = useState(null) // File queued for upload after new-student create
+    const [photoUploading, setPhotoUploading] = useState(false)
 
     // Documents — existing (saved) plus pending (selected but not yet uploaded)
     // plus linkedDocs (sibling guardian Aadhaars to share, not re-upload).
@@ -578,13 +587,34 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     }
 
     const handleCropComplete = async (blob) => {
-        const dataUrl = await new Promise((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result)
-            reader.onerror = reject
-            reader.readAsDataURL(blob)
-        })
-        updateField('photo', dataUrl)
+        const file = new File([blob], 'student-photo.jpg', { type: blob.type || 'image/jpeg' })
+
+        // Revoke any previous blob URL we made to avoid leaking object URLs
+        if (form.photo && typeof form.photo === 'string' && form.photo.startsWith('blob:')) {
+            try { URL.revokeObjectURL(form.photo) } catch (_) { /* ignore */ }
+        }
+
+        if (student?._id) {
+            // Existing student — upload to Cloudinary right away, store the returned URL
+            setPhotoUploading(true)
+            setPhotoError(null)
+            try {
+                const res = await studentsService.uploadPhoto(student._id, file)
+                const url = res?.data?.url
+                if (!url) throw new Error('Upload succeeded but no URL was returned')
+                updateField('photo', url)
+            } catch (err) {
+                setPhotoError(err?.response?.data?.message || err.message || 'Failed to upload photo')
+            } finally {
+                setPhotoUploading(false)
+            }
+            return
+        }
+
+        // New student — queue the file; parent will upload after the student is created.
+        // Use a local blob: URL for preview only; handleSubmit strips this before sending.
+        setPendingPhoto(file)
+        updateField('photo', URL.createObjectURL(blob))
     }
 
     const closeCropModal = () => setCropModal({ isOpen: false, imageSrc: null })
@@ -661,13 +691,18 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                     <div className="relative flex-shrink-0">
                                         {form.photo ? (
                                             <img
-                                                src={form.photo.startsWith('data:') || form.photo.startsWith('http') ? form.photo : `${SERVER_URL}${form.photo}`}
+                                                src={form.photo.startsWith('blob:') || form.photo.startsWith('data:') || form.photo.startsWith('http') ? form.photo : `${SERVER_URL}${form.photo}`}
                                                 alt="Student"
                                                 className="h-24 w-24 rounded-full object-cover border-2 border-gray-200 dark:border-[#38383A]"
                                             />
                                         ) : (
                                             <div className="h-24 w-24 rounded-full bg-gray-200 dark:bg-[#2C2C2E] flex items-center justify-center">
                                                 <User className="h-12 w-12 text-gray-400 dark:text-[#636366]" />
+                                            </div>
+                                        )}
+                                        {photoUploading && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
+                                                <Loader2 className="h-6 w-6 text-white animate-spin" />
                                             </div>
                                         )}
                                     </div>

@@ -391,7 +391,10 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       ? { [requestedSortBy]: sortDir, _id: 1 }
       : { name: 1, admissionNumber: 1 };
 
-    // Run count and find in parallel for speed
+    // Run count and find in parallel for speed.
+    // allowDiskUse: true — large tenants (e.g. SPIS) exceed Mongo's 32MB in-memory sort cap
+    // when sorting by admissionNumber with the en/numericOrdering collation, because no
+    // index covers that collation. Letting Mongo spill to disk avoids a 500.
     const [students, total] = await Promise.all([
       User.find(filter)
         .select(selectFields)
@@ -404,10 +407,11 @@ router.get('/', protect, authorize('admin', 'teacher'), [
         .collation({ locale: 'en', numericOrdering: true })
         .skip(skip)
         .limit(limit)
+        .allowDiskUse(true)
         .lean()
         .catch(async() => {
           // Populate failed — retry without
-          return User.find(filter).select(selectFields).sort(defaultSort).skip(skip).limit(limit).lean();
+          return User.find(filter).select(selectFields).sort(defaultSort).skip(skip).limit(limit).allowDiskUse(true).lean();
         }),
       User.countDocuments(filter)
     ]);
@@ -2341,6 +2345,13 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       return res.status(400).json({ success: false, message: 'User tenant not found.' });
     }
 
+    // Reject inline photo payloads — photos must be uploaded via /students/:id/upload-photo.
+    // Storing base64/blob photos in the document bloats the user collection and slows list queries.
+    if (typeof req.body.photo === 'string' &&
+        (req.body.photo.startsWith('data:') || req.body.photo.startsWith('blob:'))) {
+      delete req.body.photo;
+    }
+
     const {
       fullName, name, firstName, middleName, lastName, email, phone: _phone, password,
       classId, class: studentClass, section, academicYear, rollNumber, admissionDate, admissionClass,
@@ -2638,6 +2649,12 @@ router.put('/:id', protect, canAccessStudent, [
   handleValidationErrors
 ], async(req, res) => {
   try {
+    // Reject inline photo payloads — photos must be uploaded via /students/:id/upload-photo.
+    if (typeof req.body.photo === 'string' &&
+        (req.body.photo.startsWith('data:') || req.body.photo.startsWith('blob:'))) {
+      delete req.body.photo;
+    }
+
     const student = await User.findOne({
       _id: req.params.id,
       tenantId: req.user.tenantId,
@@ -4229,6 +4246,54 @@ router.delete('/:id/documents/:docId', protect, authorize('admin'), async(req, r
   } catch (error) {
     logger.error('DELETE /students/:id/documents/:docId error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });
     res.status(500).json({ success: false, message: 'Failed to delete document', requestId: req.requestId });
+  }
+});
+
+// @desc    Upload student profile photo to Cloudinary
+// @route   POST /api/students/:id/upload-photo
+// @access  Private (Admin)
+router.post('/:id/upload-photo', protect, authorize('admin'), upload.single('photo'), async(req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No photo uploaded', requestId: req.requestId });
+    }
+
+    const student = await User.findOne({
+      _id: req.params.id,
+      tenantId: req.user.tenantId,
+      role: 'student'
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found', requestId: req.requestId });
+    }
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ success: false, message: 'File upload service not configured', requestId: req.requestId });
+    }
+
+    const cloudinaryService = require('../services/cloudinaryService');
+    const result = await cloudinaryService.uploadStudentPhoto(
+      req.file,
+      req.user.tenantId.toString(),
+      student._id.toString()
+    );
+
+    const updated = await User.findByIdAndUpdate(
+      req.params.id,
+      { photo: result.secure_url },
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Student photo uploaded successfully',
+      data: { url: result.secure_url, student: updated },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    logger.error('POST /students/:id/upload-photo error', error, { requestId: req.requestId, tenantId: req.user?.tenantId });
+    res.status(500).json({ success: false, message: error.message || 'Failed to upload student photo', requestId: req.requestId });
   }
 });
 
