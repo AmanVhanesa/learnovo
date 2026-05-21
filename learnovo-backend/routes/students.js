@@ -2350,11 +2350,14 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       return res.status(400).json({ success: false, message: 'User tenant not found.' });
     }
 
-    // Reject inline photo payloads — photos must be uploaded via /students/:id/upload-photo.
+    // Reject inline photo/avatar payloads — photos must be uploaded via /students/:id/upload-photo.
     // Storing base64/blob photos in the document bloats the user collection and slows list queries.
-    if (typeof req.body.photo === 'string' &&
-        (req.body.photo.startsWith('data:') || req.body.photo.startsWith('blob:'))) {
-      delete req.body.photo;
+    // (User model has both photo and avatar — strip both to match the employees/drivers fix in d8dcd2e.)
+    for (const field of ['photo', 'avatar']) {
+      if (typeof req.body[field] === 'string' &&
+          (req.body[field].startsWith('data:') || req.body[field].startsWith('blob:'))) {
+        delete req.body[field];
+      }
     }
 
     const {
@@ -2654,10 +2657,13 @@ router.put('/:id', protect, canAccessStudent, [
   handleValidationErrors
 ], async(req, res) => {
   try {
-    // Reject inline photo payloads — photos must be uploaded via /students/:id/upload-photo.
-    if (typeof req.body.photo === 'string' &&
-        (req.body.photo.startsWith('data:') || req.body.photo.startsWith('blob:'))) {
-      delete req.body.photo;
+    // Reject inline photo/avatar payloads — photos must be uploaded via /students/:id/upload-photo.
+    // (User model has both photo and avatar — strip both to match the employees/drivers fix in d8dcd2e.)
+    for (const field of ['photo', 'avatar']) {
+      if (typeof req.body[field] === 'string' &&
+          (req.body[field].startsWith('data:') || req.body[field].startsWith('blob:'))) {
+        delete req.body[field];
+      }
     }
 
     const student = await User.findOne({
