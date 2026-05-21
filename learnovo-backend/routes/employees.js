@@ -180,6 +180,15 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
   handleValidationErrors
 ], async(req, res) => {
   try {
+    // Reject inline photo/avatar payloads — must come via /:id/upload-photo.
+    // Inline base64 bloats user docs and blows the sort stage on list queries.
+    for (const field of ['photo', 'avatar']) {
+      if (typeof req.body[field] === 'string' &&
+          (req.body[field].startsWith('data:') || req.body[field].startsWith('blob:'))) {
+        delete req.body[field];
+      }
+    }
+
     const {
       name, phone, email, role, salary, leaveDeductionPerDay, dateOfJoining, designation, department,
       fatherOrHusbandName, gender, dateOfBirth, religion, bloodGroup, nationalId,
@@ -428,6 +437,14 @@ router.put('/:id', protect, authorize('admin'), [
   handleValidationErrors
 ], async(req, res) => {
   try {
+    // Reject inline photo/avatar payloads — must come via /:id/upload-photo.
+    for (const field of ['photo', 'avatar']) {
+      if (typeof req.body[field] === 'string' &&
+          (req.body[field].startsWith('data:') || req.body[field].startsWith('blob:'))) {
+        delete req.body[field];
+      }
+    }
+
     const employee = await User.findOne({
       _id: req.params.id,
       tenantId: req.user.tenantId,

@@ -381,6 +381,12 @@ router.post('/', protect, authorize('admin'), [
   handleValidationErrors
 ], async(req, res) => {
   try {
+    // Reject inline photo payloads — must come via /:id/upload-photo.
+    if (typeof req.body.photo === 'string' &&
+        (req.body.photo.startsWith('data:') || req.body.photo.startsWith('blob:'))) {
+      delete req.body.photo;
+    }
+
     const {
       name, phone, email, licenseNumber, licenseExpiry, licenseType,
       dateOfBirth, gender, bloodGroup, address, dateOfJoining, salary,
@@ -489,6 +495,12 @@ router.put('/:id', protect, authorize('admin'), [
   handleValidationErrors
 ], async(req, res) => {
   try {
+    // Reject inline photo payloads — must come via /:id/upload-photo.
+    if (typeof req.body.photo === 'string' &&
+        (req.body.photo.startsWith('data:') || req.body.photo.startsWith('blob:'))) {
+      delete req.body.photo;
+    }
+
     const driver = await Driver.findOne({
       _id: req.params.id,
       tenantId: req.user.tenantId
