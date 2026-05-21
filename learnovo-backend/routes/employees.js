@@ -197,24 +197,64 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
 
     const tenantId = req.user.tenantId;
 
-    // Check phone uniqueness
-    if (await User.findOne({ phone: phone.trim(), tenantId })) {
-      return res.status(400).json({
+    const describeConflict = (u, field) => {
+      const label = u.name || u.fullName || '(no name)';
+      const idLabel = u.employeeId || u.admissionNumber || u._id;
+      const statusLabel = u.isActive ? 'active' : 'inactive';
+      return `${field} already used by ${u.role} "${label}" (${idLabel}, ${statusLabel})`;
+    };
+
+    // Check phone uniqueness (across all roles + active/inactive in this tenant)
+    const phoneConflict = await User.findOne({ phone: phone.trim(), tenantId })
+      .select('name fullName role employeeId admissionNumber isActive');
+    if (phoneConflict) {
+      return res.status(409).json({
         success: false,
-        message: 'Employee with this phone number already exists'
+        message: describeConflict(phoneConflict, 'Phone'),
+        conflict: {
+          field: 'phone',
+          existingUserId: phoneConflict._id,
+          existingRole: phoneConflict.role,
+          existingIsActive: phoneConflict.isActive
+        }
       });
     }
 
     // Check email uniqueness if provided
-    if (email && await User.findOne({ email: email.toLowerCase().trim(), tenantId })) {
-      return res.status(400).json({
-        success: false,
-        message: 'Employee with this email already exists'
-      });
+    if (email) {
+      const emailConflict = await User.findOne({ email: email.toLowerCase().trim(), tenantId })
+        .select('name fullName role employeeId admissionNumber isActive');
+      if (emailConflict) {
+        return res.status(409).json({
+          success: false,
+          message: describeConflict(emailConflict, 'Email'),
+          conflict: {
+            field: 'email',
+            existingUserId: emailConflict._id,
+            existingRole: emailConflict.role,
+            existingIsActive: emailConflict.isActive
+          }
+        });
+      }
     }
 
-    // Generate Employee ID
+    // Generate Employee ID. Self-heal the counter for tenants that imported
+    // employees via CSV (which writes employeeIds directly, bypassing the
+    // Counter). Without this, the next UI-driven create collides on the
+    // employeeId unique index.
     const currentYear = new Date().getFullYear().toString();
+    const empIdRe = new RegExp(`^EMP${currentYear}(\\d+)$`);
+    const highest = await User.find(
+      { tenantId, employeeId: empIdRe },
+      { employeeId: 1 }
+    ).sort({ employeeId: -1 }).limit(1).lean();
+    if (highest.length) {
+      const maxSeq = parseInt(highest[0].employeeId.match(empIdRe)[1], 10);
+      await Counter.findOneAndUpdate(
+        { name: 'employee', year: currentYear, tenantId, sequence: { $lt: maxSeq } },
+        { $set: { sequence: maxSeq } }
+      );
+    }
     const sequence = await Counter.getNextSequence('employee', currentYear, tenantId);
     const employeeId = `EMP${currentYear}${String(sequence).padStart(4, '0')}`;
 
@@ -360,9 +400,14 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
 
     console.error('Create employee error:', error);
     if (error.code === 11000) {
+      // Name the actual colliding field instead of the misleading "Phone or Email"
+      const dupField = Object.keys(error.keyPattern || error.keyValue || {})
+        .find(k => k !== 'tenantId') || 'unknown field';
+      const dupValue = error.keyValue ? error.keyValue[dupField] : '';
       return res.status(409).json({
         success: false,
-        message: 'Duplicate entry detected (Phone or Email)'
+        message: `Duplicate ${dupField}${dupValue ? ` "${dupValue}"` : ''} — a user with this ${dupField} already exists in this school.`,
+        conflict: { field: dupField, value: dupValue }
       });
     }
     res.status(500).json({
