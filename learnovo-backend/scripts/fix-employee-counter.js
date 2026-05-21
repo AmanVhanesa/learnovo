@@ -20,7 +20,7 @@ function parseArgs(argv) {
   return out;
 }
 
-(async () => {
+(async() => {
   const args = parseArgs(process.argv);
   const schoolCode = (args.schoolCode || 'spis').toLowerCase();
   const year = args.year || String(new Date().getFullYear());
@@ -61,4 +61,6 @@ function parseArgs(argv) {
   console.log(`Next generated employeeId will be: EMP${year}${String(result.sequence + 1).padStart(4, '0')}`);
 
   await mongoose.disconnect();
-})().catch(e => { console.error(e); process.exit(1); });
+})().catch(e => {
+  console.error(e); process.exit(1);
+});
