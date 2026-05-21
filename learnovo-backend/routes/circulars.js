@@ -3,6 +3,9 @@ const { body, query, param } = require('express-validator');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const circularService = require('../services/circularService');
+const circularPdfService = require('../services/circularPdfService');
+const Settings = require('../models/Settings');
+const Tenant = require('../models/Tenant');
 
 const router = express.Router();
 
@@ -27,6 +30,35 @@ router.get('/', protect, [
   } catch (error) {
     console.error('Get circulars error:', error);
     res.status(500).json({ success: false, message: 'Server error while fetching circulars' });
+  }
+});
+
+// Download circular as PDF (server-rendered via Puppeteer for crisp vector output)
+router.get('/:id/pdf', protect, [
+  param('id').isMongoId(),
+  handleValidationErrors
+], async(req, res) => {
+  try {
+    const circular = await circularService.getCircular(req.params.id, req.user.tenantId);
+    const [settings, tenant] = await Promise.all([
+      Settings.findOne({ tenantId: req.user.tenantId }).lean(),
+      Tenant.findById(req.user.tenantId).select('schoolName').lean()
+    ]);
+
+    const school = circularPdfService.buildSchoolFromSettings(settings, tenant && tenant.schoolName);
+    const pdfBuffer = await circularPdfService.generateCircularPdf(circular.toObject ? circular.toObject() : circular, school);
+
+    const safeNum = (circular.circularNumber || 'circular').replace(/[^a-z0-9]+/gi, '_');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${safeNum}.pdf`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
+  } catch (error) {
+    if (error.message === 'Circular not found') {
+      return res.status(404).json({ success: false, message: error.message });
+    }
+    console.error('Generate circular PDF error:', error);
+    res.status(500).json({ success: false, message: 'Server error while generating circular PDF' });
   }
 });
 

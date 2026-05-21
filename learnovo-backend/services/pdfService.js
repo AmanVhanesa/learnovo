@@ -1104,6 +1104,6 @@ const pdfService = {
 };
 
 // Expose browser helpers for other services (e.g. receiptPdfService) to share the Puppeteer instance
-pdfService._internal = { getBrowser, releaseBrowser };
+pdfService._internal = { getBrowser, releaseBrowser, fetchImageAsDataUri };
 
 module.exports = pdfService;

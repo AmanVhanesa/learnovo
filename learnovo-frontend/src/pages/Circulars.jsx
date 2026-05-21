@@ -7,8 +7,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import circularsService from '../services/circularsService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -205,72 +203,6 @@ ${action}
 ${autoPrint}
 </body>
 </html>`;
-};
-
-const waitForIframeAssets = (iframe) => new Promise((resolve) => {
-    const doc = iframe.contentDocument;
-    if (!doc) return resolve();
-
-    const imgs = Array.from(doc.images || []);
-    const imgPromises = imgs.map((img) => {
-        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-        return new Promise((res) => {
-            img.addEventListener('load', res, { once: true });
-            img.addEventListener('error', res, { once: true });
-        });
-    });
-
-    const fontsReady = doc.fonts && doc.fonts.ready ? doc.fonts.ready : Promise.resolve();
-
-    Promise.all([fontsReady, ...imgPromises]).then(() => resolve());
-});
-
-const downloadCircularAsPdf = async (html, filename) => {
-    const iframe = document.createElement('iframe');
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.style.position = 'fixed';
-    iframe.style.left = '-10000px';
-    iframe.style.top = '0';
-    iframe.style.width = '210mm';
-    iframe.style.height = '297mm';
-    iframe.style.border = '0';
-    iframe.style.opacity = '0';
-    iframe.style.pointerEvents = 'none';
-    document.body.appendChild(iframe);
-
-    try {
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        doc.open();
-        doc.write(html);
-        doc.close();
-
-        await waitForIframeAssets(iframe);
-        await new Promise((r) => setTimeout(r, 250));
-
-        const pageEl = doc.querySelector('.page');
-        if (!pageEl) throw new Error('Circular layout not found');
-
-        const canvas = await html2canvas(pageEl, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#f9fafb',
-            logging: false,
-            width: pageEl.scrollWidth,
-            height: pageEl.scrollHeight,
-            windowWidth: pageEl.scrollWidth,
-            windowHeight: pageEl.scrollHeight,
-        });
-
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const imgData = canvas.toDataURL('image/png', 1.0);
-        pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
-        pdf.save(filename);
-    } finally {
-        document.body.removeChild(iframe);
-    }
 };
 
 const Circulars = () => {
@@ -473,11 +405,18 @@ const Circulars = () => {
     };
 
     const handleDownload = async (circular) => {
-        const html = buildCircularHTML(circular, school, 'download');
         const safeNum = (circular.circularNumber || 'circular').replace(/[^a-z0-9]/gi, '_');
         const toastId = toast.loading('Preparing PDF...');
         try {
-            await downloadCircularAsPdf(html, `${safeNum}.pdf`);
+            const blob = await circularsService.downloadCircularPdf(circular._id);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${safeNum}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
             toast.success('Circular downloaded', { id: toastId });
         } catch (err) {
             console.error('Circular PDF download failed', err);

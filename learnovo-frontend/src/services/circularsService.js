@@ -20,6 +20,10 @@ const circularsService = {
     deleteCircular: async (id) => {
         const response = await api.delete(`/circulars/${id}`);
         return response.data;
+    },
+    downloadCircularPdf: async (id) => {
+        const response = await api.get(`/circulars/${id}/pdf`, { responseType: 'blob' });
+        return response.data;
     }
 };
 
