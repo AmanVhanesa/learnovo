@@ -10,7 +10,7 @@ async function toBase64DataUri(url) {
   try {
     const response = await axios.get(fullUrl, {
       responseType: 'arraybuffer',
-      timeout: 12000,
+      timeout: 8000,
       maxRedirects: 5,
       headers: { 'User-Agent': 'Mozilla/5.0 LearnovoPDF/1.0' }
     });
@@ -100,13 +100,13 @@ async function buildDocumentPagesHtml(student) {
 
   const studentLine = `Student: ${esc(buildStudentName(student))}${student.admissionNumber ? ` &middot; Adm# ${esc(student.admissionNumber)}` : ''}`;
 
-  const pages = [];
-
-  for (const doc of otherDocs) {
+  // Fetch every document body in parallel so a 4-doc student doesn't serialize
+  // 4×8s image-fetch waits and trip the 60s request timeout.
+  const otherPagesPromise = Promise.all(otherDocs.map(async(doc) => {
     const title = DOC_TYPE_TITLES[doc.type] || 'Document';
     const body = await renderDocBodyFull(doc);
     const uploadedOn = doc.uploadedAt ? fmtDate(doc.uploadedAt) : '';
-    pages.push(`
+    return `
       <div class="doc-page">
         <div class="doc-header">
           <div class="doc-title">${esc(title)}</div>
@@ -114,12 +114,15 @@ async function buildDocumentPagesHtml(student) {
         </div>
         <div class="doc-body">${body}</div>
         <div class="doc-footer">${studentLine}</div>
-      </div>`);
-  }
+      </div>`;
+  }));
 
   // Group guardian Aadhaar cards two-per-page so father + mother fit on a single page.
+  const guardianPairs = [];
   for (let i = 0; i < guardianDocs.length; i += 2) {
-    const pair = guardianDocs.slice(i, i + 2);
+    guardianPairs.push(guardianDocs.slice(i, i + 2));
+  }
+  const guardianPagesPromise = Promise.all(guardianPairs.map(async(pair) => {
     const items = await Promise.all(pair.map(async(doc) => {
       const label = getGuardianLabel(doc, student);
       const body = await renderDocBodyHalf(doc);
@@ -129,18 +132,18 @@ async function buildDocumentPagesHtml(student) {
           <div class="doc-multi-img-wrap">${body}</div>
         </div>`;
     }));
-
-    pages.push(`
+    return `
       <div class="doc-page">
         <div class="doc-header">
           <div class="doc-title">Guardian Aadhaar Card${pair.length > 1 ? 's' : ''}</div>
         </div>
         <div class="doc-body doc-multi-body">${items.join('')}</div>
         <div class="doc-footer">${studentLine}</div>
-      </div>`);
-  }
+      </div>`;
+  }));
 
-  return pages.join('\n');
+  const [otherPages, guardianPages] = await Promise.all([otherPagesPromise, guardianPagesPromise]);
+  return [...otherPages, ...guardianPages].join('\n');
 }
 
 const esc = (v) => {
@@ -581,12 +584,14 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
 }
 
 async function generateStudentDetailFormPdf(student, schoolData) {
-  const logoDataUri = await toBase64DataUri(schoolData.logo);
   const photoUrl = student.photo || student.avatar;
-  const photoDataUri = await toBase64DataUri(photoUrl);
   const photoFallbackUrl = photoUrl && (photoUrl.startsWith('data:') || photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
+  const [logoDataUri, photoDataUri, docPagesHtml] = await Promise.all([
+    toBase64DataUri(schoolData.logo),
+    toBase64DataUri(photoUrl),
+    buildDocumentPagesHtml(student)
+  ]);
   let html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
-  const docPagesHtml = await buildDocumentPagesHtml(student);
   if (docPagesHtml) {
     html = html.replace('</body>', `${docPagesHtml}\n</body>`);
   }
@@ -611,12 +616,14 @@ async function generateStudentDetailFormPdf(student, schoolData) {
 }
 
 async function generateStudentDetailFormHtml(student, schoolData) {
-  const logoDataUri = await toBase64DataUri(schoolData.logo);
   const photoUrl = student.photo || student.avatar;
-  const photoDataUri = await toBase64DataUri(photoUrl);
   const photoFallbackUrl = photoUrl && (photoUrl.startsWith('data:') || photoUrl.startsWith('http') ? photoUrl : `https://api.learnovoportal.com${photoUrl}`);
+  const [logoDataUri, photoDataUri, docPagesHtml] = await Promise.all([
+    toBase64DataUri(schoolData.logo),
+    toBase64DataUri(photoUrl),
+    buildDocumentPagesHtml(student)
+  ]);
   let html = buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallbackUrl);
-  const docPagesHtml = await buildDocumentPagesHtml(student);
   if (docPagesHtml) {
     html = html.replace('</body>', `${docPagesHtml}\n</body>`);
   }

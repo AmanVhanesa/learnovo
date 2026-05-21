@@ -257,7 +257,10 @@ app.use((req, res, next) => {
     '/api/exams', '/api/payroll'
   ];
   const isLongRunning = longRunningPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p));
-  const isMedium = !isLongRunning && mediumPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p));
+  const isMedium = !isLongRunning && (
+    mediumPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p))
+    || req.path.includes('/detail-form')
+  );
   const timeout = isLongRunning ? 180000 : isMedium ? 60000 : 30000;
 
   req.setTimeout(timeout, () => {
