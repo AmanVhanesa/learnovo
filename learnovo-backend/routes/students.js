@@ -387,9 +387,13 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     const allowedSortFields = ['admissionNumber', 'name', 'rollNumber', 'createdAt'];
     const requestedSortBy = allowedSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
     const sortDir = req.query.sortOrder === 'desc' ? -1 : 1;
+    // Default sort uses { admissionNumber, _id } so the existing
+    // { tenantId, admissionNumber } compound index can back it. Sorting by `name`
+    // has no covering index and forces an in-memory sort that blows Mongo's 32MB
+    // multiplanner cap on large tenants (allowDiskUse does not relax that cap).
     const defaultSort = requestedSortBy
       ? { [requestedSortBy]: sortDir, _id: 1 }
-      : { name: 1, admissionNumber: 1 };
+      : { admissionNumber: 1, _id: 1 };
 
     // Run count and find in parallel for speed.
     // No collation: en/numericOrdering forces an in-memory sort because no index
