@@ -599,8 +599,66 @@ const StudentDetail = () => {
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.category || 'N/A'}</p>
                                 </div>
                                 <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Mother Tongue</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.motherTongue || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Nationality</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.nationality || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Aadhaar Number</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.aadhaarNumber || 'N/A'}</p>
+                                </div>
+                                <div>
                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Identification Mark</p>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.identificationMark || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Orphan</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.isOrphan ? 'Yes' : 'No'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Identifiers */}
+                        <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Identifiers</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">PEN Number</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.penNumber || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">UDISE Code</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.udiseCode || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Student ID</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.studentId || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Department & Transport */}
+                        <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Department & Transport</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Sub Department</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.subDepartment?.name || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Transport Mode</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1 capitalize">{student.transportMode || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Driver</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                                        {student.driverId?.name
+                                            ? `${student.driverId.name}${student.driverId.phone ? ` • ${student.driverId.phone}` : ''}`
+                                            : 'N/A'}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -646,48 +704,62 @@ const StudentDetail = () => {
                         </div>
 
                         {/* Address */}
-                        {student.address && (
-                            <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Address</h3>
-                                <p className="text-sm text-gray-700 dark:text-[#8E8E93]">{student.address}</p>
-                            </div>
-                        )}
+                        <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Address</h3>
+                            <p className="text-sm text-gray-700 dark:text-[#8E8E93]">{student.address || 'N/A'}</p>
+                        </div>
 
                         {/* Academic Background */}
-                        {(student.previousSchool || student.previousBoard) && (
-                            <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Academic Background</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Previous School</p>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.previousSchool || 'N/A'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Previous Board</p>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.previousBoard || 'N/A'}</p>
-                                    </div>
+                        <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Academic Background</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Previous School</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.previousSchool || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Previous Board</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.previousBoard || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Previous Roll Number</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.previousRollNumber || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Transfer Notes</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.transferNotes || 'N/A'}</p>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
                         {/* Medical Information */}
-                        {(student.medicalConditions || student.allergies) && (
-                            <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Medical Information</h3>
-                                <div className="space-y-3">
-                                    {student.medicalConditions && (
-                                        <div>
-                                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Medical Conditions</p>
-                                            <p className="text-sm text-gray-700 dark:text-[#8E8E93] mt-1">{student.medicalConditions}</p>
-                                        </div>
-                                    )}
-                                    {student.allergies && (
-                                        <div>
-                                            <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Allergies</p>
-                                            <p className="text-sm text-gray-700 dark:text-[#8E8E93] mt-1">{student.allergies}</p>
-                                        </div>
-                                    )}
+                        <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Medical Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Medical Conditions</p>
+                                    <p className="text-sm text-gray-700 dark:text-white mt-1">{student.medicalConditions || 'N/A'}</p>
                                 </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Allergies</p>
+                                    <p className="text-sm text-gray-700 dark:text-white mt-1">{student.allergies || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Doctor Name</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.doctorName || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Doctor Phone</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.doctorPhone || 'N/A'}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Notes */}
+                        {student.notes && (
+                            <div className="border-t border-gray-100 dark:border-[#38383A] pt-6">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Notes</h3>
+                                <p className="text-sm text-gray-700 dark:text-[#8E8E93] whitespace-pre-wrap">{student.notes}</p>
                             </div>
                         )}
                     </div>
