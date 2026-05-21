@@ -506,7 +506,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
       ${row('Email', student.email)}
       ${row('Phone', student.phone)}
     </div>
-    <div class="row full-row" style="margin-top:6px"><span class="lbl">Address</span><span class="val">${esc(student.address)}</span></div>
+    <div class="row full-row" style="margin-top:6px"><span class="lbl">Address</span><span class="val" style="font-weight:600">${esc(student.address)}</span></div>
   `)}
 
   ${section('Guardian / Family Information', buildGuardiansHtml(student.guardians))}
