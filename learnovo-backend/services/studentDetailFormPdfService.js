@@ -596,7 +596,7 @@ async function generateStudentDetailFormPdf(student, schoolData) {
 
   try {
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
-    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 });
+    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.evaluateHandle('document.fonts.ready');
     const pdfUint8 = await page.pdf({
       format: 'A4',
