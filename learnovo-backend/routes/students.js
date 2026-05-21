@@ -392,9 +392,11 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       : { name: 1, admissionNumber: 1 };
 
     // Run count and find in parallel for speed.
-    // allowDiskUse: true — large tenants (e.g. SPIS) exceed Mongo's 32MB in-memory sort cap
-    // when sorting by admissionNumber with the en/numericOrdering collation, because no
-    // index covers that collation. Letting Mongo spill to disk avoids a 500.
+    // No collation: en/numericOrdering forces an in-memory sort because no index
+    // covers it, and Mongo's multiplanner aborts during plan selection on large
+    // tenants (SPIS) with a 32MB cap that allowDiskUse does not relax. Binary
+    // sort on zero-padded admission numbers (e.g. SPIS20250001) produces the
+    // same order and uses the existing { tenantId, admissionNumber } index.
     const [students, total] = await Promise.all([
       User.find(filter)
         .select(selectFields)
@@ -404,7 +406,6 @@ router.get('/', protect, authorize('admin', 'teacher'), [
           { path: 'driverId', select: 'name phone', strictPopulate: false }
         ])
         .sort(defaultSort)
-        .collation({ locale: 'en', numericOrdering: true })
         .skip(skip)
         .limit(limit)
         .allowDiskUse(true)
