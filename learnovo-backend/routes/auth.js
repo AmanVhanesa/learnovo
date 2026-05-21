@@ -821,10 +821,11 @@ router.post('/upload-photo', protect, upload.single('photo'), async(req, res) =>
       }
     });
 
-    // Save the Cloudinary URL into the user's avatar field
+    // Save the Cloudinary URL into both avatar and photo fields so the photo
+    // is visible everywhere (Profile page reads `avatar`, admin Employees list reads `photo`)
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
-      { avatar: result.secure_url },
+      { avatar: result.secure_url, photo: result.secure_url },
       { new: true }
     );
 
@@ -833,7 +834,7 @@ router.post('/upload-photo', protect, upload.single('photo'), async(req, res) =>
       success: true,
       message: 'Profile photo updated successfully',
       avatar: result.secure_url,
-      photo: result.secure_url,  // alias for frontend compatibility
+      photo: result.secure_url,
       user: {
         id: updatedUser._id,
         name: updatedUser.name,
@@ -841,7 +842,7 @@ router.post('/upload-photo', protect, upload.single('photo'), async(req, res) =>
         email: updatedUser.email,
         role: updatedUser.role,
         avatar: updatedUser.avatar,
-        photo: updatedUser.avatar
+        photo: updatedUser.photo
       }
     });
   } catch (error) {
