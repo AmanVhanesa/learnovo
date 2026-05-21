@@ -35,7 +35,7 @@ function extFor(mime) {
   return 'bin';
 }
 
-(async () => {
+(async() => {
   const start = Date.now();
   const uri = process.env.MONGODB_URI || process.env.MONGO_URI;
   if (!uri) {
@@ -120,6 +120,8 @@ function extFor(mime) {
   process.exit(failed > 0 ? 1 : 0);
 })().catch(async(err) => {
   console.error('Migration error:', err);
-  try { await mongoose.disconnect(); } catch (_) { /* ignore */ }
+  try {
+    await mongoose.disconnect();
+  } catch (_) { /* ignore */ }
   process.exit(1);
 });
