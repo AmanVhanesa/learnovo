@@ -226,8 +226,6 @@ const Circulars = () => {
         priority: 'medium',
         targetAudience: ['all'],
         issueDate: new Date().toISOString().split('T')[0],
-        signedByName: '',
-        signedByDesignation: 'Principal',
         referenceNumber: ''
     });
 
@@ -291,7 +289,7 @@ const Circulars = () => {
             setFormData({
                 title: '', subject: '', body: '', category: 'general', priority: 'medium',
                 targetAudience: ['all'], issueDate: new Date().toISOString().split('T')[0],
-                signedByName: '', signedByDesignation: 'Principal', referenceNumber: ''
+                referenceNumber: ''
             });
             queryClient.invalidateQueries({ queryKey: ['circulars'] });
         },
@@ -312,7 +310,7 @@ const Circulars = () => {
             setFormData({
                 title: '', subject: '', body: '', category: 'general', priority: 'medium',
                 targetAudience: ['all'], issueDate: new Date().toISOString().split('T')[0],
-                signedByName: '', signedByDesignation: 'Principal', referenceNumber: ''
+                referenceNumber: ''
             });
             queryClient.invalidateQueries({ queryKey: ['circulars'] });
         },
@@ -368,8 +366,6 @@ const Circulars = () => {
             issueDate: c.issueDate
                 ? new Date(c.issueDate).toISOString().split('T')[0]
                 : (c.createdAt ? new Date(c.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
-            signedByName: c.signedByName || '',
-            signedByDesignation: c.signedByDesignation || 'Principal',
             referenceNumber: c.referenceNumber || ''
         });
         setShowCreateModal(true);
@@ -381,7 +377,7 @@ const Circulars = () => {
         setFormData({
             title: '', subject: '', body: '', category: 'general', priority: 'medium',
             targetAudience: ['all'], issueDate: new Date().toISOString().split('T')[0],
-            signedByName: '', signedByDesignation: 'Principal', referenceNumber: ''
+            referenceNumber: ''
         });
     };
 
@@ -760,29 +756,6 @@ const Circulars = () => {
                                         onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
                                         className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#2C2C2E] dark:text-white"
                                         placeholder="External ref. (if any)"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Signed By (Name)</label>
-                                    <input
-                                        type="text"
-                                        value={formData.signedByName}
-                                        onChange={(e) => setFormData({ ...formData, signedByName: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#2C2C2E] dark:text-white"
-                                        placeholder="Principal's name"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">Designation</label>
-                                    <input
-                                        type="text"
-                                        value={formData.signedByDesignation}
-                                        onChange={(e) => setFormData({ ...formData, signedByDesignation: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 dark:border-[#38383A] rounded-xl focus:ring-2 focus:ring-primary-500 outline-none dark:bg-[#2C2C2E] dark:text-white"
-                                        placeholder="e.g., Principal"
                                     />
                                 </div>
                             </div>
