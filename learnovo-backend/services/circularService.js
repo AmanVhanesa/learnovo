@@ -14,7 +14,7 @@ async function generateCircularNumber(tenantId) {
     tenantId,
     circularNumber: { $regex: `^${prefix}` }
   })
-    .sort({ createdAt: -1 })
+    .sort({ circularNumber: -1 })
     .select('circularNumber')
     .lean();
 
@@ -154,7 +154,7 @@ async function getCirculars(tenantId, options = {}) {
     Circular.find(query)
       .populate('createdBy', 'name role')
       .populate('targetClasses', 'name grade')
-      .sort({ createdAt: -1 })
+      .sort({ circularNumber: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
