@@ -551,6 +551,13 @@ userSchema.index({ tenantId: 1, driverId: 1 }, { sparse: true });
 // Employee query optimization indexes
 userSchema.index({ tenantId: 1, employeeId: 1 }, { sparse: true });
 userSchema.index({ tenantId: 1, isActive: 1 });
+// Backs the Students page "Recent Admission" toggle. Admission numbers are
+// stored as strings, so sorting them descending gives lexicographic order
+// ("812" > "6424") — confusing for users on tenants with unpadded numbers
+// like SPIS. The students route remaps sortBy=admissionNumber to createdAt
+// so newest admissions actually appear first; this index keeps that sort
+// O(log n) and avoids the in-memory sort path that crashed SPIS on 2026-05-21.
+userSchema.index({ tenantId: 1, role: 1, createdAt: -1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

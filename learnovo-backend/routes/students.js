@@ -387,12 +387,18 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     const allowedSortFields = ['admissionNumber', 'name', 'rollNumber', 'createdAt'];
     const requestedSortBy = allowedSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
     const sortDir = req.query.sortOrder === 'desc' ? -1 : 1;
+    // admissionNumber is stored as a string, so descending sort produces
+    // lexicographic order ("812" > "6424") on tenants like SPIS whose numbers
+    // aren't zero-padded. Remap explicit admissionNumber sorts to createdAt
+    // so the column toggle actually means newest-first / oldest-first.
+    // Backed by { tenantId, role, createdAt: -1 } on User.
+    const effectiveSortField = requestedSortBy === 'admissionNumber' ? 'createdAt' : requestedSortBy;
     // Default sort uses { admissionNumber, _id } so the existing
     // { tenantId, admissionNumber } compound index can back it. Sorting by `name`
     // has no covering index and forces an in-memory sort that blows Mongo's 32MB
     // multiplanner cap on large tenants (allowDiskUse does not relax that cap).
-    const defaultSort = requestedSortBy
-      ? { [requestedSortBy]: sortDir, _id: 1 }
+    const defaultSort = effectiveSortField
+      ? { [effectiveSortField]: sortDir, _id: 1 }
       : { admissionNumber: 1, _id: 1 };
 
     // Run count and find in parallel for speed.
