@@ -1635,7 +1635,7 @@ const ReceiptsTab = ({ receipts, loading, fetching, hasMore, onLoadMore, filters
                 <tr key={p._id} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E] transition-colors">
                   <td className="px-5 py-3 whitespace-nowrap text-sm font-mono font-semibold text-primary-600 dark:text-primary-400">{p.receiptNumber}</td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm font-mono text-gray-700 dark:text-gray-300">{p.studentId?.admissionNumber || p.studentId?.studentId || '-'}</td>
-                  <td className="px-5 py-3 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{p.studentId?.name || p.studentId?.fullName || 'N/A'}</div></td>
+                  <td className="px-5 py-3 whitespace-nowrap"><div className="text-sm font-medium text-gray-900 dark:text-white">{p.studentId?.name || p.studentId?.fullName || 'N/A'}</div>{p.studentId?.guardians?.[0]?.name && <div className="text-xs text-gray-500 dark:text-[#8E8E93]">{p.studentId.guardians[0].name}</div>}</td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{p.studentId?.classId?.name || '-'}</td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-[#8E8E93]">{p.invoiceId?.billingPeriod?.quarter ? `Q${p.invoiceId.billingPeriod.quarter}${p.invoiceId.billingPeriod.year ? ` ${p.invoiceId.billingPeriod.year}` : ''}` : (p.invoiceId?.periodLabel || '-')}</td>
                   <td className="px-5 py-3 whitespace-nowrap text-sm font-semibold text-green-600 dark:text-green-400">{formatCurrency(p.amount)}</td>

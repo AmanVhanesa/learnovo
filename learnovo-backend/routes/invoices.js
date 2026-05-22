@@ -1829,7 +1829,7 @@ router.put('/payments/:id', protect, authorize('admin'), [
     } catch (_) { /* non-fatal */ }
 
     const updated = await Payment.findById(payment._id)
-      .populate({ path: 'studentId', select: 'name fullName admissionNumber studentId classId', populate: { path: 'classId', select: 'name' } })
+      .populate({ path: 'studentId', select: 'name fullName admissionNumber studentId classId guardians', populate: { path: 'classId', select: 'name' } })
       .populate('invoiceId', 'invoiceNumber');
 
     res.json({ success: true, message: 'Payment updated successfully', data: updated });
@@ -1915,7 +1915,7 @@ router.get('/payments', protect, authorize('admin', 'accountant'), async(req, re
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 5000);
 
     const payments = await Payment.find(filter)
-      .populate({ path: 'studentId', select: 'name fullName admissionNumber studentId classId', populate: { path: 'classId', select: 'name' } })
+      .populate({ path: 'studentId', select: 'name fullName admissionNumber studentId classId guardians', populate: { path: 'classId', select: 'name' } })
       .populate('invoiceId', 'invoiceNumber periodLabel billingPeriod')
       .populate('collectedBy', 'name')
       .sort({ paymentDate: -1, createdAt: -1 })
