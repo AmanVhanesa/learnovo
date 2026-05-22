@@ -2049,6 +2049,21 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
       email: { label: 'Email', extract: (s) => s.email || '' },
       address: { label: 'Address', extract: (s) => `"${(s.address || '').replace(/"/g, '""')}"` },
 
+      // Aadhaar
+      aadhaarNumber: { label: 'Aadhaar Number', extract: (s) => s.aadhaarNumber || '' },
+      fatherAadhaar: {
+        label: 'Father Aadhaar', extract: (s) => {
+          const father = s.guardians?.find(g => g.relation === 'Father');
+          return father?.aadhaarNumber || '';
+        }
+      },
+      motherAadhaar: {
+        label: 'Mother Aadhaar', extract: (s) => {
+          const mother = s.guardians?.find(g => g.relation === 'Mother');
+          return mother?.aadhaarNumber || '';
+        }
+      },
+
       // Personal
       dob: { label: 'DOB', extract: (s) => s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString('en-IN') : '' },
       gender: { label: 'Gender', extract: (s) => s.gender || '' },

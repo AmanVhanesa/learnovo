@@ -87,6 +87,9 @@ const Students = () => {
     { key: 'altMobile', label: 'Alt Mobile' },
     { key: 'email', label: 'Email' },
     { key: 'address', label: 'Address' },
+    { key: 'aadhaarNumber', label: 'Aadhaar Number' },
+    { key: 'fatherAadhaar', label: 'Father Aadhaar' },
+    { key: 'motherAadhaar', label: 'Mother Aadhaar' },
     { key: 'dob', label: 'Date of Birth' },
     { key: 'gender', label: 'Gender' },
     { key: 'bloodGroup', label: 'Blood Group' },
@@ -1005,18 +1008,30 @@ const Students = () => {
                     ))}
                   </div>
 
+                  <p className="text-[11px] text-gray-400 dark:text-[#8E8E93] mb-2 italic">
+                    Columns export in the order you select them — the number badge shows each column's position.
+                  </p>
                   <div className="grid grid-cols-2 gap-1 max-h-52 overflow-y-auto pr-1">
-                    {ALL_EXPORT_FIELDS.map(field => (
-                      <label key={field.key} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
-                        <input
-                          type="checkbox"
-                          checked={selectedExportFields.includes(field.key)}
-                          onChange={() => toggleExportField(field.key)}
-                          className="h-3.5 w-3.5 text-primary-600 rounded"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-[#8E8E93]">{field.label}</span>
-                      </label>
-                    ))}
+                    {ALL_EXPORT_FIELDS.map(field => {
+                      const orderIndex = selectedExportFields.indexOf(field.key)
+                      const isSelected = orderIndex !== -1
+                      return (
+                        <label key={field.key} className="flex items-center gap-2 cursor-pointer p-1.5 rounded hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleExportField(field.key)}
+                            className="h-3.5 w-3.5 text-primary-600 rounded"
+                          />
+                          {isSelected && (
+                            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-semibold rounded-full bg-primary-600 text-white">
+                              {orderIndex + 1}
+                            </span>
+                          )}
+                          <span className="text-sm text-gray-700 dark:text-[#8E8E93]">{field.label}</span>
+                        </label>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
