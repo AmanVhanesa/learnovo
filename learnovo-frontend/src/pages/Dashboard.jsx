@@ -220,20 +220,21 @@ const Dashboard = () => {
           {
             title: 'Pending Fees',
             value: (
-              <div className="flex items-center gap-2">
-                <span>
+              <div className="flex flex-col items-start gap-1.5 min-w-0">
+                <span className="break-all leading-tight">
                   {pendingFeesHidden ? '••••••' : formatCurrency(stats.fees.pending || 0)}
                 </span>
                 <button
                   type="button"
                   onClick={togglePendingFeesHidden}
-                  className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium normal-case tracking-normal text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#2C2C2E] hover:bg-gray-200 dark:hover:bg-[#3A3A3C] hover:text-gray-900 dark:hover:text-white transition-colors"
                   title={pendingFeesHidden ? 'Show amount' : 'Hide amount'}
                   aria-label={pendingFeesHidden ? 'Show pending fees amount' : 'Hide pending fees amount'}
                 >
                   {pendingFeesHidden
-                    ? <Eye className="h-4 w-4" />
-                    : <EyeOff className="h-4 w-4" />}
+                    ? <Eye className="h-3 w-3" />
+                    : <EyeOff className="h-3 w-3" />}
+                  <span>{pendingFeesHidden ? 'Show' : 'Hide'}</span>
                 </button>
               </div>
             ),
