@@ -11,6 +11,13 @@ const bankReconRowSchema = new mongoose.Schema({
   txnDate: { type: Date },
   bankStatus: { type: String, trim: true },
 
+  // Display-only enrichment from the MIS — surfaced in the UI so an operator
+  // can identify the row even when no candidate matches in Learnovo.
+  paymentMode: { type: String, trim: true },
+  customerName: { type: String, trim: true },
+  customerId: { type: String, trim: true },
+  invoiceNumber: { type: String, trim: true },
+
   classification: {
     type: String,
     enum: ['MATCHED_CONFIRMED', 'BANK_ONLY', 'AMBIGUOUS', 'LEARNOVO_ONLY', 'IGNORED', 'ACTIONED'],

@@ -7,18 +7,89 @@ const ImportExportService = require('./importExportService');
 const { confirmFeePayment } = require('./paymentConfirmationService');
 const { moneyEquals } = require('../utils/money');
 
+// Header aliases — each value goes through normaliseHeader() before matching,
+// so spaces, dots, underscores, and hyphens are all flattened. The lists below
+// cover ICICI Orange v2 MIS, ICICI EazyPay, Razorpay settlement, HDFC/AXIS
+// generic MIS exports. Order matters: the first non-empty match wins.
 const HEADER_ALIASES = {
-  utr: ['utr', 'utr no', 'utr_no', 'utrnumber', 'utr number', 'rrn', 'bankreference', 'bank reference'],
-  gatewayOrderId: ['order id', 'order_id', 'orderid', 'merchant order id', 'merchant_order_id', 'merchantorderid'],
-  gatewayPaymentId: ['payment id', 'payment_id', 'paymentid', 'transaction id', 'transaction_id', 'txn id', 'txn_id', 'txnid'],
-  amount: ['amount', 'amt', 'txn amount', 'transaction amount', 'credit amount', 'settlement amount'],
-  txnDate: ['date', 'txn date', 'transaction date', 'settlement date', 'value date'],
-  bankStatus: ['status', 'txn status', 'transaction status']
+  utr: [
+    'utr', 'utr no', 'utr number', 'utrno', 'utrnumber',
+    'rrn', 'rrn no', 'rrn number',
+    'bank ref no', 'bank reference', 'bank reference no', 'bankrefno'
+  ],
+  gatewayOrderId: [
+    // ICICI Orange MIS calls our merchantTxnNo "Merchant Ref.No."
+    'merchant ref no', 'merchant ref', 'merchant reference', 'merchant reference no',
+    'merchant txn no', 'merchant txn number', 'merchanttxnno',
+    'merchant order id', 'merchantorderid', 'order id', 'orderid',
+    'mer ref no', 'mer refno', 'merch ref no', 'merch refno', 'merchrefno'
+  ],
+  gatewayPaymentId: [
+    // ICICI Orange MIS: "PaymentID" and "TransactionID" both carry bank-side IDs.
+    // PaymentID is the canonical one, TransactionID is the leg-level id; either
+    // is fine for matching since both end up on Payment.transactionDetails.
+    'paymentid', 'payment id',
+    'transactionid', 'transaction id', 'txn id', 'txnid',
+    'original transaction id', 'original txn id', 'originaltransactionid',
+    'pg txn id', 'pg ref no', 'pgtxnid', 'pgrefno',
+    'icici ref', 'icici reference', 'iciciref',
+    'bank txn id', 'banktxnid'
+  ],
+  amount: [
+    // ICICI MIS has GrossAmount, Chargeable Amount, AND Amount Paid.
+    // "Amount Paid" is what actually settled to the merchant — that's the
+    // figure the bank credit will show on the statement, so we match it
+    // first. GrossAmount is what the customer paid (incl. surcharge), used
+    // as a fallback when Amount Paid is missing.
+    'amount paid', 'amountpaid',
+    'chargeable amount', 'chargeableamount',
+    'gross amount', 'grossamount',
+    'settlement amount', 'settledamount', 'settl amt', 'settlamt',
+    'net amount', 'netamount',
+    'credit amount', 'creditamount',
+    'txn amount', 'transaction amount', 'txn amt', 'tran amt', 'txnamount', 'tranamount',
+    'paid amount', 'paidamount',
+    'total amount', 'totalamount',
+    'amount', 'amt'
+  ],
+  txnDate: [
+    // ICICI uses "transaction completion date and time" — long but exact.
+    // settlementDate comes back from settlement reports.
+    'transaction completion date and time', 'transaction completion date time',
+    'transaction completion date',
+    'txn date', 'transaction date', 'tran date', 'txn dt',
+    'settlement date', 'settled date', 'settlementdate', 'set date',
+    'value date', 'date and time', 'datetime', 'date'
+  ],
+  bankStatus: [
+    'status', 'txn status', 'transaction status', 'payment status', 'paymentstatus', 'txnstatus'
+  ],
+  // Optional enrichment fields — surfaced in the UI to help an operator
+  // identify the row quickly even when nothing matches in Learnovo.
+  paymentMode: ['payment mode', 'paymode', 'mode'],
+  customerName: ['customer name', 'customername', 'cust name'],
+  customerId: ['customer id', 'customerid', 'user id', 'userid', 'cust id'],
+  invoiceNumber: ['invoice number', 'invoice no', 'invoiceno', 'invoicenumber', 'invoice'],
+  additionalParam1: ['additionalparameter1', 'additional parameter 1', 'addlparam1', 'addlparam 1'],
+  additionalParam2: ['additionalparameter2', 'additional parameter 2', 'addlparam2', 'addlparam 2']
 };
 
 function normaliseHeader(h) {
-  return String(h || '').trim().toLowerCase().replace(/[\s_-]+/g, ' ').replace(/\s+/g, ' ');
+  // Flatten "Merchant Ref.No." → "merchant ref no" so both
+  // dots and case differences are absorbed before alias matching.
+  return String(h || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, ' ')
+    .replace(/[\s_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
+
+const MONTH_INDEX = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11
+};
 
 function mapRow(rawRow) {
   const mapped = { raw: { ...rawRow } };
@@ -49,16 +120,39 @@ function parseAmount(val) {
   return parseFloat(cleaned);
 }
 
+// Tries the formats ICICI/Razorpay/HDFC actually emit, in order:
+//   1. dd-MMM-yyyy [hh:mm[:ss]]              e.g. 23-May-2026 09:10:02  (ICICI Orange)
+//   2. dd/mm/yyyy or dd-mm-yyyy [hh:mm[:ss]] e.g. 23/05/2026
+//   3. yyyy-mm-dd hh:mm:ss                    ICICI also uses this form
+//   4. Native Date() — covers ISO 8601 + epoch-millis-as-string
 function parseDate(val) {
-  if (!val) return null;
+  if (val == null || val === '') return null;
   const trimmed = String(val).trim();
-  const dmy = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+  if (!trimmed) return null;
+
+  const monthName = trimmed.match(
+    /^(\d{1,2})[\s/-]([A-Za-z]{3,4})[\s/-](\d{2,4})(?:[\sT](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+  if (monthName) {
+    const [, d, mName, y, hh = '0', mm = '0', ss = '0'] = monthName;
+    const mIdx = MONTH_INDEX[mName.toLowerCase()];
+    if (mIdx != null) {
+      const year = y.length === 2 ? 2000 + parseInt(y, 10) : parseInt(y, 10);
+      const dt = new Date(year, mIdx, parseInt(d, 10), parseInt(hh, 10), parseInt(mm, 10), parseInt(ss, 10));
+      if (!isNaN(dt.getTime())) return dt;
+    }
+  }
+
+  const dmy = trimmed.match(
+    /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:[\sT](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
   if (dmy) {
-    const [, d, m, y] = dmy;
+    const [, d, m, y, hh = '0', mm = '0', ss = '0'] = dmy;
     const year = y.length === 2 ? 2000 + parseInt(y, 10) : parseInt(y, 10);
-    const dt = new Date(year, parseInt(m, 10) - 1, parseInt(d, 10));
+    const dt = new Date(year, parseInt(m, 10) - 1, parseInt(d, 10), parseInt(hh, 10), parseInt(mm, 10), parseInt(ss, 10));
     if (!isNaN(dt.getTime())) return dt;
   }
+
   const native = new Date(trimmed);
   return isNaN(native.getTime()) ? null : native;
 }
@@ -66,6 +160,7 @@ function parseDate(val) {
 async function findCandidates(tenantId, row) {
   const candidates = { orders: [], attempts: [] };
 
+  // ── FeePaymentOrder is Razorpay-only; ICICI flows skip this collection ──
   if (row.gatewayOrderId) {
     const orders = await FeePaymentOrder.find({
       tenantId,
@@ -82,27 +177,43 @@ async function findCandidates(tenantId, row) {
     candidates.orders.push(...orders);
   }
 
-  if (row.gatewayOrderId || row.gatewayPaymentId) {
-    const ref = row.gatewayPaymentId || row.gatewayOrderId;
+  // ── PaymentAttempt covers ICICI Orange + all other gateways ────────────
+  // gatewayRefId = the merchantTxnNo we sent ICICI = "Merchant Ref.No." in the MIS.
+  // transactionRefId = bank-issued ref (PaymentID / UTR / RRN) stored on callback.
+  const attemptRefs = [row.gatewayOrderId, row.gatewayPaymentId, row.utr].filter(Boolean);
+  if (attemptRefs.length > 0) {
     const attempts = await PaymentAttempt.find({
       tenantId,
-      gatewayRefId: ref
-    }).select('_id invoiceId studentId amount status').lean();
+      $or: [
+        { gatewayRefId: { $in: attemptRefs } },
+        { transactionRefId: { $in: attemptRefs } }
+      ]
+    }).select('_id invoiceId studentId amount status gatewayRefId transactionRefId').lean();
     candidates.attempts.push(...attempts);
   }
 
+  // ── Fuzzy fallback: same-day + same-amount when we have nothing to grab ──
   if (candidates.orders.length === 0 && candidates.attempts.length === 0 && row.txnDate && row.amount > 0) {
     const windowMs = 3 * 24 * 60 * 60 * 1000;
     const windowStart = new Date(row.txnDate.getTime() - windowMs);
     const windowEnd = new Date(row.txnDate.getTime() + windowMs);
 
-    const fuzzyOrders = await FeePaymentOrder.find({
-      tenantId,
-      status: { $in: ['created', 'paid'] },
-      amount: { $gte: row.amount - 0.5, $lte: row.amount + 0.5 },
-      createdAt: { $gte: windowStart, $lte: windowEnd }
-    }).select('_id invoiceId studentId amount status razorpayOrderId').limit(10).lean();
+    const [fuzzyOrders, fuzzyAttempts] = await Promise.all([
+      FeePaymentOrder.find({
+        tenantId,
+        status: { $in: ['created', 'paid'] },
+        amount: { $gte: row.amount - 0.5, $lte: row.amount + 0.5 },
+        createdAt: { $gte: windowStart, $lte: windowEnd }
+      }).select('_id invoiceId studentId amount status razorpayOrderId').limit(10).lean(),
+      PaymentAttempt.find({
+        tenantId,
+        status: { $in: ['INITIATED', 'PROCESSING', 'PENDING', 'UNDER_REVIEW'] },
+        amount: { $gte: row.amount - 0.5, $lte: row.amount + 0.5 },
+        createdAt: { $gte: windowStart, $lte: windowEnd }
+      }).select('_id invoiceId studentId amount status gatewayRefId').limit(10).lean()
+    ]);
     candidates.orders.push(...fuzzyOrders);
+    candidates.attempts.push(...fuzzyAttempts);
   }
 
   return candidates;
@@ -165,16 +276,30 @@ async function processUploadedFile({ tenantId, userId, fileBuffer, filename, sou
     const amount = parseAmount(mapped.amount);
     const txnDate = parseDate(mapped.txnDate);
 
-    if (!(amount > 0)) {
+    // A row only gets auto-ignored when amount is unparseable AND nothing
+    // identifies it. With identifiers we keep it visible — the operator can
+    // ignore manually if it's noise, but silently burying it is what made
+    // every ICICI row vanish before the parser fix.
+    const hasIdentifier = Boolean(
+      mapped.utr || mapped.gatewayOrderId || mapped.gatewayPaymentId
+    );
+    const isFailedStatus = mapped.bankStatus &&
+      /fail|decline|cancel|reject/i.test(mapped.bankStatus);
+
+    if (!(amount > 0) && !hasIdentifier) {
       rows.push({
         rowNumber,
         raw: mapped.raw,
-        utr: mapped.utr || null,
-        gatewayOrderId: mapped.gatewayOrderId || null,
-        gatewayPaymentId: mapped.gatewayPaymentId || null,
+        utr: null,
+        gatewayOrderId: null,
+        gatewayPaymentId: null,
         amount: 0,
         txnDate: null,
         bankStatus: mapped.bankStatus || null,
+        paymentMode: mapped.paymentMode || null,
+        customerName: mapped.customerName || null,
+        customerId: mapped.customerId || null,
+        invoiceNumber: mapped.invoiceNumber || null,
         classification: 'IGNORED',
         candidateOrderIds: [],
         candidateAttemptIds: [],
@@ -192,13 +317,19 @@ async function processUploadedFile({ tenantId, userId, fileBuffer, filename, sou
       utr: mapped.utr,
       gatewayOrderId: mapped.gatewayOrderId,
       gatewayPaymentId: mapped.gatewayPaymentId,
-      amount,
+      amount: amount > 0 ? amount : 0,
       txnDate
     };
 
-    const candidates = await findCandidates(tenantId, searchRow);
+    const candidates = amount > 0
+      ? await findCandidates(tenantId, searchRow)
+      : { orders: [], attempts: [] };
     const existingPayment = await isAlreadyPaidInLearnovo(tenantId, searchRow);
-    const classification = classifyRow(searchRow, candidates, existingPayment);
+    let classification = classifyRow(searchRow, candidates, existingPayment);
+    // Bank-reported failures should never invite a confirm action.
+    if (isFailedStatus && classification !== 'MATCHED_CONFIRMED') {
+      classification = 'IGNORED';
+    }
 
     const candidateInvoiceIds = [
       ...candidates.orders.map(o => o.invoiceId),
@@ -211,9 +342,13 @@ async function processUploadedFile({ tenantId, userId, fileBuffer, filename, sou
       utr: mapped.utr || null,
       gatewayOrderId: mapped.gatewayOrderId || null,
       gatewayPaymentId: mapped.gatewayPaymentId || null,
-      amount,
+      amount: amount > 0 ? amount : 0,
       txnDate,
       bankStatus: mapped.bankStatus || null,
+      paymentMode: mapped.paymentMode || null,
+      customerName: mapped.customerName || null,
+      customerId: mapped.customerId || null,
+      invoiceNumber: mapped.invoiceNumber || null,
       classification,
       candidateOrderIds: candidates.orders.map(o => o._id),
       candidateAttemptIds: candidates.attempts.map(a => a._id),
