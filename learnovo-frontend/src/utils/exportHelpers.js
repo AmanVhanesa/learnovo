@@ -338,3 +338,33 @@ export const exportPNGPlaceholder = (filename) => {
     URL.revokeObjectURL(url)
   })
 }
+
+// Export a live <canvas> element (e.g. a Chart.js chart) to a PNG download.
+// Composites onto a white background so transparent backgrounds don't render black.
+export const exportCanvasAsPNG = (canvasEl, filename) => {
+  if (!canvasEl || typeof canvasEl.getContext !== 'function') return false
+  try {
+    const out = document.createElement('canvas')
+    out.width = canvasEl.width
+    out.height = canvasEl.height
+    const ctx = out.getContext('2d')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, out.width, out.height)
+    ctx.drawImage(canvasEl, 0, 0)
+    out.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    }, 'image/png')
+    return true
+  } catch (err) {
+    console.error('exportCanvasAsPNG failed:', err)
+    return false
+  }
+}
