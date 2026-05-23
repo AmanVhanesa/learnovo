@@ -237,7 +237,7 @@ router.get('/dashboard', protect, async(req, res) => {
         Admission.countDocuments({ status: 'pending', tenantId }),
         Admission.countDocuments({ status: 'approved', tenantId }),
         Admission.countDocuments({ status: 'rejected', tenantId }),
-        User.countDocuments({ role: 'student', tenantId, createdAt: { $gte: monthStart, $lt: tomorrow } }),
+        User.countDocuments({ role: 'student', tenantId, isActive: true, createdAt: { $gte: monthStart, $lt: tomorrow } }),
         Fee.aggregate(feeAggPipeline),
         FeeInvoice.aggregate(invoiceAggPipeline),
         Fee.aggregate(todayFeeAggPipeline),

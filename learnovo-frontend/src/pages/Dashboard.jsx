@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
@@ -16,7 +16,9 @@ import {
   UserPlus,
   ClipboardList,
   School,
-  RefreshCw
+  RefreshCw,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { Line, Doughnut } from 'react-chartjs-2'
 import KpiCard from '../components/KpiCard'
@@ -89,6 +91,22 @@ const Dashboard = () => {
   const { user, tenant } = useAuth()
   const { settings, formatCurrency } = useSettings()
   const navigate = useNavigate()
+
+  const [pendingFeesHidden, setPendingFeesHidden] = useState(() => {
+    try {
+      return localStorage.getItem('dashboard.pendingFeesHidden') === '1'
+    } catch {
+      return false
+    }
+  })
+
+  const togglePendingFeesHidden = useCallback(() => {
+    setPendingFeesHidden((prev) => {
+      const next = !prev
+      try { localStorage.setItem('dashboard.pendingFeesHidden', next ? '1' : '0') } catch { /* ignore */ }
+      return next
+    })
+  }, [])
 
   const defaultStats = {
     students: { total: 0, active: 0 },
@@ -201,7 +219,24 @@ const Dashboard = () => {
           },
           {
             title: 'Pending Fees',
-            value: formatCurrency(stats.fees.pending || 0),
+            value: (
+              <div className="flex items-center gap-2">
+                <span>
+                  {pendingFeesHidden ? '••••••' : formatCurrency(stats.fees.pending || 0)}
+                </span>
+                <button
+                  type="button"
+                  onClick={togglePendingFeesHidden}
+                  className="p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors"
+                  title={pendingFeesHidden ? 'Show amount' : 'Hide amount'}
+                  aria-label={pendingFeesHidden ? 'Show pending fees amount' : 'Hide pending fees amount'}
+                >
+                  {pendingFeesHidden
+                    ? <Eye className="h-4 w-4" />
+                    : <EyeOff className="h-4 w-4" />}
+                </button>
+              </div>
+            ),
             icon: AlertTriangle,
             color: 'text-yellow-600',
             bgColor: 'bg-yellow-100'
@@ -488,7 +523,12 @@ const Dashboard = () => {
 
             // Handle export with more data
             const handleExport = () => {
-              const rows = [[stat.title, String(stat.value)]]
+              const exportValue = typeof stat.value === 'string' || typeof stat.value === 'number'
+                ? String(stat.value)
+                : (stat.title === 'Pending Fees'
+                    ? formatCurrency(stats.fees.pending || 0)
+                    : '')
+              const rows = [[stat.title, exportValue]]
 
               if (stat.title.toLowerCase().includes('fee') && stats.fees && user?.role === 'admin') {
                 rows.push(['Total Fees', stats.fees.total])
