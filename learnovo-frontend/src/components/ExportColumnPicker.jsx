@@ -69,7 +69,7 @@ const ExportColumnPicker = ({
     };
     const [exporting, setExporting] = useState(false);
     const [selectedFormat, setSelectedFormat] = useState(formats[0] || 'excel');
-    const [exportAll, setExportAll] = useState(false);
+    const [exportAll, setExportAll] = useState(typeof fetchAllData === 'function');
 
     // Default selection: any column with defaultSelected !== false
     const defaultKeys = useMemo(
