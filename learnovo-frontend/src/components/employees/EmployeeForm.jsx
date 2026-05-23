@@ -218,6 +218,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+        if (activeSection !== sections.length - 1) return
         const errors = validateForm()
         if (Object.keys(errors).length > 0) {
             setFormErrors(errors)
@@ -827,9 +828,9 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                         <div className="flex gap-2">
                             <button type="button" onClick={onCancel} className="btn btn-ghost w-full sm:w-auto">Cancel</button>
                             {activeSection < sections.length - 1 ? (
-                                <button type="button" onClick={() => setActiveSection(activeSection + 1)} className="btn btn-primary w-full sm:w-auto">Next</button>
+                                <button key="next-btn" type="button" onClick={() => setActiveSection(activeSection + 1)} className="btn btn-primary w-full sm:w-auto">Next</button>
                             ) : (
-                                <button type="submit" className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2" disabled={isLoading || photoUploading}>
+                                <button key="submit-btn" type="submit" className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2" disabled={isLoading || photoUploading}>
                                     {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                                     {isLoading ? 'Saving...' : employee ? 'Update Employee' : 'Add Employee'}
                                 </button>
