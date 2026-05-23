@@ -351,6 +351,11 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.driverId = req.query.driver;
     }
 
+    // Add sub-department filter
+    if (req.query.subDepartment) {
+      filter.subDepartment = req.query.subDepartment;
+    }
+
     // Add student type filter (old / new)
     if (req.query.studentType === 'old') {
       filter.studentType = 'old';
@@ -1812,7 +1817,7 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
     // Class list source of truth = Class collection, scoped to classes that
     // actually have students. We fall back to free-text User.class values
     // only for students whose classId is missing (legacy/unimported rows).
-    const [classDocs, orphanClassStrings, sections, academicYears, drivers] = await Promise.all([
+    const [classDocs, orphanClassStrings, sections, academicYears, drivers, subDepartments] = await Promise.all([
       (async() => {
         const idsWithStudents = await User.distinct('classId', {
           role: 'student',
@@ -1831,7 +1836,20 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
       }),
       Section.distinct('name', sectionQuery),
       User.distinct('academicYear', { role: 'student', tenantId }),
-      Driver.find({ tenantId, isActive: true }).select('_id name').sort({ name: 1 })
+      Driver.find({ tenantId, isActive: true }).select('_id name').sort({ name: 1 }),
+      (async() => {
+        // Only show sub-departments that actually have at least one student assigned
+        const idsWithStudents = await User.distinct('subDepartment', {
+          role: 'student',
+          tenantId,
+          subDepartment: { $ne: null }
+        });
+        if (!idsWithStudents.length) return [];
+        return SubDepartment.find({ tenantId, _id: { $in: idsWithStudents } })
+          .select('_id name')
+          .sort({ name: 1 })
+          .lean();
+      })()
     ]);
 
     // Dedupe case-insensitively. Class-collection values win over orphan strings.
@@ -1870,7 +1888,8 @@ router.get('/filters', protect, authorize('admin', 'teacher'), async(req, res) =
         sections: sections.filter(Boolean).sort(sortAlphaNum),
         academicYears: academicYears.filter(Boolean).sort().reverse(), // Newest first
         genders: ['Male', 'Female', 'Other'],
-        drivers: drivers.map(d => ({ _id: d._id, name: d.name }))
+        drivers: drivers.map(d => ({ _id: d._id, name: d.name })),
+        subDepartments: subDepartments.map(s => ({ _id: s._id, name: s.name }))
       }
     });
   } catch (error) {
@@ -1975,6 +1994,11 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
     // NEW: Driver filter
     if (req.query.driverId) {
       filter.driverId = req.query.driverId;
+    }
+
+    // NEW: Sub-department filter
+    if (req.query.subDepartment) {
+      filter.subDepartment = req.query.subDepartment;
     }
 
     // NEW: Transport mode filter
@@ -2245,7 +2269,7 @@ router.get('/:id', protect, canAccessStudent, async(req, res) => {
     const fees = await Fee.find({ student: student._id }).sort({ dueDate: -1 }).limit(50).lean();
 
     // Format currency once and reuse for all fees
-    const currencySymbol = await formatCurrencyWithSettings(0);
+    const currencySymbol = await formatCurrencyWithSettings(req.user.tenantId, 0);
     const symbolPrefix = currencySymbol.replace(/[\d.,\s]/g, '');
     const formatAmount = (amt) => `${symbolPrefix}${Number(amt || 0).toLocaleString('en-IN')}`;
 
@@ -3214,7 +3238,7 @@ router.get('/:id/fees', protect, canAccessStudent, async(req, res) => {
     const formattedFees = await Promise.all(
       fees.map(async(fee) => ({
         ...fee.toJSON(),
-        formattedAmount: await formatCurrencyWithSettings(fee.amount, fee.currency)
+        formattedAmount: await formatCurrencyWithSettings(req.user.tenantId, fee.amount, fee.currency)
       }))
     );
 
@@ -3259,10 +3283,10 @@ router.get('/:id/statistics', protect, canAccessStudent, async(req, res) => {
     };
 
     // Format amounts
-    statistics.formattedTotalAmount = await formatCurrencyWithSettings(statistics.totalAmount);
-    statistics.formattedPaidAmount = await formatCurrencyWithSettings(statistics.paidAmount);
-    statistics.formattedPendingAmount = await formatCurrencyWithSettings(statistics.pendingAmount);
-    statistics.formattedOverdueAmount = await formatCurrencyWithSettings(statistics.overdueAmount);
+    statistics.formattedTotalAmount = await formatCurrencyWithSettings(req.user.tenantId, statistics.totalAmount);
+    statistics.formattedPaidAmount = await formatCurrencyWithSettings(req.user.tenantId, statistics.paidAmount);
+    statistics.formattedPendingAmount = await formatCurrencyWithSettings(req.user.tenantId, statistics.pendingAmount);
+    statistics.formattedOverdueAmount = await formatCurrencyWithSettings(req.user.tenantId, statistics.overdueAmount);
 
     res.json({
       success: true,

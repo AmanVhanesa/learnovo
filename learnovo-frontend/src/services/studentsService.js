@@ -2,7 +2,7 @@ import api from './authService'
 
 export const studentsService = {
   list: async (filters = {}) => {
-    const { page = 1, limit = 20, search = '', class: classFilter, classId, section, academicYear, status, driver, studentType, lightweight, sortBy, sortOrder } = filters
+    const { page = 1, limit = 20, search = '', class: classFilter, classId, section, academicYear, status, driver, subDepartment, studentType, lightweight, sortBy, sortOrder } = filters
     const params = new URLSearchParams()
 
     // Only add non-empty params to avoid validation errors
@@ -15,6 +15,7 @@ export const studentsService = {
     if (academicYear && academicYear.trim()) params.append('academicYear', academicYear.trim())
     if (status && status.trim()) params.append('status', status.trim())
     if (driver && driver.trim()) params.append('driver', driver.trim())
+    if (subDepartment && subDepartment.trim()) params.append('subDepartment', subDepartment.trim())
     if (studentType && studentType.trim()) params.append('studentType', studentType.trim())
     if (lightweight) params.append('lightweight', 'true')
     if (sortBy && sortBy.trim()) params.append('sortBy', sortBy.trim())
@@ -126,12 +127,15 @@ export const studentsService = {
     return res.data
   },
 
-  // Profile photo upload — multipart, returns Cloudinary URL
+  // Profile photo upload — multipart, returns Cloudinary URL.
+  // Cloudinary face-detect + resize can exceed the default 30s on slow networks,
+  // so override the axios timeout to keep the client in sync with the backend.
   uploadPhoto: async (studentId, file) => {
     const formData = new FormData()
     formData.append('photo', file)
     const res = await api.post(`/students/${studentId}/upload-photo`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000
     })
     return res.data
   },
@@ -145,7 +149,8 @@ export const studentsService = {
       formData.append('guardianIndex', String(guardianIndex))
     }
     const res = await api.post(`/students/${studentId}/documents`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000
     })
     return res.data
   },
