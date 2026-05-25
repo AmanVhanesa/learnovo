@@ -104,7 +104,7 @@ const Students = () => {
     { key: 'transportMode', label: 'Transport Mode' },
   ]
   const [selectedExportFields, setSelectedExportFields] = useState(
-    ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'fatherName', 'mobile', 'email', 'driverName', 'status']
+    ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'fatherName', 'mobile', 'email', 'aadhaarNumber', 'driverName', 'status']
   )
 
   // Pagination state
@@ -569,6 +569,11 @@ const Students = () => {
     if (selectedExportFields.length > 0) {
       params.set('fields', selectedExportFields.join(','))
     }
+    // Mirror the on-screen sort order in the exported file.
+    if (sortField) {
+      params.set('sortBy', sortField)
+      params.set('sortOrder', sortAsc ? 'asc' : 'desc')
+    }
     const token = localStorage.getItem('token')
     const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
     const dateStr = new Date().toISOString().split('T')[0]
@@ -583,10 +588,13 @@ const Students = () => {
       if (selectedFormat === 'csv') {
         exportCSV(`students_export_${dateStr}.csv`, [json.headers, ...json.rows])
       } else {
+        // Prepend a serial number column for Excel exports.
+        const xlsxHeaders = ['S.No', ...json.headers]
+        const xlsxRows = json.rows.map((row, idx) => [idx + 1, ...row])
         await exportReport(`students_export_${dateStr}.xlsx`, {
           schoolName: settings?.institution?.name,
           reportTitle: 'Student List',
-          headers: json.headers, rows: json.rows, sheetName: 'Students',
+          headers: xlsxHeaders, rows: xlsxRows, sheetName: 'Students',
         })
       }
       toast.success(`${selectedFormat.toUpperCase()} downloaded!`, { id: exportId })

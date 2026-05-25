@@ -2014,8 +2014,21 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
       ];
     }
 
+    // Sorting: accept sortBy/sortOrder from the UI so the export mirrors what
+    // the user sees on screen (e.g. admission number top-to-bottom). Falls back
+    // to the legacy class/section/roll/name order when no sortBy is given.
+    const allowedExportSortFields = ['admissionNumber', 'name', 'rollNumber', 'createdAt'];
+    const requestedExportSortBy = allowedExportSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
+    const exportSortDir = req.query.sortOrder === 'desc' ? -1 : 1;
+    // admissionNumber is stored as a string; remap to createdAt to match the
+    // list endpoint's behavior and keep the visible order stable.
+    const effectiveExportSortField = requestedExportSortBy === 'admissionNumber' ? 'createdAt' : requestedExportSortBy;
+    const exportSort = effectiveExportSortField
+      ? { [effectiveExportSortField]: exportSortDir, _id: 1 }
+      : { class: 1, section: 1, rollNumber: 1, fullName: 1 };
+
     const students = await User.find(filter)
-      .sort({ class: 1, section: 1, rollNumber: 1, fullName: 1 })
+      .sort(exportSort)
       .populate('subDepartment', 'name')
       .populate('driverId', 'name phone');
 
@@ -2119,7 +2132,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
       selectedFields = [
         'admissionNumber', 'name', 'class', 'section', 'rollNumber',
         'fatherName', 'motherName', 'mobile', 'altMobile', 'email',
-        'dob', 'gender', 'address', 'driverName', 'driverPhone', 'subDepartment', 'status'
+        'dob', 'gender', 'address', 'aadhaarNumber', 'driverName', 'driverPhone', 'subDepartment', 'status'
       ];
     }
 
@@ -2167,20 +2180,23 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
       topRows.push(['Student List']);
       topRows.push([headerInfo.dateTime]);
       topRows.push([]);
-      const wsData = [...topRows, headerLabels, ...rawRows];
+      // Prepend a serial number column for Excel exports.
+      const excelHeaderLabels = ['S.No', ...headerLabels];
+      const excelRows = rawRows.map((row, idx) => [idx + 1, ...row]);
+      const wsData = [...topRows, excelHeaderLabels, ...excelRows];
       const ws = xlsx.utils.aoa_to_sheet(wsData);
 
       // Merge header info rows across all columns
-      if (headerLabels.length > 1) {
+      if (excelHeaderLabels.length > 1) {
         ws['!merges'] = [];
         for (let i = 0; i < topRows.length - 1; i++) {
-          ws['!merges'].push({ s: { r: i, c: 0 }, e: { r: i, c: headerLabels.length - 1 } });
+          ws['!merges'].push({ s: { r: i, c: 0 }, e: { r: i, c: excelHeaderLabels.length - 1 } });
         }
       }
 
       // Auto column widths
-      const colWidths = headerLabels.map((h, i) => ({
-        wch: Math.max(h.length, ...rawRows.map(r => String(r[i] ?? '').length), 10)
+      const colWidths = excelHeaderLabels.map((h, i) => ({
+        wch: Math.max(h.length, ...excelRows.map(r => String(r[i] ?? '').length), 6)
       }));
       ws['!cols'] = colWidths;
 
