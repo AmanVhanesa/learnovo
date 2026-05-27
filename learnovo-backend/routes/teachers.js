@@ -421,9 +421,10 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
 });
 
 // @desc    Get pending fee summary for students of a class
-//          (class teacher only — read-only summary)
+//          (any teacher linked to the class — read-only summary)
 // @route   GET /api/teachers/my-classes/:classId/pending-fees
-// @access  Private (Teacher who is the class teacher of :classId)
+// @access  Private (Teacher linked to :classId via classTeacher,
+//          sectionTeacher, Class.subjects[].teacher, or TeacherSubjectAssignment)
 router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), async(req, res, next) => {
   try {
     const teacherId = req.user._id;
@@ -434,15 +435,32 @@ router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), a
       return res.status(400).json({ success: false, message: 'Invalid class ID', requestId: req.requestId });
     }
 
-    const classDoc = await Class.findOne({ _id: classId, tenantId }).select('name grade classTeacher').lean();
+    const classDoc = await Class.findOne({ _id: classId, tenantId })
+      .select('name grade classTeacher subjects')
+      .lean();
     if (!classDoc) {
       return res.status(404).json({ success: false, message: 'Class not found', requestId: req.requestId });
     }
 
-    if (!classDoc.classTeacher || classDoc.classTeacher.toString() !== teacherId.toString()) {
+    const teacherIdStr = teacherId.toString();
+    const isClassTeacher = classDoc.classTeacher && classDoc.classTeacher.toString() === teacherIdStr;
+    const isEmbeddedSubjectTeacher = (classDoc.subjects || []).some(
+      s => s.teacher && s.teacher.toString() === teacherIdStr
+    );
+
+    let isLinked = isClassTeacher || isEmbeddedSubjectTeacher;
+    if (!isLinked) {
+      const [sectionLink, assignmentLink] = await Promise.all([
+        Section.exists({ tenantId, classId, sectionTeacher: teacherId }),
+        TeacherSubjectAssignment.exists({ tenantId, teacherId, classId, isActive: true })
+      ]);
+      isLinked = Boolean(sectionLink || assignmentLink);
+    }
+
+    if (!isLinked) {
       return res.status(403).json({
         success: false,
-        message: 'Only the assigned class teacher can view fee status for this class',
+        message: 'You are not assigned to this class',
         requestId: req.requestId
       });
     }

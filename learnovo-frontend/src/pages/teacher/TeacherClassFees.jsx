@@ -13,16 +13,14 @@ const TeacherClassFees = () => {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all') // all | pending | paid
 
-  // Pull teacher's classes — only keep classes where this teacher is the class teacher.
+  // Pull every class this teacher is linked to (class teacher, section teacher,
+  // or subject teacher). The backend enforces the same linkage check on the
+  // pending-fees endpoint.
   const { data: myClasses = [], isLoading: loadingClasses } = useQuery({
     queryKey: ['teacher-class-fees-classes'],
     queryFn: async () => {
       const res = await teachersService.myClasses({ strict: true })
-      const userId = user?._id?.toString()
-      return (res.data || []).filter(c => {
-        const ctId = c.classTeacher?._id?.toString() || c.classTeacher?.toString()
-        return ctId === userId
-      })
+      return res.data || []
     },
     enabled: !!user?._id
   })
@@ -60,7 +58,8 @@ const TeacherClassFees = () => {
           <Users className="h-10 w-10 text-gray-400 mx-auto mb-3" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">No assigned classes</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            You are not assigned as the class teacher of any class. Only class teachers can view class fee status.
+            You don't have any classes assigned to you. Ask an admin to assign you as a class teacher,
+            section teacher, or subject teacher.
           </p>
         </div>
       </div>
@@ -72,7 +71,7 @@ const TeacherClassFees = () => {
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white tracking-tight">Class Fee Status</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Pending fee summary for students of classes where you are the class teacher.
+          Pending fee summary for students of classes assigned to you.
         </p>
       </div>
 
