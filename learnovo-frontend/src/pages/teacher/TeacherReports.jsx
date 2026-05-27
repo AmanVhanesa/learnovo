@@ -63,13 +63,14 @@ const TeacherReports = () => {
   })
 
   // Teacher's assignments for subjects
+  const teacherId = user?.id || user?._id
   const { data: myAssignments = [] } = useQuery({
-    queryKey: ['teacher-report-assignments', user?._id],
+    queryKey: ['teacher-report-assignments', teacherId],
     queryFn: async () => {
-      const res = await teacherAssignmentsService.list({ teacherId: user._id })
+      const res = await teacherAssignmentsService.list({ teacherId })
       return res.data || []
     },
-    enabled: !!user?._id,
+    enabled: !!teacherId,
   })
 
   // Exams for teacher's subjects

@@ -36,7 +36,7 @@ const AcademicSession = require('../models/AcademicSession');
       { name: new RegExp(arg, 'i') },
       { fullName: new RegExp(arg, 'i') }
     ]
-  }).select('_id name fullName email tenantId role isActive');
+  }).select('_id name fullName email tenantId role isActive assignedClasses');
 
   if (teachers.length === 0) {
     console.log(`No teachers matched "${arg}"`);
@@ -91,16 +91,33 @@ const AcademicSession = require('../models/AcademicSession');
     console.log(`\n  [Strategy 3] Section.sectionTeacher  -> ${asSectionTeacher.length} section(s)`);
     asSectionTeacher.forEach(s => console.log(`    - class=${s.classId?.name || '?'}, section=${s.name}, active=${s.isActive}`));
 
+    // Strategy 4: Legacy User.assignedClasses string array matched against Class.name
+    const legacyNames = Array.isArray(t.assignedClasses) ? t.assignedClasses : [];
+    console.log(`\n  [Strategy 4] User.assignedClasses (legacy strings) -> ${legacyNames.length} entr(y/ies)`);
+    if (legacyNames.length > 0) {
+      console.log(`    raw: ${JSON.stringify(legacyNames)}`);
+      const legacyFound = await Class.find({ tenantId, name: { $in: legacyNames } }).select('name grade isActive');
+      console.log(`    matched to ${legacyFound.length} Class doc(s) by exact name:`);
+      legacyFound.forEach(c => console.log(`      - ${c.name} (grade ${c.grade}, active=${c.isActive})`));
+      const unmatched = legacyNames.filter(n => !legacyFound.some(c => c.name === n));
+      if (unmatched.length > 0) {
+        console.log(`    UNMATCHED legacy names (no Class.name === these): ${JSON.stringify(unmatched)}`);
+        const tenantClassNames = await Class.find({ tenantId }).select('name').lean();
+        console.log(`    Existing Class.name values in tenant: ${JSON.stringify(tenantClassNames.map(c => c.name))}`);
+      }
+    }
+
     // Summary
     const totalLinks =
       asClassTeacher.length +
       asSubjectInClass.length +
       activeAssignments.length +
-      asSectionTeacher.length;
+      asSectionTeacher.length +
+      legacyNames.length;
     console.log(`\n  TOTAL linkages: ${totalLinks}`);
     if (totalLinks === 0) {
       console.log('  >>> This teacher has NO assignments in any strategy.');
-      console.log('      /api/teachers/my-classes?strict=true will return [].');
+      console.log('      /api/teachers/assigned-classes will return [].');
     }
   }
 

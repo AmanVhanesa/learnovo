@@ -22,7 +22,7 @@ const TeacherClassFees = () => {
       const res = await teachersService.myAssignedClasses()
       return res.data || []
     },
-    enabled: !!user?._id
+    enabled: !!(user?.id || user?._id)
   })
 
   const { data: classFees, isLoading: loadingFees, error: feesError } = useQuery({

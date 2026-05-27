@@ -61,19 +61,21 @@ const TeacherAcademics = () => {
     },
   })
 
+  const teacherId = user?.id || user?._id
+
   const { data: myAssignments = [] } = useQuery({
-    queryKey: ['teacher-my-assignments', activeSession?._id],
+    queryKey: ['teacher-my-assignments', activeSession?._id, teacherId],
     queryFn: async () => {
       const res = await teacherAssignmentsService.list({
-        teacherId: user._id,
+        teacherId,
         academicSessionId: activeSession?._id
       })
       return res.data || []
     },
-    enabled: !!user?._id,
+    enabled: !!teacherId,
   })
 
-  const userId = user?._id?.toString()
+  const userId = teacherId?.toString()
   const idOf = (v) => (v && typeof v === 'object' ? v._id : v)?.toString()
 
   // myClasses comes from /api/teachers/my-classes — already authoritative

@@ -97,13 +97,14 @@ const TeacherExams = () => {
   })
 
   // Fetch teacher's assignments
+  const teacherId = user?.id || user?._id
   const { data: myAssignments = [] } = useQuery({
-    queryKey: ['teacher-exam-assignments', user?._id],
+    queryKey: ['teacher-exam-assignments', teacherId],
     queryFn: async () => {
-      const res = await teacherAssignmentsService.list({ teacherId: user._id })
+      const res = await teacherAssignmentsService.list({ teacherId })
       return res.data || []
     },
-    enabled: !!user?._id,
+    enabled: !!teacherId,
   })
 
   // Fetch teacher's classes
