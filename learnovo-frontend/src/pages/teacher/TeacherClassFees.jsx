@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CreditCard, AlertTriangle, CheckCircle, Users, Search } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -33,6 +33,14 @@ const TeacherClassFees = () => {
     },
     enabled: !!selectedClassId
   })
+
+  // Auto-select when the teacher has exactly one class — no point making
+  // them click a single-option dropdown.
+  useEffect(() => {
+    if (myClasses.length === 1 && !selectedClassId) {
+      setSelectedClassId(myClasses[0]._id)
+    }
+  }, [myClasses, selectedClassId])
 
   const students = classFees?.students || []
   const totals = classFees?.totals || { totalInvoiced: 0, totalPaid: 0, totalBalance: 0, pendingCount: 0, studentCount: 0, byQuarter: {} }
@@ -83,19 +91,25 @@ const TeacherClassFees = () => {
         </p>
       </div>
 
-      {/* Class picker */}
+      {/* Class picker — hidden when teacher only has one class */}
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Class:</label>
-        <select
-          value={selectedClassId}
-          onChange={(e) => setSelectedClassId(e.target.value)}
-          className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-        >
-          <option value="">— Select a class —</option>
-          {myClasses.map(c => (
-            <option key={c._id} value={c._id}>{c.name}</option>
-          ))}
-        </select>
+        {myClasses.length === 1 ? (
+          <span className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] font-medium text-gray-900 dark:text-white">
+            {myClasses[0].name}
+          </span>
+        ) : (
+          <select
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">— Select a class —</option>
+            {myClasses.map(c => (
+              <option key={c._id} value={c._id}>{c.name}</option>
+            ))}
+          </select>
+        )}
         {classFees?.session?.name && (
           <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
             Session: <span className="font-medium text-gray-700 dark:text-gray-300">{classFees.session.name}</span>
@@ -103,7 +117,7 @@ const TeacherClassFees = () => {
         )}
       </div>
 
-      {!selectedClassId && (
+      {!selectedClassId && myClasses.length > 1 && (
         <div className="rounded-xl border border-dashed border-gray-300 dark:border-[#38383A] bg-gray-50 dark:bg-[#1C1C1E] p-8 text-center">
           <CreditCard className="h-8 w-8 text-gray-400 mx-auto mb-2" />
           <p className="text-sm text-gray-500 dark:text-gray-400">Pick a class to see its pending fee summary.</p>
