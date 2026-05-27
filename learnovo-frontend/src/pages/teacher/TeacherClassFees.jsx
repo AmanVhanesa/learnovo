@@ -13,13 +13,13 @@ const TeacherClassFees = () => {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all') // all | pending | paid
 
-  // Pull every class this teacher is linked to (class teacher, section teacher,
-  // or subject teacher). The backend enforces the same linkage check on the
-  // pending-fees endpoint.
+  // Pull every class this teacher is linked to via any allocation method —
+  // matches the dashboard's broader lookup so inactive classes and legacy
+  // assignedClasses entries are also picked up.
   const { data: myClasses = [], isLoading: loadingClasses } = useQuery({
     queryKey: ['teacher-class-fees-classes'],
     queryFn: async () => {
-      const res = await teachersService.myClasses({ strict: true })
+      const res = await teachersService.myAssignedClasses()
       return res.data || []
     },
     enabled: !!user?._id

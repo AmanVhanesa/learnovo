@@ -420,14 +420,82 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
   }
 });
 
+// Helper: resolve the classes a teacher is linked to via any of the 4
+// allocation methods (Class.classTeacher, Class.subjects[].teacher,
+// Section.sectionTeacher, TeacherSubjectAssignment, legacy assignedClasses).
+// Matches the same broad lookup the dashboard uses so a teacher who
+// only appears in one allocation method is still recognized.
+async function resolveTeacherClasses(tenantId, teacherUser) {
+  const teacherId = teacherUser._id;
+  const classMap = new Map();
+
+  const directClasses = await Class.find({
+    tenantId,
+    $or: [
+      { classTeacher: teacherId },
+      { 'subjects.teacher': teacherId }
+    ]
+  }).select('name grade').lean();
+  directClasses.forEach(c => classMap.set(c._id.toString(), { _id: c._id, name: c.name, grade: c.grade }));
+
+  const teacherSections = await Section.find({
+    tenantId, sectionTeacher: teacherId, isActive: true
+  }).select('classId').lean();
+  if (teacherSections.length > 0) {
+    const sectionClassIds = [...new Set(teacherSections.map(s => s.classId?.toString()).filter(Boolean))];
+    const missing = sectionClassIds.filter(id => !classMap.has(id));
+    if (missing.length > 0) {
+      const secClasses = await Class.find({ _id: { $in: missing }, tenantId }).select('name grade').lean();
+      secClasses.forEach(c => classMap.set(c._id.toString(), { _id: c._id, name: c.name, grade: c.grade }));
+    }
+  }
+
+  const tsaRecords = await TeacherSubjectAssignment.find({
+    teacherId, tenantId, isActive: true
+  }).select('classId').lean();
+  if (tsaRecords.length > 0) {
+    const tsaClassIds = [...new Set(tsaRecords.map(a => a.classId?.toString()).filter(Boolean))];
+    const missing = tsaClassIds.filter(id => !classMap.has(id));
+    if (missing.length > 0) {
+      const tsaClasses = await Class.find({ _id: { $in: missing }, tenantId }).select('name grade').lean();
+      tsaClasses.forEach(c => classMap.set(c._id.toString(), { _id: c._id, name: c.name, grade: c.grade }));
+    }
+  }
+
+  const legacyNames = Array.isArray(teacherUser.assignedClasses) ? teacherUser.assignedClasses : [];
+  if (legacyNames.length > 0) {
+    const legacyFound = await Class.find({ tenantId, name: { $in: legacyNames } }).select('name grade').lean();
+    legacyFound.forEach(c => {
+      if (!classMap.has(c._id.toString())) {
+        classMap.set(c._id.toString(), { _id: c._id, name: c.name, grade: c.grade });
+      }
+    });
+  }
+
+  return Array.from(classMap.values());
+}
+
+// @desc    Get classes a teacher is linked to (any allocation method,
+//          incl. inactive classes and legacy assignedClasses) for the
+//          Class Fee Status picker.
+// @route   GET /api/teachers/assigned-classes
+// @access  Private (Teacher)
+router.get('/assigned-classes', protect, authorize('teacher'), async(req, res, next) => {
+  try {
+    const classes = await resolveTeacherClasses(req.user.tenantId, req.user);
+    classes.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    res.json({ success: true, data: classes, count: classes.length, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // @desc    Get pending fee summary for students of a class
 //          (any teacher linked to the class — read-only summary)
 // @route   GET /api/teachers/my-classes/:classId/pending-fees
-// @access  Private (Teacher linked to :classId via classTeacher,
-//          sectionTeacher, Class.subjects[].teacher, or TeacherSubjectAssignment)
+// @access  Private (Teacher linked to :classId via any allocation method)
 router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), async(req, res, next) => {
   try {
-    const teacherId = req.user._id;
     const tenantId = req.user.tenantId;
     const { classId } = req.params;
 
@@ -435,27 +503,14 @@ router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), a
       return res.status(400).json({ success: false, message: 'Invalid class ID', requestId: req.requestId });
     }
 
-    const classDoc = await Class.findOne({ _id: classId, tenantId })
-      .select('name grade classTeacher subjects')
-      .lean();
+    const classDoc = await Class.findOne({ _id: classId, tenantId }).select('name grade').lean();
     if (!classDoc) {
       return res.status(404).json({ success: false, message: 'Class not found', requestId: req.requestId });
     }
 
-    const teacherIdStr = teacherId.toString();
-    const isClassTeacher = classDoc.classTeacher && classDoc.classTeacher.toString() === teacherIdStr;
-    const isEmbeddedSubjectTeacher = (classDoc.subjects || []).some(
-      s => s.teacher && s.teacher.toString() === teacherIdStr
-    );
-
-    let isLinked = isClassTeacher || isEmbeddedSubjectTeacher;
-    if (!isLinked) {
-      const [sectionLink, assignmentLink] = await Promise.all([
-        Section.exists({ tenantId, classId, sectionTeacher: teacherId }),
-        TeacherSubjectAssignment.exists({ tenantId, teacherId, classId, isActive: true })
-      ]);
-      isLinked = Boolean(sectionLink || assignmentLink);
-    }
+    // Match the same 4-strategy linkage logic used by the dashboard.
+    const linkedClasses = await resolveTeacherClasses(tenantId, req.user);
+    const isLinked = linkedClasses.some(c => c._id.toString() === classId.toString());
 
     if (!isLinked) {
       return res.status(403).json({

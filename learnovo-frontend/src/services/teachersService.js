@@ -25,6 +25,10 @@ export const teachersService = {
     const res = await api.get(`/teachers/my-classes${strict ? '?strict=true' : ''}`)
     return res.data
   },
+  myAssignedClasses: async () => {
+    const res = await api.get('/teachers/assigned-classes')
+    return res.data
+  },
   myClassPendingFees: async (classId) => {
     const res = await api.get(`/teachers/my-classes/${classId}/pending-fees`)
     return res.data
