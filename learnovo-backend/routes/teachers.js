@@ -529,12 +529,21 @@ router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), a
       });
     }
 
-    const students = await User.find({
+    // Match students via classId OR legacy string `class` (name/grade) — mirrors
+    // the lookup used by routes/classes.js and the reports dashboard so imported
+    // students that only have the legacy `class` string are not silently excluded.
+    const studentMatch = {
       tenantId,
       role: 'student',
-      classId,
-      isActive: true
-    })
+      isActive: true,
+      $or: [{ classId }]
+    };
+    if (classDoc.name) studentMatch.$or.push({ class: classDoc.name });
+    if (classDoc.grade && classDoc.grade !== classDoc.name) {
+      studentMatch.$or.push({ class: classDoc.grade });
+    }
+
+    const students = await User.find(studentMatch)
       .select('name fullName admissionNumber rollNumber sectionId')
       .populate('sectionId', 'name')
       .sort({ rollNumber: 1, name: 1 })
