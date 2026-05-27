@@ -101,6 +101,7 @@ const Payroll = lazy(() => import('./pages/Payroll'))
 const Expenses = lazy(() => import('./pages/Expenses'))
 const Income = lazy(() => import('./pages/Income'))
 const FinanceDashboard = lazy(() => import('./pages/FinanceDashboard'))
+const TeacherClassFees = lazy(() => import('./pages/teacher/TeacherClassFees'))
 const BankReconciliation = lazy(() => import('./pages/admin/BankReconciliation'))
 const CertificateGeneration = lazy(() => import('./pages/certificates/CertificateGeneration'))
 const TemplateSettings = lazy(() => import('./pages/certificates/TemplateSettings'))
@@ -348,6 +349,11 @@ function App() {
                       <Route path="student/fees" element={
                         <ProtectedRoute allowedRoles={['student', 'parent']}>
                           <StudentFeesDashboard />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="class-fees" element={
+                        <ProtectedRoute allowedRoles={['teacher']}>
+                          <TeacherClassFees />
                         </ProtectedRoute>
                       } />
 

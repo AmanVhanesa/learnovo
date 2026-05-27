@@ -1,10 +1,13 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, query } = require('express-validator');
 const User = require('../models/User');
 const Class = require('../models/Class');
 const Section = require('../models/Section');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const ClassSubject = require('../models/ClassSubject');
+const AcademicSession = require('../models/AcademicSession');
+const StudentBalance = require('../models/StudentBalance');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const planGate = require('../middleware/planGate');
@@ -414,6 +417,102 @@ router.get('/my-classes', protect, authorize('teacher'), async(req, res) => {
       success: false,
       message: 'Server error while fetching classes'
     });
+  }
+});
+
+// @desc    Get pending fee summary for students of a class
+//          (class teacher only — read-only summary)
+// @route   GET /api/teachers/my-classes/:classId/pending-fees
+// @access  Private (Teacher who is the class teacher of :classId)
+router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), async(req, res, next) => {
+  try {
+    const teacherId = req.user._id;
+    const tenantId = req.user.tenantId;
+    const { classId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(classId)) {
+      return res.status(400).json({ success: false, message: 'Invalid class ID', requestId: req.requestId });
+    }
+
+    const classDoc = await Class.findOne({ _id: classId, tenantId }).select('name grade classTeacher').lean();
+    if (!classDoc) {
+      return res.status(404).json({ success: false, message: 'Class not found', requestId: req.requestId });
+    }
+
+    if (!classDoc.classTeacher || classDoc.classTeacher.toString() !== teacherId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the assigned class teacher can view fee status for this class',
+        requestId: req.requestId
+      });
+    }
+
+    const activeSession = await AcademicSession.findOne({ tenantId, isActive: true }).select('_id name').lean();
+    if (!activeSession) {
+      return res.status(404).json({
+        success: false,
+        message: 'No active academic session found',
+        requestId: req.requestId
+      });
+    }
+
+    const students = await User.find({
+      tenantId,
+      role: 'student',
+      classId,
+      isActive: true
+    })
+      .select('name fullName admissionNumber rollNumber sectionId')
+      .populate('sectionId', 'name')
+      .sort({ rollNumber: 1, name: 1 })
+      .lean();
+
+    const studentIds = students.map(s => s._id);
+    const balances = await StudentBalance.find({
+      tenantId,
+      academicSessionId: activeSession._id,
+      studentId: { $in: studentIds }
+    }).lean();
+
+    const balanceByStudent = new Map(
+      balances.map(b => [b.studentId.toString(), b])
+    );
+
+    const rows = students.map(s => {
+      const bal = balanceByStudent.get(s._id.toString());
+      return {
+        studentId: s._id,
+        name: s.fullName || s.name,
+        admissionNumber: s.admissionNumber || '',
+        rollNumber: s.rollNumber || '',
+        sectionName: s.sectionId?.name || '',
+        totalInvoiced: bal?.totalInvoiced || 0,
+        totalPaid: bal?.totalPaid || 0,
+        totalBalance: bal?.totalBalance || 0,
+        lastPaymentDate: bal?.lastPaymentDate || null
+      };
+    });
+
+    const totals = rows.reduce((acc, r) => {
+      acc.totalInvoiced += r.totalInvoiced;
+      acc.totalPaid += r.totalPaid;
+      acc.totalBalance += r.totalBalance;
+      if (r.totalBalance > 0) acc.pendingCount += 1;
+      return acc;
+    }, { totalInvoiced: 0, totalPaid: 0, totalBalance: 0, pendingCount: 0, studentCount: rows.length });
+
+    res.json({
+      success: true,
+      data: {
+        class: { _id: classDoc._id, name: classDoc.name, grade: classDoc.grade },
+        session: { _id: activeSession._id, name: activeSession.name },
+        totals,
+        students: rows
+      },
+      requestId: req.requestId
+    });
+  } catch (error) {
+    next(error);
   }
 });
 

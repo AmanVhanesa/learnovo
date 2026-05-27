@@ -91,6 +91,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     // ── Fees & Finance (unified section for all fee + finance items) ──
     const feesFinanceItems = [
       { name: 'My Fees', href: '/app/student/fees', icon: CreditCard, roles: ['student', 'parent'] },
+      { name: 'Class Fee Status', href: '/app/class-fees', icon: CreditCard, roles: ['teacher'] },
       { name: 'Fee Collection', href: '/app/fees-finance', icon: CreditCard, roles: ['admin'] },
       { name: 'Finance Overview', href: '/app/finance-dashboard', icon: PieChart, roles: ['admin'] },
       { name: 'Income', href: '/app/income', icon: CircleDollarSign, roles: ['admin'] },
