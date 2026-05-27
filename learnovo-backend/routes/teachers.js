@@ -7,7 +7,8 @@ const Section = require('../models/Section');
 const TeacherSubjectAssignment = require('../models/TeacherSubjectAssignment');
 const ClassSubject = require('../models/ClassSubject');
 const AcademicSession = require('../models/AcademicSession');
-const StudentBalance = require('../models/StudentBalance');
+const FeeInvoice = require('../models/FeeInvoice');
+const Payment = require('../models/Payment');
 const { protect, authorize } = require('../middleware/auth');
 const { handleValidationErrors } = require('../middleware/validation');
 const planGate = require('../middleware/planGate');
@@ -490,8 +491,52 @@ router.get('/assigned-classes', protect, authorize('teacher'), async(req, res, n
   }
 });
 
-// @desc    Get pending fee summary for students of a class
-//          (any teacher linked to the class — read-only summary)
+// Helper: determine which section IDs the teacher is allowed to see in a class.
+// Returns either the string 'all' (whole class) or a Set<string> of sectionIds.
+// Mirrors resolveTeacherClasses but at section granularity:
+//   - Class.classTeacher                  -> 'all'
+//   - Class.subjects[].teacher            -> 'all' (subject teacher for the class)
+//   - User.assignedClasses contains class -> 'all' (legacy import)
+//   - TeacherSubjectAssignment w/o section-> 'all' (class-wide subject teacher)
+//   - TeacherSubjectAssignment w/ section -> that section
+//   - Section.sectionTeacher              -> that section
+async function resolveTeacherSectionsInClass(tenantId, teacherUser, classDoc) {
+  const teacherId = teacherUser._id;
+  const classId = classDoc._id;
+
+  // Whole-class signals
+  if (classDoc.classTeacher && classDoc.classTeacher.toString() === teacherId.toString()) return 'all';
+  const embeddedSubjectMatch = (classDoc.subjects || []).some(s =>
+    s?.teacher && s.teacher.toString() === teacherId.toString()
+  );
+  if (embeddedSubjectMatch) return 'all';
+
+  const legacyNames = Array.isArray(teacherUser.assignedClasses) ? teacherUser.assignedClasses : [];
+  if (legacyNames.includes(classDoc.name) || legacyNames.includes(classDoc.grade)) return 'all';
+
+  const tsaRecords = await TeacherSubjectAssignment.find({
+    tenantId, teacherId, classId, isActive: true
+  }).select('sectionId').lean();
+  if (tsaRecords.some(a => !a.sectionId)) return 'all';
+
+  const allowed = new Set();
+  tsaRecords.forEach(a => {
+    if (a.sectionId) allowed.add(a.sectionId.toString());
+  });
+
+  const teacherSections = await Section.find({
+    tenantId, classId, sectionTeacher: teacherId, isActive: true
+  }).select('_id').lean();
+  teacherSections.forEach(s => allowed.add(s._id.toString()));
+
+  return allowed;
+}
+
+// @desc    Get pending fee summary (per-quarter) for students of a class.
+//          Restricted to the section(s) the teacher is linked to within
+//          the class — a class teacher / subject teacher / legacy-assigned
+//          teacher sees all sections; a section-only teacher sees just
+//          their section(s).
 // @route   GET /api/teachers/my-classes/:classId/pending-fees
 // @access  Private (Teacher linked to :classId via any allocation method)
 router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), async(req, res, next) => {
@@ -503,15 +548,15 @@ router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), a
       return res.status(400).json({ success: false, message: 'Invalid class ID', requestId: req.requestId });
     }
 
-    const classDoc = await Class.findOne({ _id: classId, tenantId }).select('name grade').lean();
+    const classDoc = await Class.findOne({ _id: classId, tenantId })
+      .select('name grade classTeacher subjects')
+      .lean();
     if (!classDoc) {
       return res.status(404).json({ success: false, message: 'Class not found', requestId: req.requestId });
     }
 
-    // Match the same 4-strategy linkage logic used by the dashboard.
     const linkedClasses = await resolveTeacherClasses(tenantId, req.user);
     const isLinked = linkedClasses.some(c => c._id.toString() === classId.toString());
-
     if (!isLinked) {
       return res.status(403).json({
         success: false,
@@ -529,18 +574,48 @@ router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), a
       });
     }
 
-    // Match students via classId OR legacy string `class` (name/grade) — mirrors
-    // the lookup used by routes/classes.js and the reports dashboard so imported
-    // students that only have the legacy `class` string are not silently excluded.
-    const studentMatch = {
-      tenantId,
-      role: 'student',
-      isActive: true,
-      $or: [{ classId }]
-    };
-    if (classDoc.name) studentMatch.$or.push({ class: classDoc.name });
-    if (classDoc.grade && classDoc.grade !== classDoc.name) {
-      studentMatch.$or.push({ class: classDoc.grade });
+    const allowedSections = await resolveTeacherSectionsInClass(tenantId, req.user, classDoc);
+    const restrictToSections = allowedSections !== 'all';
+
+    // Build student match. Section-only teachers MUST have sectionId in
+    // their allowed set — legacy class-string students (no sectionId) are
+    // excluded for them since we can't verify section ownership. Whole-class
+    // teachers fall back to legacy class-string matching so imported students
+    // are not silently dropped.
+    let studentMatch;
+    if (restrictToSections) {
+      if (allowedSections.size === 0) {
+        // Linked to the class but to no section within it — return empty.
+        return res.json({
+          success: true,
+          data: {
+            class: { _id: classDoc._id, name: classDoc.name, grade: classDoc.grade },
+            session: { _id: activeSession._id, name: activeSession.name },
+            scope: { restrictedToSections: true, sectionIds: [] },
+            quarters: [],
+            totals: { studentCount: 0, pendingCount: 0, totalInvoiced: 0, totalPaid: 0, totalBalance: 0, byQuarter: {} },
+            students: []
+          },
+          requestId: req.requestId
+        });
+      }
+      studentMatch = {
+        tenantId,
+        role: 'student',
+        isActive: true,
+        sectionId: { $in: Array.from(allowedSections).map(id => new mongoose.Types.ObjectId(id)) }
+      };
+    } else {
+      studentMatch = {
+        tenantId,
+        role: 'student',
+        isActive: true,
+        $or: [{ classId }]
+      };
+      if (classDoc.name) studentMatch.$or.push({ class: classDoc.name });
+      if (classDoc.grade && classDoc.grade !== classDoc.name) {
+        studentMatch.$or.push({ class: classDoc.grade });
+      }
     }
 
     const students = await User.find(studentMatch)
@@ -549,29 +624,136 @@ router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), a
       .sort({ rollNumber: 1, name: 1 })
       .lean();
 
-    const studentIds = students.map(s => s._id);
-    const balances = await StudentBalance.find({
-      tenantId,
-      academicSessionId: activeSession._id,
-      studentId: { $in: studentIds }
-    }).lean();
+    if (students.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          class: { _id: classDoc._id, name: classDoc.name, grade: classDoc.grade },
+          session: { _id: activeSession._id, name: activeSession.name },
+          scope: {
+            restrictedToSections: restrictToSections,
+            sectionIds: restrictToSections ? Array.from(allowedSections) : []
+          },
+          quarters: [],
+          totals: { studentCount: 0, pendingCount: 0, totalInvoiced: 0, totalPaid: 0, totalBalance: 0, byQuarter: {} },
+          students: []
+        },
+        requestId: req.requestId
+      });
+    }
 
-    const balanceByStudent = new Map(
-      balances.map(b => [b.studentId.toString(), b])
-    );
+    const studentIds = students.map(s => s._id);
+
+    // Aggregate non-cancelled invoices per (student, period).
+    const invoiceAgg = await FeeInvoice.aggregate([
+      {
+        $match: {
+          tenantId: new mongoose.Types.ObjectId(tenantId),
+          studentId: { $in: studentIds },
+          academicSessionId: new mongoose.Types.ObjectId(activeSession._id),
+          status: { $ne: 'Cancelled' }
+        }
+      },
+      {
+        $group: {
+          _id: { studentId: '$studentId', periodLabel: '$periodLabel' },
+          periodStart: { $min: '$periodStart' },
+          invoiced: { $sum: { $add: [{ $ifNull: ['$totalAmount', 0] }, { $ifNull: ['$lateFeeApplied', 0] }, { $multiply: [-1, { $ifNull: ['$discountAmount', 0] }] }] } },
+          paid: { $sum: { $ifNull: ['$paidAmount', 0] } },
+          balance: { $sum: { $ifNull: ['$balanceAmount', 0] } }
+        }
+      }
+    ]);
+
+    // Last confirmed payment per student in this session
+    const lastPayments = await Payment.aggregate([
+      {
+        $match: {
+          tenantId: new mongoose.Types.ObjectId(tenantId),
+          studentId: { $in: studentIds },
+          isConfirmed: true,
+          isReversed: false
+        }
+      },
+      {
+        $lookup: {
+          from: 'feeinvoices',
+          localField: 'invoiceId',
+          foreignField: '_id',
+          as: 'invoice'
+        }
+      },
+      { $unwind: { path: '$invoice', preserveNullAndEmptyArrays: true } },
+      {
+        $match: {
+          $or: [
+            { 'invoice.academicSessionId': new mongoose.Types.ObjectId(activeSession._id) },
+            { invoice: null }
+          ]
+        }
+      },
+      { $sort: { paymentDate: -1 } },
+      { $group: { _id: '$studentId', lastPaymentDate: { $first: '$paymentDate' } } }
+    ]);
+    const lastPaymentByStudent = new Map(lastPayments.map(p => [p._id.toString(), p.lastPaymentDate]));
+
+    // Build quarter list: distinct (periodLabel) ordered by earliest periodStart
+    const quarterMap = new Map(); // label -> { label, periodStart }
+    invoiceAgg.forEach(row => {
+      const label = row._id.periodLabel || 'Unscheduled';
+      const ps = row.periodStart || null;
+      const existing = quarterMap.get(label);
+      if (!existing) {
+        quarterMap.set(label, { label, periodStart: ps });
+      } else if (ps && (!existing.periodStart || ps < existing.periodStart)) {
+        existing.periodStart = ps;
+      }
+    });
+    const quarters = Array.from(quarterMap.values()).sort((a, b) => {
+      if (a.periodStart && b.periodStart) return new Date(a.periodStart) - new Date(b.periodStart);
+      return (a.label || '').localeCompare(b.label || '');
+    });
+    const quarterLabels = quarters.map(q => q.label);
+
+    // Index aggregates by student
+    const aggByStudent = new Map(); // sid -> { label -> { invoiced, paid, balance } }
+    invoiceAgg.forEach(row => {
+      const sid = row._id.studentId.toString();
+      const label = row._id.periodLabel || 'Unscheduled';
+      if (!aggByStudent.has(sid)) aggByStudent.set(sid, {});
+      aggByStudent.get(sid)[label] = {
+        invoiced: Math.round(row.invoiced || 0),
+        paid: Math.round(row.paid || 0),
+        balance: Math.round(row.balance || 0)
+      };
+    });
+
+    const round = (n) => Math.round(n || 0);
 
     const rows = students.map(s => {
-      const bal = balanceByStudent.get(s._id.toString());
+      const sid = s._id.toString();
+      const perQuarter = aggByStudent.get(sid) || {};
+      let totalInvoiced = 0, totalPaid = 0, totalBalance = 0;
+      const byQuarter = {};
+      quarterLabels.forEach(label => {
+        const q = perQuarter[label] || { invoiced: 0, paid: 0, balance: 0 };
+        byQuarter[label] = q;
+        totalInvoiced += q.invoiced;
+        totalPaid += q.paid;
+        totalBalance += q.balance;
+      });
       return {
         studentId: s._id,
         name: s.fullName || s.name,
         admissionNumber: s.admissionNumber || '',
         rollNumber: s.rollNumber || '',
         sectionName: s.sectionId?.name || '',
-        totalInvoiced: bal?.totalInvoiced || 0,
-        totalPaid: bal?.totalPaid || 0,
-        totalBalance: bal?.totalBalance || 0,
-        lastPaymentDate: bal?.lastPaymentDate || null
+        sectionId: s.sectionId?._id || null,
+        totalInvoiced: round(totalInvoiced),
+        totalPaid: round(totalPaid),
+        totalBalance: round(totalBalance),
+        lastPaymentDate: lastPaymentByStudent.get(sid) || null,
+        byQuarter
       };
     });
 
@@ -580,14 +762,27 @@ router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), a
       acc.totalPaid += r.totalPaid;
       acc.totalBalance += r.totalBalance;
       if (r.totalBalance > 0) acc.pendingCount += 1;
+      quarterLabels.forEach(label => {
+        const q = r.byQuarter[label] || { invoiced: 0, paid: 0, balance: 0 };
+        if (!acc.byQuarter[label]) acc.byQuarter[label] = { invoiced: 0, paid: 0, balance: 0, pendingCount: 0 };
+        acc.byQuarter[label].invoiced += q.invoiced;
+        acc.byQuarter[label].paid += q.paid;
+        acc.byQuarter[label].balance += q.balance;
+        if (q.balance > 0) acc.byQuarter[label].pendingCount += 1;
+      });
       return acc;
-    }, { totalInvoiced: 0, totalPaid: 0, totalBalance: 0, pendingCount: 0, studentCount: rows.length });
+    }, { totalInvoiced: 0, totalPaid: 0, totalBalance: 0, pendingCount: 0, studentCount: rows.length, byQuarter: {} });
 
     res.json({
       success: true,
       data: {
         class: { _id: classDoc._id, name: classDoc.name, grade: classDoc.grade },
         session: { _id: activeSession._id, name: activeSession.name },
+        scope: {
+          restrictedToSections: restrictToSections,
+          sectionIds: restrictToSections ? Array.from(allowedSections) : []
+        },
+        quarters,
         totals,
         students: rows
       },

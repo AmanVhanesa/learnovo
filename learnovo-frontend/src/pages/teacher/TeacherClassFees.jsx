@@ -35,7 +35,15 @@ const TeacherClassFees = () => {
   })
 
   const students = classFees?.students || []
-  const totals = classFees?.totals || { totalInvoiced: 0, totalPaid: 0, totalBalance: 0, pendingCount: 0, studentCount: 0 }
+  const totals = classFees?.totals || { totalInvoiced: 0, totalPaid: 0, totalBalance: 0, pendingCount: 0, studentCount: 0, byQuarter: {} }
+  const quarters = classFees?.quarters || []
+  // Compact label for narrow columns: e.g. "Q1 2026 (Apr-Jun)" -> "Q1 Apr–Jun"
+  const shortQuarterLabel = (label) => {
+    if (!label) return ''
+    const m = label.match(/^(Q\d)\b.*\(([^)]+)\)/)
+    if (m) return `${m[1]} ${m[2].replace(/-/g, '–')}`
+    return label
+  }
 
   const filteredStudents = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -173,44 +181,87 @@ const TeacherClassFees = () => {
             </div>
           </div>
 
+          {/* Per-quarter totals */}
+          {quarters.length > 0 && (
+            <div className="rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] p-3">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-1">
+                Quarter-wise pending
+              </div>
+              <div className={`grid gap-2 ${quarters.length <= 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
+                {quarters.map(q => {
+                  const t = totals.byQuarter?.[q.label] || { invoiced: 0, paid: 0, balance: 0, pendingCount: 0 }
+                  const danger = t.balance > 0
+                  return (
+                    <div key={q.label} className="rounded-lg border border-gray-200 dark:border-[#38383A] p-3">
+                      <div className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{shortQuarterLabel(q.label)}</div>
+                      <div className={`mt-1 text-base font-semibold tabular-nums ${danger ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        {formatCurrency(t.balance)}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {t.pendingCount} pending · paid {formatCurrency(t.paid)}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Table */}
           <div className="rounded-xl border border-gray-200 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-400 text-xs uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold">Student</th>
-                    <th className="px-4 py-3 text-left font-semibold">Section</th>
-                    <th className="px-4 py-3 text-right font-semibold">Invoiced</th>
-                    <th className="px-4 py-3 text-right font-semibold">Paid</th>
-                    <th className="px-4 py-3 text-right font-semibold">Pending</th>
-                    <th className="px-4 py-3 text-left font-semibold">Last payment</th>
+                    <th className="px-4 py-3 text-left font-semibold sticky left-0 bg-gray-50 dark:bg-[#2C2C2E] z-10">Student</th>
+                    <th className="px-3 py-3 text-left font-semibold">Section</th>
+                    {quarters.map(q => (
+                      <th key={q.label} className="px-3 py-3 text-right font-semibold whitespace-nowrap">
+                        {shortQuarterLabel(q.label)}
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-right font-semibold whitespace-nowrap">Total pending</th>
+                    <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">Last payment</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-[#2C2C2E]">
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                      <td colSpan={4 + quarters.length} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                         No students match your filters.
                       </td>
                     </tr>
                   ) : filteredStudents.map(s => (
                     <tr key={s.studentId} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 dark:text-white">{s.name}</div>
+                      <td className="px-4 py-3 sticky left-0 bg-white dark:bg-[#1C1C1E] z-10">
+                        <div className="font-medium text-gray-900 dark:text-white whitespace-nowrap">{s.name}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {s.admissionNumber || '—'}{s.rollNumber ? ` · Roll ${s.rollNumber}` : ''}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{s.sectionName || '—'}</td>
-                      <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300 tabular-nums">{formatCurrency(s.totalInvoiced)}</td>
-                      <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-300 tabular-nums">{formatCurrency(s.totalPaid)}</td>
-                      <td className={`px-4 py-3 text-right font-semibold tabular-nums ${
+                      <td className="px-3 py-3 text-gray-700 dark:text-gray-300">{s.sectionName || '—'}</td>
+                      {quarters.map(q => {
+                        const cell = s.byQuarter?.[q.label] || { invoiced: 0, paid: 0, balance: 0 }
+                        const noInvoice = !cell.invoiced && !cell.paid && !cell.balance
+                        const paidFully = !noInvoice && cell.balance <= 0
+                        return (
+                          <td key={q.label} className="px-3 py-3 text-right tabular-nums whitespace-nowrap">
+                            {noInvoice ? (
+                              <span className="text-gray-400 dark:text-gray-500">—</span>
+                            ) : paidFully ? (
+                              <span className="text-emerald-600 dark:text-emerald-400 text-xs font-medium">Paid</span>
+                            ) : (
+                              <span className="text-red-600 dark:text-red-400 font-semibold">{formatCurrency(cell.balance)}</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                      <td className={`px-4 py-3 text-right font-semibold tabular-nums whitespace-nowrap ${
                         s.totalBalance > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
                       }`}>
                         {formatCurrency(s.totalBalance)}
                       </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{fmtDate(s.lastPaymentDate)}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">{fmtDate(s.lastPaymentDate)}</td>
                     </tr>
                   ))}
                 </tbody>
