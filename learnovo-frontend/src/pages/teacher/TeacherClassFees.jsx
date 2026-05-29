@@ -227,7 +227,7 @@ const TeacherClassFees = () => {
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-400 text-xs uppercase tracking-wider">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold sticky left-0 bg-gray-50 dark:bg-[#2C2C2E] z-10">Student</th>
+                    <th className="px-4 py-3 text-left font-semibold sticky left-0 bg-gray-50 dark:bg-[#2C2C2E] z-10 max-w-[45vw] sm:max-w-none">Student</th>
                     <th className="px-3 py-3 text-left font-semibold">Section</th>
                     {quarters.map(q => (
                       <th key={q.label} className="px-3 py-3 text-right font-semibold whitespace-nowrap">
@@ -247,8 +247,8 @@ const TeacherClassFees = () => {
                     </tr>
                   ) : filteredStudents.map(s => (
                     <tr key={s.studentId} className="hover:bg-gray-50 dark:hover:bg-[#2C2C2E]">
-                      <td className="px-4 py-3 sticky left-0 bg-white dark:bg-[#1C1C1E] z-10">
-                        <div className="font-medium text-gray-900 dark:text-white whitespace-nowrap">{s.name}</div>
+                      <td className="px-4 py-3 sticky left-0 bg-white dark:bg-[#1C1C1E] z-10 max-w-[45vw] sm:max-w-none">
+                        <div className="font-medium text-gray-900 dark:text-white break-words sm:whitespace-nowrap">{s.name}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {s.admissionNumber || '—'}{s.rollNumber ? ` · Roll ${s.rollNumber}` : ''}
                         </div>
