@@ -266,7 +266,7 @@ function buildReceiptHtml(payment, schoolData, logoDataUri) {
   ${isPartial ? `
   <div class="bal-sec">
     <div class="bal-box">
-      <span class="bal-label">Remaining Balance${billingPeriod ? ` (${billingPeriod})` : ''}</span>
+      <span class="bal-label">Remaining Balance${billingPeriod ? ` — ${billingPeriod}` : ''}</span>
       <span class="bal-value">&#8377; ${invoiceBalance.toLocaleString('en-IN')}</span>
     </div>
   </div>` : ''}

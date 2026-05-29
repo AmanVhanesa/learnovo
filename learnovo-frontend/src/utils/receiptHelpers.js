@@ -308,7 +308,7 @@ export function buildReceiptHtml(rawPayment, rawSchool, opts = {}) {
         <!-- Remaining balance -->
         <div class="balance-section">
           <div class="balance-box">
-            <span class="bal-label">Remaining Balance${billingPeriod ? ` (${billingPeriod})` : ''}</span>
+            <span class="bal-label">Remaining Balance${billingPeriod ? ` — ${billingPeriod}` : ''}</span>
             <span class="bal-value">&#8377; ${invoiceBalance.toLocaleString('en-IN')}</span>
           </div>
         </div>` : ''}
@@ -609,7 +609,7 @@ async function _oldDownloadReceiptAsPdf_UNUSED(rawPayment, rawSchool) {
     const balBoxH = 8
     roundRect(L, Y, W, balBoxH, 2, C.amberBg, C.amberBorder)
     pdf.setFontSize(5.5); pdf.setFont('helvetica', 'bold'); setColor(C.amber)
-    const balLabel = `REMAINING BALANCE${billingPeriod ? ` (${billingPeriod})` : ''}`
+    const balLabel = `REMAINING BALANCE${billingPeriod ? ` — ${billingPeriod}` : ''}`
     pdf.text(balLabel, L + 4, Y + 5)
     pdf.setFontSize(10); pdf.setFont('helvetica', 'bold'); setColor(C.amber)
     pdf.text(`\u20B9 ${invoiceBalance.toLocaleString('en-IN')}`, R - 4, Y + 5.5, { align: 'right' })
