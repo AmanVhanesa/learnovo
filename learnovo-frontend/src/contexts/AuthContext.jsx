@@ -236,6 +236,22 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('selectedChildId')
     dispatch({ type: 'LOGOUT' })
     toast.success('Logged out successfully!')
+
+    // The demo tenant is a shared playground reached via the "Quick Demo" buttons
+    // on the root domain. On the demo subdomain the login is tenant-branded, which
+    // hides those role buttons — so a user who logged out of demo admin would be
+    // trapped and unable to try the teacher/student demo. Send them back to the
+    // root login where the demo buttons live. Real tenants (e.g. spis) are left
+    // alone and stay on their own subdomain login.
+    try {
+      const host = window.location.hostname.toLowerCase()
+      const baseDomain = import.meta.env.VITE_APP_DOMAIN || 'learnovoportal.com'
+      if (host === `demo.${baseDomain}`) {
+        window.location.href = `${window.location.protocol}//${baseDomain}/login`
+      }
+    } catch (e) {
+      // Non-fatal — fall back to the caller's own post-logout navigation
+    }
   }
 
   const updateProfile = async (profileData) => {
