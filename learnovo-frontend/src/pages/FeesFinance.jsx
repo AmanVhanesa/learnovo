@@ -478,7 +478,7 @@ const FeesFinance = () => {
             <div key={group.label} className="flex items-end">
               {gIdx > 0 && <div className="w-px h-6 bg-gray-200 dark:bg-[#38383A] mx-1 sm:mx-2 mb-2 flex-shrink-0" />}
               <div className="flex flex-col items-start">
-                <span className="text-[9px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wider px-2 mb-0.5 hidden sm:block">{group.label}</span>
+                <span className="text-[9px] font-semibold text-gray-400 dark:text-[#636366] uppercase tracking-wider px-2 mb-0.5">{group.label}</span>
                 <div className="flex space-x-0.5 sm:space-x-1">
                   {group.tabs.map((tab) => {
                     const Icon = tab.icon
@@ -486,8 +486,8 @@ const FeesFinance = () => {
                     return (
                       <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                         className={`py-3 px-2.5 sm:px-3 border-b-2 font-medium text-sm flex items-center gap-1.5 transition-all whitespace-nowrap rounded-t-lg ${isActive ? 'border-primary-500 text-primary-600 dark:text-primary-400 bg-primary-50/50 dark:bg-primary-900/10' : 'border-transparent text-gray-500 dark:text-[#8E8E93] hover:text-gray-700 dark:hover:text-white hover:border-gray-300 dark:hover:border-[#38383A]'}`}>
-                        <Icon className="h-4 w-4" />
-                        <span className="hidden sm:inline">{tab.label}</span>
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <span>{tab.label}</span>
                       </button>
                     )
                   })}
