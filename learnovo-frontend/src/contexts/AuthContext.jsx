@@ -78,6 +78,26 @@ export function AuthProvider({ children }) {
       // When a user logs in on the root domain and is redirected to a tenant
       // subdomain, localStorage isn't shared, so the token is passed via URL.
       const urlParams = new URLSearchParams(window.location.search)
+
+      // Cross-origin logout signal: a user who logged out of the demo subdomain
+      // is redirected here with ?signedout=1. The root origin may still hold the
+      // session it created during the original login handoff, which would
+      // silently re-authenticate and bounce them back to the demo. Clear it and
+      // stay logged out so the root login (with its Quick Demo buttons) shows.
+      if (urlParams.get('signedout') === '1') {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('tenant')
+        localStorage.removeItem('selectedChildId')
+        urlParams.delete('signedout')
+        const cleanUrl = urlParams.toString()
+          ? `${window.location.pathname}?${urlParams.toString()}`
+          : window.location.pathname
+        window.history.replaceState({}, '', cleanUrl)
+        dispatch({ type: 'AUTH_FAILURE', payload: null })
+        return
+      }
+
       const urlToken = urlParams.get('authToken')
       if (urlToken) {
         localStorage.setItem('token', urlToken)
@@ -247,7 +267,11 @@ export function AuthProvider({ children }) {
       const host = window.location.hostname.toLowerCase()
       const baseDomain = import.meta.env.VITE_APP_DOMAIN || 'learnovoportal.com'
       if (host === `demo.${baseDomain}`) {
-        window.location.href = `${window.location.protocol}//${baseDomain}/login`
+        // signedout=1 tells the root-domain AuthContext to clear its own stale
+        // session (the demo user first logged in on the root origin, whose
+        // localStorage we cannot clear from this subdomain origin). Without it
+        // the root would silently re-authenticate and bounce back to the demo.
+        window.location.href = `${window.location.protocol}//${baseDomain}/login?signedout=1`
       }
     } catch (e) {
       // Non-fatal — fall back to the caller's own post-logout navigation
