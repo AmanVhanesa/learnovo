@@ -41,9 +41,18 @@ async function toBase64DataUri(url) {
   }
 }
 
+function resolveFatherName(student) {
+  if (!student) return '';
+  const fromGuardian = Array.isArray(student.guardians)
+    ? student.guardians.find(g => g && /father/i.test(g.relation || ''))?.name
+    : '';
+  return fromGuardian || student.fatherOrHusbandName || student.fatherName || student.parentName || '';
+}
+
 function buildReceiptHtml(payment, schoolData, logoDataUri) {
   const student = payment.studentId || {};
   const studentName = student.name || student.fullName || 'N/A';
+  const fatherName = resolveFatherName(student);
   const studentAdmNo = student.admissionNumber || student.studentId || '-';
   const studentClass = (student.classId?.name || student.class || '-') + (student.section ? ` (${student.section})` : '');
   const paymentDate = payment.paymentDate
@@ -232,6 +241,7 @@ function buildReceiptHtml(payment, schoolData, logoDataUri) {
     <div class="info-col">
       <div class="info-title">Student</div>
       <div class="info-row"><span class="info-lbl">Name</span><span class="info-val">${studentName}</span></div>
+      ${fatherName ? `<div class="info-row"><span class="info-lbl">Father</span><span class="info-val">${fatherName}</span></div>` : ''}
       <div class="info-row"><span class="info-lbl">Adm. No.</span><span class="info-val">${studentAdmNo}</span></div>
       <div class="info-row"><span class="info-lbl">Class</span><span class="info-val">${studentClass}</span></div>
     </div>
@@ -356,6 +366,7 @@ function buildConsolidatedReceiptHtml(payments, schoolData, logoDataUri) {
   const first = payments[0] || {};
   const student = first.studentId || {};
   const studentName = student.name || student.fullName || 'N/A';
+  const fatherName = resolveFatherName(student);
   const studentAdmNo = student.admissionNumber || student.studentId || '-';
   const studentClass = (student.classId?.name || student.class || '-') + (student.section ? ` (${student.section})` : '');
 
@@ -520,6 +531,7 @@ function buildConsolidatedReceiptHtml(payments, schoolData, logoDataUri) {
     <div class="info-col">
       <div class="info-title">Student</div>
       <div class="info-row"><span class="info-lbl">Name</span><span class="info-val">${studentName}</span></div>
+      ${fatherName ? `<div class="info-row"><span class="info-lbl">Father</span><span class="info-val">${fatherName}</span></div>` : ''}
       <div class="info-row"><span class="info-lbl">Adm. No.</span><span class="info-val">${studentAdmNo}</span></div>
       <div class="info-row"><span class="info-lbl">Class</span><span class="info-val">${studentClass}</span></div>
     </div>

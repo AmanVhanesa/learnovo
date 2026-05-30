@@ -2019,7 +2019,7 @@ router.get('/payments/:id/receipt/pdf', protect, async(req, res) => {
     const payment = await Payment.findOne({ _id: id, tenantId })
       .populate({
         path: 'studentId',
-        select: 'name fullName admissionNumber studentId class section parentName classId',
+        select: 'name fullName admissionNumber studentId class section parentName guardians fatherOrHusbandName classId',
         populate: { path: 'classId', select: 'name' }
       })
       .populate('invoiceId')
@@ -2079,7 +2079,7 @@ router.get('/payments/group/:groupId/receipt/pdf', protect, async(req, res) => {
     const payments = await Payment.find({ tenantId, transactionGroupId: groupId })
       .populate({
         path: 'studentId',
-        select: 'name fullName admissionNumber studentId class section parentName classId',
+        select: 'name fullName admissionNumber studentId class section parentName guardians fatherOrHusbandName classId',
         populate: { path: 'classId', select: 'name' }
       })
       .populate('invoiceId')
@@ -2138,7 +2138,7 @@ router.get('/payments/:id/receipt/html', protect, async(req, res) => {
     const payment = await Payment.findOne({ _id: id, tenantId })
       .populate({
         path: 'studentId',
-        select: 'name fullName admissionNumber studentId class section parentName fatherName classId',
+        select: 'name fullName admissionNumber studentId class section parentName fatherName guardians fatherOrHusbandName classId',
         populate: { path: 'classId', select: 'name' }
       })
       .populate('invoiceId')

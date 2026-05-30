@@ -1371,7 +1371,7 @@ router.get('/receipt/group/:groupId/pdf', protect, authorize('student', 'parent'
     const payments = await Payment.find({ tenantId, studentId, transactionGroupId: groupId })
       .populate({
         path: 'studentId',
-        select: 'name fullName admissionNumber studentId class section parentName classId',
+        select: 'name fullName admissionNumber studentId class section parentName guardians fatherOrHusbandName classId',
         populate: { path: 'classId', select: 'name' }
       })
       .populate('invoiceId')
@@ -1730,7 +1730,7 @@ router.get('/receipt/:id/html', protect, authorize('student', 'parent'), async(r
 
     await receipt.populate({
       path: 'studentId',
-      select: 'name fullName admissionNumber studentId class section classId',
+      select: 'name fullName admissionNumber studentId class section guardians fatherOrHusbandName classId',
       populate: { path: 'classId', select: 'name' }
     });
     await receipt.populate('invoiceId', 'invoiceNumber items billingPeriod status balanceAmount periodLabel');
@@ -1789,7 +1789,7 @@ router.get('/receipt/:id/pdf', protect, authorize('student', 'parent'), async(re
 
     await receipt.populate({
       path: 'studentId',
-      select: 'name fullName admissionNumber studentId class section classId',
+      select: 'name fullName admissionNumber studentId class section guardians fatherOrHusbandName classId',
       populate: { path: 'classId', select: 'name' }
     });
     await receipt.populate('invoiceId', 'invoiceNumber items billingPeriod status balanceAmount periodLabel');
