@@ -886,7 +886,9 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
           Number(p.amount || 0)
         ]);
         row.height = 18;
-        const isCash = (p.paymentMethod || '').toLowerCase() === 'cash';
+        const method = (p.paymentMethod || '').toLowerCase();
+        const isCash = method === 'cash';
+        const isUpi = method === 'upi';
         row.eachCell((cell, colNumber) => {
           cell.border = { top: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' }, bottom: { style: 'hair' } };
           if (colNumber === colCount) {
@@ -898,6 +900,11 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
         if (isCash) {
           row.eachCell(c => {
             c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF59D' } };
+            c.font = { ...(c.font || {}), bold: true };
+          });
+        } else if (isUpi) {
+          row.eachCell(c => {
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3E5FC' } };
             c.font = { ...(c.font || {}), bold: true };
           });
         } else if (idx % 2 === 1) {
