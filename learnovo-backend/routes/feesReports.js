@@ -759,7 +759,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       if (inv.periodLabel) return inv.periodLabel;
       if (inv.billingPeriod?.displayText) return inv.billingPeriod.displayText;
       if (inv.billingPeriod?.quarter) {
-        return `Q${inv.billingPeriod.quarter}${inv.billingPeriod.year ? ' ' + inv.billingPeriod.year : ''}`;
+        return `Q${inv.billingPeriod.quarter}${inv.billingPeriod.year ? ` ${inv.billingPeriod.year}` : ''}`;
       }
       return '-';
     };
