@@ -203,7 +203,7 @@ const Employees = () => {
         { key: 'isActive', label: 'Status', group: 'Basic', getValue: e => (e.isActive ? 'Active' : 'Inactive') },
         { key: 'phone', label: 'Phone', group: 'Contact', getValue: e => e.phone || '' },
         { key: 'email', label: 'Email', group: 'Contact', getValue: e => e.email || '' },
-        { key: 'address', label: 'Address', group: 'Contact', getValue: e => e.address || '' },
+        { key: 'address', label: 'Address', group: 'Contact', getValue: e => e.homeAddress || e.address || '' },
         { key: 'dateOfJoining', label: 'Joining Date', group: 'Employment', getValue: e => e.dateOfJoining ? formatDate(e.dateOfJoining) : '' },
         { key: 'dateOfBirth', label: 'Date of Birth', group: 'Employment', getValue: e => e.dateOfBirth ? formatDate(e.dateOfBirth) : '' },
         { key: 'gender', label: 'Gender', group: 'Employment', getValue: e => e.gender || '' },
