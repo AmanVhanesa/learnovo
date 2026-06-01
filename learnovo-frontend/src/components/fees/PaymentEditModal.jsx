@@ -6,11 +6,19 @@ import { paymentsService } from '../../services/feesService'
 
 const METHODS = ['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'Card', 'Online']
 
+// Format a Date into the local `YYYY-MM-DDTHH:mm` value an <input type="datetime-local"> expects
+const toLocalDateTimeInput = (d) => {
+  const dt = new Date(d)
+  if (Number.isNaN(dt.getTime())) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`
+}
+
 const PaymentEditModal = ({ payment, mode, onClose, onSuccess }) => {
   const isReverse = mode === 'reverse'
   const [paymentMethod, setPaymentMethod] = useState(payment.paymentMethod || 'Cash')
   const [paymentDate, setPaymentDate] = useState(
-    payment.paymentDate ? new Date(payment.paymentDate).toISOString().split('T')[0] : ''
+    payment.paymentDate ? toLocalDateTimeInput(payment.paymentDate) : ''
   )
   const [depositorName, setDepositorName] = useState(payment.depositorName || '')
   const [referenceNumber, setReferenceNumber] = useState(payment.transactionDetails?.referenceNumber || '')
@@ -30,7 +38,7 @@ const PaymentEditModal = ({ payment, mode, onClose, onSuccess }) => {
       } else {
         await paymentsService.update(payment._id, {
           paymentMethod,
-          paymentDate,
+          paymentDate: paymentDate ? new Date(paymentDate).toISOString() : undefined,
           depositorName,
           remarks,
           transactionDetails: {
@@ -102,9 +110,9 @@ const PaymentEditModal = ({ payment, mode, onClose, onSuccess }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Payment Date</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Payment Date &amp; Time</label>
                   <input
-                    type="date"
+                    type="datetime-local"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-[#38383A] rounded-lg text-sm dark:bg-[#1C1C1E] dark:text-white"
                     value={paymentDate}
                     onChange={(e) => setPaymentDate(e.target.value)}

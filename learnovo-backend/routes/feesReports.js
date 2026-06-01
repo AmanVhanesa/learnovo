@@ -810,7 +810,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       ws.columns = [
         { width: 5 },   // #
         { width: 15 },  // Receipt No.
-        { width: 11 },  // Date
+        { width: 18 },  // Date & Time
         { width: 12 },  // Adm. No.
         { width: 22 },  // Student Name
         { width: 20 },  // Father Name
@@ -871,7 +871,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       listTitle.alignment = { horizontal: 'center' };
       listTitle.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
 
-      const headerRow = ws.addRow(['#', 'Receipt No.', 'Date', 'Adm. No.', 'Student Name', 'Father Name', 'Phone', 'Class', 'Method', 'Period', 'Amount']);
+      const headerRow = ws.addRow(['#', 'Receipt No.', 'Date & Time', 'Adm. No.', 'Student Name', 'Father Name', 'Phone', 'Class', 'Method', 'Period', 'Amount']);
       headerRow.eachCell(cell => {
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
@@ -887,7 +887,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
         const row = ws.addRow([
           idx + 1,
           p.receiptNumber || '',
-          p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
+          p.paymentDate ? new Date(p.paymentDate).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '',
           adm,
           student,
           getFatherName(s) || '-',
@@ -1022,7 +1022,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
 
     // ── Receipt details (primary, placed first) ──
     lines.push(centered('RECEIPT DETAILS'));
-    const csvHeaders = ['#', 'Receipt No.', 'Date', 'Adm. No.', 'Student Name', 'Father Name', 'Phone', 'Class', 'Method', 'Amount'];
+    const csvHeaders = ['#', 'Receipt No.', 'Date & Time', 'Adm. No.', 'Student Name', 'Father Name', 'Phone', 'Class', 'Method', 'Amount'];
     lines.push(csvHeaders.map(q).join(','));
 
     payments.forEach((p, idx) => {
@@ -1030,7 +1030,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       lines.push([
         idx + 1,
         p.receiptNumber || '',
-        p.paymentDate ? new Date(p.paymentDate).toLocaleDateString('en-IN') : '',
+        p.paymentDate ? new Date(p.paymentDate).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '',
         s?.admissionNumber || s?.studentId || '-',
         s?.fullName || s?.name || 'N/A',
         getFatherName(s) || '-',
