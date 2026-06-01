@@ -732,7 +732,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
         select: 'name fullName admissionNumber studentId classId phone fatherOrHusbandName guardianName guardianPhone guardians',
         populate: { path: 'classId', select: 'name' }
       })
-      .populate('invoiceId', 'invoiceNumber')
+      .populate('invoiceId', 'invoiceNumber periodLabel billingPeriod')
       .populate('collectedBy', 'name')
       .sort({ paymentDate: -1, createdAt: -1 })
       .lean();
@@ -752,6 +752,16 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       const primary = (s.guardians || []).find(g => g.isPrimary) || (s.guardians || [])[0];
       if (primary?.phone) return primary.phone;
       return s.guardianPhone || '';
+    };
+    const getPeriod = (p) => {
+      const inv = p.invoiceId;
+      if (!inv) return '-';
+      if (inv.periodLabel) return inv.periodLabel;
+      if (inv.billingPeriod?.displayText) return inv.billingPeriod.displayText;
+      if (inv.billingPeriod?.quarter) {
+        return `Q${inv.billingPeriod.quarter}${inv.billingPeriod.year ? ' ' + inv.billingPeriod.year : ''}`;
+      }
+      return '-';
     };
 
     // Totals by method
@@ -796,7 +806,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
         }
       });
 
-      const colCount = 10;
+      const colCount = 11;
       ws.columns = [
         { width: 5 },   // #
         { width: 15 },  // Receipt No.
@@ -807,6 +817,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
         { width: 14 },  // Phone
         { width: 9 },   // Class
         { width: 11 },  // Method
+        { width: 16 },  // Period
         { width: 13 }   // Amount
       ];
 
@@ -860,7 +871,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       listTitle.alignment = { horizontal: 'center' };
       listTitle.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F7A3A' } };
 
-      const headerRow = ws.addRow(['#', 'Receipt No.', 'Date', 'Adm. No.', 'Student Name', 'Father Name', 'Phone', 'Class', 'Method', 'Amount']);
+      const headerRow = ws.addRow(['#', 'Receipt No.', 'Date', 'Adm. No.', 'Student Name', 'Father Name', 'Phone', 'Class', 'Method', 'Period', 'Amount']);
       headerRow.eachCell(cell => {
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF333333' } };
@@ -883,6 +894,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
           getPhone(s) || '-',
           s?.classId?.name || '-',
           p.paymentMethod || '-',
+          getPeriod(p),
           Number(p.amount || 0)
         ]);
         row.height = 18;
@@ -893,7 +905,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
           cell.border = { top: { style: 'hair' }, left: { style: 'hair' }, right: { style: 'hair' }, bottom: { style: 'hair' } };
           if (colNumber === colCount) {
             cell.numFmt = '₹#,##0.00'; cell.alignment = { horizontal: 'right' };
-          } else if (colNumber === 1 || colNumber === 3 || colNumber === 4 || colNumber === 8 || colNumber === 9) {
+          } else if (colNumber === 1 || colNumber === 3 || colNumber === 4 || colNumber === 8 || colNumber === 9 || colNumber === 10) {
             cell.alignment = { horizontal: 'center', vertical: 'middle' };
           } else cell.alignment = { horizontal: 'left', vertical: 'middle' };
         });
@@ -915,8 +927,8 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       });
 
       // Grand total at end of list
-      const totalRow = ws.addRow(['', '', '', '', '', '', '', '', 'TOTAL', Number(roundToRupee(grandTotal))]);
-      ws.mergeCells(totalRow.number, 1, totalRow.number, 8);
+      const totalRow = ws.addRow(['', '', '', '', '', '', '', '', '', 'TOTAL', Number(roundToRupee(grandTotal))]);
+      ws.mergeCells(totalRow.number, 1, totalRow.number, 9);
       totalRow.eachCell((cell, colNumber) => {
         cell.font = { bold: true };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
@@ -940,7 +952,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       const mh = ws.addRow(['Payment Method', '', '', 'Transactions', '', '', 'Amount (INR)', '', '', '']);
       ws.mergeCells(mh.number, 1, mh.number, 3);
       ws.mergeCells(mh.number, 4, mh.number, 6);
-      ws.mergeCells(mh.number, 7, mh.number, 10);
+      ws.mergeCells(mh.number, 7, mh.number, colCount);
       mh.font = { bold: true, size: 10 };
       mh.eachCell(c => {
         c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
@@ -951,7 +963,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
         const r = ws.addRow([m, '', '', methodCounts[m] || 0, '', '', Number(roundToRupee(methodTotals[m] || 0)), '', '', '']);
         ws.mergeCells(r.number, 1, r.number, 3);
         ws.mergeCells(r.number, 4, r.number, 6);
-        ws.mergeCells(r.number, 7, r.number, 10);
+        ws.mergeCells(r.number, 7, r.number, colCount);
         r.getCell(1).alignment = { horizontal: 'center' };
         r.getCell(4).alignment = { horizontal: 'center' };
         r.getCell(7).alignment = { horizontal: 'center' };
@@ -962,7 +974,7 @@ router.get('/receipts/export', protect, authorize('admin', 'accountant'), async(
       const grandLine = ws.addRow(['GRAND TOTAL', '', '', grandCount, '', '', Number(roundToRupee(grandTotal)), '', '', '']);
       ws.mergeCells(grandLine.number, 1, grandLine.number, 3);
       ws.mergeCells(grandLine.number, 4, grandLine.number, 6);
-      ws.mergeCells(grandLine.number, 7, grandLine.number, 10);
+      ws.mergeCells(grandLine.number, 7, grandLine.number, colCount);
       grandLine.eachCell(c => {
         c.font = { bold: true, size: 11 };
         c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF5EC' } };
