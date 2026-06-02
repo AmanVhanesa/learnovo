@@ -480,6 +480,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
       ${row('Religion', student.religion)}
       ${row('Category', student.category)}
       ${row('PEN Number', student.penNumber)}
+      ${row('APAAR ID', student.apaarId)}
       ${row('UDISE Code', student.udiseCode || udiseCode)}
       ${row('National ID', student.nationalId)}
       ${row('Identification Mark', student.identificationMark)}

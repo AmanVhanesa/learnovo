@@ -355,6 +355,7 @@ router.post('/login', [
         section: user.section,
         admissionDate: user.admissionDate,
         penNumber: user.penNumber,
+        apaarId: user.apaarId,
         // Employee/Teacher-specific fields
         employeeId: user.employeeId,
         designation: user.designation,
@@ -468,6 +469,7 @@ router.get('/me', protect, async(req, res) => {
         section: user.section,
         admissionDate: user.admissionDate,
         penNumber: user.penNumber,
+        apaarId: user.apaarId,
         // Employee/Teacher-specific fields
         employeeId: user.employeeId,
         designation: user.designation,

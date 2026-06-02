@@ -351,6 +351,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  apaarId: {
+    type: String,
+    trim: true
+  },
   udiseCode: {
     type: String,
     trim: true
@@ -546,6 +550,7 @@ userSchema.index({ tenantId: 1, admissionNumber: 1 });
 userSchema.index({ tenantId: 1, role: 1, class: 1, section: 1 });
 userSchema.index({ tenantId: 1, rollNumber: 1 });
 userSchema.index({ tenantId: 1, penNumber: 1 }, { sparse: true });
+userSchema.index({ tenantId: 1, apaarId: 1 }, { sparse: true });
 userSchema.index({ tenantId: 1, classId: 1 });
 userSchema.index({ tenantId: 1, driverId: 1 }, { sparse: true });
 // Employee query optimization indexes

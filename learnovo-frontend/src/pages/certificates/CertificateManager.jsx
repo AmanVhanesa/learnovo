@@ -78,6 +78,7 @@ const CertificateManager = () => {
             nationality: s.nationality || '',
             category: s.category || '',
             penNumber: s.penNumber || '',
+            apaarId: s.apaarId || '',
             srNumber: s.srNumber || '',
             // Dates & place
             issueDate: s.issueDate || '',
@@ -347,6 +348,10 @@ const CertificateManager = () => {
                                     <div>
                                         <label className="label mb-1 block text-xs">PEN Number</label>
                                         <input type="text" className="input" value={editForm.penNumber} onChange={e => setEditForm({ ...editForm, penNumber: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="label mb-1 block text-xs">APAAR ID</label>
+                                        <input type="text" inputMode="numeric" maxLength={12} className="input" value={editForm.apaarId} onChange={e => setEditForm({ ...editForm, apaarId: e.target.value.replace(/\D/g, '').slice(0, 12) })} />
                                     </div>
                                     <div>
                                         <label className="label mb-1 block text-xs">SR / GR Number</label>

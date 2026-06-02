@@ -97,6 +97,7 @@ const Students = () => {
     { key: 'category', label: 'Category' },
     { key: 'religion', label: 'Religion' },
     { key: 'penNumber', label: 'PEN Number' },
+    { key: 'apaarId', label: 'APAAR ID' },
     { key: 'subDepartment', label: 'Sub Department' },
     { key: 'admissionDate', label: 'Admission Date' },
     { key: 'driverName', label: 'Driver' },
@@ -1040,7 +1041,7 @@ const Students = () => {
                       { label: '📋 Basic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'status'] },
                       { label: '📞 Contact', fields: ['admissionNumber', 'name', 'fatherName', 'motherName', 'mobile', 'altMobile', 'email', 'address'] },
                       { label: '🚌 Transport', fields: ['admissionNumber', 'name', 'class', 'section', 'driverName', 'driverPhone', 'transportMode'] },
-                      { label: '🎓 Academic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'academicYear', 'penNumber', 'subDepartment'] },
+                      { label: '🎓 Academic', fields: ['admissionNumber', 'name', 'class', 'section', 'rollNumber', 'academicYear', 'penNumber', 'apaarId', 'subDepartment'] },
                     ].map(preset => (
                       <button
                         key={preset.label}

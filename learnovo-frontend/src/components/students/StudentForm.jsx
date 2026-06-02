@@ -38,6 +38,7 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         admissionClass: student?.admissionClass || '',
         admissionNumber: student?.admissionNumber || '',
         penNumber: student?.penNumber || '',
+        apaarId: student?.apaarId || '',
 
         subDepartment: student?.subDepartment?._id || student?.subDepartment || '',
         driverId: student?.transportMode === 'Self' ? 'self' : (student?.driverId?._id || student?.driverId || ''),
@@ -993,6 +994,17 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 onChange={(e) => updateField('penNumber', e.target.value)}
                                                 placeholder="Permanent Education Number"
                                                 readOnly={!!student?.penNumber}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="label">APAAR ID</label>
+                                            <input
+                                                className="input"
+                                                value={form.apaarId}
+                                                onChange={(e) => updateField('apaarId', e.target.value.replace(/\D/g, '').slice(0, 12))}
+                                                placeholder="12-digit APAAR ID (e.g. 188069219468)"
+                                                inputMode="numeric"
+                                                maxLength={12}
                                             />
                                         </div>
                                         <div>

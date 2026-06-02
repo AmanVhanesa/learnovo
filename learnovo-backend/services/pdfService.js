@@ -155,6 +155,7 @@ function buildPlaceholderMap(data) {
     remarks: data.remarks || '-',
     purpose: data.purpose || 'general purpose',
     pen_number: data.penNumber || '-',
+    apaar_id: data.apaarId || '-',
     sr_number: data.srNumber || data.admissionNumber || '-'
   };
 }

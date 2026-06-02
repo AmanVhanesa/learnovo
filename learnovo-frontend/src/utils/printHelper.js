@@ -44,6 +44,7 @@ export function buildCertificatePrintHTML({ type, data, certificateNumber }) {
     ['Category (Gen / SC / ST / OBC)', d.category],
     ['Date of Birth', d.dob, true],
     ['PEN Number', d.penNumber],
+    ['APAAR ID', d.apaarId],
     ['Date of First Admission in School', d.admissionDate],
     ['Class in which Last Studied', d.class, true],
     ['Board Examination Last Taken', d.boardResult],

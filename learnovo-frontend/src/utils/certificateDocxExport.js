@@ -24,6 +24,7 @@ function buildTCPlaceholders(data) {
         category: val(data.categoryOverride || data.category),
         dob: val(data.dob),
         pen_number: val(data.penNumber),
+        apaar_id: val(data.apaarId),
         admission_date: val(data.admissionDate),
         class_last_studied: val(data.classOverride || data.class),
         board_exam_result: val(data.boardResult),

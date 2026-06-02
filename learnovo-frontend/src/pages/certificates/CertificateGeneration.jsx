@@ -256,6 +256,7 @@ const CertificateGeneration = () => {
         dob: 'dateOfBirth',
         nationality: 'nationality',
         category: 'category',
+        apaarId: 'apaarId',
     };
 
     const syncModifiedFieldsToProfile = async () => {
@@ -561,6 +562,7 @@ const CertificateGeneration = () => {
                                 {certType === 'BONAFIDE' && <EditableField label="Section" field="section" value={previewData.section} modified={isModified('section')} onChange={handleFieldChange} />}
                                 {certType === 'BONAFIDE' && <EditableField label="Academic Year" field="academicYear" value={previewData.academicYear} modified={isModified('academicYear')} onChange={handleFieldChange} />}
                                 {certType === 'TC' && <EditableField label="PEN Number" field="penNumber" value={previewData.penNumber} modified={isModified('penNumber')} onChange={handleFieldChange} />}
+                                {certType === 'TC' && <EditableField label="APAAR ID" field="apaarId" value={previewData.apaarId} modified={isModified('apaarId')} onChange={handleFieldChange} />}
                                 {certType === 'TC' && <EditableField label="Subjects Studied" field="subjects" value={previewData.subjects} modified={isModified('subjects')} onChange={handleFieldChange} />}
                                 {certType === 'TC' && <SelectField label="Board Exam Result" field="boardResult" options={['Passed', 'Failed', 'Appeared', 'Not Appeared']} value={previewData.boardResult} modified={isModified('boardResult')} onChange={handleFieldChange} />}
                                 {certType === 'TC' && <SelectField label="Qualified for Promotion" field="promotionStatus" options={['Yes', 'No']} value={previewData.promotionStatus} modified={isModified('promotionStatus')} onChange={handleFieldChange} />}

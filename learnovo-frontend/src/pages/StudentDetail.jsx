@@ -630,6 +630,10 @@ const StudentDetail = () => {
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.penNumber || 'N/A'}</p>
                                 </div>
                                 <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">APAAR ID</p>
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.apaarId || 'N/A'}</p>
+                                </div>
+                                <div>
                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">UDISE Code</p>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.udiseCode || 'N/A'}</p>
                                 </div>

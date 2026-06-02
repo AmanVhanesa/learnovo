@@ -22,6 +22,7 @@ const ExportColumnModal = ({ isOpen, onClose, onExport }) => {
                 academicYear: 'Academic Year',
                 admissionDate: 'Admission Date',
                 penNumber: 'PEN Number',
+                apaarId: 'APAAR ID',
                 subDepartment: 'Sub Department'
             }
         },

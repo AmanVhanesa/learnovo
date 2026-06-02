@@ -322,6 +322,7 @@ exports.previewCertificate = async(req, res) => {
       remarks: '',
 
       penNumber: student.penNumber || '', // PEN Number from student profile
+      apaarId: student.apaarId || '', // APAAR ID from student profile
 
       // New fields for premium templates
       purpose: 'general purpose', // Bonafide: purpose of certificate
@@ -890,17 +891,18 @@ function buildTCDocument(data, cert, logoBuffer, signatureBuffer) {
     { num: '05', label: 'Category (Gen / SC / ST / OBC)', val: data.categoryOverride || data.category || '' },
     { num: '06', label: 'Date of Birth', val: `${data.dob || ''}${data.dobWords ? ` (${data.dobWords})` : ''}`, bold: true },
     { num: '07', label: 'PEN Number', val: data.penNumber || '-' },
-    { num: '08', label: 'Date of First Admission in School', val: data.admissionDate || '' },
-    { num: '09', label: 'Class in which Last Studied', val: `${data.classOverride || data.class || ''} - ${data.section || ''}`, bold: true },
-    { num: '10', label: 'Board Examination Last Taken', val: data.boardResult || '' },
-    { num: '11', label: 'Whether Qualified for Promotion', val: data.promotionStatus || '' },
-    { num: '12', label: 'Subjects Studied', val: data.subjects || '' },
-    { num: '13', label: 'Month up to which Fees Paid', val: data.feeStatus || '' },
-    { num: '14', label: 'General Conduct', val: data.conduct || '' },
-    { num: '15', label: 'Date of Application for Certificate', val: data.applicationDate || '' },
-    { num: '16', label: 'Date of Issue of Certificate', val: data.issueDate || '' },
-    { num: '17', label: 'Reason for Leaving the School', val: data.leavingReason || '', bold: true },
-    { num: '18', label: 'Any Other Remarks', val: data.remarks || '-' }
+    { num: '08', label: 'APAAR ID', val: data.apaarId || '-' },
+    { num: '09', label: 'Date of First Admission in School', val: data.admissionDate || '' },
+    { num: '10', label: 'Class in which Last Studied', val: `${data.classOverride || data.class || ''} - ${data.section || ''}`, bold: true },
+    { num: '11', label: 'Board Examination Last Taken', val: data.boardResult || '' },
+    { num: '12', label: 'Whether Qualified for Promotion', val: data.promotionStatus || '' },
+    { num: '13', label: 'Subjects Studied', val: data.subjects || '' },
+    { num: '14', label: 'Month up to which Fees Paid', val: data.feeStatus || '' },
+    { num: '15', label: 'General Conduct', val: data.conduct || '' },
+    { num: '16', label: 'Date of Application for Certificate', val: data.applicationDate || '' },
+    { num: '17', label: 'Date of Issue of Certificate', val: data.issueDate || '' },
+    { num: '18', label: 'Reason for Leaving the School', val: data.leavingReason || '', bold: true },
+    { num: '19', label: 'Any Other Remarks', val: data.remarks || '-' }
   ];
 
   const tableRows = rows.map((r, i) => new TableRow({

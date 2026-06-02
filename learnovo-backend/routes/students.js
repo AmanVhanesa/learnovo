@@ -35,7 +35,7 @@ const STUDENT_IMPORT_FIELDS = [
   'dateOfBirth', 'gender', 'bloodGroup', 'category', 'religion',
   'motherTongue', 'nationality',
   // IDs
-  'aadhaarNumber', 'penNumber', 'udiseCode', 'identificationMark', 'isOrphan',
+  'aadhaarNumber', 'penNumber', 'apaarId', 'udiseCode', 'identificationMark', 'isOrphan',
   // Contact
   'email', 'phone', 'address',
   // Father
@@ -63,7 +63,7 @@ const STUDENT_IMPORT_SAMPLES = [
     admissionSection: 'A', studentType: 'new',
     dateOfBirth: '2010-05-15', gender: 'male', bloodGroup: 'A+',
     category: 'General', religion: 'Hindu', motherTongue: 'Hindi', nationality: 'Indian',
-    aadhaarNumber: '123456789012', penNumber: '12345678901', udiseCode: '12345678901',
+    aadhaarNumber: '123456789012', penNumber: '12345678901', apaarId: '188069219468', udiseCode: '12345678901',
     identificationMark: 'Mole on left cheek', isOrphan: 'false',
     email: 'john.doe@example.com', phone: '1234567890', address: '123 Main St',
     fatherName: 'Father Name', fatherPhone: '9876543210', fatherEmail: 'father@example.com',
@@ -85,7 +85,7 @@ const STUDENT_IMPORT_SAMPLES = [
     admissionSection: 'A', studentType: 'old',
     dateOfBirth: '2009-08-20', gender: 'female', bloodGroup: 'B+',
     category: 'OBC', religion: '', motherTongue: '', nationality: 'Indian',
-    aadhaarNumber: '', penNumber: '', udiseCode: '',
+    aadhaarNumber: '', penNumber: '', apaarId: '', udiseCode: '',
     identificationMark: '', isOrphan: 'false',
     email: 'jane@example.com', phone: '9876543210', address: '456 Oak Ave',
     fatherName: '', fatherPhone: '', fatherEmail: '', fatherOccupation: '', fatherAadhaar: '',
@@ -641,6 +641,9 @@ router.post('/import/preview', protect, authorize('admin'), planGate.requireActi
         'subdepartment': 'subDepartment',
         'pen_number': 'penNumber',
         'pennumber': 'penNumber',
+        'apaar_id': 'apaarId',
+        'apaarid': 'apaarId',
+        'apaar': 'apaarId',
         // Student personal IDs / demographics
         'aadhaar': 'aadhaarNumber',
         'aadhar': 'aadhaarNumber',
@@ -1511,6 +1514,9 @@ router.post('/import/execute', protect, authorize('admin'), planGate.requireActi
         if (row.penNumber && row.penNumber.toString().trim()) {
           studentData.penNumber = row.penNumber.toString().trim();
         }
+        if (row.apaarId && row.apaarId.toString().trim()) {
+          studentData.apaarId = row.apaarId.toString().trim();
+        }
         if (row.udiseCode && row.udiseCode.toString().trim()) {
           studentData.udiseCode = row.udiseCode.toString().trim();
         }
@@ -2047,6 +2053,7 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
       admissionDate: { label: 'Admission Date', extract: (s) => s.admissionDate ? new Date(s.admissionDate).toLocaleDateString('en-IN') : '' },
       admissionClass: { label: 'Admission Class', extract: (s) => s.admissionClass || '' },
       penNumber: { label: 'PEN Number', extract: (s) => s.penNumber || '' },
+      apaarId: { label: 'APAAR ID', extract: (s) => s.apaarId || '' },
       subDepartment: { label: 'Sub Department', extract: (s) => s.subDepartment?.name || '' },
 
       // Contact
@@ -2425,7 +2432,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       fullName, name, firstName, middleName, lastName, email, phone: _phone, password,
       classId, class: studentClass, section, academicYear, rollNumber, admissionDate, admissionClass,
       guardians, address, avatar, photo,
-      penNumber, subDepartment, udiseCode,
+      penNumber, apaarId, subDepartment, udiseCode,
       transportMode, driverId,
       // Student personal/medical fields from form
       dateOfBirth, gender, bloodGroup, religion, category,
@@ -2626,6 +2633,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       // Backfill legacy fatherOrHusbandName from guardians for backward compatibility
       fatherOrHusbandName: guardians?.find(g => g.relation === 'Father')?.name || undefined,
       penNumber: penNumber ? penNumber.trim() : undefined,
+      apaarId: apaarId ? apaarId.trim() : undefined,
       subDepartment,
       udiseCode: udiseCode ? udiseCode.trim() : undefined,
       transportMode: finalTransportMode,

@@ -320,6 +320,7 @@ const Profile = () => {
                 <ReadOnlyField label="Class" value={user?.class} />
                 <ReadOnlyField label="Section" value={user?.section} />
                 <ReadOnlyField label="PEN Number" value={user?.penNumber} />
+                <ReadOnlyField label="APAAR ID" value={user?.apaarId} />
                 <ReadOnlyField
                   label="Admission Date"
                   value={user?.admissionDate ? new Date(user.admissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null}
