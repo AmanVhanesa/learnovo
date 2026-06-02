@@ -26,7 +26,7 @@ const payrollService = {
       // Get all active employees with salary, optionally restricted to a chosen subset
       const employeeFilter = {
         tenantId,
-        role: { $in: ['admin', 'teacher', 'accountant', 'staff'] },
+        role: { $in: ['admin', 'teacher', 'accountant', 'staff', 'librarian', 'driver', 'support_staff', 'principal', 'vice_principal'] },
         isActive: true,
         salary: { $exists: true, $ne: null, $gt: 0 }
       };
