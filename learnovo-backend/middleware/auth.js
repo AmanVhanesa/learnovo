@@ -180,6 +180,17 @@ exports.canAccessStudent = async(req, res, next) => {
   }
 };
 
+// Read-only student access — same as canAccessStudent, but additionally lets
+// coordinators (teachers with isCoordinator) view ANY student's profile.
+// Use this only on safe read endpoints (e.g. GET /:id). Fee/statistics/edit
+// endpoints keep using canAccessStudent so coordinators stay blocked there.
+exports.canViewStudent = async(req, res, next) => {
+  if (req.user && req.user.role === 'teacher' && req.user.isCoordinator) {
+    return next();
+  }
+  return exports.canAccessStudent(req, res, next);
+};
+
 // Check if user can access fee data
 exports.canAccessFee = async(req, res, next) => {
   try {

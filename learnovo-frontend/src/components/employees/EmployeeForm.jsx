@@ -54,6 +54,7 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
 
         // Appointment
         role: employee?.role || 'teacher',
+        isCoordinator: employee?.isCoordinator || false,
         designation: employee?.designation || '',
         department: employee?.department || '',
         dateOfJoining: employee?.dateOfJoining ? employee.dateOfJoining.substring(0, 10) : '',
@@ -471,6 +472,14 @@ const EmployeeForm = ({ employee, onSave, onCancel, isLoading }) => {
                                         <select className="input" value={form.role} onChange={(e) => updateField('role', e.target.value)} required>
                                             {ROLE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                                         </select>
+                                        {form.role === 'teacher' && (
+                                            <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                                                <input type="checkbox" checked={form.isCoordinator} onChange={(e) => updateField('isCoordinator', e.target.checked)} className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                    Coordinator — can view <strong>all</strong> students &amp; employees (view-only, no fees access)
+                                                </span>
+                                            </label>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="label">Designation</label>

@@ -358,6 +358,7 @@ router.post('/login', [
         apaarId: user.apaarId,
         // Employee/Teacher-specific fields
         employeeId: user.employeeId,
+        isCoordinator: user.isCoordinator,
         designation: user.designation,
         department: user.department,
         dateOfJoining: user.dateOfJoining,
@@ -472,6 +473,7 @@ router.get('/me', protect, async(req, res) => {
         apaarId: user.apaarId,
         // Employee/Teacher-specific fields
         employeeId: user.employeeId,
+        isCoordinator: user.isCoordinator,
         designation: user.designation,
         department: user.department,
         dateOfJoining: user.dateOfJoining,
@@ -713,6 +715,7 @@ router.put('/profile', protect, [
         class: user.class,
         section: user.section,
         employeeId: user.employeeId,
+        isCoordinator: user.isCoordinator,
         designation: user.designation,
         department: user.department,
         dateOfBirth: user.dateOfBirth,

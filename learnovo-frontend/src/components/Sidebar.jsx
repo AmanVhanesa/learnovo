@@ -54,6 +54,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     const r = user?.role
     if (!r) return []
 
+    // Coordinator = a teacher with school-wide view-only access (no fees)
+    const isCoordinator = r === 'teacher' && user?.isCoordinator
+
     const sections = []
 
     // ── Overview (all roles) ──────────────────────────────────────
@@ -66,8 +69,9 @@ const Sidebar = ({ isOpen, onClose }) => {
     // ── People ────────────────────────────────────────────────────
     const peopleItems = [
       { name: 'Students', href: '/app/students', icon: Users, roles: ['admin', 'teacher', 'parent'] },
-      { name: 'Employees', href: '/app/employees', icon: UserPlus, roles: ['admin'] },
-    ].filter(i => i.roles.includes(r))
+      // Employees visible to admins and coordinators
+      { name: 'Employees', href: '/app/employees', icon: UserPlus, roles: ['admin'], coordinator: true },
+    ].filter(i => i.roles.includes(r) || (isCoordinator && i.coordinator))
 
     if (peopleItems.length > 0) {
       sections.push({ label: 'People', items: peopleItems })
@@ -98,7 +102,7 @@ const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Expenses', href: '/app/expenses', icon: ReceiptText, roles: ['admin'] },
       { name: 'Payroll', href: '/app/payroll', icon: Wallet, roles: ['admin'] },
       { name: 'Bank Reconciliation', href: '/app/bank-reconciliation', icon: ReceiptText, roles: ['admin', 'accountant'] },
-    ].filter(i => i.roles.includes(r))
+    ].filter(i => i.roles.includes(r) && !isCoordinator) // coordinators have no fees/finance access
 
     if (feesFinanceItems.length > 0) {
       sections.push({ label: 'Fees & Finance', items: feesFinanceItems })

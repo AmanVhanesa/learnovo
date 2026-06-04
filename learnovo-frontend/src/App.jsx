@@ -303,12 +303,12 @@ function App() {
                         </ProtectedRoute>
                       } />
                       <Route path="employees" element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin']} allowCoordinator>
                           <Employees />
                         </ProtectedRoute>
                       } />
                       <Route path="employees/:id" element={
-                        <ProtectedRoute allowedRoles={['admin']}>
+                        <ProtectedRoute allowedRoles={['admin']} allowCoordinator>
                           <EmployeeDetail />
                         </ProtectedRoute>
                       } />
@@ -352,7 +352,7 @@ function App() {
                         </ProtectedRoute>
                       } />
                       <Route path="class-fees" element={
-                        <ProtectedRoute allowedRoles={['teacher']}>
+                        <ProtectedRoute allowedRoles={['teacher']} denyCoordinator>
                           <TeacherClassFees />
                         </ProtectedRoute>
                       } />

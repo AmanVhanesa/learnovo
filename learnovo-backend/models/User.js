@@ -88,6 +88,12 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Coordinator flag — a teacher with school-wide view-only access to all
+  // students and employees (but no access to fees/finance data).
+  isCoordinator: {
+    type: Boolean,
+    default: false
+  },
   forcePasswordChange: {
     type: Boolean,
     default: false

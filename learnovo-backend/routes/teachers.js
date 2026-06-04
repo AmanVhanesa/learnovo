@@ -541,6 +541,10 @@ async function resolveTeacherSectionsInClass(tenantId, teacherUser, classDoc) {
 // @access  Private (Teacher linked to :classId via any allocation method)
 router.get('/my-classes/:classId/pending-fees', protect, authorize('teacher'), async(req, res, next) => {
   try {
+    // Coordinators have no access to fees data.
+    if (req.user.isCoordinator) {
+      return res.status(403).json({ success: false, message: 'Coordinators do not have access to fees data.', requestId: req.requestId });
+    }
     const tenantId = req.user.tenantId;
     const { classId } = req.params;
 

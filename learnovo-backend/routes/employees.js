@@ -195,7 +195,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       education, experience, homeAddress, photo, password,
       bankName, accountNumber, ifscCode,
       subjects, emergencyContact,
-      createLogin,
+      createLogin, isCoordinator,
       // Service-book fields
       maritalStatus, nationality, employmentType, appointmentOrderNo,
       probationEndDate, reportingTo, specialization, previousEmployer,
@@ -348,6 +348,8 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       accountNumber: accountNumber ? accountNumber.replace(/\s/g, '') : undefined,
       ifscCode: normalizedIfsc || undefined,
       subjects: role === 'teacher' ? subjects : undefined,
+      // Coordinator flag only applies to teachers
+      isCoordinator: role === 'teacher' ? !!isCoordinator : false,
       qualifications,
       emergencyContact,
       leaveBalance: { casual: 12, sick: 12, earned: 15 },
@@ -492,6 +494,12 @@ router.put('/:id', protect, authorize('admin'), [
     const updatePayload = { ...req.body };
     if (updatePayload.password === '') {
       delete updatePayload.password;
+    }
+
+    // Coordinator flag only applies to teachers
+    if (updatePayload.isCoordinator !== undefined) {
+      const effectiveRole = updatePayload.role || employee.role;
+      updatePayload.isCoordinator = effectiveRole === 'teacher' ? !!updatePayload.isCoordinator : false;
     }
 
     // Normalize and validate IFSC if provided

@@ -2,7 +2,7 @@ const express = require('express');
 const { body, query } = require('express-validator');
 const User = require('../models/User');
 const Fee = require('../models/Fee');
-const { protect, authorize, canAccessStudent } = require('../middleware/auth');
+const { protect, authorize, canAccessStudent, canViewStudent } = require('../middleware/auth');
 const { handleValidationErrors, validateStudent } = require('../middleware/validation');
 const Settings = require('../models/Settings'); // Import Settings model
 const SubDepartment = require('../models/SubDepartment');
@@ -198,9 +198,10 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.tenantId = req.user.tenantId;
     }
 
-    // Add class filter for teachers
-    // Add class filter for teachers
-    if (req.user.role === 'teacher') {
+    // Add class filter for teachers.
+    // Coordinators (teachers with isCoordinator) bypass the class restriction
+    // and see all students in the tenant, like an admin.
+    if (req.user.role === 'teacher' && !req.user.isCoordinator) {
       try {
         const legacyClasses = Array.isArray(req.user.assignedClasses) ? req.user.assignedClasses : [];
         const assignmentQuery = { teacherId: req.user._id, tenantId: req.user.tenantId, isActive: true };
@@ -1914,7 +1915,8 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
     // Build filter (same as list route)
     const filter = { role: 'student', tenantId };
 
-    if (req.user.role === 'teacher') {
+    // Coordinators (teachers with isCoordinator) export all students, like an admin.
+    if (req.user.role === 'teacher' && !req.user.isCoordinator) {
       try {
         const legacyClasses = Array.isArray(req.user.assignedClasses) ? req.user.assignedClasses : [];
         const assignmentQuery = { teacherId: req.user._id, tenantId: req.user.tenantId, isActive: true };
@@ -2255,8 +2257,8 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
 
 // @desc    Get single student
 // @route   GET /api/students/:id
-// @access  Private
-router.get('/:id', protect, canAccessStudent, async(req, res) => {
+// @access  Private (coordinators may view any student profile; fee data stays gated)
+router.get('/:id', protect, canViewStudent, async(req, res) => {
   try {
     const student = await User.findOne({
       _id: req.params.id,

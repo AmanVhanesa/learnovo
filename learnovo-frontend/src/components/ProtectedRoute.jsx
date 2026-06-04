@@ -8,9 +8,11 @@ import { useAuth } from '../contexts/AuthContext'
  * and tenant subscription status (locks out expired trials / suspended accounts).
  *
  * @param {Array} allowedRoles - Array of roles allowed to access this route
+ * @param {boolean} allowCoordinator - If true, coordinator teachers may access even if 'teacher' isn't in allowedRoles
+ * @param {boolean} denyCoordinator - If true, coordinator teachers are blocked even if 'teacher' is allowed
  * @param {ReactNode} children - Child components to render if authorized
  */
-const ProtectedRoute = ({ children, allowedRoles = [] }) => {
+const ProtectedRoute = ({ children, allowedRoles = [], allowCoordinator = false, denyCoordinator = false }) => {
   const { isAuthenticated, isLoading, user, tenant } = useAuth()
 
   if (isLoading) {
@@ -39,9 +41,19 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     }
   }
 
-  // Check if user's role is allowed (if allowedRoles is specified)
-  if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
+  const isCoordinator = user?.role === 'teacher' && user?.isCoordinator
+
+  // Coordinators are blocked from fee-related routes even if 'teacher' is allowed
+  if (denyCoordinator && isCoordinator) {
     return <Navigate to="/app/dashboard" replace />
+  }
+
+  // Check if user's role is allowed (if allowedRoles is specified).
+  // Coordinators may be granted access to otherwise admin-only routes.
+  if (allowedRoles.length > 0 && user && !allowedRoles.includes(user.role)) {
+    if (!(allowCoordinator && isCoordinator)) {
+      return <Navigate to="/app/dashboard" replace />
+    }
   }
 
   return children

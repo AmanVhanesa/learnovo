@@ -13,8 +13,20 @@ const planGate = require('../middleware/planGate');
 
 const router = express.Router();
 
+// Coordinators (teachers with isCoordinator) have no access to fees/finance data.
+const blockCoordinators = (req, res, next) => {
+  if (req.user && req.user.role === 'teacher' && req.user.isCoordinator) {
+    return res.status(403).json({
+      success: false,
+      message: 'Coordinators do not have access to fees data.',
+      requestId: req.requestId
+    });
+  }
+  return next();
+};
+
 // Plan gates: all fee routes require fees/finance feature (Basic+ plan)
-const feePlanGates = [planGate.requireActiveSubscription, planGate.checkFeesAndFinance];
+const feePlanGates = [blockCoordinators, planGate.requireActiveSubscription, planGate.checkFeesAndFinance];
 
 // @desc    Get all fees
 // @route   GET /api/fees
