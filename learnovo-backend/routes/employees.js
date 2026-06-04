@@ -9,6 +9,16 @@ const planGate = require('../middleware/planGate');
 
 const router = express.Router();
 
+// Financial/HR fields hidden from coordinators (view-only, no finance data)
+const COORDINATOR_HIDDEN_FIELDS = ['salary', 'leaveDeductionPerDay', 'bankName', 'accountNumber', 'ifscCode'];
+const isCoordinatorUser = (user) => user && user.role === 'teacher' && user.isCoordinator;
+const stripFinancialFields = (obj) => {
+  if (!obj) return obj;
+  const clean = { ...obj };
+  COORDINATOR_HIDDEN_FIELDS.forEach(f => delete clean[f]);
+  return clean;
+};
+
 // @desc    Get all employees
 // @route   GET /api/employees
 // @access  Private (Admin, Teacher)
@@ -83,7 +93,10 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       });
     }
 
-    res.json(paginatedResponse(employees, total, page, limit));
+    // Coordinators must not see financial/HR fields
+    const payload = isCoordinatorUser(req.user) ? employees.map(stripFinancialFields) : employees;
+
+    res.json(paginatedResponse(payload, total, page, limit));
   } catch (error) {
     console.error('Get employees error:', error);
     res.status(500).json({
@@ -148,7 +161,7 @@ router.get('/:id', protect, async(req, res) => {
     }
 
     // Check access: admin, coordinator (view-only), or self
-    const isCoordinator = req.user.role === 'teacher' && req.user.isCoordinator;
+    const isCoordinator = isCoordinatorUser(req.user);
     if (req.user.role !== 'admin' && !isCoordinator && req.user._id.toString() !== employee._id.toString()) {
       return res.status(403).json({
         success: false,
@@ -156,9 +169,12 @@ router.get('/:id', protect, async(req, res) => {
       });
     }
 
+    // Coordinators must not see financial/HR fields
+    const data = isCoordinator ? stripFinancialFields(employee.toObject()) : employee;
+
     res.json({
       success: true,
-      data: employee
+      data
     });
   } catch (error) {
     console.error('Get employee error:', error);

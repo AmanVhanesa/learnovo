@@ -196,13 +196,16 @@ const EmployeeDetail = () => {
 
     const isSaving = updateEmployeeMutation.isPending
 
+    // Coordinators (view-only teachers) have no access to financial data
+    const isCoordinator = user?.role === 'teacher' && user?.isCoordinator
+
     const tabs = [
         { id: 'profile', label: 'Profile' },
         { id: 'attendance', label: 'Attendance' },
         { id: 'salary', label: 'Salary' },
         { id: 'timetable', label: 'Timetable' },
         { id: 'activity', label: 'Activity Log' }
-    ]
+    ].filter(tab => !(isCoordinator && tab.id === 'salary'))
 
     if (isLoading) {
         return (
@@ -436,12 +439,14 @@ const EmployeeDetail = () => {
                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Department</p>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{employee.department || 'N/A'}</p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Monthly Salary</p>
-                                    <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
-                                        {employee.salary ? `₹${employee.salary.toLocaleString()}` : 'N/A'}
-                                    </p>
-                                </div>
+                                {!isCoordinator && (
+                                    <div>
+                                        <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Monthly Salary</p>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                                            {employee.salary ? `₹${employee.salary.toLocaleString()}` : 'N/A'}
+                                        </p>
+                                    </div>
+                                )}
                                 <div>
                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Education</p>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{employee.education || 'N/A'}</p>
