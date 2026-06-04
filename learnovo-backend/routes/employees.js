@@ -147,8 +147,9 @@ router.get('/:id', protect, async(req, res) => {
       });
     }
 
-    // Check access: admin or self
-    if (req.user.role !== 'admin' && req.user._id.toString() !== employee._id.toString()) {
+    // Check access: admin, coordinator (view-only), or self
+    const isCoordinator = req.user.role === 'teacher' && req.user.isCoordinator;
+    if (req.user.role !== 'admin' && !isCoordinator && req.user._id.toString() !== employee._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to view this employee'
