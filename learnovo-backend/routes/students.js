@@ -2348,6 +2348,7 @@ async function loadStudentAndSchoolForForm(req) {
   const settings = await Settings.getSettings(req.user.tenantId);
   const schoolData = tenant ? { ...tenant } : {};
   if (settings?.institution) {
+    if (settings.institution.name) schoolData.schoolName = settings.institution.name;
     if (settings.institution.contact?.phone) schoolData.phone = settings.institution.contact.phone;
     if (settings.institution.contact?.email) schoolData.email = settings.institution.contact.email;
     if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;

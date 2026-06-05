@@ -1967,6 +1967,8 @@ router.get('/payments/:id/receipt', protect, authorize('admin', 'accountant'), a
 
     const schoolData = tenant.toObject();
     if (settings && settings.institution) {
+      // Institution name from Settings overrides the (possibly stale) Tenant.schoolName
+      if (settings.institution.name) schoolData.schoolName = settings.institution.name;
       // Add contact information
       if (settings.institution.contact) {
         if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
@@ -2034,6 +2036,7 @@ router.get('/payments/:id/receipt/pdf', protect, async(req, res) => {
 
     const schoolData = tenant ? tenant.toObject() : {};
     if (settings && settings.institution) {
+      if (settings.institution.name) schoolData.schoolName = settings.institution.name;
       if (settings.institution.contact) {
         if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
         if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
@@ -2094,6 +2097,7 @@ router.get('/payments/group/:groupId/receipt/pdf', protect, async(req, res) => {
     const settings = await Settings.getSettings(tenantId);
     const schoolData = tenant ? tenant.toObject() : {};
     if (settings && settings.institution) {
+      if (settings.institution.name) schoolData.schoolName = settings.institution.name;
       if (settings.institution.contact) {
         if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
         if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
@@ -2153,6 +2157,7 @@ router.get('/payments/:id/receipt/html', protect, async(req, res) => {
 
     const schoolData = tenant ? tenant.toObject() : {};
     if (settings && settings.institution) {
+      if (settings.institution.name) schoolData.schoolName = settings.institution.name;
       if (settings.institution.contact) {
         if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
         if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;

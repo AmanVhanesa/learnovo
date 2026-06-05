@@ -1387,6 +1387,7 @@ router.get('/receipt/group/:groupId/pdf', protect, authorize('student', 'parent'
     const settings = await Settings.getSettings(tenantId);
     const schoolData = tenant ? tenant.toObject() : {};
     if (settings && settings.institution) {
+      if (settings.institution.name) schoolData.schoolName = settings.institution.name;
       if (settings.institution.contact) {
         if (settings.institution.contact.phone) schoolData.phone = settings.institution.contact.phone;
         if (settings.institution.contact.email) schoolData.email = settings.institution.contact.email;
@@ -1752,6 +1753,7 @@ router.get('/receipt/:id/html', protect, authorize('student', 'parent'), async(r
     const settings = await Settings.getSettings(req.user.tenantId);
     const schoolData = tenant ? tenant.toObject() : {};
     if (settings?.institution) {
+      if (settings.institution.name) schoolData.schoolName = settings.institution.name;
       if (settings.institution.contact?.phone) schoolData.phone = settings.institution.contact.phone;
       if (settings.institution.contact?.email) schoolData.email = settings.institution.contact.email;
       if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
@@ -1811,6 +1813,7 @@ router.get('/receipt/:id/pdf', protect, authorize('student', 'parent'), async(re
     const settings = await Settings.getSettings(req.user.tenantId);
     const schoolData = tenant ? tenant.toObject() : {};
     if (settings?.institution) {
+      if (settings.institution.name) schoolData.schoolName = settings.institution.name;
       if (settings.institution.contact?.phone) schoolData.phone = settings.institution.contact.phone;
       if (settings.institution.contact?.email) schoolData.email = settings.institution.contact.email;
       if (settings.institution.schoolCode) schoolData.schoolCode = settings.institution.schoolCode;
