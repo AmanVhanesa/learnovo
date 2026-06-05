@@ -316,6 +316,10 @@ const StudentDetail = () => {
         )
     }
 
+    // Imported students may have fullName/firstName/lastName but no `name`, so
+    // fall back the same way the Students list does (avoids a blank header).
+    const displayName = student.fullName || student.name || [student.firstName, student.lastName].filter(Boolean).join(' ') || ''
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -414,13 +418,13 @@ const StudentDetail = () => {
                         {student.photo ? (
                             <img
                                 src={student.photo.startsWith('http') ? student.photo : `${SERVER_URL}${student.photo}`}
-                                alt={student.name}
+                                alt={displayName}
                                 className="h-24 w-24 sm:h-32 sm:w-32 rounded-full object-cover border-4 border-gray-200 dark:border-[#38383A]"
                             />
                         ) : (
                             <div className="h-24 w-24 sm:h-32 sm:w-32 rounded-full bg-gradient-to-br from-teal-400 to-teal-700 flex items-center justify-center border-4 border-gray-200 dark:border-[#38383A]">
                                 <span className="text-3xl sm:text-4xl font-medium text-white">
-                                    {student.name?.charAt(0)?.toUpperCase() || 'U'}
+                                    {displayName?.charAt(0)?.toUpperCase() || 'U'}
                                 </span>
                             </div>
                         )}
@@ -430,7 +434,7 @@ const StudentDetail = () => {
                     <div className="flex-1 text-center sm:text-left w-full">
                         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-2">
                             <div>
-                                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{student.name}</h2>
+                                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{displayName}</h2>
                                 <p className="text-sm text-gray-500 dark:text-[#8E8E93] mt-1">
                                     {student.class} {student.section && `- Section ${student.section}`} • Roll No: {student.rollNumber || 'N/A'}
                                 </p>
@@ -1062,7 +1066,7 @@ const StudentDetail = () => {
                         </div>
                         <form onSubmit={handleResetPassword} className="p-6 space-y-4">
                             <p className="text-sm text-gray-600 dark:text-[#8E8E93]">
-                                Set a new password for <strong>{student.name}</strong>. Leave blank to auto-generate a secure password.
+                                Set a new password for <strong>{displayName}</strong>. Leave blank to auto-generate a secure password.
                             </p>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-[#8E8E93] mb-1">New Password</label>
@@ -1125,7 +1129,7 @@ const StudentDetail = () => {
                         <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl">
                                 <p className="text-sm text-red-700 dark:text-red-400">
-                                    You are about to deactivate <strong>{student.name}</strong> ({student.admissionNumber}). This will prevent them from logging in and accessing the system.
+                                    You are about to deactivate <strong>{displayName}</strong> ({student.admissionNumber}). This will prevent them from logging in and accessing the system.
                                 </p>
                             </div>
 
