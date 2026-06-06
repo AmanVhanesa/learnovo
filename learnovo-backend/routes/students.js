@@ -2815,6 +2815,17 @@ router.put('/:id', protect, canAccessStudent, [
         updatePayload.rollNumber = rn;
       }
     }
+    // PEN number is sparse-indexed: a blank value must unset the field rather than
+    // persist "" (empty strings still occupy the index and can collide on bulk ops).
+    if (Object.prototype.hasOwnProperty.call(updatePayload, 'penNumber')) {
+      const pen = updatePayload.penNumber == null ? '' : String(updatePayload.penNumber).trim();
+      if (!pen) {
+        delete updatePayload.penNumber;
+        unsetFields = { ...(unsetFields || {}), penNumber: '' };
+      } else {
+        updatePayload.penNumber = pen;
+      }
+    }
 
     // Keep name and fullName in sync (StudentForm sends 'name', but fullName is displayed)
     if (updatePayload.name && !updatePayload.fullName) {

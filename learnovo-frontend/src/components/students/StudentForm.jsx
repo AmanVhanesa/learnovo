@@ -993,7 +993,6 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 value={form.penNumber}
                                                 onChange={(e) => updateField('penNumber', e.target.value)}
                                                 placeholder="Permanent Education Number"
-                                                readOnly={!!student?.penNumber}
                                             />
                                         </div>
                                         <div>
