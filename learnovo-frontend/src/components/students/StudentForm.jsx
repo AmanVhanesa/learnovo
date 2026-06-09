@@ -898,11 +898,17 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 <option value="">
                                                     {loadingSections ? 'Loading sections...' : 'Select Section'}
                                                 </option>
-                                                {sectionOptions.map(section => (
-                                                    <option key={section._id} value={section.name}>
-                                                        {section.name}
-                                                    </option>
-                                                ))}
+                                                {sectionOptions.map(section => {
+                                                    const count = section.studentCount ?? 0
+                                                    const teacherName = section.sectionTeacher?.name || section.sectionTeacher?.fullName
+                                                    const label = `${section.name} · ${count} ${count === 1 ? 'student' : 'students'}`
+                                                        + (teacherName ? ` · ${teacherName}` : ' · No teacher assigned')
+                                                    return (
+                                                        <option key={section._id} value={section.name}>
+                                                            {label}
+                                                        </option>
+                                                    )
+                                                })}
                                             </select>
                                             {!form.class && (
                                                 <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">Please select a class first</p>
