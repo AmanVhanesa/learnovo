@@ -60,6 +60,7 @@ const Students = () => {
   const [driverFilter, setDriverFilter] = useState('')
   const [subDepartmentFilter, setSubDepartmentFilter] = useState('')
   const [studentTypeFilter, setStudentTypeFilter] = useState('')
+  const [udiseFilter, setUdiseFilter] = useState('') // '' | 'true' | 'false'
 
   // UI state
   const [showMobileFilters, setShowMobileFilters] = useState(false)
@@ -131,7 +132,7 @@ const Students = () => {
   useEffect(() => {
     setCurrentPage(1) // reset to page 1 on filter/sort change
     setSelectedStudents([]) // clear selection on filter/sort change
-  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, subDepartmentFilter, studentTypeFilter, sortField, sortAsc])
+  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter, sortField, sortAsc])
 
   // Reset section filter when class changes (available sections depend on class)
   useEffect(() => {
@@ -153,7 +154,7 @@ const Students = () => {
 
   // Fetch students with React Query
   const { data: studentsResponse, isLoading, error: studentsError, refetch: refetchStudents } = useQuery({
-    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, subDepartmentFilter, studentTypeFilter, currentPage, perPage, sortField, sortAsc],
+    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter, currentPage, perPage, sortField, sortAsc],
     queryFn: async () => {
       const filters = {
         search: debouncedSearch,
@@ -164,6 +165,7 @@ const Students = () => {
         driver: driverFilter,
         subDepartment: subDepartmentFilter,
         studentType: studentTypeFilter,
+        udiseRegistered: udiseFilter,
         page: currentPage,
         limit: perPage,
         ...(sortField ? { sortBy: sortField, sortOrder: sortAsc ? 'asc' : 'desc' } : {})
@@ -362,6 +364,23 @@ const Students = () => {
         reactivateMutation.mutate(student._id)
       }
     }
+  }
+
+  // Inline UDISE-registration toggle from the list — lets admins mark a student
+  // as added/updated on the UDISE portal without opening the edit form.
+  const udiseMutation = useMutation({
+    mutationFn: ({ id, udiseRegistered }) => studentsService.update(id, { udiseRegistered }),
+    onSuccess: (_res, variables) => {
+      toast.success(variables.udiseRegistered ? 'Marked as added to UDISE' : 'Marked as not added to UDISE')
+      queryClient.invalidateQueries({ queryKey: ['students'] })
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to update UDISE status')
+    }
+  })
+
+  const handleToggleUdise = (student) => {
+    udiseMutation.mutate({ id: student._id, udiseRegistered: !student.udiseRegistered })
   }
 
   const deleteMutation = useMutation({
@@ -621,6 +640,7 @@ const Students = () => {
     setDriverFilter('')
     setSubDepartmentFilter('')
     setStudentTypeFilter('')
+    setUdiseFilter('')
   }
 
   // if (isLoading) {
@@ -739,16 +759,16 @@ const Students = () => {
           <button
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={`h-9 px-3.5 text-xs font-medium rounded-lg border transition-all inline-flex items-center gap-2 ${
-              (classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter)
+              (classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter)
                 ? 'bg-primary-50 dark:bg-primary-500/10 border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
             }`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Filters
-            {(classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter) && (
+            {(classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter) && (
               <span className="h-4 min-w-[16px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center">
-                {[classFilter, sectionFilter, yearFilter, driverFilter, subDepartmentFilter, studentTypeFilter].filter(Boolean).length}
+                {[classFilter, sectionFilter, yearFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter].filter(Boolean).length}
               </span>
             )}
           </button>
@@ -830,7 +850,18 @@ const Students = () => {
                 <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
               </div>
             </div>
-            {(classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter) && (
+            <div className="relative">
+              <select value={udiseFilter} onChange={(e) => setUdiseFilter(e.target.value)}
+                className="appearance-none w-full h-10 pl-3 pr-8 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer">
+                <option value="">UDISE: All</option>
+                <option value="true">UDISE: Added</option>
+                <option value="false">UDISE: Not added</option>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
+              </div>
+            </div>
+            {(classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter) && (
               <button onClick={clearFilters}
                 className="h-9 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-lg transition-all self-start">
                 Clear all filters
@@ -948,8 +979,24 @@ const Students = () => {
             </div>
           </div>
 
+          {/* UDISE Registration Filter */}
+          <div className="relative">
+            <select
+              value={udiseFilter}
+              onChange={(e) => setUdiseFilter(e.target.value)}
+              className="appearance-none h-8 pl-3 pr-8 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-[#2C2C2E] hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all cursor-pointer"
+            >
+              <option value="">UDISE: All</option>
+              <option value="true">UDISE: Added</option>
+              <option value="false">UDISE: Not added</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+              <ChevronDown className="h-3 w-3 text-gray-400 dark:text-[#8E8E93]" />
+            </div>
+          </div>
+
           {/* Clear Filters Button */}
-          {(searchQuery || classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter) && (
+          {(searchQuery || classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter) && (
             <button
               onClick={clearFilters}
               className="h-8 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-md transition-all"
@@ -1219,13 +1266,14 @@ const Students = () => {
                 <th>Class</th>
                 <th>Section</th>
                 <th>Status</th>
+                <th>UDISE</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={user?.role === 'admin' ? 9 : 8} className="text-center py-12">
+                  <td colSpan={user?.role === 'admin' ? 10 : 9} className="text-center py-12">
                     <div className="flex justify-center">
                       <div className="loading-spinner"></div>
                     </div>
@@ -1233,7 +1281,7 @@ const Students = () => {
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.role === 'admin' ? 9 : 8} className="text-center py-12">
+                  <td colSpan={user?.role === 'admin' ? 10 : 9} className="text-center py-12">
                     <div className="flex flex-col items-center">
                       <div className="w-12 h-12 bg-gray-50 dark:bg-[#2C2C2E] rounded-full flex items-center justify-center mb-3">
                         <Users className="w-6 h-6 text-gray-400 dark:text-[#636366]" />
@@ -1312,6 +1360,26 @@ const Students = () => {
                             </div>
                           )}
                         </div>
+                      )}
+                    </td>
+                    <td>
+                      {user?.role === 'admin' ? (
+                        <button
+                          onClick={() => handleToggleUdise(student)}
+                          disabled={udiseMutation.isPending}
+                          title={student.udiseRegistered ? 'Added to UDISE portal — click to unmark' : 'Not added to UDISE portal — click to mark as added'}
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${student.udiseRegistered
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
+                            : 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50'}`}
+                        >
+                          {student.udiseRegistered ? '✓ Added' : 'Not added'}
+                        </button>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${student.udiseRegistered
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                          {student.udiseRegistered ? '✓ Added' : 'Not added'}
+                        </span>
                       )}
                     </td>
                     <td>

@@ -364,6 +364,14 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.studentType = 'new';
     }
 
+    // Add UDISE registration filter (added / not-added on the govt portal).
+    // 'false' must also match legacy students where the field was never set.
+    if (req.query.udiseRegistered === 'true') {
+      filter.udiseRegistered = true;
+    } else if (req.query.udiseRegistered === 'false') {
+      filter.udiseRegistered = { $ne: true };
+    }
+
     // Add search filter
     const searchTerm = req.query.search;
     if (searchTerm) {
@@ -2435,7 +2443,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       fullName, name, firstName, middleName, lastName, email, phone: _phone, password,
       classId, class: studentClass, section, academicYear, rollNumber, admissionDate, admissionClass,
       guardians, address, avatar, photo,
-      penNumber, apaarId, subDepartment, udiseCode,
+      penNumber, apaarId, subDepartment, udiseCode, udiseRegistered,
       transportMode, driverId,
       // Student personal/medical fields from form
       dateOfBirth, gender, bloodGroup, religion, category,
@@ -2639,6 +2647,7 @@ router.post('/', protect, authorize('admin'), planGate.requireActiveSubscription
       apaarId: apaarId ? apaarId.trim() : undefined,
       subDepartment,
       udiseCode: udiseCode ? udiseCode.trim() : undefined,
+      udiseRegistered: udiseRegistered === true || udiseRegistered === 'true',
       transportMode: finalTransportMode,
       driverId: finalDriverId,
       // Personal details

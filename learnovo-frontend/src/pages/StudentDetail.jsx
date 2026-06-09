@@ -642,6 +642,14 @@ const StudentDetail = () => {
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.udiseCode || 'N/A'}</p>
                                 </div>
                                 <div>
+                                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">UDISE Portal</p>
+                                    <span className={`inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${student.udiseRegistered
+                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                                        {student.udiseRegistered ? '✓ Added' : 'Not added'}
+                                    </span>
+                                </div>
+                                <div>
                                     <p className="text-xs text-gray-500 dark:text-[#8E8E93] uppercase">Student ID</p>
                                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">{student.studentId || 'N/A'}</p>
                                 </div>

@@ -365,6 +365,13 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // Admin-only tracking flag: ticked once this student has been added/updated
+  // on the UDISE+ government portal. Purely a bookkeeping note for the admin —
+  // not linked to the school's udiseCode (which is a single school-level code).
+  udiseRegistered: {
+    type: Boolean,
+    default: false
+  },
   subDepartment: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SubDepartment'

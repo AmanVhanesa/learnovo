@@ -39,6 +39,8 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         admissionNumber: student?.admissionNumber || '',
         penNumber: student?.penNumber || '',
         apaarId: student?.apaarId || '',
+        // Admin note: whether this student has been added/updated on the UDISE portal
+        udiseRegistered: student?.udiseRegistered || false,
 
         subDepartment: student?.subDepartment?._id || student?.subDepartment || '',
         driverId: student?.transportMode === 'Self' ? 'self' : (student?.driverId?._id || student?.driverId || ''),
@@ -1019,6 +1021,20 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                                 value={student?.udiseCode || schoolUdiseCode || 'Not set in school settings'}
                                                 readOnly
                                             />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-[#38383A] bg-gray-50 dark:bg-[#2C2C2E] cursor-pointer hover:border-primary-400 transition-colors">
+                                                <input
+                                                    type="checkbox"
+                                                    className="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-[#38383A] text-primary-600 focus:ring-primary-500"
+                                                    checked={!!form.udiseRegistered}
+                                                    onChange={(e) => updateField('udiseRegistered', e.target.checked)}
+                                                />
+                                                <span>
+                                                    <span className="block text-sm font-medium text-gray-900 dark:text-white">Added / updated on UDISE portal</span>
+                                                    <span className="block text-xs text-gray-500 dark:text-[#8E8E93] mt-0.5">Tick once you have entered or updated this student on the UDISE+ government website.</span>
+                                                </span>
+                                            </label>
                                         </div>
                                     </div>
                                 </div>
