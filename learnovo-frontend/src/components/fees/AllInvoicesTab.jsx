@@ -595,6 +595,10 @@ const AllInvoicesTab = ({
           onApplyDiscount={(inv) => { setViewingInvoice(null); setDiscountInvoice(inv) }}
           onPrintReceipt={onPrintReceipt}
           onDownloadReceipt={onDownloadReceipt}
+          onChanged={() => {
+            queryClient.invalidateQueries({ queryKey: ['all-invoices'] })
+            queryClient.invalidateQueries({ queryKey: ['fees-dashboard'] })
+          }}
         />
       )}
 

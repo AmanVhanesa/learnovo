@@ -1,21 +1,77 @@
-import React from 'react'
-import { FileText, Printer, Download, DollarSign, Tag, Calendar, User, Hash, Edit } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { FileText, Printer, Download, DollarSign, Tag, Hash, Edit, RotateCcw } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatCurrency'
+import { paymentsService } from '../../services/feesService'
 import StatusBadge from '../StatusBadge'
 import ModalWrapper from '../ModalWrapper'
+import PaymentEditModal from './PaymentEditModal'
 
-const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt, onDownloadReceipt, onApplyDiscount, onEdit }) => {
+const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt, onDownloadReceipt, onApplyDiscount, onEdit, onChanged }) => {
+  // Payments for this invoice are fetched here — the invoice list API doesn't include
+  // them, so without this the Payment History (and the Undo option) would never render.
+  const [livePayments, setLivePayments] = useState(null) // null = not loaded yet
+  const [loadingPayments, setLoadingPayments] = useState(false)
+  const [reversingPayment, setReversingPayment] = useState(null)
+
+  const invoiceId = invoice?._id
+
+  const fetchPayments = useCallback(async () => {
+    if (!invoiceId) return
+    setLoadingPayments(true)
+    try {
+      const res = await paymentsService.list({ invoiceId })
+      setLivePayments(res.data || [])
+    } catch {
+      // Fall back to whatever the invoice already carried; don't block the modal.
+      setLivePayments(invoice?.payments || [])
+    } finally {
+      setLoadingPayments(false)
+    }
+  }, [invoiceId, invoice])
+
+  useEffect(() => { fetchPayments() }, [fetchPayments])
+
   if (!invoice) return null
 
   const student = invoice.studentId || {}
-  const payments = invoice.payments || []
-  const paidAmount = invoice.paidAmount || 0
-  const progressPercent = invoice.totalAmount > 0
-    ? Math.round((paidAmount / invoice.totalAmount) * 100)
-    : 0
+  const paymentsLoaded = livePayments !== null
+  // Real collections (positive amounts). Reversed ones stay visible with a badge; the
+  // negative mirror entries created by a reversal are hidden to keep the history readable.
+  const sourcePayments = paymentsLoaded ? livePayments : (invoice.payments || [])
+  const displayPayments = sourcePayments.filter(p => Number(p.amount) > 0)
+
+  // Recompute totals from the live payments once loaded so the modal instantly reflects
+  // an undo (balance restored, status back to Pending) without needing a reopen.
+  const total = Number(invoice.totalAmount || 0)
+  const lateFee = Number(invoice.lateFeeApplied || 0)
+  const discount = Number(invoice.discountAmount || 0)
+  const billable = Math.max(0, total + lateFee - discount)
+
+  const paidAmount = paymentsLoaded
+    ? displayPayments.filter(p => !p.isReversed).reduce((s, p) => s + Number(p.amount || 0), 0)
+    : Number(invoice.paidAmount || 0)
+  const balanceAmount = paymentsLoaded
+    ? Math.max(0, billable - paidAmount)
+    : Number(invoice.balanceAmount || 0)
+
+  const displayStatus = !paymentsLoaded
+    ? invoice.status
+    : balanceAmount <= 0 && billable > 0
+      ? 'Paid'
+      : paidAmount > 0
+        ? 'Partial'
+        : (invoice.status === 'Overdue' ? 'Overdue' : 'Pending')
+
+  const progressPercent = total > 0 ? Math.round((paidAmount / total) * 100) : 0
 
   const studentName = student.fullName || student.name || ''
   const initials = studentName ? studentName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() : '?'
+
+  const handleReversed = () => {
+    setReversingPayment(null)
+    fetchPayments()       // refresh history so the reversed entry shows its badge
+    onChanged?.()         // let the parent refresh the invoice list / dashboard
+  }
 
   return (
     <ModalWrapper title={`Invoice ${invoice.invoiceNumber}`} onClose={onClose} maxWidth="max-w-3xl">
@@ -35,7 +91,7 @@ const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt
               </p>
             </div>
           </div>
-          <StatusBadge status={invoice.status} />
+          <StatusBadge status={displayStatus} />
         </div>
 
         {/* Amount breakdown cards — explicit colors, no dynamic classes */}
@@ -53,20 +109,20 @@ const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt
             <p className="text-lg font-bold mt-1 text-blue-700 dark:text-blue-400">{formatCurrency(invoice.discountAmount || 0)}</p>
           </div>
           <div className={`p-3.5 rounded-xl border ${
-            (invoice.balanceAmount || 0) > 0
+            balanceAmount > 0
               ? 'bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/30'
               : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/30'
           }`}>
             <p className={`text-[11px] font-semibold uppercase tracking-wide ${
-              (invoice.balanceAmount || 0) > 0
+              balanceAmount > 0
                 ? 'text-red-600 dark:text-red-400'
                 : 'text-emerald-600 dark:text-emerald-400'
             }`}>Balance</p>
             <p className={`text-lg font-bold mt-1 ${
-              (invoice.balanceAmount || 0) > 0
+              balanceAmount > 0
                 ? 'text-red-700 dark:text-red-400'
                 : 'text-emerald-700 dark:text-emerald-400'
-            }`}>{formatCurrency(invoice.balanceAmount || 0)}</p>
+            }`}>{formatCurrency(balanceAmount)}</p>
           </div>
         </div>
 
@@ -177,43 +233,62 @@ const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt
         </div>
 
         {/* Payment history */}
-        {payments.length > 0 && (
+        {(displayPayments.length > 0 || loadingPayments) && (
           <div>
             <h5 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-gray-400" /> Payment History
             </h5>
-            <div className="space-y-2">
-              {payments.map((p) => (
-                <div key={p._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(p.amount)}</span>
-                      <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full">
-                        {p.status || 'Paid'}
-                      </span>
+            {loadingPayments && displayPayments.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-[#636366] px-1">Loading payments…</p>
+            ) : (
+              <div className="space-y-2">
+                {displayPayments.map((p) => (
+                  <div key={p._id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#2C2C2E] rounded-xl border border-gray-100 dark:border-[#38383A]">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-semibold ${p.isReversed ? 'text-gray-400 dark:text-[#636366] line-through' : 'text-gray-900 dark:text-white'}`}>{formatCurrency(p.amount)}</span>
+                        {p.isReversed ? (
+                          <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-medium rounded-full">
+                            Reversed
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-medium rounded-full">
+                            {p.status || 'Paid'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
+                        {new Date(p.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} &bull; {p.paymentMethod}
+                      </p>
+                      {p.receiptNumber && (
+                        <p className="text-xs text-gray-400 dark:text-[#636366]">Receipt: {p.receiptNumber}</p>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-[#8E8E93] mt-1">
-                      {new Date(p.paymentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} &bull; {p.paymentMethod}
-                    </p>
-                    {p.receiptNumber && (
-                      <p className="text-xs text-gray-400 dark:text-[#636366]">Receipt: {p.receiptNumber}</p>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {onPrintReceipt && !p.isReversed && (
+                        <button onClick={() => onPrintReceipt(p._id)} className="btn-icon !p-1.5 !rounded-lg" title="Print Receipt">
+                          <Printer className="h-4 w-4" />
+                        </button>
+                      )}
+                      {onDownloadReceipt && !p.isReversed && (
+                        <button onClick={() => onDownloadReceipt(p._id)} className="btn-icon !p-1.5 !rounded-lg" title="Download Receipt">
+                          <Download className="h-4 w-4" />
+                        </button>
+                      )}
+                      {!p.isReversed && (
+                        <button
+                          onClick={() => setReversingPayment(p)}
+                          className="btn-icon !p-1.5 !rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          title="Undo this collection (resets the invoice balance)"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {onPrintReceipt && (
-                      <button onClick={() => onPrintReceipt(p._id)} className="btn-icon !p-1.5 !rounded-lg" title="Print Receipt">
-                        <Printer className="h-4 w-4" />
-                      </button>
-                    )}
-                    {onDownloadReceipt && (
-                      <button onClick={() => onDownloadReceipt(p._id)} className="btn-icon !p-1.5 !rounded-lg" title="Download Receipt">
-                        <Download className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -230,7 +305,7 @@ const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt
           <button onClick={onClose} className="btn btn-outline w-full sm:w-auto">
             Close
           </button>
-          {onApplyDiscount && invoice.status !== 'Paid' && !invoice.discountAmount && (
+          {onApplyDiscount && displayStatus !== 'Paid' && !invoice.discountAmount && (
             <button
               onClick={() => onApplyDiscount(invoice)}
               className="btn w-full sm:w-auto bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/30 dark:hover:bg-blue-900/30"
@@ -243,13 +318,24 @@ const InvoiceDetailModal = ({ invoice, onClose, onCollectPayment, onPrintReceipt
               <Edit className="h-4 w-4 mr-2" /> Edit
             </button>
           )}
-          {onCollectPayment && (invoice.status === 'Pending' || invoice.status === 'Partial' || invoice.status === 'Overdue') && (
+          {onCollectPayment && (displayStatus === 'Pending' || displayStatus === 'Partial' || displayStatus === 'Overdue') && (
             <button onClick={() => onCollectPayment(invoice)} className="btn btn-primary w-full sm:w-auto">
               <DollarSign className="h-4 w-4 mr-2" /> Collect Payment
             </button>
           )}
         </div>
       </div>
+
+      {/* Undo / reverse a payment — reuses the existing reverse flow (asks for a reason,
+          restores the invoice balance, and removes the auto-synced income record). */}
+      {reversingPayment && (
+        <PaymentEditModal
+          payment={reversingPayment}
+          mode="reverse"
+          onClose={() => setReversingPayment(null)}
+          onSuccess={handleReversed}
+        />
+      )}
     </ModalWrapper>
   )
 }
