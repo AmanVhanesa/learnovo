@@ -1326,22 +1326,42 @@ async function recalculateSectionStrengths(tenantId) {
  * Returns only sections that belong to this tenant's class.
  */
 async function getSectionsForClass(tenantId, className) {
-  // Find the class document(s) for this grade
-  const classDocs = await Class.find({ tenantId, grade: className, isActive: true });
+  // The frontend dropdown sends the canonical Class.name (e.g. "NURSERY"), which
+  // may differ from Class.grade — so resolve the class by either field. Matching
+  // grade alone silently misses classes whose name !== grade, which dropped the
+  // feature into the (count-less) fallback branch below.
+  const classDocs = await Class.find({
+    tenantId,
+    isActive: true,
+    $or: [{ name: className }, { grade: className }]
+  });
+
+  // Class-string variants a student record may carry (legacy string-based data).
+  const classStrings = [...new Set(
+    classDocs.flatMap(c => [c.name, c.grade]).concat(className).filter(Boolean)
+  )];
+
   if (classDocs.length === 0) {
-    // Fallback: derive sections from student records
+    // Fallback: no Class doc — derive sections from student records and count them.
     const studentSections = await User.distinct('section', {
       tenantId,
       role: 'student',
       class: className,
       isActive: true
     });
-    return studentSections.filter(Boolean).sort().map(name => ({
-      name,
-      studentCount: 0, // will be populated below
-      capacity: 40,
-      currentStrength: 0
-    }));
+    const names = studentSections.filter(Boolean).sort();
+    const result = [];
+    for (const name of names) {
+      const studentCount = await User.countDocuments({
+        tenantId,
+        role: 'student',
+        isActive: true,
+        class: className,
+        section: name
+      });
+      result.push({ _id: null, name, capacity: 40, currentStrength: studentCount, studentCount });
+    }
+    return result;
   }
 
   const classIds = classDocs.map(c => c._id);
@@ -1351,7 +1371,8 @@ async function getSectionsForClass(tenantId, className) {
     isActive: true
   }).sort({ name: 1 });
 
-  // Get student counts per section
+  // Get student counts per section — match by sectionId (source of truth) first,
+  // then fall back to classId/class-string + section name for legacy records.
   const result = [];
   for (const section of sections) {
     const studentCount = await User.countDocuments({
@@ -1359,8 +1380,9 @@ async function getSectionsForClass(tenantId, className) {
       role: 'student',
       isActive: true,
       $or: [
-        { classId: section.classId, sectionId: section._id },
-        { class: className, section: section.name }
+        { sectionId: section._id },
+        { classId: { $in: classIds }, section: section.name },
+        { class: { $in: classStrings }, section: section.name }
       ]
     });
 
@@ -1374,19 +1396,19 @@ async function getSectionsForClass(tenantId, className) {
   }
 
   // Also check for sections that exist only in student records (legacy data)
-  const sectionNames = new Set(sections.map(s => s.name));
+  const sectionNames = new Set(sections.map(s => (s.name || '').toUpperCase()));
   const studentSections = await User.distinct('section', {
     tenantId,
     role: 'student',
-    class: className,
+    class: { $in: classStrings },
     isActive: true
   });
   for (const secName of studentSections) {
-    if (secName && !sectionNames.has(secName.toUpperCase()) && !sectionNames.has(secName)) {
+    if (secName && !sectionNames.has(secName.toUpperCase())) {
       const count = await User.countDocuments({
         tenantId,
         role: 'student',
-        class: className,
+        class: { $in: classStrings },
         section: secName,
         isActive: true
       });
