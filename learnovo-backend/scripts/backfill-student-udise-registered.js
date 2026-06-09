@@ -48,8 +48,12 @@ async function run() {
   console.log('Done.');
 }
 
-run().catch(async (err) => {
+run().catch(async(err) => {
   console.error('Backfill failed:', err);
-  try { await mongoose.disconnect(); } catch { /* ignore */ }
+  try {
+    await mongoose.disconnect();
+  } catch {
+    /* ignore */
+  }
   process.exit(1);
 });
