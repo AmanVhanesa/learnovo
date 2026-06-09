@@ -46,6 +46,46 @@ router.put('/class-hierarchy', authorize('admin', 'principal'), async(req, res, 
   }
 });
 
+// ─── BULK PROMOTION ──────────────────────────────────────────────────────────
+
+// POST /api/transitions/promote/bulk
+// NOTE: this static route MUST be declared before '/promote/:studentId',
+// otherwise Express matches '/bulk' as the :studentId param and tries to cast
+// "bulk" to an ObjectId, failing with "Invalid ID format".
+router.post('/promote/bulk', authorize('admin', 'principal'), async(req, res, next) => {
+  try {
+    const { fromClass, fromSection, toClass, toSection, academicYear, excludeStudents, includeFailed, forceOverride, remarks } = req.body;
+    if (!fromClass) {
+      return res.status(400).json({ success: false, message: 'fromClass is required', requestId: req.requestId });
+    }
+    if (!academicYear) {
+      return res.status(400).json({ success: false, message: 'academicYear is required', requestId: req.requestId });
+    }
+
+    const result = await transitionService.bulkPromote({
+      tenantId: req.user.tenantId,
+      fromClass,
+      fromSection,
+      toClass,
+      toSection,
+      academicYear,
+      excludeStudentIds: excludeStudents || [],
+      includeFailed: includeFailed === true,
+      forceOverride: forceOverride === true,
+      remarks,
+      performedBy: req.user._id
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, errors: result.errors, requestId: req.requestId });
+    }
+
+    res.json({ success: true, message: 'Bulk promotion completed', data: result.data, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ─── SINGLE STUDENT PROMOTION ────────────────────────────────────────────────
 
 // POST /api/transitions/promote/:studentId
@@ -114,43 +154,6 @@ router.post('/demote/:studentId', authorize('admin', 'principal'), async(req, re
   }
 });
 
-// ─── BULK PROMOTION ──────────────────────────────────────────────────────────
-
-// POST /api/transitions/promote/bulk
-router.post('/promote/bulk', authorize('admin', 'principal'), async(req, res, next) => {
-  try {
-    const { fromClass, fromSection, toClass, toSection, academicYear, excludeStudents, includeFailed, forceOverride, remarks } = req.body;
-    if (!fromClass) {
-      return res.status(400).json({ success: false, message: 'fromClass is required', requestId: req.requestId });
-    }
-    if (!academicYear) {
-      return res.status(400).json({ success: false, message: 'academicYear is required', requestId: req.requestId });
-    }
-
-    const result = await transitionService.bulkPromote({
-      tenantId: req.user.tenantId,
-      fromClass,
-      fromSection,
-      toClass,
-      toSection,
-      academicYear,
-      excludeStudentIds: excludeStudents || [],
-      includeFailed: includeFailed === true,
-      forceOverride: forceOverride === true,
-      remarks,
-      performedBy: req.user._id
-    });
-
-    if (!result.success) {
-      return res.status(400).json({ success: false, errors: result.errors, requestId: req.requestId });
-    }
-
-    res.json({ success: true, message: 'Bulk promotion completed', data: result.data, requestId: req.requestId });
-  } catch (error) {
-    next(error);
-  }
-});
-
 // ─── BULK SHIFT STUDENTS (by admission numbers) ────────────────────────────
 
 // POST /api/transitions/shift-students
@@ -214,33 +217,10 @@ router.post('/resolve-students', authorize('admin', 'principal'), async(req, res
 
 // ─── SECTION SHIFT ───────────────────────────────────────────────────────────
 
-// POST /api/transitions/shift-section/:studentId
-router.post('/shift-section/:studentId', authorize('admin', 'principal'), async(req, res, next) => {
-  try {
-    const { toSection, reason } = req.body;
-    if (!toSection) {
-      return res.status(400).json({ success: false, message: 'toSection is required', requestId: req.requestId });
-    }
-
-    const result = await transitionService.shiftSection({
-      tenantId: req.user.tenantId,
-      studentId: req.params.studentId,
-      toSection,
-      reason,
-      performedBy: req.user._id
-    });
-
-    if (!result.success) {
-      return res.status(400).json({ success: false, errors: result.errors, requestId: req.requestId });
-    }
-
-    res.json({ success: true, message: 'Section shifted successfully', data: result.data, requestId: req.requestId });
-  } catch (error) {
-    next(error);
-  }
-});
-
 // POST /api/transitions/shift-section/bulk
+// NOTE: this static route MUST be declared before '/shift-section/:studentId',
+// otherwise Express matches '/bulk' as the :studentId param and tries to cast
+// "bulk" to an ObjectId, failing with "Invalid ID format".
 router.post('/shift-section/bulk', authorize('admin', 'principal'), async(req, res, next) => {
   try {
     const { className, fromSection, toSection, studentIds } = req.body;
@@ -265,6 +245,32 @@ router.post('/shift-section/bulk', authorize('admin', 'principal'), async(req, r
     }
 
     res.json({ success: true, message: 'Bulk section shift completed', data: result.data, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/transitions/shift-section/:studentId
+router.post('/shift-section/:studentId', authorize('admin', 'principal'), async(req, res, next) => {
+  try {
+    const { toSection, reason } = req.body;
+    if (!toSection) {
+      return res.status(400).json({ success: false, message: 'toSection is required', requestId: req.requestId });
+    }
+
+    const result = await transitionService.shiftSection({
+      tenantId: req.user.tenantId,
+      studentId: req.params.studentId,
+      toSection,
+      reason,
+      performedBy: req.user._id
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, errors: result.errors, requestId: req.requestId });
+    }
+
+    res.json({ success: true, message: 'Section shifted successfully', data: result.data, requestId: req.requestId });
   } catch (error) {
     next(error);
   }

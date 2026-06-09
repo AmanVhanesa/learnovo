@@ -144,7 +144,14 @@ async function validateStudentForTransition(student, tenantId, actionType, acade
  * Resolve class and section ObjectIds from string names.
  */
 async function resolveClassAndSection(tenantId, className, sectionName) {
-  const classDoc = await Class.findOne({ grade: className, tenantId, isActive: true });
+  // Resolve by Class.name OR Class.grade — the frontend sends the canonical
+  // Class.name, which may differ from grade. Matching grade alone silently
+  // fails for those classes (e.g. "NURSERY") and reports the section as missing.
+  const classDoc = await Class.findOne({
+    tenantId,
+    isActive: true,
+    $or: [{ name: className }, { grade: className }]
+  });
   let sectionDoc = null;
   if (classDoc && sectionName) {
     sectionDoc = await Section.findOne({
@@ -763,10 +770,16 @@ async function bulkShiftSection({ tenantId, className, fromSection, toSection, s
   if (!sectionDoc) return { success: false, errors: [`Section "${upperTo}" does not exist for class ${className}`] };
 
   // Get students to shift
-  const query = { tenantId, role: 'student', class: className, isActive: true };
+  const query = { tenantId, role: 'student', isActive: true };
   if (studentIds && studentIds.length > 0) {
-    query._id = { $in: studentIds };
+    // Match the explicitly selected students by _id. Don't also constrain by the
+    // class string — in inconsistent data a student's stored class may not equal
+    // the canonical class name, which would silently drop selected students.
+    const validIds = studentIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length === 0) return { success: false, errors: ['No valid student IDs provided'] };
+    query._id = { $in: validIds };
   } else if (upperFrom) {
+    query.class = className;
     query.section = upperFrom;
   } else {
     return { success: false, errors: ['Either studentIds or fromSection is required'] };
@@ -1263,7 +1276,10 @@ async function getTransitionHistory({ tenantId, studentId, type, batchId, fromDa
 async function updateSectionStrength(tenantId, className, sectionName, delta, session) {
   if (!className || !sectionName) return;
 
-  const classDoc = await Class.findOne({ tenantId, grade: className }).session(session);
+  const classDoc = await Class.findOne({
+    tenantId,
+    $or: [{ name: className }, { grade: className }]
+  }).session(session);
   if (!classDoc) return;
 
   const section = await Section.findOne({
