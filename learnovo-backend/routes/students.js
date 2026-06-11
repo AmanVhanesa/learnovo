@@ -411,8 +411,12 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     // { tenantId, admissionNumber } compound index can back it. Sorting by `name`
     // has no covering index and forces an in-memory sort that blows Mongo's 32MB
     // multiplanner cap on large tenants (allowDiskUse does not relax that cap).
+    // The _id tiebreaker must follow the primary sort direction. Bulk CSV
+    // imports share one createdAt timestamp, so a fixed { _id: 1 } tiebreaker
+    // renders those tied rows ascending even while the rest of a descending
+    // page renders newest-first — the block appears to sort the wrong way.
     const defaultSort = effectiveSortField
-      ? { [effectiveSortField]: sortDir, _id: 1 }
+      ? { [effectiveSortField]: sortDir, _id: sortDir }
       : { admissionNumber: 1, _id: 1 };
 
     // Run count and find in parallel for speed.
