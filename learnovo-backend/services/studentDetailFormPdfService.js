@@ -539,7 +539,6 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
       ${row('Section', sectionName)}
       ${row('Academic Year', student.academicYear)}
       ${row('Admission Class', formatClassName(student.admissionClass))}
-      ${row('Admission Section', student.admissionSection)}
       ${row('Admission Date', fmtDate(student.admissionDate))}
       ${row('Sub-Department', subDeptName)}
     </div>
