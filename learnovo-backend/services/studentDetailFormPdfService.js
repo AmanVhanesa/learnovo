@@ -162,6 +162,35 @@ const fmtDate = (d) => {
 
 const yesNo = (v) => (v ? 'Yes' : 'No');
 
+// Fallback Terms & Conditions used when a school has not configured its own
+// (Settings → Rules & Regulations). Keeps the back page of the form populated.
+const DEFAULT_TERMS = `1. All information provided in this form is true and correct to the best of my knowledge.
+2. Admission is provisional and subject to verification of the original documents submitted.
+3. Fees once paid are non-refundable and non-transferable under any circumstances.
+4. The school reserves the right to cancel admission if any information is found to be false or misleading.
+5. Parents/guardians are responsible for keeping the school informed of any change in contact details or address.
+6. Students are expected to abide by the rules, regulations, and code of conduct of the school at all times.
+7. The school is not responsible for any belongings lost on the school premises.`;
+
+// Format a class value for display: numeric grades get an ordinal suffix
+// (1 -> 1ST, 2 -> 2ND, 3 -> 3RD, 4 -> 4TH...); non-numeric values (LKG, UKG,
+// "1ST" etc.) are returned uppercased and unchanged.
+const formatClassName = (v) => {
+  if (v === undefined || v === null) return v;
+  const str = String(v).trim();
+  if (!/^\d+$/.test(str)) return str.toUpperCase();
+  const n = parseInt(str, 10);
+  const rem100 = n % 100;
+  const rem10 = n % 10;
+  let suffix = 'TH';
+  if (rem100 < 11 || rem100 > 13) {
+    if (rem10 === 1) suffix = 'ST';
+    else if (rem10 === 2) suffix = 'ND';
+    else if (rem10 === 3) suffix = 'RD';
+  }
+  return `${n}${suffix}`;
+};
+
 function buildStudentName(student) {
   return student.fullName
     || student.name
@@ -222,6 +251,11 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
   const email = schoolData.email || '-';
   const schoolCode = schoolData.schoolCode || '';
   const udiseCode = schoolData.udiseCode || '';
+  // Terms & Conditions are admin-editable (Settings → Rules & Regulations).
+  // Fall back to a sensible default so the back page is never left empty.
+  const termsContent = (schoolData.termsAndConditions && String(schoolData.termsAndConditions).trim())
+    ? String(schoolData.termsAndConditions).trim()
+    : DEFAULT_TERMS;
 
   const generatedOn = new Date().toLocaleString('en-IN', {
     day: '2-digit', month: '2-digit', year: 'numeric',
@@ -360,6 +394,18 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
     text-transform: uppercase; letter-spacing: 1px;
   }
 
+  /* Terms & Conditions */
+  .terms-text {
+    white-space: pre-wrap; font-size: 9px; line-height: 1.55;
+    color: #111827; font-weight: 500;
+  }
+
+  /* Page-2 bottom block — keeps declaration + signatures + footer pinned
+     to the bottom of the page regardless of how much content sits above. */
+  .page2-bottom {
+    position: absolute; left: 50px; right: 50px; bottom: 16px;
+  }
+
   /* Declaration */
   .declaration {
     margin-top: 14px; padding: 10px 12px;
@@ -463,7 +509,7 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
         ${row('Academic Year', student.academicYear)}
         ${row('Admission Date', fmtDate(student.admissionDate))}
         ${row('Date of Birth', fmtDate(student.dateOfBirth))}
-        ${row('Gender', student.gender)}
+        ${row('Gender', student.gender ? String(student.gender).toUpperCase() : student.gender)}
         ${row('Blood Group', student.bloodGroup)}
         ${row('Nationality', student.nationality)}
       </div>
@@ -482,10 +528,8 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
       ${row('PEN Number', student.penNumber)}
       ${row('APAAR ID', student.apaarId)}
       ${row('UDISE Code', student.udiseCode || udiseCode)}
-      ${row('National ID', student.nationalId)}
       ${row('Identification Mark', student.identificationMark)}
       ${row('Is Orphan', yesNo(student.isOrphan))}
-      ${row('Student Type', student.studentType)}
     </div>
   `)}
 
@@ -493,9 +537,8 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
     <div class="grid-2">
       ${row('Class', className)}
       ${row('Section', sectionName)}
-      ${row('Roll Number', student.rollNumber)}
       ${row('Academic Year', student.academicYear)}
-      ${row('Admission Class', student.admissionClass)}
+      ${row('Admission Class', formatClassName(student.admissionClass))}
       ${row('Admission Section', student.admissionSection)}
       ${row('Admission Date', fmtDate(student.admissionDate))}
       ${row('Sub-Department', subDeptName)}
@@ -553,30 +596,36 @@ function buildHtml(student, schoolData, logoDataUri, photoDataUri, photoFallback
     <div class="row full-row"><span class="val">${esc(student.notes)}</span></div>
   `) : ''}
 
-  <div class="declaration">
-    <b>Declaration:</b> The information provided above has been verified against the original documents
-    submitted at the time of admission. Any discrepancy found later may lead to cancellation of admission
-    as per school policy.
-  </div>
+  ${termsContent ? section('Terms &amp; Conditions', `
+    <div class="terms-text">${esc(termsContent)}</div>
+  `) : ''}
 
-  <div class="signatures">
-    <div class="sig-box">
-      <div class="sig-line"></div>
-      <div class="sig-label">Class Teacher</div>
+  <div class="page2-bottom">
+    <div class="declaration">
+      <b>Declaration:</b> The information provided above has been verified against the original documents
+      submitted at the time of admission. Any discrepancy found later may lead to cancellation of admission
+      as per school policy.
     </div>
-    <div class="sig-box">
-      <div class="sig-line"></div>
-      <div class="sig-label">Parent / Guardian</div>
-    </div>
-    <div class="sig-box">
-      <div class="sig-line"></div>
-      <div class="sig-label">Principal</div>
-    </div>
-  </div>
 
-  <div class="footer">
-    <span>Powered by <span class="brand">Learnovo</span> &mdash; School Management System</span>
-    <span class="gen">Generated: ${generatedOn}</span>
+    <div class="signatures">
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div class="sig-label">Class Teacher</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div class="sig-label">Parent / Guardian</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-line"></div>
+        <div class="sig-label">Principal</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>Powered by <span class="brand">Learnovo</span> &mdash; School Management System</span>
+      <span class="gen">Generated: ${generatedOn}</span>
+    </div>
   </div>
 
 </div>

@@ -2367,6 +2367,11 @@ async function loadStudentAndSchoolForForm(req) {
     if (settings.institution.udiseCode) schoolData.udiseCode = settings.institution.udiseCode;
     if (settings.institution.logo) schoolData.logo = settings.institution.logo;
   }
+  // Terms & Conditions for the detail form are admin-editable under
+  // Settings → Rules & Regulations. Only include when the section is active.
+  if (settings?.rulesAndRegulations?.isActive !== false) {
+    schoolData.termsAndConditions = settings?.rulesAndRegulations?.content || '';
+  }
 
   return { student, schoolData };
 }
