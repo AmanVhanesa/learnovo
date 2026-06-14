@@ -13,6 +13,43 @@ const currentYear = new Date().getFullYear()
 const defaultAcademicYear = `${currentYear}-${currentYear + 1}`
 const FALLBACK_ACADEMIC_YEAR = defaultAcademicYear
 
+// Build a lightweight crop source from a picked image file. Phone photos are
+// commonly 3000-4000px / several MB; feeding that straight into the cropper as
+// a base64 data URL is what makes cropping laggy on mobile (huge string held in
+// React state + a full-resolution image repainted on every drag frame). We
+// downscale large images onto a canvas and hand back a cheap object URL so the
+// cropper only ever drags a small image. Returns an object URL the caller must
+// revoke when the crop modal closes.
+async function fileToCropSource(file, maxDim = 2000) {
+    const objectUrl = URL.createObjectURL(file)
+    let img
+    try {
+        img = await new Promise((resolve, reject) => {
+            const im = new Image()
+            im.onload = () => resolve(im)
+            im.onerror = reject
+            im.src = objectUrl
+        })
+    } catch {
+        return objectUrl
+    }
+    const longEdge = Math.max(img.naturalWidth, img.naturalHeight)
+    if (!longEdge || longEdge <= maxDim) return objectUrl
+
+    const scale = maxDim / longEdge
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(img.naturalWidth * scale)
+    canvas.height = Math.round(img.naturalHeight * scale)
+    const ctx = canvas.getContext('2d')
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+    if (!blob) return objectUrl
+    URL.revokeObjectURL(objectUrl)
+    return URL.createObjectURL(blob)
+}
+
 const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     const { settings } = useSettings()
     const schoolUdiseCode = settings?.institution?.udiseCode || ''
@@ -498,27 +535,32 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
     }
 
     // For document slots: images go through the crop modal first; PDFs are added as-is.
-    const handleDocFilePick = (file, type, guardianIndex) => {
+    const handleDocFilePick = async (file, type, guardianIndex) => {
         if (!isValidDocFile(file)) return
         if (file.type === 'application/pdf') {
             addPendingDoc(file, type, guardianIndex)
             return
         }
-        const reader = new FileReader()
-        reader.onloadend = () => {
+        try {
+            const imageSrc = await fileToCropSource(file)
             setDocCropModal({
                 isOpen: true,
-                imageSrc: reader.result,
+                imageSrc,
                 type,
                 guardianIndex,
                 fileName: file.name || 'document.png',
             })
+        } catch {
+            setDocError('Failed to read the selected file.')
         }
-        reader.onerror = () => setDocError('Failed to read the selected file.')
-        reader.readAsDataURL(file)
     }
 
-    const closeDocCropModal = () => setDocCropModal({ isOpen: false, imageSrc: null, type: null, guardianIndex: undefined, fileName: '' })
+    const closeDocCropModal = () => setDocCropModal((prev) => {
+        if (prev.imageSrc && prev.imageSrc.startsWith('blob:')) {
+            try { URL.revokeObjectURL(prev.imageSrc) } catch (_) { /* ignore */ }
+        }
+        return { isOpen: false, imageSrc: null, type: null, guardianIndex: undefined, fileName: '' }
+    })
 
     const handleDocCropComplete = async (blob) => {
         const baseName = (docCropModal.fileName || 'document').replace(/\.[^.]+$/, '')
@@ -582,11 +624,12 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         }
         setPhotoError(null)
 
-        const reader = new FileReader()
-        reader.onloadend = () => {
-            setCropModal({ isOpen: true, imageSrc: reader.result })
+        try {
+            const imageSrc = await fileToCropSource(file)
+            setCropModal({ isOpen: true, imageSrc })
+        } catch {
+            setPhotoError('Failed to read the selected file.')
         }
-        reader.readAsDataURL(file)
     }
 
     const handleCropComplete = async (blob) => {
@@ -620,7 +663,12 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
         updateField('photo', URL.createObjectURL(blob))
     }
 
-    const closeCropModal = () => setCropModal({ isOpen: false, imageSrc: null })
+    const closeCropModal = () => setCropModal((prev) => {
+        if (prev.imageSrc && prev.imageSrc.startsWith('blob:')) {
+            try { URL.revokeObjectURL(prev.imageSrc) } catch (_) { /* ignore */ }
+        }
+        return { isOpen: false, imageSrc: null }
+    })
 
     return createPortal(
         <div className="modal-overlay" role="dialog" aria-modal="true">
@@ -1590,13 +1638,13 @@ const StudentForm = ({ student, onSave, onCancel, isLoading }) => {
                                 </button>
                             ) : (
                                 <button
-                                    key="student-form-submit-btn"
+                                    key={isLoading ? 'student-form-submit-btn-loading' : 'student-form-submit-btn'}
                                     type="submit"
                                     className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
                                     disabled={isLoading}
                                 >
                                     {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                                    {isLoading ? 'Saving...' : student ? 'Update Student' : 'Add Student'}
+                                    {isLoading ? (student ? 'Updating...' : 'Adding...') : student ? 'Update Student' : 'Add Student'}
                                 </button>
                             )}
                         </div>
