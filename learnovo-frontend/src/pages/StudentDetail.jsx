@@ -238,13 +238,70 @@ const StudentDetail = () => {
         })
     }
 
+    // Upload documents/photo queued in the edit form. These are picked but not
+    // uploaded until save (e.g. TC / Birth Certificate, guardian Aadhaars).
+    const uploadPendingDocs = async (studentId, pendingDocs) => {
+        if (!studentId || !Array.isArray(pendingDocs) || pendingDocs.length === 0) return { uploaded: 0, failed: 0 }
+        let uploaded = 0
+        let failed = 0
+        for (const doc of pendingDocs) {
+            try {
+                await studentsService.uploadDocument(studentId, doc.file, doc.type, doc.guardianIndex)
+                uploaded += 1
+            } catch (err) {
+                failed += 1
+                toast.error(err?.response?.data?.message || `Failed to upload ${doc.file?.name || 'document'}`)
+            }
+        }
+        return { uploaded, failed }
+    }
+
+    const linkSiblingDocs = async (studentId, linkedDocs) => {
+        if (!studentId || !Array.isArray(linkedDocs) || linkedDocs.length === 0) return { uploaded: 0, failed: 0 }
+        let uploaded = 0
+        let failed = 0
+        for (const doc of linkedDocs) {
+            try {
+                await studentsService.linkDocument(studentId, {
+                    type: doc.type,
+                    guardianIndex: doc.guardianIndex,
+                    sourceStudentId: doc.sourceStudentId,
+                    sourceDocId: doc.sourceDocId
+                })
+                uploaded += 1
+            } catch (err) {
+                failed += 1
+                toast.error(err?.response?.data?.message || 'Failed to link sibling document')
+            }
+        }
+        return { uploaded, failed }
+    }
+
+    const uploadPendingPhoto = async (studentId, pendingPhoto) => {
+        if (!studentId || !pendingPhoto) return
+        try {
+            await studentsService.uploadPhoto(studentId, pendingPhoto)
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Failed to upload student photo')
+        }
+    }
+
     // Save student mutation
     const saveMutation = useMutation({
-        mutationFn: (formData) => studentsService.update(id, formData),
-        onSuccess: () => {
+        mutationFn: async ({ formData, pendingDocs, linkedDocs, pendingPhoto }) => {
+            await studentsService.update(id, formData)
+            await uploadPendingPhoto(id, pendingPhoto)
+            const uploadResult = await uploadPendingDocs(id, pendingDocs)
+            const linkResult = await linkSiblingDocs(id, linkedDocs)
+            return { docResult: { uploaded: uploadResult.uploaded + linkResult.uploaded, failed: uploadResult.failed + linkResult.failed } }
+        },
+        onSuccess: (result) => {
             queryClient.invalidateQueries({ queryKey: ['student', id] })
             queryClient.invalidateQueries({ queryKey: ['students'] })
             toast.success('Student updated successfully')
+            if (result?.docResult?.uploaded > 0) {
+                toast.success(`Uploaded ${result.docResult.uploaded} document${result.docResult.uploaded === 1 ? '' : 's'}`)
+            }
             setShowEditForm(false)
         },
         onError: (error) => {
@@ -258,8 +315,8 @@ const StudentDetail = () => {
         },
     })
 
-    const handleSaveStudent = (formData) => {
-        saveMutation.mutate(formData)
+    const handleSaveStudent = (formData, pendingDocs = [], linkedDocs = [], pendingPhoto = null) => {
+        saveMutation.mutate({ formData, pendingDocs, linkedDocs, pendingPhoto })
     }
 
     // Class action mutation (promote/demote)
