@@ -55,17 +55,20 @@ function getFeeHeadType(head) {
 }
 
 /**
- * Check if a student has ever been charged a specific fee head.
- * Only considers non-cancelled invoices.
+ * True if a fee head (e.g. the admission fee) has actually been PAID — i.e. a
+ * non-cancelled, fully-paid invoice containing this head exists. Used to decide
+ * whether a new student should still be charged the admission fee: an unpaid
+ * admission invoice can be deleted and re-added on regeneration, but a paid one
+ * is never re-charged.
  */
-async function hasBeenChargedBefore(tenantId, studentId, feeHeadName) {
-  const existing = await FeeInvoice.findOne({
+async function hasBeenPaidBefore(tenantId, studentId, feeHeadName) {
+  const paid = await FeeInvoice.findOne({
     tenantId,
     studentId,
     'items.feeHeadName': feeHeadName,
-    status: { $ne: 'Cancelled' }
+    status: 'Paid'
   });
-  return !!existing;
+  return !!paid;
 }
 
 /**
@@ -94,21 +97,20 @@ async function buildApplicableFeeHeads(tenantId, student, feeStructure) {
     };
 
     if (headType === 'one_time') {
-      // Check admission fee exclusions
+      // Admission fee rule:
+      //   - Old/returning students never pay it again.
+      //   - New students are charged until it is ACTUALLY PAID, so deleting an
+      //     unpaid admission invoice and regenerating re-adds it. Duplicate adds
+      //     on an existing active invoice are prevented by skipOneTimeHeads below.
       if (head.isAdmissionFee) {
-        if (student.isImported && student.studentType !== 'new') {
+        const isOldStudent = student.studentType === 'old' ||
+          (student.isImported && student.studentType !== 'new');
+        if (isOldStudent) {
           headEntry.isIncluded = false;
           headEntry.exclusionReason = 'Old student — exempt from admission fee';
-        } else if (student.admissionFeePaid) {
+        } else if (await hasBeenPaidBefore(tenantId, student._id, head.name)) {
           headEntry.isIncluded = false;
           headEntry.exclusionReason = 'Admission fee already paid';
-        } else {
-          // Check if ever charged before (any year, any invoice)
-          const alreadyCharged = await hasBeenChargedBefore(tenantId, student._id, head.name);
-          if (alreadyCharged) {
-            headEntry.isIncluded = false;
-            headEntry.exclusionReason = 'Admission fee already invoiced in a prior period';
-          }
         }
       }
       oneTimeHeads.push(headEntry);
@@ -697,5 +699,5 @@ module.exports = {
   buildApplicableFeeHeads,
   getFeeHeadAnnualAmount,
   getFeeHeadType,
-  hasBeenChargedBefore
+  hasBeenPaidBefore
 };

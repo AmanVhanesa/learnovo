@@ -43,41 +43,28 @@ async function buildStudentFeeHeads(student, feeStructure, tenantId) {
       exclusionReason: null
     };
 
-    // Exclude admission fees for old students (returning from previous year)
-    if (head.isAdmissionFee && student.studentType === 'old') {
-      entry.isIncluded = false;
-      entry.exclusionReason = 'Old student — exempt from admission fee';
-      allocatedHeads.push(entry);
-      continue;
-    }
-
-    // Exclude admission fees for imported old students (new imported students still pay)
-    if (head.isAdmissionFee && student.isImported && student.studentType !== 'new') {
-      entry.isIncluded = false;
-      entry.exclusionReason = 'Imported old student — exempt from admission fee';
-      allocatedHeads.push(entry);
-      continue;
-    }
-
-    // Exclude admission fees if already paid
-    if (head.isAdmissionFee && student.admissionFeePaid) {
-      entry.isIncluded = false;
-      entry.exclusionReason = 'Admission fee already paid';
-      allocatedHeads.push(entry);
-      continue;
-    }
-
-    // Exclude admission fees if a prior non-cancelled invoice exists
+    // Admission fee: old/returning students are exempt; new students are
+    // charged until it is actually PAID, so deleting an unpaid admission
+    // invoice and regenerating re-adds it.
     if (head.isAdmissionFee) {
-      const existingAdmissionInvoice = await FeeInvoice.findOne({
+      const isOldStudent = student.studentType === 'old' ||
+        (student.isImported && student.studentType !== 'new');
+      if (isOldStudent) {
+        entry.isIncluded = false;
+        entry.exclusionReason = 'Old student — exempt from admission fee';
+        allocatedHeads.push(entry);
+        continue;
+      }
+
+      const paidInvoice = await FeeInvoice.findOne({
         tenantId,
         studentId: student._id,
         'items.feeHeadName': head.name,
-        status: { $ne: 'Cancelled' }
+        status: 'Paid'
       });
-      if (existingAdmissionInvoice) {
+      if (paidInvoice) {
         entry.isIncluded = false;
-        entry.exclusionReason = 'Admission fee already invoiced';
+        entry.exclusionReason = 'Admission fee already paid';
         allocatedHeads.push(entry);
         continue;
       }
