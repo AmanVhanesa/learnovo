@@ -261,21 +261,6 @@ function generateAnnualPeriod(startYear, dueDay) {
 }
 
 /**
- * Filter periods for mid-year admissions.
- * Only returns periods that start on or after the student's admission date.
- *
- * @param {Array} periods - All periods for the year
- * @param {Date} admissionDate - Student's admission date (null = start of year)
- * @returns {Array} Filtered periods
- */
-function filterPeriodsForMidYearAdmission(periods, admissionDate) {
-  if (!admissionDate) return periods;
-
-  const admission = new Date(admissionDate);
-  return periods.filter(period => period.end >= admission);
-}
-
-/**
  * Core algorithm: Generate all invoices for a student for an academic year.
  *
  * @param {Object} params
@@ -286,7 +271,6 @@ function filterPeriodsForMidYearAdmission(periods, admissionDate) {
  * @param {string} params.academicSessionId
  * @param {string} params.academicYearName - e.g., "2025-2026"
  * @param {string} params.generatedBy - User ID who triggered generation
- * @param {Date} [params.admissionDate] - For mid-year admission filtering
  * @param {number} [params.dueDay] - Day of month for due dates (default 10)
  * @returns {Object} { allocation, invoices, summary }
  */
@@ -298,7 +282,6 @@ async function generateInvoicesForStudent({
   academicSessionId,
   academicYearName,
   generatedBy,
-  admissionDate,
   dueDay = 10,
   concessionPercentage = 0,
   concessionReason = null
@@ -386,11 +369,10 @@ async function generateInvoicesForStudent({
     }
   }
 
-  // 4. Get billing periods and filter for mid-year admission
-  let periods = generatePeriods(academicYearName, paymentPlan, dueDay);
-  if (admissionDate || student.admissionDate) {
-    periods = filterPeriodsForMidYearAdmission(periods, admissionDate || student.admissionDate);
-  }
+  // 4. Get billing periods. Policy: every student is billed the full academic
+  // year (all periods) regardless of admission date — no mid-year proration.
+  // A student admitted after Q1 has ended still receives all 4 quarters.
+  const periods = generatePeriods(academicYearName, paymentPlan, dueDay);
 
   const numberOfPeriods = periods.length;
   if (numberOfPeriods === 0) {
@@ -664,10 +646,8 @@ async function previewInvoiceGeneration({
     const totalOneTime = roundToRupee(sumMoney(includedOneTime.map(h => h.annualAmount)));
     const totalAnnual = totalRecurring + totalOneTime;
 
-    let periods = generatePeriods(academicYearName, paymentPlan, dueDay);
-    if (student.admissionDate) {
-      periods = filterPeriodsForMidYearAdmission(periods, student.admissionDate);
-    }
+    // Full academic year for every student — no mid-year proration.
+    const periods = generatePeriods(academicYearName, paymentPlan, dueDay);
 
     const numberOfPeriods = periods.length;
     const perPeriodRecurring = numberOfPeriods > 0 ? roundToRupee(totalRecurring / numberOfPeriods) : 0;
@@ -714,7 +694,6 @@ module.exports = {
   generateInvoicesForBulk,
   previewInvoiceGeneration,
   generatePeriods,
-  filterPeriodsForMidYearAdmission,
   buildApplicableFeeHeads,
   getFeeHeadAnnualAmount,
   getFeeHeadType,
