@@ -61,6 +61,8 @@ const Students = () => {
   const [subDepartmentFilter, setSubDepartmentFilter] = useState('')
   const [studentTypeFilter, setStudentTypeFilter] = useState('')
   const [udiseFilter, setUdiseFilter] = useState('') // '' | 'true' | 'false'
+  const [admissionFromFilter, setAdmissionFromFilter] = useState('') // admission number range start
+  const [admissionToFilter, setAdmissionToFilter] = useState('') // admission number range end
 
   // UI state
   const [showMobileFilters, setShowMobileFilters] = useState(false)
@@ -129,10 +131,24 @@ const Students = () => {
     return () => clearTimeout(searchTimerRef.current)
   }, [searchQuery])
 
+  // Debounced admission-number range (typed inputs) — avoids a request per keystroke
+  const [debouncedAdmissionFrom, setDebouncedAdmissionFrom] = useState('')
+  const [debouncedAdmissionTo, setDebouncedAdmissionTo] = useState('')
+  const admissionTimerRef = useRef(null)
+
+  useEffect(() => {
+    if (admissionTimerRef.current) clearTimeout(admissionTimerRef.current)
+    admissionTimerRef.current = setTimeout(() => {
+      setDebouncedAdmissionFrom(admissionFromFilter)
+      setDebouncedAdmissionTo(admissionToFilter)
+    }, 400)
+    return () => clearTimeout(admissionTimerRef.current)
+  }, [admissionFromFilter, admissionToFilter])
+
   useEffect(() => {
     setCurrentPage(1) // reset to page 1 on filter/sort change
     setSelectedStudents([]) // clear selection on filter/sort change
-  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter, sortField, sortAsc])
+  }, [debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter, debouncedAdmissionFrom, debouncedAdmissionTo, sortField, sortAsc])
 
   // Reset section filter when class changes (available sections depend on class)
   useEffect(() => {
@@ -154,7 +170,7 @@ const Students = () => {
 
   // Fetch students with React Query
   const { data: studentsResponse, isLoading, error: studentsError, refetch: refetchStudents } = useQuery({
-    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter, currentPage, perPage, sortField, sortAsc],
+    queryKey: ['students', debouncedSearch, classFilter, sectionFilter, yearFilter, statusFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter, debouncedAdmissionFrom, debouncedAdmissionTo, currentPage, perPage, sortField, sortAsc],
     queryFn: async () => {
       const filters = {
         search: debouncedSearch,
@@ -166,6 +182,8 @@ const Students = () => {
         subDepartment: subDepartmentFilter,
         studentType: studentTypeFilter,
         udiseRegistered: udiseFilter,
+        admissionFrom: debouncedAdmissionFrom,
+        admissionTo: debouncedAdmissionTo,
         page: currentPage,
         limit: perPage,
         ...(sortField ? { sortBy: sortField, sortOrder: sortAsc ? 'asc' : 'desc' } : {})
@@ -586,6 +604,8 @@ const Students = () => {
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (driverFilter) params.set('driverId', driverFilter)
     if (subDepartmentFilter) params.set('subDepartment', subDepartmentFilter)
+    if (admissionFromFilter.trim()) params.set('admissionFrom', admissionFromFilter.trim())
+    if (admissionToFilter.trim()) params.set('admissionTo', admissionToFilter.trim())
     if (selectedExportFields.length > 0) {
       params.set('fields', selectedExportFields.join(','))
     }
@@ -641,6 +661,8 @@ const Students = () => {
     setSubDepartmentFilter('')
     setStudentTypeFilter('')
     setUdiseFilter('')
+    setAdmissionFromFilter('')
+    setAdmissionToFilter('')
   }
 
   // if (isLoading) {
@@ -759,16 +781,16 @@ const Students = () => {
           <button
             onClick={() => setShowMobileFilters(!showMobileFilters)}
             className={`h-9 px-3.5 text-xs font-medium rounded-lg border transition-all inline-flex items-center gap-2 ${
-              (classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter)
+              (classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter || admissionFromFilter || admissionToFilter)
                 ? 'bg-primary-50 dark:bg-primary-500/10 border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'border-gray-300 dark:border-[#38383A] text-gray-700 dark:text-[#8E8E93] hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'
             }`}
           >
             <SlidersHorizontal className="h-3.5 w-3.5" />
             Filters
-            {(classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter) && (
+            {(classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter || admissionFromFilter || admissionToFilter) && (
               <span className="h-4 min-w-[16px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center">
-                {[classFilter, sectionFilter, yearFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter].filter(Boolean).length}
+                {[classFilter, sectionFilter, yearFilter, driverFilter, subDepartmentFilter, studentTypeFilter, udiseFilter, admissionFromFilter, admissionToFilter].filter(Boolean).length}
               </span>
             )}
           </button>
@@ -861,7 +883,30 @@ const Students = () => {
                 <ChevronDown className="h-4 w-4 text-gray-400 dark:text-[#8E8E93]" />
               </div>
             </div>
-            {(classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter) && (
+            {/* Admission Number Range */}
+            <div>
+              <span className="block text-xs font-medium text-gray-500 dark:text-[#8E8E93] mb-1">Admission Number Range</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={admissionFromFilter}
+                  onChange={(e) => setAdmissionFromFilter(e.target.value)}
+                  placeholder="From"
+                  className="w-full h-10 px-3 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                />
+                <span className="text-sm text-gray-400 dark:text-[#8E8E93]">–</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={admissionToFilter}
+                  onChange={(e) => setAdmissionToFilter(e.target.value)}
+                  placeholder="To"
+                  className="w-full h-10 px-3 text-sm font-medium rounded-lg border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#2C2C2E] text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+                />
+              </div>
+            </div>
+            {(classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter || admissionFromFilter || admissionToFilter) && (
               <button onClick={clearFilters}
                 className="h-9 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-lg transition-all self-start">
                 Clear all filters
@@ -995,8 +1040,30 @@ const Students = () => {
             </div>
           </div>
 
+          {/* Admission Number Range Filter */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-gray-500 dark:text-[#8E8E93]">Adm #</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={admissionFromFilter}
+              onChange={(e) => setAdmissionFromFilter(e.target.value)}
+              placeholder="From"
+              className="h-8 w-24 px-2 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            />
+            <span className="text-xs text-gray-400 dark:text-[#8E8E93]">–</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={admissionToFilter}
+              onChange={(e) => setAdmissionToFilter(e.target.value)}
+              placeholder="To"
+              className="h-8 w-24 px-2 text-xs font-medium rounded-md border border-gray-300 dark:border-[#38383A] bg-white dark:bg-[#1C1C1E] text-gray-900 dark:text-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all"
+            />
+          </div>
+
           {/* Clear Filters Button */}
-          {(searchQuery || classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter) && (
+          {(searchQuery || classFilter || sectionFilter || yearFilter || driverFilter || subDepartmentFilter || studentTypeFilter || udiseFilter || admissionFromFilter || admissionToFilter) && (
             <button
               onClick={clearFilters}
               className="h-8 px-3 text-xs font-medium text-gray-600 dark:text-[#8E8E93] hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-[#2C2C2E] rounded-md transition-all"
@@ -1035,7 +1102,7 @@ const Students = () => {
                 <div className="px-6 pt-4">
                   <p className="text-xs font-medium text-gray-500 dark:text-[#8E8E93] uppercase tracking-wide mb-2">Active Filters (applied to export)</p>
                   <div className="flex flex-wrap gap-1.5 mb-4">
-                    {!classFilter && !sectionFilter && !yearFilter && !driverFilter && !subDepartmentFilter && !searchQuery && (
+                    {!classFilter && !sectionFilter && !yearFilter && !driverFilter && !subDepartmentFilter && !searchQuery && !admissionFromFilter && !admissionToFilter && (
                       <span className="text-xs text-gray-400 italic">None — will export all {statusFilter === 'inactive' ? 'inactive' : 'active'} students</span>
                     )}
                     {classFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Class: {formatClassDisplay(classFilter)}</span>}
@@ -1045,6 +1112,7 @@ const Students = () => {
                     {driverFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Driver: {filterOptions.drivers?.find(d => d._id === driverFilter)?.name || driverFilter}</span>}
                     {subDepartmentFilter && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Sub Dept: {filterOptions.subDepartments?.find(s => s._id === subDepartmentFilter)?.name || subDepartmentFilter}</span>}
                     {searchQuery && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Search: {searchQuery}</span>}
+                    {(admissionFromFilter || admissionToFilter) && <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs rounded-full">Adm #: {admissionFromFilter || '…'} – {admissionToFilter || '…'}</span>}
                   </div>
                 </div>
 
@@ -1144,7 +1212,7 @@ const Students = () => {
         )}
 
         {/* Active Filters Display */}
-        {(classFilter || sectionFilter || yearFilter || driverFilter) && (
+        {(classFilter || sectionFilter || yearFilter || driverFilter || admissionFromFilter || admissionToFilter) && (
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-[#38383A]">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-gray-500 dark:text-[#8E8E93]">Active filters:</span>
@@ -1192,6 +1260,19 @@ const Students = () => {
                   Driver: {filterOptions.drivers.find(d => d._id === driverFilter)?.name || driverFilter}
                   <button
                     onClick={() => setDriverFilter('')}
+                    className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+              {(admissionFromFilter || admissionToFilter) && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
+                  Adm #: {admissionFromFilter || '…'} – {admissionToFilter || '…'}
+                  <button
+                    onClick={() => { setAdmissionFromFilter(''); setAdmissionToFilter('') }}
                     className="hover:bg-primary-100 rounded-full p-0.5 transition-colors"
                   >
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

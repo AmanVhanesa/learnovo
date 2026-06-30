@@ -23,6 +23,54 @@ const AcademicSession = require('../models/AcademicSession');
 
 const router = express.Router();
 
+// ── Admission-number range filter ────────────────────────────────────────
+// Builds a Mongo clause matching students whose admission number falls inside
+// the inclusive [from, to] range. Admission numbers are stored as strings that
+// may be plain numbers (SPIS: "812", "6424") or alphanumeric ("SPIS20250001",
+// "ADM001"). When the supplied bounds are numeric we compare the numeric value
+// extracted from each admission number, so "812" sorts before "6424" instead of
+// lexicographically after it; otherwise we fall back to a string range. Returns
+// null when neither bound is usable. Use inside filter.$and to avoid clashing
+// with an existing $or/$expr on the same filter.
+function buildAdmissionRangeClause(fromRaw, toRaw) {
+  const from = (fromRaw || '').toString().trim();
+  const to = (toRaw || '').toString().trim();
+  if (!from && !to) return null;
+
+  const numericOnly = /^\d+$/;
+  const fromNum = numericOnly.test(from) ? Number(from) : null;
+  const toNum = numericOnly.test(to) ? Number(to) : null;
+  const fromIsNumeric = from === '' || fromNum !== null;
+  const toIsNumeric = to === '' || toNum !== null;
+
+  // Numeric range: compare the first run of digits in each admission number.
+  if (fromIsNumeric && toIsNumeric && (fromNum !== null || toNum !== null)) {
+    const digitValue = {
+      $convert: {
+        input: {
+          $let: {
+            vars: { m: { $regexFind: { input: { $ifNull: ['$admissionNumber', ''] }, regex: /[0-9]+/ } } },
+            in: { $ifNull: ['$$m.match', ''] }
+          }
+        },
+        to: 'double',
+        onError: null,
+        onNull: null
+      }
+    };
+    const conds = [{ $ne: [digitValue, null] }];
+    if (fromNum !== null) conds.push({ $gte: [digitValue, fromNum] });
+    if (toNum !== null) conds.push({ $lte: [digitValue, toNum] });
+    return { $expr: { $and: conds } };
+  }
+
+  // String range fallback for alphanumeric admission numbers.
+  const clause = {};
+  if (from) clause.$gte = from;
+  if (to) clause.$lte = to;
+  return { admissionNumber: clause };
+}
+
 // ── Student import template: shared field list + sample rows ─────────────
 // Used by both the CSV and Excel template endpoints so the two stay in sync.
 const STUDENT_IMPORT_FIELDS = [
@@ -184,6 +232,8 @@ router.get('/', protect, authorize('admin', 'teacher'), [
   query('limit').optional().isInt({ min: 1, max: 500 }).withMessage('Limit must be between 1 and 500'),
   query('class').optional().trim().notEmpty().withMessage('Class filter cannot be empty'),
   query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
+  query('admissionFrom').optional().trim().isLength({ max: 50 }).withMessage('Admission number must be at most 50 characters'),
+  query('admissionTo').optional().trim().isLength({ max: 50 }).withMessage('Admission number must be at most 50 characters'),
   handleValidationErrors
 ], async(req, res) => {
   try {
@@ -370,6 +420,13 @@ router.get('/', protect, authorize('admin', 'teacher'), [
       filter.udiseRegistered = true;
     } else if (req.query.udiseRegistered === 'false') {
       filter.udiseRegistered = { $ne: true };
+    }
+
+    // Add admission-number range filter (from / to, inclusive)
+    const admissionRange = buildAdmissionRangeClause(req.query.admissionFrom, req.query.admissionTo);
+    if (admissionRange) {
+      filter.$and = filter.$and || [];
+      filter.$and.push(admissionRange);
     }
 
     // Add search filter
@@ -2032,6 +2089,13 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
         { admissionNumber: { $regex: req.query.search, $options: 'i' } },
         { rollNumber: { $regex: req.query.search, $options: 'i' } }
       ];
+    }
+
+    // Admission-number range filter (from / to, inclusive) — mirrors the list view
+    const exportAdmissionRange = buildAdmissionRangeClause(req.query.admissionFrom, req.query.admissionTo);
+    if (exportAdmissionRange) {
+      filter.$and = filter.$and || [];
+      filter.$and.push(exportAdmissionRange);
     }
 
     // Sorting: accept sortBy/sortOrder from the UI so the export mirrors what
