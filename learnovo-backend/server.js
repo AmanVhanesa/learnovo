@@ -257,8 +257,18 @@ app.use((req, res, next) => {
     '/api/exams', '/api/payroll'
   ];
   const isLongRunning = longRunningPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p));
+  // Cloudinary/S3 uploads stream a buffer to a third party and apply transforms
+  // (face-detect crop, resize), which on slow networks can easily exceed 30s.
+  const isUpload = !isLongRunning && (
+    req.path.endsWith('/upload-photo')
+    || req.path.endsWith('/upload-logo')
+    || req.path.endsWith('/upload-signature')
+    || req.path.endsWith('/documents')
+    || req.path.endsWith('/avatar')
+  );
   const isMedium = !isLongRunning && (
-    mediumPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p))
+    isUpload
+    || mediumPaths.some(p => req.path.startsWith(p) || req.originalUrl.startsWith(p))
     || req.path.includes('/detail-form')
   );
   const timeout = isLongRunning ? 180000 : isMedium ? 60000 : 30000;
@@ -437,6 +447,13 @@ if (isPrimaryInstance) {
     libraryOverdueJob.startJob();
   } catch (e) {
     console.error('Failed to start library overdue job:', e);
+  }
+
+  try {
+    const feeOverdueJob = require('./jobs/feeOverdueJob');
+    feeOverdueJob.startJob();
+  } catch (e) {
+    console.error('Failed to start fee overdue job:', e);
   }
 } else {
   console.log(`Skipping cron jobs on PM2 instance ${process.env.NODE_APP_INSTANCE}`);
