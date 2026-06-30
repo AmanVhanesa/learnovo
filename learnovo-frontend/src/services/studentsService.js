@@ -2,7 +2,7 @@ import api from './authService'
 
 export const studentsService = {
   list: async (filters = {}) => {
-    const { page = 1, limit = 20, search = '', class: classFilter, classId, section, academicYear, status, driver, subDepartment, studentType, udiseRegistered, admissionFrom, admissionTo, lightweight, sortBy, sortOrder } = filters
+    const { page = 1, limit = 20, search = '', class: classFilter, classId, section, academicYear, status, driver, subDepartment, studentType, udiseRegistered, admissionFrom, admissionTo, admissionDateFrom, admissionDateTo, lightweight, sortBy, sortOrder } = filters
     const params = new URLSearchParams()
 
     // Only add non-empty params to avoid validation errors
@@ -20,6 +20,8 @@ export const studentsService = {
     if (udiseRegistered && udiseRegistered.trim()) params.append('udiseRegistered', udiseRegistered.trim())
     if (admissionFrom && admissionFrom.trim()) params.append('admissionFrom', admissionFrom.trim())
     if (admissionTo && admissionTo.trim()) params.append('admissionTo', admissionTo.trim())
+    if (admissionDateFrom && admissionDateFrom.trim()) params.append('admissionDateFrom', admissionDateFrom.trim())
+    if (admissionDateTo && admissionDateTo.trim()) params.append('admissionDateTo', admissionDateTo.trim())
     if (lightweight) params.append('lightweight', 'true')
     if (sortBy && sortBy.trim()) params.append('sortBy', sortBy.trim())
     if (sortOrder && sortOrder.trim()) params.append('sortOrder', sortOrder.trim())

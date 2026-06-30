@@ -71,6 +71,28 @@ function buildAdmissionRangeClause(fromRaw, toRaw) {
   return { admissionNumber: clause };
 }
 
+// ── Admission-date range filter ──────────────────────────────────────────
+// Builds a Mongo clause matching students whose admissionDate falls inside the
+// inclusive [from, to] date range. Inputs are 'YYYY-MM-DD' strings from the UI;
+// the upper bound covers the whole "to" day. Returns null when neither bound is
+// a valid date.
+function buildAdmissionDateClause(fromRaw, toRaw) {
+  const from = (fromRaw || '').toString().trim();
+  const to = (toRaw || '').toString().trim();
+  if (!from && !to) return null;
+
+  const clause = {};
+  if (from) {
+    const start = new Date(`${from}T00:00:00.000Z`);
+    if (!isNaN(start.getTime())) clause.$gte = start;
+  }
+  if (to) {
+    const end = new Date(`${to}T23:59:59.999Z`);
+    if (!isNaN(end.getTime())) clause.$lte = end;
+  }
+  return Object.keys(clause).length ? { admissionDate: clause } : null;
+}
+
 // ── Student import template: shared field list + sample rows ─────────────
 // Used by both the CSV and Excel template endpoints so the two stay in sync.
 const STUDENT_IMPORT_FIELDS = [
@@ -234,6 +256,8 @@ router.get('/', protect, authorize('admin', 'teacher'), [
   query('search').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Search query must be between 1 and 100 characters'),
   query('admissionFrom').optional().trim().isLength({ max: 50 }).withMessage('Admission number must be at most 50 characters'),
   query('admissionTo').optional().trim().isLength({ max: 50 }).withMessage('Admission number must be at most 50 characters'),
+  query('admissionDateFrom').optional().trim().isISO8601().withMessage('Admission date from must be a valid date'),
+  query('admissionDateTo').optional().trim().isISO8601().withMessage('Admission date to must be a valid date'),
   handleValidationErrors
 ], async(req, res) => {
   try {
@@ -427,6 +451,12 @@ router.get('/', protect, authorize('admin', 'teacher'), [
     if (admissionRange) {
       filter.$and = filter.$and || [];
       filter.$and.push(admissionRange);
+    }
+
+    // Add admission-date range filter (from / to, inclusive)
+    const admissionDateRange = buildAdmissionDateClause(req.query.admissionDateFrom, req.query.admissionDateTo);
+    if (admissionDateRange) {
+      Object.assign(filter, admissionDateRange);
     }
 
     // Add search filter
@@ -2096,6 +2126,12 @@ router.get('/export', protect, authorize('admin', 'teacher'), async(req, res) =>
     if (exportAdmissionRange) {
       filter.$and = filter.$and || [];
       filter.$and.push(exportAdmissionRange);
+    }
+
+    // Admission-date range filter (from / to, inclusive) — mirrors the list view
+    const exportAdmissionDateRange = buildAdmissionDateClause(req.query.admissionDateFrom, req.query.admissionDateTo);
+    if (exportAdmissionDateRange) {
+      Object.assign(filter, exportAdmissionDateRange);
     }
 
     // Sorting: accept sortBy/sortOrder from the UI so the export mirrors what
