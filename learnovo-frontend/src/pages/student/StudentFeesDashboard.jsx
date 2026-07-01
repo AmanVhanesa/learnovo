@@ -9,6 +9,25 @@ import { SERVER_URL } from '../../constants/config';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useChild } from '../../contexts/ChildContext';
 
+// Detect an in-app WebView (the school's Android/iOS app embeds the portal).
+// Android System WebView tags its UA with "; wv"; React-Native / custom shells
+// expose a ReactNativeWebView bridge; iOS WKWebView is AppleWebKit without
+// "Safari".
+// Open a payment-gateway checkout URL with a top-level, same-window navigation.
+// ICICI's hosted checkout validates the Referer header against the school's
+// registered domain. Opening in a new tab / external Custom Tab (which in-app
+// WebViews do for window.open('_blank')) drops the Referer and fails with
+// "domain validation failed". A same-window navigation keeps the tenant origin
+// as the Referer and works in every container — desktop, mobile browser, and
+// any in-app WebView regardless of its user-agent (UA sniffing missed some
+// webview wrappers, so we no longer rely on it). After payment ICICI posts back
+// to the returnURL and the backend 302-redirects the browser to /payment/status
+// on this subdomain, so the user returns to the portal. Pending-attempt
+// reconciliation already handles the page unload this causes.
+const openGatewayCheckout = (url) => {
+    window.location.assign(url);
+};
+
 // Format date
 const formatDate = (dateString, withTime = false) => {
     if (!dateString) return '-';
@@ -257,8 +276,7 @@ const StudentFeesDashboard = () => {
                 // PENDING/UNKNOWN for tab-closed-without-acting cases, which
                 // the backend refresh can't safely flip to FAILED on its own.
                 if (data.paymentAttemptId) setPendingAttempt(data.paymentAttemptId);
-                const paymentWindow = window.open(data.paymentUrl, '_blank');
-                if (!paymentWindow) window.location.href = data.paymentUrl;
+                openGatewayCheckout(data.paymentUrl);
                 toast.success('Redirecting to payment gateway...');
                 setTimeout(() => {
                     queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
@@ -354,8 +372,7 @@ const StudentFeesDashboard = () => {
 
             if (data.paymentUrl) {
                 if (data.paymentAttemptId) setPendingAttempt(data.paymentAttemptId);
-                const paymentWindow = window.open(data.paymentUrl, '_blank');
-                if (!paymentWindow) window.location.href = data.paymentUrl;
+                openGatewayCheckout(data.paymentUrl);
                 toast.success(`Redirecting to pay ${data.invoiceCount} invoices...`);
                 setTimeout(() => {
                     queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
